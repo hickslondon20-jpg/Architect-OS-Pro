@@ -1,0 +1,191 @@
+# Architect OS — Planning Section Experience Spec
+## Strategic Roadmap: Horizon Declaration → Synthesis → Quarter Focus
+**Status:** Concept / Pre-Build Spec  
+**Last Updated:** February 2026  
+**Purpose:** Codifies the intended user experience for the Strategic Roadmap flow — from initial landing through horizon declaration, executive synthesis, and transition into the 3P capability selection. This document is a design and experience spec, not a technical implementation guide.
+
+---
+
+## Context: Who Is This User and What Are They Carrying
+
+By the time a user lands in the Planning section, they have completed a significant body of self-reflective work across the platform's foundational and diagnostic layers. They have:
+
+- Built their agency profile through the **Agency Snapshot**
+- Modeled their growth trajectory and pressure profile through the **GV Simulator**
+- Articulated their qualitative and quantitative vision across three time horizons through the **Clarity Compass**
+- Identified their current AE Ladder stage through the **AE Ladder Assessment**
+- Completed a 125-checkpoint diagnostic and received a ranked capability maturity profile through the **M&R Audit**
+
+They do not have an information problem. They have a translation problem. They understand where they are and where they want to go — but they don't yet have a bridge that converts all of that self-knowledge into a coherent, committed answer to: *given everything I now know, what do I actually focus on first, and why?*
+
+The Planning section is that bridge. It is the first moment in the platform where the user shifts from being assessed to being the author of their own forward direction. The experience must honor that shift. It should feel like a different kind of moment — not more reflection, but the beginning of action.
+
+---
+
+## Overall Flow: Three Moments
+
+The Strategic Roadmap experience consists of three sequential moments before the user enters the Sprint Planning tool:
+
+1. **The Horizon Declaration** — reaffirm where they're going
+2. **The Executive Synthesis** — understand what that means given where they are
+3. **The Bridge** — transition into quarterly capability selection
+
+These three moments form a single coherent narrative arc, not three separate tools or pages.
+
+---
+
+## Moment 1 — The Horizon Declaration
+
+### Purpose
+Before the platform can generate meaningful synthesis, the user must confirm that their stated vision is still accurate. This is not a form — it is a reaffirmation. The platform is treating their prior work with respect, surfacing what they said and asking them to stand behind it or update it before moving forward.
+
+### What It Contains
+A clean, structured readback of the user's Clarity Compass entries across all three horizons and the ultimate vision. For each horizon, the platform surfaces:
+
+- The **time target** (e.g., Q1 2027 for 12-month, Q1 2028 for 24-month, Q1 2029 for 36-month)
+- The **stated vision** for that horizon — the qualitative goal they articulated
+- The **growth scenario** they attached — the financial target and trajectory model
+- A **one-line synthesis** of what that horizon represents in plain language
+
+This is not editable on this screen. It is a readback, not a form.
+
+### User Decision
+Two options only:
+
+- **Confirm & Proceed** — "Yes, this still reflects where I'm going." Locks these horizons as the planning foundation and triggers the synthesis generation.
+- **Update My Vision** — A secondary link that routes them back to the Clarity Compass to revise their entries before returning. This should feel like a deliberate detour, not an escape hatch.
+
+### Design Principles
+- The screen should feel more like a document than a form
+- No dropdowns, no input fields — only reading and a single confirmation action
+- The tone is: "here's what you told us — does it still hold?"
+- The confirmation button language should reinforce commitment: something like "Confirm My Direction" or "Lock in My Horizons"
+
+### What Happens on Confirmation
+The horizon data is locked for this planning session. A synthesis generation process is triggered in the background using the following data inputs:
+
+- Confirmed Clarity Compass horizon goals and growth scenarios
+- AE Ladder stage placement
+- M&R Audit dimension scores, capability scores, and stage-calibrated rankings
+- GV Simulator pressure family profile
+
+The user is transitioned to the synthesis view — either immediately if synthesis is pre-generated or via a brief transitional state if generated on demand.
+
+---
+
+## Moment 2 — The Executive Synthesis
+
+### Purpose
+This is the platform's most intelligent moment. It synthesizes everything the platform knows about this user into a coherent narrative that tells them what their vision implies and what their current reality requires of them — across all three horizons, narrowing progressively toward the present quarter.
+
+The experience should feel like receiving a prepared brief from a strategic advisor who has studied their situation. Not a list of recommendations. Not a dashboard. A narrative that a sophisticated founder would find genuinely insightful rather than generic.
+
+### Format
+Progressive reveal — section by section. Each horizon opens in sequence, either as an accordion that expands on scroll or as a step-through experience. The goal is to reward reading rather than enable skimming. The most important insight in each section should be visually anchored — a callout, a pull quote, a highlighted statement — so that even a founder moving quickly encounters the core message.
+
+A downloadable version (PDF) captures the full narrative in greater detail and is available at the end of the synthesis. The on-platform version is the primary experience; the download is the artifact they can share and reference offline.
+
+### Section 1 — Ultimate Vision Anchor
+**Before any horizon analysis, a single grounding statement.**
+
+The platform reflects back the user's stated ultimate vision — what they said they wanted the business to ultimately become. No analysis. No implications. Just a clear reflection of the destination that orients everything that follows.
+
+One to two sentences. Visually distinct from the rest of the synthesis — perhaps a pull quote or a styled header block. The purpose is to remind the user why any of this matters before the platform begins talking about what it requires.
+
+### Section 2 — 36-Month Horizon: The Trajectory
+**What does getting to this 36-month vision actually require of the business as a whole?**
+
+This section draws from the stated 36-month goals, the attached growth scenario, and the structural implications of the user's current AE Ladder stage.
+
+It is directional rather than tactical. The narrative addresses:
+
+- **The structural arc** — what kind of agency does this founder need to build between now and then? What are the broad shifts in how the business operates at that horizon versus today?
+- **Stage-level themes** — what does the AE Ladder tell us about the evolution required to reach this state? (e.g., transitioning from founder-led delivery to systems-led delivery; from revenue growth to margin-aware scaling)
+- **Primary pressure families** — which of the six GV pressure families are most likely to intensify along this trajectory, and what does that mean at a structural level?
+
+The section ends with a transitional sentence that sets up the 24-month view: *"To reach this 36-month state, the next 24 months are where the structural foundation gets built."*
+
+### Section 3 — 24-Month Horizon: The Structural Requirements
+**What needs to be true about the business at the 24-month mark for the 36-month vision to remain reachable?**
+
+This section introduces the M&R Audit data — but not as a gap list. As a structural requirement. The platform is not saying "you scored low on X." It is saying "at the 24-month mark, a business on this trajectory needs X to be operating at a certain level, and here is what your current assessment tells us about where that stands."
+
+The narrative operates at the **dimension level** (not individual capability level). It addresses:
+
+- Which of the five dimensions — Financial Health, Client Portfolio, Operations, Team Structure, Strategic Stewardship — carry the most structural weight at this horizon given the stated goals?
+- What does the user's current maturity profile suggest about where the development work is most needed at this level?
+- Are there dimension-level strengths that can be leveraged, or dimension-level gaps that represent genuine risk to the trajectory?
+
+Language is observational, not prescriptive. The platform is revealing implications, not dictating tactics.
+
+Ends with: *"Which means the next 12 months are where the most critical foundational work happens."*
+
+### Section 4 — 12-Month Horizon: The Operational Reality
+**Given everything we know about where you are and where you're trying to go, what does this next year actually require — and where is the leverage?**
+
+This is the most specific and most important section of the synthesis. It operates at the **capability area level** and earns its intelligence by being genuinely specific to this user's situation.
+
+The narrative addresses:
+
+- **Load-bearing capability areas** — across the five dimensions, which 2-3 capability areas carry the most structural weight for this specific founder at this specific stage given their 12-month goals? Not all 25. Not a ranked list. A narrative explanation of which areas are most important and why.
+- **The sequencing insight** — what needs to happen before other things can happen? Which capability area, if addressed first, unlocks progress in others? This is one of the most valuable things the platform can surface, because founders often try to work on everything at once and miss the dependency chain.
+- **The primary constraint** — the single thing most likely to slow or derail progress at this horizon given the current profile. Not discouraging — clarifying. Named so it can be planned around.
+
+This section ends differently from the others. It does not transition to the next horizon. It transitions to action:
+
+*"With this in mind, the question for this quarter is where to direct your focused energy to build the most important foundation for everything that follows."*
+
+That sentence opens directly into the bridge.
+
+---
+
+## Moment 3 — The Bridge
+
+### Purpose
+Before the user encounters the 3P capability selection screen, they receive a single synthesized statement that distills everything above into a current-quarter strategic posture. This is not a list of capabilities — it is a statement of intent.
+
+### What It Looks Like
+A visually distinct block — styled as a callout or a brief — that reads something like:
+
+*"For this quarter, the most structurally important work centers on [2-3 theme areas]. These aren't the only things that matter — but they're the ones where progress now creates the most leverage for everything that follows."*
+
+The specific theme areas are drawn from the 12-month synthesis and are expressed at the dimension or capability area level — not as specific checkpoints or tasks.
+
+### The Transition
+A single clear CTA: something like "Select My Q1 Focus Areas" or "Build My Quarter Plan."
+
+This takes them into the 3P capability selection screen. By this point, the user is not choosing from a list. They are confirming what the narrative already surfaced. The selection becomes an act of commitment rather than an act of open-ended decision-making.
+
+---
+
+## Data Inputs Required for Synthesis Generation
+
+The synthesis engine draws from the following data sources. All must be populated before meaningful synthesis can be generated:
+
+| Data Source | What It Contributes |
+|---|---|
+| Clarity Compass — confirmed horizons | Vision statements, growth targets, and financial scenarios for 12, 24, 36 months and ultimate vision |
+| GV Simulator — pressure profile | Six pressure family scores that indicate where structural friction will intensify along the growth trajectory |
+| AE Ladder — stage placement | Current maturity stage, which calibrates all language, implications, and capability area weighting |
+| M&R Audit — dimension scores | Five dimension-level maturity scores that identify structural development priorities |
+| M&R Audit — capability scores | 25 capability area scores and stage-calibrated rankings that identify specific load-bearing focus areas |
+
+If any of these inputs are missing, the synthesis cannot be generated at full fidelity. The platform should surface a clear state for users who have not yet completed upstream tools, with a pathway to complete them before proceeding.
+
+---
+
+## What This Experience Is Not
+
+- It is not a dashboard — no charts, no data tables, no score displays
+- It is not a recitation of audit results — the M&R gaps are not listed again; they are translated into implications
+- It is not prescriptive — the platform does not tell the founder what to do; it reveals what their situation requires and implies
+- It is not another assessment — the user is done answering questions; they are now receiving and acting
+
+---
+
+## Open Questions for Next Pass
+
+- **Synthesis generation timing** — is this generated on-demand at the point of horizon confirmation, or pre-generated at audit completion and updated when horizons are confirmed? On-demand is more responsive to horizon changes; pre-generated is faster but may go stale.
+- **Edit vs. source of truth** — if a user wants to adjust their horizon vision at this stage, do we update the Clarity Compass directly or allow a planning-session override? Current recommendation is to update the source directly to maintain a single source of truth.
+- **Empty state handling** — what happens if the user arrives here without having completed the M&R Audit or the Clarity Compass? The synthesis cannot be generated. The platform needs a clear empty state with a pathway to complete upstream tools.
+- **Naming** — "Strategic Roadmap" and "Current Quarter Focus" are current working names. Final naming TBD.

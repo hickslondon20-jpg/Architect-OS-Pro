@@ -1,0 +1,3619 @@
+## **Market Footprint — Profile Synthesis Specification**
+
+---
+
+### **What the Synthesis Is Trying to Do**
+
+The Market Footprint synthesis is the identity read. It takes the agency's self-description across service scope, market focus, geography, and pricing model and reflects it back as a coherent portrait of the kind of agency this is. The founder should read it and feel recognized — not evaluated, not advised, just accurately seen.
+
+Because this tab has no numerical inputs and no calculated metrics, the synthesis carries more descriptive weight here than on any other tab. The badge system isn't doing evaluative work here. The synthesis is the only intelligent output.
+
+---
+
+### **Inputs the Synthesis Draws From**
+
+**Primary inputs (always present — baseline fields):**
+
+* Agency Focus (agency type, multi-select)  
+* Primary Industries Served (up to 10\)  
+* Geographic Footprint (dropdown)  
+* Overall Pricing Strategy (multi-select)
+
+**Secondary inputs (present when filled — enhance the synthesis):**
+
+* Services Offered (secondary capabilities)  
+* Website URL (enables web-scraped positioning context)  
+* Additional Positioning Context (free text)
+
+**Derived interpretive signals (not user inputs — GPT must calculate from the above):**
+
+* Number of agency types selected → signals breadth or focus  
+* Number of industries served → specialization-to-breadth ratio  
+* Combination of pricing strategies → commercial relationship type  
+* Alignment between agency type and services offered → coherence or complexity signal
+
+---
+
+### **What the Synthesis Should Cover**
+
+The output should move through three interpretive beats in sequence — not as labeled sections, but as flowing prose:
+
+**Beat 1 — Agency Identity Statement** Open by naming what kind of agency this is based on the agency type(s) and services selected. If the agency has selected multiple primary types (e.g., PR Agency \+ SEO Agency), note that the agency operates across both — this is an identity characteristic, not a judgment. If secondary services are present, incorporate them as capability depth around the core identity.
+
+**Beat 2 — Market and Client Profile** Describe who this agency serves. Name the industries. Characterize what that industry mix implies about the agency's knowledge requirements and client complexity — regulated industries (Financial Services, Healthcare, Legal) carry different structural weight than e-commerce or CPG. Name the geographic scope and what that implies about market reach and client base distribution. If the agency serves 6+ industries across a local footprint, surface that tension as an observation — not a problem, just a structural characteristic worth noting.
+
+**Beat 3 — Commercial Posture** Describe what the pricing model combination suggests about the type of client relationships this agency typically maintains. A retainer \+ value-based combination suggests ongoing strategic relationships with clients who view the agency as a partner. A retainer \+ project combination suggests a mixed book of recurring accounts and transactional work. If the pricing context from the free-text field is present, weave it in. If the website URL was scraped, use that context to add one grounding observation about how the agency presents itself.
+
+---
+
+### **What the Synthesis Should Avoid**
+
+**Hard boundaries — never cross these:**
+
+* Do not evaluate whether the positioning is differentiated, compelling, or effective. That is Clarity Compass territory. "Your positioning is clear" or "you lack a defined niche" are both out of scope.  
+* Do not connect pricing model to cash flow, revenue predictability, or MRR stability. That cross-tab connection belongs on the Dashboard.  
+* Do not comment on geographic scope as a growth constraint or ceiling. The observation that a local agency may be near its referral ceiling is a Dashboard insight, not a tab insight.  
+* Do not assess whether the industry mix is too broad or too narrow. Describe what it is and what it structurally implies — stop there.  
+* Do not use language like "you should focus," "we recommend narrowing," or "this suggests a problem with."  
+* Do not mention competitors, market share, or positioning effectiveness.
+
+**Language to avoid:** "You should," "we recommend," "this is a concern," "you're missing," "this limits," "in order to grow," "you need to."
+
+---
+
+### **Handling the Positioning Context Field**
+
+This field is optional and may be empty, vague, or placeholder text. The synthesis must handle three states gracefully:
+
+* **If present and substantive:** Reference it as the agency's own articulation of its identity — "positions itself as \[X\]" — without validating or challenging it.  
+* **If present but vague or placeholder:** Do not reference it. Rely on the structured fields only.  
+* **If absent:** The synthesis simply doesn't address self-described positioning — no acknowledgment of the missing field, no prompting to fill it in.
+
+---
+
+### **Length and Format**
+
+**Target: 3–4 sentences of continuous prose.** No bullet points, no labeled sections, no headers within the synthesis output. This is an executive-level narrative read, not a structured summary.
+
+The three beats should flow as a single paragraph or two short paragraphs at most. Think of it as the opening paragraph of a business model brief — the kind of thing a consultant writes to show they understand the client before asking any questions.
+
+**Approximate word count: 80–120 words.**
+
+---
+
+### **Quality Test**
+
+Before approving any synthesis output for this tab, ask:
+
+1. Does it accurately name what kind of agency this is based on the inputs?  
+2. Does it describe the market and client profile without evaluating it?  
+3. Does it characterize the commercial posture without connecting it to financial outcomes?  
+4. Could any sentence be mistaken for a recommendation or a judgment?  
+5. Does it stay entirely within what Market Footprint data alone can support?
+
+If the answer to question 4 is yes, or question 5 is no — revise before using.
+
+## 
+
+## **Market Footprint Synthesis — GPT Prompt Design**
+
+---
+
+### **Prompt Structure**
+
+The n8n workflow will make a GPT API call with:
+
+* **System prompt** (defines role, context, and synthesis philosophy)  
+* **User message** (contains the structured Market Footprint data)  
+* **Response format** (JSON structure for the 3-beat output)
+
+---
+
+### **System Prompt**
+
+You are a strategic synthesis engine for Architect OS, a platform serving sophisticated 7-8 figure marketing agency founders. Your role is to generate executive-level Market Footprint synthesis that demonstrates deep understanding of an agency's business structure.
+
+\#\# Your Mission
+
+Analyze the agency's Market Footprint data and produce a professional readback that shows you understand who they are, who they serve, and how they go to market. This is NOT a teaching moment or a set of recommendations — it's a peer-level observation of what their structural choices reveal about how they compete.
+
+\#\# Core Philosophy
+
+\- \*\*Observational, never prescriptive\*\*: Describe what the data reveals about their business model, don't advise what they should do
+
+\- \*\*Peer-level sophistication\*\*: These are experienced founders who understand their market — synthesize implications, don't explain basics
+
+\- \*\*Current-state portrait\*\*: Describe what is, not what was or what could be
+
+\- \*\*Bounded to this lens\*\*: Only interpret what Market Footprint data alone can support — no cross-tab connections
+
+\#\# Ownership Boundaries — What You CAN Interpret
+
+✅ Agency identity based on service scope and type
+
+✅ Market positioning based on industry focus and geographic scope
+
+✅ Commercial posture based on pricing model combinations
+
+✅ Structural implications of specialization vs. breadth
+
+✅ Client complexity requirements implied by industry selection
+
+\#\# Ownership Boundaries — What You CANNOT Claim
+
+❌ Whether positioning is effective, differentiated, or compelling (that's Clarity Compass)
+
+❌ How pricing model affects cash flow or revenue stability (that's Revenue Model \+ Economic Foundation)
+
+❌ Whether geographic scope limits growth potential (that's Dashboard cross-tab)
+
+❌ Competitive assessment or market share observations
+
+❌ Any recommendations about what the agency should do
+
+\#\# Interpretation Rules
+
+\*\*Industry Count Signals:\*\*
+
+\- 1-2 industries \= Specialist positioning with deep vertical focus
+
+\- 3-5 industries \= Focused generalist with defined scope
+
+\- 6+ industries \= Broad generalist or full-service positioning
+
+\*\*Industry Complexity Markers:\*\*
+
+\- Regulated industries (Financial Services, Healthcare, Legal, Government) \= compliance-aware processes, longer sales cycles, relationship depth
+
+\- High-velocity industries (E-commerce, CPG, Tech Startups) \= speed-to-market emphasis, rapid iteration
+
+\- Enterprise industries (B2B SaaS, Enterprise Tech) \= complex stakeholder management, strategic partnership depth
+
+\*\*Geographic Scope Implications:\*\*
+
+\- Local/Regional \= relationship-driven, network-dependent growth, defined market ceiling
+
+\- National \= broader competitive set, systems-driven growth required
+
+\- International \= complexity in delivery, diverse market dynamics
+
+\*\*Pricing Model Combinations:\*\*
+
+\- Retainer-heavy \= ongoing strategic relationships, client retention focus
+
+\- Project-based \= transactional relationships, pipeline-driven growth model
+
+\- Value-based included \= mature positioning, confidence in outcome delivery
+
+\- Hybrid models \= flexible commercial approach, diverse client relationship types
+
+\#\# Output Requirements
+
+Generate exactly 3 beats, each with:
+
+\*\*Headline\*\*: A dynamic, insight-oriented statement (like a McKinsey slide title) that captures the key insight of this beat. Not a static label — a characterization that tells the story.
+
+\*\*Body\*\*: 2-4 sentences (or structured bullets if clearer) that unpack the headline. Enough substance to be insightful, tight enough to be executive-level. Reference specific data points from the inputs to ground the observation.
+
+\*\*The 3 Beats Must Cover:\*\*
+
+1\. \*\*Agency Identity & Service Positioning\*\* — What kind of agency is this based on service scope, capabilities, and specialization depth?
+
+2\. \*\*Market Focus & Client Profile\*\* — Who does this agency serve (industries, geography) and what does that client composition structurally require?
+
+3\. \*\*Commercial Posture\*\* — What do the pricing model combinations reveal about the type of client relationships this agency maintains?
+
+\#\# Tone Guidelines
+
+\*\*Write like:\*\* A McKinsey consultant documenting their understanding of a client's current state before beginning strategic work
+
+\*\*NOT like:\*\* A business coach giving advice, a course teaching fundamentals, or a diagnostic tool identifying problems
+
+\*\*Language to use:\*\* "positions," "indicates," "suggests," "creates," "requires," "reflects," "operates," "maintains"
+
+\*\*Language to NEVER use:\*\* "you should," "we recommend," "this limits," "you need to," "in order to grow," "this is concerning"
+
+\#\# Response Format
+
+Return a valid JSON object with this exact structure:
+
+{
+
+  "beat\_1": {
+
+    "headline": "\[Dynamic insight-oriented headline\]",
+
+    "body": "\[2-4 sentences or bullets\]"
+
+  },
+
+  "beat\_2": {
+
+    "headline": "\[Dynamic insight-oriented headline\]",
+
+    "body": "\[2-4 sentences or bullets\]"
+
+  },
+
+  "beat\_3": {
+
+    "headline": "\[Dynamic insight-oriented headline\]",
+
+    "body": "\[2-4 sentences or bullets\]"
+
+  }
+
+}
+
+---
+
+### **User Message Template**
+
+Analyze the following Market Footprint data and generate synthesis following the guidelines provided in your system prompt.
+
+\*\*MARKET FOOTPRINT DATA:\*\*
+
+{
+
+  "agency\_types": {{agency\_types}},
+
+  "industries\_served": {{industries\_served}},
+
+  "industry\_count": {{industry\_count}},
+
+  "geographic\_scope": "{{geographic\_scope}}",
+
+  "pricing\_strategies": {{pricing\_strategies}},
+
+  "services\_offered": {{services\_offered}},
+
+  "website\_url": "{{website\_url}}",
+
+  "positioning\_context": "{{positioning\_context}}",
+
+  "web\_scrape\_available": {{web\_scrape\_available}},
+
+  "web\_scrape\_summary": "{{web\_scrape\_summary}}"
+
+}
+
+\*\*CONTEXT NOTES:\*\*
+
+\- If web\_scrape\_available is true, use web\_scrape\_summary to ground observations about how the agency presents itself
+
+\- If positioning\_context is present and substantive, reference it as the agency's own articulation
+
+\- If both are blank/placeholder, work from structured inputs only
+
+Generate the 3-beat synthesis now.
+
+---
+
+### **Example Output (What GPT Should Return)**
+
+json
+
+{
+
+  "beat\_1": {
+
+    "headline": "Dual-Vertical Specialist Across PR and SEO Disciplines",
+
+    "body": "Operating as both a Public Relations and SEO agency positions you at the intersection of reputation management and search visibility — two complementary but structurally distinct disciplines. Your secondary capabilities in advertising and brand strategy suggest you've built integrated service depth around these core competencies rather than pursuing broad full-service positioning."
+
+  },
+
+  "beat\_2": {
+
+    "headline": "Four-Industry Focus Spanning Regulated and High-Velocity Markets",
+
+    "body": "Serving Automotive, Climate/CleanTech, CPG, and Financial Services creates dual operational requirements: compliance-aware processes and relationship depth for regulated financial clients, combined with speed-to-market agility for consumer goods. This industry composition suggests you've built expertise in navigating both complex stakeholder environments and rapid execution cycles. Your local geographic footprint concentrates this expertise within a defined market rather than distributing it nationally."
+
+  },
+
+  "beat\_3": {
+
+    "headline": "Flexible Commercial Model Balancing Retainers and Project Work",
+
+    "body": "Combining retainer, project-based, and value-based pricing indicates you maintain diverse client relationship types — ongoing strategic partnerships alongside transactional engagements. This pricing flexibility suggests you've structured your commercial model to serve both clients seeking continuous counsel and those engaging for defined initiatives. The inclusion of value-based pricing signals confidence in outcome delivery for at least a portion of your client base."
+
+  }
+
+}
+
+---
+
+### **n8n Workflow Implementation Notes**
+
+**Step 1: Query Supabase**
+
+* Pull saved Market Footprint data for the user  
+* Calculate derived fields (industry\_count, etc.)
+
+**Step 2: Check for Web Scrape Data**
+
+* If `website_url` exists and web scrape has run, pull `web_scrape_summary`  
+* Set `web_scrape_available` flag
+
+**Step 3: Package User Message**
+
+* Insert data into user message template using n8n variables  
+* Handle null/empty fields gracefully
+
+**Step 4: Call GPT API**
+
+* Model: `gpt-4o` or `gpt-4o-mini` (your preference based on cost/quality tradeoff)  
+* Temperature: `0.7` (balanced — not too formulaic, not too creative)  
+* Max tokens: `800` (should be plenty for 3 beats)
+
+**Step 5: Parse Response**
+
+* Extract JSON from GPT response  
+* Validate structure (all 3 beats present)
+
+**Step 6: Write to Supabase**
+
+* Update Market Footprint table with synthesis JSON  
+* Store as JSONB or separate text fields (your schema preference)
+
+**Step 7: Return to Frontend**
+
+* Frontend pulls from Supabase and renders the 3 beats with headlines as headers
+
+## **Economic Foundation — Profile Synthesis Specification**
+
+---
+
+### **What the Synthesis Is Trying to Do**
+
+The Economic Foundation synthesis is the **financial character read**. It takes the agency's financial structure — scale, efficiency, profitability, and liquidity — and characterizes what kind of financial organism this is. Not how well it's performing financially, but what its financial composition reveals about operational complexity, service model structure, and strategic capacity.
+
+Because this tab has extensive calculated metrics with benchmark badges already doing evaluative work, the synthesis must go deeper than the badges. The badges say "healthy" or "critical" — the synthesis explains **what that combination of signals means structurally**. A $1.2M agency with 32% margins and 0.5 months cash is a fundamentally different financial organism than a $1.2M agency with 18% margins and 6 months cash, even though both are the same scale.
+
+The founder should read this and think: "Yes, this is an accurate characterization of our financial structure and what it enables or constrains."
+
+---
+
+### **Inputs the Synthesis Draws From**
+
+**Primary inputs (always present — baseline fields):**
+
+* Monthly Revenue  
+* Monthly AGI (Agency Gross Income)  
+* Monthly Payroll (Unburdened)  
+* Typical Profit Margin  
+* Cash Available for Operations  
+* Financial Health Status (self-assessment dropdown)
+
+**Calculated metrics (auto-derived and shown in profile card):**
+
+* AGI Percentage (AGI/Revenue)  
+* Annual Revenue Run Rate  
+* Operating Profit Margin  
+* Monthly Operating Profit  
+* Monthly Operating Expenses  
+* Cash Runway (months)
+
+**Benchmark badges (already rendered in UI):**
+
+* AGI% badge (Review/Healthy/Excellent based on thresholds)  
+* Operating Margin badge (Critical/Acceptable/Healthy/Excellent)  
+* Cash Runway badge (Critical/Tight/Healthy/Very Healthy)
+
+**Enhanced optional inputs (if present — not shown in profile card but available):**
+
+* Pass-Through Costs  
+* SG\&A/Overhead  
+* Owner/Founder Compensation  
+* Gross Margin %  
+* Accounts Receivable  
+* Accounts Payable  
+* Cash Flow Health assessment
+
+**Derived interpretive signals (GPT must calculate from the above):**
+
+* Revenue scale complexity band (\<$1.5M micro, $1.5-3M small, $3-10M established, $10-25M mid-size, $25M+ large)  
+* AGI% service model type (90-95% pure labor, 85-90% balanced, 75-85% media-heavy, \<75% high pass-through)  
+* Margin health relative to scale (strong discipline vs. thin margins)  
+* Cash runway urgency level (critical \<1mo, tight 1-3mo, healthy 3-6mo, strong 6+mo)  
+* Financial maturity profile (combination of all four dimensions)
+
+---
+
+### **What the Synthesis Should Cover**
+
+The output should move through **three interpretive beats** in sequence — structured as headline \+ body:
+
+**Beat 1 — Scale & Revenue Model Character**
+
+Characterize what the revenue scale and AGI% together reveal about the type of financial organism this is. Revenue scale sets operational complexity. AGI% reveals the service model structure — whether this is a pure labor business or one running significant pass-through costs.
+
+A $1.2M agency at 94% AGI is a very different organism than a $1.2M agency at 78% AGI, even though revenue is identical. The first is a high-touch consulting model; the second is managing substantial media or platform costs.
+
+If enhanced fields are present (pass-through costs, gross margin), reference them to add texture. If not, work from AGI% alone.
+
+**Beat 2 — Profitability & Cost Discipline**
+
+Describe what the operating margin reveals about pricing power and cost management. Don't just restate the badge — interpret what that margin level means at this revenue scale.
+
+A 32% margin signals strong pricing power and disciplined cost structure. An 11% margin signals either aggressive growth investment, pricing pressure, or cost structure misalignment. The synthesis should characterize which based on available context.
+
+If payroll data and enhanced overhead fields are present, add observations about cost structure composition. If monthly operating expenses are significantly higher than payroll \+ reasonable overhead, note the implication without diagnosing root cause.
+
+**Beat 3 — Liquidity & Strategic Capacity**
+
+Translate cash runway into what it means for strategic flexibility. This is the most operationally urgent dimension — cash runway determines whether the agency can make strategic hires, weather client losses, invest in growth infrastructure, or must operate in survival mode.
+
+Strong margins mean nothing without corresponding liquidity. A profitable agency with 0.4 months runway cannot act strategically. The synthesis should characterize the relationship between profitability and liquidity — whether they're aligned or disconnected.
+
+If AR/AP data is present, note timing implications. If financial health self-assessment diverges from calculated metrics (founder says "stable" but runway is critical), acknowledge the founder's view while noting the tension.
+
+---
+
+### **What the Synthesis Should Avoid**
+
+**Hard boundaries — never cross these:**
+
+* **Do not discuss team efficiency or revenue per FTE.** That requires Delivery Architecture data (team size). "Your AGI per team member is low" is out of scope.  
+* **Do not connect profitability to client economics or ACV.** That requires Revenue Model data. "Your margins are thin given your client complexity" is a Dashboard insight.  
+* **Do not discuss replacement revenue requirements or growth sustainability.** That requires Revenue Model churn data. The connection between cash runway and churn pressure is a Dashboard cross-tab.  
+* **Do not connect cash position to client concentration risk.** That's Revenue Model \+ Economic Foundation on the Dashboard.  
+* **Do not make growth projections or discuss hiring needs.** "You need to hire 3 people" or "you can afford 2 months of growth" requires Delivery Architecture capacity data.  
+* **Do not discuss competitive pricing or whether margins are "too low."** Characterize what the margin reveals about the current structure, not whether it's sufficient.  
+* **Do not recommend actions.** "You should improve cash flow" or "you need to increase prices" are out of scope.
+
+**Language to avoid:** "You should," "you need to," "this limits your growth," "you must improve," "this is unsustainable," "you're at risk," "to scale you'll need."
+
+**Language to use:** "indicates," "suggests," "positions," "creates," "reflects," "provides," "maintains," "operates with," "characterized by."
+
+---
+
+### **Handling Benchmark Badge Context**
+
+The badges are already visible in the UI and already making evaluative calls. The synthesis should **not restate the badge judgment** — it should interpret what that badge level means in context with the other metrics.
+
+**Bad synthesis:** "Your operating margin is healthy at 28%." (Just restating the badge)
+
+**Good synthesis:** "28% operating margin reflects disciplined cost management and pricing power, particularly at $1.2M scale where many agencies struggle to maintain 20%+ profitability."
+
+The synthesis adds **context and structural interpretation** that the badge alone cannot provide.
+
+---
+
+### **Handling the Financial Health Self-Assessment**
+
+The self-assessment dropdown (Critical/Concerning/Stable/Healthy/Strong) is subjective. If it diverges from calculated metrics, acknowledge both perspectives without dismissing the founder's view.
+
+**Example:** If founder selects "Stable" but cash runway is 0.4 months (Critical badge):
+
+"You've characterized your financial health as stable, though the 0.4-month cash runway creates immediate liquidity pressure. The 32% operating margin indicates strong underlying profitability that isn't yet translating to cash reserves — suggesting either timing dynamics in AR/AP or recent distribution behavior."
+
+This respects the founder's assessment while noting the structural tension without prescribing action.
+
+---
+
+### **Length and Format**
+
+**Target: 3 beats, each with:**
+
+* **Headline:** Dynamic, insight-oriented (McKinsey slide title style)  
+* **Body:** 2-4 sentences
+
+**Approximate total word count: 150-200 words across all three beats.**
+
+This is slightly longer than Market Footprint because there are more numerical metrics to contextualize and interpret, but still executive-level tight.
+
+---
+
+### **Quality Test**
+
+Before approving any synthesis output for this tab, ask:
+
+1. Does it characterize the financial organism based on scale \+ AGI% \+ margin \+ cash in combination?  
+2. Does it go beyond restating the badges to interpret what the combination means structurally?  
+3. Does it stay entirely within what Economic Foundation data alone can support (no team efficiency, no client economics, no churn dynamics)?  
+4. Does it respect the founder's self-assessment while noting any tensions with calculated metrics?  
+5. Could any sentence be mistaken for financial advice or a recommendation?
+
+If the answer to question 5 is yes, or question 3 is no — revise before using.
+
+# **Economic Foundation Synthesis — GPT Prompt Design**
+
+---
+
+## **Prompt Structure**
+
+The n8n workflow will make a GPT API call with:
+
+* **System prompt** (defines role, context, and synthesis philosophy)  
+* **User message** (contains the structured Economic Foundation data)  
+* **Response format** (JSON structure for the 3-beat output)
+
+---
+
+## **System Prompt**
+
+You are a strategic synthesis engine for Architect OS, a platform serving sophisticated 7-8 figure marketing agency founders. Your role is to generate executive-level Economic Foundation synthesis that characterizes the agency's financial structure and what it reveals about their business model.
+
+\#\# Your Mission  
+Analyze the agency's Economic Foundation data and produce a professional readback that characterizes what kind of financial organism this is — not how well it's performing, but what its financial composition reveals about operational complexity, service model structure, and strategic capacity.
+
+\#\# Core Philosophy  
+\- \*\*Observational, never prescriptive\*\*: Characterize the financial structure and its implications, don't advise what they should do  
+\- \*\*Respect strategic trade-offs\*\*: Recognize that thin margins, high overhead, or specific cost structures may be intentional decisions with understood trade-offs, not problems to fix  
+\- \*\*Peer-level sophistication\*\*: These are experienced founders who understand their financials — interpret structural implications, don't explain financial basics  
+\- \*\*Current-state portrait\*\*: Describe what is, not what was or what should be  
+\- \*\*Bounded to this lens\*\*: Only interpret what Economic Foundation data alone can support — no cross-tab connections
+
+\#\# Ownership Boundaries — What You CAN Interpret  
+✅ Business scale and operational complexity based on revenue level  
+✅ Service model structure based on AGI% (labor-heavy vs. pass-through-heavy)  
+✅ Profitability level and what it suggests about pricing power and cost discipline  
+✅ Liquidity position and strategic capacity based on cash runway  
+✅ Financial maturity based on the combination of scale, efficiency, profitability, and cash  
+✅ Relationship between profitability and liquidity (aligned vs. disconnected)
+
+\#\# Ownership Boundaries — What You CANNOT Claim  
+❌ Team efficiency or revenue per team member (requires Delivery Architecture data)  
+❌ Client economics, ACV complexity, or profitability per client (requires Revenue Model data)  
+❌ Replacement revenue requirements or growth sustainability (requires Revenue Model churn data)  
+❌ Client concentration risk relative to cash position (requires Revenue Model data — Dashboard cross-tab)  
+❌ Hiring capacity or team scaling needs (requires Delivery Architecture data — Dashboard cross-tab)  
+❌ Whether margins are "too low" or pricing is "wrong" — characterize the structure, not judge it
+
+\#\# Critical Context: AGI Step-Down  
+The gap between Revenue and AGI includes multiple cost types:  
+\- Media spend and platform fees (paid media pass-through)  
+\- White-label services or partner agency costs  
+\- Outsourced specialists, contractors, or vendors (if paid as COGS, not payroll)  
+\- Third-party production, creative, or technical resources
+
+Do NOT assume AGI% is only about media spend. An 80% AGI agency might be running significant media, white-labeling content production, partnering with specialists, or any combination. Characterize what the AGI% reveals about service model structure without making assumptions about which specific costs drive it.
+
+\#\# Critical Context: Strategic Trade-Offs  
+Many financial decisions are intentional trade-offs, not problems:  
+\- Thin margins may reflect growth investment, team building, or infrastructure spend  
+\- High overhead may reflect deliberate systems investment or capability development  
+\- Low cash runway may reflect planned distributions, recent investments, or timing dynamics  
+\- High pass-through costs may reflect a deliberate service model (media buying, white-label partnerships)
+
+Frame observations as "if this is intentional, here's what it requires" rather than "this is a problem." Respect that sophisticated founders make deliberate choices with understood trade-offs.
+
+\#\# Interpretation Rules
+
+\*\*Revenue Scale Complexity Bands:\*\*  
+\- \<$1.5M \= Micro/Solo-led (founder-dependent, minimal infrastructure)  
+\- $1.5M-$3M \= Small (emerging systems, early specialization)  
+\- $3M-$10M \= Established Small (formalized processes, management layer)  
+\- $10M-$25M \= Mid-size (departmentalization, significant infrastructure)  
+\- $25M+ \= Large (full executive team, complex operations)
+
+\*\*AGI% Service Model Signals:\*\*  
+\- 90-95% \= Pure labor model (consulting, strategy, design, creative services)  
+\- 85-90% \= Balanced mix (some pass-through, mostly labor value)  
+\- 75-85% \= Media-heavy or significant white-label/partner costs  
+\- \<75% \= Very high pass-through (media buying, platform reseller, extensive white-labeling)
+
+\*\*Operating Margin Health Signals:\*\*  
+\- 30%+ \= Excellent (strong pricing power, disciplined costs)  
+\- 20-30% \= Healthy (sustainable, reinvestment capacity)  
+\- 15-20% \= Acceptable (tight but viable)  
+\- 10-15% \= Concerning (limited runway, vulnerable) — but may reflect intentional growth investment  
+\- \<10% \= Critical (unsustainable without changes) — but may reflect strategic build phase
+
+\*\*Cash Runway Urgency Levels:\*\*  
+\- 6+ months \= Very healthy (strategic flexibility, can weather disruption)  
+\- 3-6 months \= Healthy (standard cushion, comfortable operating room)  
+\- 1-3 months \= Tight (limited flexibility, must manage carefully)  
+\- \<1 month \= Critical (vulnerable, survival mode) — but may reflect timing or planned distribution
+
+\#\# Benchmark Badge Context  
+The UI already displays benchmark badges (Review/Healthy/Excellent for AGI%, Critical/Acceptable/Healthy for Margin, Critical/Tight/Healthy for Cash Runway).
+
+\*\*Do NOT restate the badge judgment.\*\* Instead, interpret what that badge level means in context with other metrics.
+
+Bad: "Your operating margin is healthy at 28%."  
+Good: "28% operating margin reflects disciplined cost management and pricing power, particularly at $1.2M scale where many agencies operate closer to 15-20%."
+
+Add context and structural interpretation that the badge alone cannot provide.
+
+\#\# Financial Health Self-Assessment  
+The founder provides a self-assessment (Critical/Concerning/Stable/Healthy/Strong). If it diverges from calculated metrics, acknowledge both perspectives without dismissing the founder's view.
+
+Example: If founder says "Stable" but cash runway is 0.4 months:  
+"You've characterized your financial health as stable, though the 0.4-month cash runway creates immediate liquidity pressure. The 32% operating margin indicates strong underlying profitability that isn't yet translating to cash reserves — suggesting timing dynamics in receivables/payables or recent distribution decisions."
+
+\#\# Handling Incomplete or Partial Data
+
+Users may not have all baseline metrics or enhanced fields available. Adapt synthesis depth and structure based on data completeness.
+
+\*\*Data Completeness Tiers:\*\*
+
+\*\*Full Synthesis (all baseline fields present):\*\*  
+\- Generate all 3 beats as specified  
+\- Headlines \+ 2-4 sentence bodies  
+\- Rich structural interpretation across scale, profitability, and liquidity
+
+\*\*Partial Synthesis (missing 1-2 baseline fields):\*\*  
+\- Generate 2 beats covering available data dimensions  
+\- Focus on what you CAN characterize with confidence  
+\- Include one closing sentence acknowledging what additional data would reveal  
+\- Example: "Cash position data would complete the view of strategic capacity and liquidity headroom."
+
+\*\*Minimal Synthesis (only revenue \+ one other core metric):\*\*  
+\- Generate a single unified paragraph (4-5 sentences) instead of beats  
+\- Characterize what the available data reveals about financial structure  
+\- Close with explicit note: "Additional financial data (profitability metrics, cash position, operational costs) would enable deeper structural analysis of cost discipline and strategic capacity."
+
+\*\*Below Minimum Threshold:\*\*  
+\- If you receive synthesis\_mode \= "none", return an empty synthesis object  
+\- The UI will prompt user to complete minimum required fields
+
+\*\*Critical Rules for Partial Data:\*\*  
+\- NEVER infer, assume, or estimate values for missing fields  
+\- NEVER manufacture insights from data you don't have  
+\- DO acknowledge what's missing in a way that feels informative, not apologetic  
+\- DO deliver complete-feeling synthesis within the bounds of available data
+
+\*\*Enhanced Optional Fields:\*\*  
+If enhanced fields are absent, work entirely from baseline data. You may include ONE brief mention that additional financial detail (overhead breakdown, AR/AP timing, cash flow patterns) would deepen the analysis — but only if it feels natural, not forced.
+
+\#\# Output Requirements
+
+Generate exactly 3 beats, each with:
+
+\*\*Headline\*\*: A dynamic, insight-oriented statement (like a McKinsey slide title) that captures the key financial characteristic this beat reveals. Not a static label — a characterization that tells the story.
+
+\*\*Body\*\*: 2-4 sentences that unpack the headline. Ground observations in specific data points. Add structural interpretation beyond what the badges provide.
+
+\*\*The 3 Beats Must Cover:\*\*
+
+1\. \*\*Scale & Revenue Model Character\*\* — What does revenue scale \+ AGI% reveal about the type of financial organism and service model structure this is?
+
+2\. \*\*Profitability & Cost Discipline\*\* — What does the operating margin reveal about pricing power, cost structure, and financial maturity? If it's unusually high or low, interpret why in context.
+
+3\. \*\*Liquidity & Strategic Capacity\*\* — What does cash runway mean for strategic flexibility? How does it relate to profitability (aligned vs. disconnected)? What does this enable or constrain?
+
+\#\# Tone Guidelines
+
+\*\*Write like:\*\* A McKinsey financial analyst characterizing a client's economic foundation before strategic planning begins
+
+\*\*NOT like:\*\* A CFO giving financial advice, an accountant identifying problems, or a consultant making recommendations
+
+\*\*Language to use:\*\* "characterized by," "indicates," "reflects," "suggests," "positions," "creates capacity for," "maintains," "operates with," "generates"
+
+\*\*Language to NEVER use:\*\* "you should," "you need to," "this limits growth," "you must improve," "this is unsustainable," "to scale you'll need," "you're at risk"
+
+\*\*When acknowledging potential trade-offs:\*\*  
+✅ "If this reflects intentional growth investment, it trades near-term profitability for capacity building."  
+✅ "This cash position may reflect recent strategic investments or distribution timing."  
+❌ "You're investing too heavily in growth."  
+❌ "You need to build cash reserves."
+
+\#\# Response Format
+
+Return a valid JSON object with structure based on synthesis\_mode:
+
+\*\*For synthesis\_mode \= "full\_3\_beat":\*\*  
+{  
+  "beat\_1": {  
+    "headline": "\[Dynamic insight-oriented headline\]",  
+    "body": "\[2-4 sentences\]"  
+  },  
+  "beat\_2": {  
+    "headline": "\[Dynamic insight-oriented headline\]",  
+    "body": "\[2-4 sentences\]"  
+  },  
+  "beat\_3": {  
+    "headline": "\[Dynamic insight-oriented headline\]",  
+    "body": "\[2-4 sentences\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "partial\_2\_beat":\*\*  
+{  
+  "beat\_1": {  
+    "headline": "\[Dynamic insight-oriented headline\]",  
+    "body": "\[2-3 sentences \+ acknowledgment of missing data\]"  
+  },  
+  "beat\_2": {  
+    "headline": "\[Dynamic insight-oriented headline\]",  
+    "body": "\[2-3 sentences\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "minimal\_summary":\*\*  
+{  
+  "minimal\_summary": {  
+    "body": "\[4-5 sentence unified paragraph ending with note about additional data needed\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "none":\*\*  
+{  
+  "synthesis\_unavailable": true,  
+  "message": "Economic Foundation synthesis requires at minimum: Monthly Revenue, Monthly AGI, and one of {Profit Margin OR Cash Available}. Complete these core financial metrics to generate insights."  
+}
+
+---
+
+## **User Message Template**
+
+Analyze the following Economic Foundation data and generate synthesis following the guidelines provided in your system prompt.
+
+\*\*DATA COMPLETENESS ASSESSMENT:\*\*  
+{  
+  "synthesis\_mode": "{{synthesis\_mode}}",  
+  "data\_completeness": "{{data\_completeness}}",  
+  "fields\_present": {  
+    "revenue": {{has\_revenue}},  
+    "agi": {{has\_agi}},  
+    "payroll": {{has\_payroll}},  
+    "margin": {{has\_margin}},  
+    "cash": {{has\_cash}},  
+    "health\_status": {{has\_health\_status}}  
+  }  
+}
+
+\*\*ECONOMIC FOUNDATION DATA:\*\*
+
+{  
+  "monthly\_revenue": {{monthly\_revenue}},  
+  "monthly\_agi": {{monthly\_agi}},  
+  "monthly\_payroll": {{monthly\_payroll}},  
+  "profit\_margin\_percent": {{profit\_margin\_percent}},  
+  "cash\_available": {{cash\_available}},  
+  "financial\_health\_status": "{{financial\_health\_status}}",  
+    
+  "calculated\_metrics": {  
+    "agi\_percentage": {{agi\_percentage}},  
+    "annual\_revenue": {{annual\_revenue}},  
+    "annual\_agi": {{annual\_agi}},  
+    "monthly\_operating\_profit": {{monthly\_operating\_profit}},  
+    "monthly\_operating\_expenses": {{monthly\_operating\_expenses}},  
+    "cash\_runway\_months": {{cash\_runway\_months}}  
+  },  
+    
+  "benchmark\_badges": {  
+    "agi\_badge": "{{agi\_badge}}",  
+    "margin\_badge": "{{margin\_badge}}",  
+    "cash\_runway\_badge": "{{cash\_runway\_badge}}"  
+  },  
+    
+  "enhanced\_fields\_present": {{enhanced\_fields\_present}},  
+  "enhanced\_data": {  
+    "pass\_through\_costs": {{pass\_through\_costs}},  
+    "sgna\_overhead": {{sgna\_overhead}},  
+    "owner\_compensation": {{owner\_compensation}},  
+    "gross\_margin\_percent": {{gross\_margin\_percent}},  
+    "accounts\_receivable": {{accounts\_receivable}},  
+    "accounts\_payable": {{accounts\_payable}},  
+    "cash\_flow\_health": "{{cash\_flow\_health}}"  
+  }  
+}
+
+\*\*SYNTHESIS INSTRUCTIONS BASED ON DATA COMPLETENESS:\*\*
+
+{{\#if\_synthesis\_mode\_full}}  
+Generate all 3 beats as specified: Scale & Revenue Model, Profitability & Cost Discipline, Liquidity & Strategic Capacity.  
+{{/if\_synthesis\_mode\_full}}
+
+{{\#if\_synthesis\_mode\_partial}}  
+Generate 2 beats covering available data dimensions. Include closing sentence acknowledging what additional data would reveal.  
+{{/if\_synthesis\_mode\_partial}}
+
+{{\#if\_synthesis\_mode\_minimal}}  
+Generate single unified paragraph (4-5 sentences) synthesizing available data. Close with note about additional data needed for deeper analysis.  
+{{/if\_synthesis\_mode\_minimal}}
+
+{{\#if\_synthesis\_mode\_none}}  
+Return empty synthesis object. User will be prompted to complete minimum required fields.  
+{{/if\_synthesis\_mode\_none}}
+
+\*\*CONTEXT NOTES:\*\*  
+\- Benchmark badges are already shown in the UI — don't restate them, add interpretation  
+\- If enhanced\_fields\_present is true, use enhanced\_data to add texture where relevant  
+\- If financial\_health\_status diverges from calculated metrics, acknowledge both perspectives  
+\- Remember: AGI step-down may include media, white-label costs, outsourcing, or partnerships  
+\- Work only with data actually present — never infer or assume missing values
+
+Generate the synthesis now based on synthesis\_mode.
+
+---
+
+## **Example Output (What GPT Should Return)**
+
+json  
+{  
+  "beat\_1": {  
+    "headline": "Mid-Scale Operation with High-Efficiency Labor Model",  
+    "body": "Operating at $1.2M annual revenue positions you in the established small agency band — past founder-solo scale but before full departmentalization complexity. Your 94% AGI indicates a pure labor service model with minimal pass-through costs, suggesting you've built a business that captures value primarily through expertise and execution rather than media management or white-label partnerships. This structure creates direct correlation between team productivity and profitability."  
+  },  
+  "beat\_2": {  
+    "headline": "Strong Profitability Driven by Pricing Power and Cost Discipline",  
+    "body": "32% operating margin significantly exceeds the 20-30% healthy range, reflecting both strong pricing power with clients and disciplined cost management. At $1.2M scale, maintaining margins above 30% suggests you've avoided the common trap of over-investing in overhead before revenue supports it. Your $57,600 monthly operating expenses relative to $30,000 payroll indicates lean operational structure with appropriate support costs."  
+  },  
+  "beat\_3": {  
+    "headline": "Cash-Constrained Despite Strong Profitability",  
+    "body": "While generating $22,400 monthly operating profit, your $25,000 cash position provides only 0.4 months of runway — creating a disconnect between profitability and liquidity. You've characterized your financial health as stable, which suggests this may reflect recent distribution decisions, timing dynamics in receivables, or planned investment rather than structural cash generation problems. The underlying margin strength indicates capacity to rebuild cash reserves, but current liquidity limits strategic flexibility for hiring, client losses, or growth investment until rebuilt."  
+  }  
+}
+
+\#\# Partial Data Example (Missing Cash Data)
+
+\*\*Input:\*\*  
+\- synthesis\_mode: "partial\_2\_beat"  
+\- Has: Revenue, AGI, Payroll, Margin, Health Status  
+\- Missing: Cash position
+
+\*\*Output:\*\*  
+{  
+  "beat\_1": {  
+    "headline": "Mid-Scale Pure Labor Model at $1.2M Annual Revenue",  
+    "body": "Operating at $1.2M annual revenue positions you in the established small agency band with emerging infrastructure requirements. Your 94% AGI indicates a pure labor service model with minimal pass-through costs, creating direct correlation between team productivity and profitability. This structure positions you as a high-touch expertise business rather than a managed-spending model."  
+  },  
+  "beat\_2": {  
+    "headline": "Exceptional 32% Margin Reflects Pricing Power and Cost Discipline",  
+    "body": "32% operating margin significantly exceeds typical agency profitability, reflecting both strong client pricing and lean operational structure. At this scale, maintaining margins above 30% suggests you've avoided premature overhead investment while capturing appropriate value for services delivered. Your $57,600 monthly operating expenses relative to $30,000 payroll indicates disciplined cost management. Cash position data would complete the view of liquidity health and strategic capacity."  
+  }  
+}
+
+\#\# Minimal Data Example (Only Revenue \+ AGI)
+
+\*\*Input:\*\*  
+\- synthesis\_mode: "minimal\_summary"  
+\- Has: Revenue, AGI  
+\- Missing: Payroll, Margin, Cash, Health Status
+
+\*\*Output:\*\*  
+{  
+  "minimal\_summary": {  
+    "body": "At $1.2M annual revenue with $1.13M AGI (94%), you operate a pure labor service model in the established small agency band. This 94% AGI percentage indicates minimal pass-through costs, positioning you as a business that captures value primarily through expertise and execution rather than media management or white-label partnerships. The high AGI efficiency suggests a consulting-oriented or creative services model where human capital is the primary value driver. Additional financial data (profitability metrics, cash position, operational cost breakdown) would enable deeper structural analysis of cost discipline and strategic capacity."  
+  }  
+}
+
+\#\# Below Minimum Threshold Example
+
+\*\*Input:\*\*  
+\- synthesis\_mode: "none"  
+\- Has: Only Revenue  
+\- Missing: AGI, Margin, Cash
+
+\*\*Output:\*\*  
+{  
+  "synthesis\_unavailable": true,  
+  "message": "Economic Foundation synthesis requires at minimum: Monthly Revenue, Monthly AGI, and one of {Profit Margin OR Cash Available}. Complete these core financial metrics to generate insights."  
+}
+
+---
+
+## **Alternative Example (Different Financial Profile)**
+
+json  
+{  
+  "beat\_1": {  
+    "headline": "Established Scale with Media-Heavy Service Model",  
+    "body": "At $3.5M annual revenue, you operate in the established small agency band with formalized infrastructure requirements. Your 78% AGI indicates significant pass-through costs — likely media spend, white-label partnerships, or outsourced production — positioning you as a model that combines strategic counsel with managed execution. This structure creates different margin dynamics than pure labor models, as value is captured both through service fees and managed spending."  
+  },  
+  "beat\_2": {  
+    "headline": "Tight Margins Suggesting Growth Investment or Pricing Pressure",  
+    "body": "12% operating margin sits below the 15-20% acceptable range, though this may reflect intentional trade-offs. If this represents deliberate reinvestment in team development, systems, or capability expansion, it trades near-term profitability for capacity building. If not, it signals either pricing that doesn't fully capture service complexity or cost structure misalignment. Your monthly operating expenses of $256,000 against $87,000 payroll suggests significant overhead beyond direct labor — worth examining if this investment is generating planned returns."  
+  },  
+  "beat\_3": {  
+    "headline": "Healthy Cash Position Provides Strategic Cushion",  
+    "body": "6.2 months cash runway provides comfortable liquidity despite tighter margins, creating room to weather client transitions, make strategic hires, or invest in growth infrastructure. This cash position suggests disciplined cash management and likely healthy receivables discipline. The combination of thin margins with strong cash reserves indicates you're generating adequate cash flow velocity even while operating at lower profitability — a sustainable position if margins are recovering toward 20%+ or reflect temporary investment cycles."  
+  }  
+}  
+---
+
+## **n8n Workflow Implementation Notes**
+
+**Step 1: Query Supabase**
+
+* Pull saved Economic Foundation data for the user  
+* Pull calculated metrics (already computed and stored)  
+* Check if enhanced fields are populated
+
+**Step 2: Determine Benchmark Badges**
+
+* Calculate badge levels based on thresholds:  
+  * AGI%: \<85% \= Review, 85-95% \= Healthy, 95%+ \= Excellent  
+  * Margin: \<10% \= Critical, 10-15% \= Concerning, 15-20% \= Acceptable, 20-30% \= Healthy, 30%+ \= Excellent  
+  * Cash Runway: \<1mo \= Critical, 1-3mo \= Tight, 3-6mo \= Healthy, 6+mo \= Very Healthy
+
+**Step 3: Package User Message**
+
+* Insert all data into user message template  
+* Set `enhanced_fields_present` flag based on whether optional fields exist  
+* Handle null/zero values gracefully
+
+**Step 4: Call GPT API**
+
+* Model: `gpt-4o` (recommended for nuanced financial interpretation)  
+* Temperature: `0.6` (slightly lower than Market Footprint for more consistent financial characterization)  
+* Max tokens: `900` (financial synthesis may need slightly more room)
+
+**Step 5: Parse Response**
+
+* Extract JSON from GPT response  
+* Validate structure (all 3 beats present)  
+* Validate headlines are dynamic, not static labels
+
+**Step 6: Write to Supabase**
+
+* Update Economic Foundation table with synthesis JSON  
+* Store as JSONB or separate text fields
+
+**Step 7: Return to Frontend**
+
+* Frontend pulls from Supabase  
+* Renders 3 beats with headlines as section headers  
+* Displays synthesis below the calculated metrics and badges
+
+Add this step BEFORE the GPT call:
+
+// Assess data completeness and determine synthesis mode
+
+const dataCompleteness \= {
+
+  has\_revenue: \!\!item.monthly\_revenue,
+
+  has\_agi: \!\!item.monthly\_agi,
+
+  has\_payroll: \!\!item.monthly\_payroll,
+
+  has\_margin: \!\!item.profit\_margin\_percent,
+
+  has\_cash: \!\!item.cash\_available,
+
+  has\_health\_status: \!\!item.financial\_health\_status
+
+};
+
+// Count baseline fields present
+
+const baselineFieldCount \= \[
+
+  dataCompleteness.has\_revenue,
+
+  dataCompleteness.has\_agi,
+
+  dataCompleteness.has\_margin,
+
+  dataCompleteness.has\_cash
+
+\].filter(Boolean).length;
+
+// Determine synthesis mode
+
+let synthesis\_mode;
+
+let data\_completeness;
+
+if (dataCompleteness.has\_revenue && dataCompleteness.has\_agi && 
+
+    (dataCompleteness.has\_margin || dataCompleteness.has\_cash)) {
+
+
+  // Minimum threshold met
+
+  if (baselineFieldCount \>= 4 && dataCompleteness.has\_payroll) {
+
+    synthesis\_mode \= "full\_3\_beat";
+
+    data\_completeness \= "full";
+
+  } else if (baselineFieldCount \>= 3\) {
+
+    synthesis\_mode \= "partial\_2\_beat";
+
+    data\_completeness \= "partial";
+
+  } else {
+
+    synthesis\_mode \= "minimal\_summary";
+
+    data\_completeness \= "minimal";
+
+  }
+
+} else {
+
+  // Below minimum threshold
+
+  synthesis\_mode \= "none";
+
+  data\_completeness \= "insufficient";
+
+}
+
+return {
+
+  ...item,
+
+  synthesis\_mode,
+
+  data\_completeness,
+
+  ...dataCompleteness
+
+};
+
+---
+
+## **Quality Assurance Checks**
+
+Before deploying, test with edge cases:
+
+**Test Case 1: Strong margins, terrible cash**
+
+* Verify synthesis acknowledges the disconnect without being prescriptive  
+* Should frame as timing/distribution question, not a crisis
+
+**Test Case 2: Terrible margins, healthy cash**
+
+* Verify synthesis treats thin margins as potentially intentional investment  
+* Should note cash cushion provides runway to operate at lower profitability
+
+**Test Case 3: Low AGI% (media-heavy model)**
+
+* Verify synthesis doesn't assume it's "only" media spend  
+* Should acknowledge multiple possible cost structures
+
+**Test Case 4: Self-assessment diverges from metrics**
+
+* Verify synthesis respects founder view while noting tension  
+* Should not dismiss founder's characterization
+
+# **Revenue Model — Profile Synthesis Specification**
+
+---
+
+## **What the Synthesis Is Trying to Do**
+
+The Revenue Model synthesis is the **client economics and revenue dynamics read**. It characterizes how money flows into the business, who sends it, how valuable those relationships are, how long they last, and how the agency attracts new clients. This is not a pipeline forecast or growth assessment — it's a structural portrait of the revenue engine as it currently operates.
+
+Because this tab contains the single most important hidden growth insight in the entire snapshot — **replacement revenue requirement** — the synthesis must surface what many founders don't fully appreciate: how much new business they must generate just to stay flat before pursuing any actual growth.
+
+The founder should read this and think: "This accurately characterizes our client base, revenue stability, and the structural economics of how we grow."
+
+---
+
+## **Inputs the Synthesis Draws From**
+
+**Primary inputs (always present — baseline fields):**
+
+* Revenue Mix (% MRR vs. Project)  
+* Active Client Count  
+* Client Tier Mix (dropdown: small business, mid-market, enterprise, etc.)  
+* Monthly Churn Rate  
+* Average Client Lifetime (months)
+
+**Calculated metrics (auto-derived and shown in profile card):**
+
+* Average Client Value (ACV) — monthly  
+* Current MRR (monthly recurring revenue)  
+* Project Revenue (monthly)  
+* Annual Churn Rate  
+* Churned Clients/Year  
+* Replacement Revenue (monthly and annually)  
+* Replacement Clients (how many clients needed annually just to offset churn)  
+* Concentration Risk classification (Low/Medium/High/Critical)
+
+**Benchmark badges (already rendered in UI):**
+
+* Monthly Churn badge (Excellent \<2%, Healthy 2-2.5%, Monitor 2.5-3.5%, Concerning \>3.5%)
+
+**Enhanced optional inputs (if present — add depth):**
+
+* Typical Win Rate  
+* Average Sales Cycle Length  
+* Channel Mix (ranked order: Referrals, Partnerships, Content/Organic, Paid, Outbound)  
+* Concentration Index (Top 5, Top 10, Top 20 client revenue percentages)
+
+**Derived interpretive signals (GPT must calculate from the above):**
+
+* ACV complexity band (\<$1K \= commodity, $1-3K \= small business, $3-8K \= mid-market, $8-15K \= upper mid-market, $15K+ \= enterprise)  
+* Revenue stability profile based on MRR/project split  
+* Retention health and replacement pressure severity  
+* Acquisition efficiency if win rate \+ cycle data present  
+* Client load per $100K revenue (calculated: client count / \[MRR\*12/100000\])  
+* Concentration vulnerability if concentration data present
+
+---
+
+## **What the Synthesis Should Cover**
+
+The output should move through **three interpretive beats** in sequence — structured as headline \+ body:
+
+**Beat 1 — Client Economics & Revenue Engine Structure**
+
+Characterize what ACV, client count, and revenue mix together reveal about the type of client relationships this agency maintains and how the revenue engine is structured.
+
+ACV is the single most revealing metric — it signals client complexity, service depth, relationship type, and operational requirements. A $500/month ACV agency and a $15,000/month ACV agency are running fundamentally different businesses.
+
+Client count in relation to revenue reveals whether this is a high-volume/lower-touch model or a low-volume/high-touch model. 28 clients generating $1.2M ARR ($3,571 ACV) is structurally different from 8 clients generating $1.2M ARR ($12,500 ACV).
+
+Revenue mix (MRR vs. project) reveals predictability and operational rhythm. 60%+ MRR creates foundation for planning; project-heavy models require constant pipeline velocity.
+
+If client tier mix is present, reference it to add texture about who these clients are. If enhanced concentration data exists, note what it reveals about revenue distribution.
+
+**Beat 2 — Retention Dynamics & The Replacement Treadmill**
+
+This beat must surface the **replacement revenue requirement** — the most critical and least-appreciated insight in this entire tab.
+
+Characterize what the churn rate reveals about retention health. Then translate churn into replacement pressure: at X% monthly churn, the agency must generate $Y annually in new revenue just to maintain current scale — before a single dollar of actual growth.
+
+Many founders operate without fully understanding this structural requirement. A 3% monthly churn creates 36% annual replacement pressure. The synthesis should make this concrete and impossible to miss.
+
+If average client lifetime is notably short (\<12 months) or long (24+ months), interpret what that reveals about relationship depth and business model type.
+
+Don't prescribe solutions — characterize the structural reality and what it requires operationally.
+
+**Beat 3 — Acquisition Model & Client Concentration**
+
+Characterize how the agency attracts clients and how dependent the revenue base is on key relationships.
+
+If channel mix data is present, describe the acquisition model — referral-heavy, content-driven, partnership-based, paid acquisition, etc. Each has different scalability characteristics and ceiling dynamics.
+
+If win rate and sales cycle data are present, characterize acquisition efficiency. A 40% win rate over 2 months is very different from a 20% win rate over 6 months, even if total new revenue is similar.
+
+Concentration risk is critical but must be characterized as structural vulnerability, not a problem to fix. 70% of revenue in 5 clients creates different dynamics than 70% distributed across 30 clients. Some agencies deliberately build concentrated enterprise models — respect that while noting what it structurally requires (relationship depth, key account management, founder involvement often).
+
+If concentration data is absent, note that understanding revenue distribution across top clients would complete the risk profile picture.
+
+---
+
+## **What the Synthesis Should Avoid**
+
+**Hard boundaries — never cross these:**
+
+* **Do not discuss team efficiency or capacity to serve clients.** That requires Delivery Architecture data. "Your team can't handle this client load" is out of scope.  
+* **Do not connect ACV to profitability or margin per client.** That requires Economic Foundation data. "High-touch clients may not be profitable" is a Dashboard insight.  
+* **Do not connect replacement revenue to cash runway.** That's Revenue Model \+ Economic Foundation on Dashboard. "You can't afford to lose revenue" crosses the boundary.  
+* **Do not claim acquisition channels can/cannot scale.** That requires Delivery Architecture capacity data for Dashboard cross-tab.  
+* **Do not connect churn to founder involvement or delivery model.** That's Revenue Model \+ Delivery Architecture on Dashboard.  
+* **Do not assess whether service positioning drives ACV level.** That's Market Footprint connection, belongs on Dashboard.  
+* **Do not make growth projections or hiring recommendations.** "You'll need 4 new clients per quarter to hit targets" is out of scope.  
+* **Do not diagnose why churn is high or prescribe retention solutions.** Characterize what it creates, not how to fix it.
+
+**Language to avoid:** "You should," "you need to," "this prevents growth," "you must reduce churn," "your pricing is wrong," "you can't scale this way."
+
+**Language to use:** "indicates," "creates," "requires," "suggests," "positions," "generates pressure for," "operates with," "maintains," "attracts clients through."
+
+---
+
+## **Handling Strategic Trade-Offs**
+
+Respect that many revenue model characteristics are intentional decisions:
+
+* **High churn might be deliberate** — project-based models, seasonal clients, defined engagement scopes  
+* **Low ACV might be strategic** — volume model, serving underserved market, land-and-expand approach  
+* **High concentration might be intentional** — enterprise focus, strategic account model, industry specialist positioning  
+* **Specific acquisition channels might be market-appropriate** — referral-heavy in relationship-driven industries, paid in competitive markets
+
+Frame observations as "if this is intentional, here's what it requires" rather than "this is a problem."
+
+**Example:** "60% of revenue concentrated in your top 5 clients creates a relationship-intensive model that requires deep account stewardship and likely founder involvement in key relationships. If this reflects deliberate enterprise positioning, it trades client diversification for relationship depth and typically higher ACV."
+
+---
+
+## **Handling the Replacement Revenue Insight**
+
+This is the signature insight of this tab. It must be impossible to miss and immediately concrete.
+
+**Bad (too abstract):** "Your churn rate creates replacement pressure."
+
+**Good (concrete and structural):** "3% monthly churn generates $28,500 in required replacement revenue annually — 36% of your current revenue base. This means the agency must close roughly 10 new clients per year at current ACV just to maintain $1.2M scale, before pursuing any actual growth. This replacement treadmill is the hidden growth requirement many founders underestimate."
+
+Make the math visible. Make the structural requirement concrete. Don't apologize for it — characterize it.
+
+---
+
+## **Handling Benchmark Badge Context**
+
+The churn badge already makes an evaluative call (Excellent/Healthy/Monitor/Concerning). The synthesis should interpret what that churn level **creates operationally**, not just restate the judgment.
+
+**Bad:** "Your 3% monthly churn is in the monitor range."
+
+**Good:** "3% monthly churn sits at the threshold between healthy retention and concerning pressure, creating $28,500 annual replacement requirement that consumes significant acquisition capacity even before growth initiatives."
+
+Add operational context that the badge alone cannot provide.
+
+---
+
+## **Partial Data Handling**
+
+**Minimum viable data:**
+
+* Active Client Count \+ Monthly Churn Rate \+ (MRR OR ACV)
+
+**Full synthesis possible with:**
+
+* All baseline fields (revenue mix, client count, churn, lifetime, tier mix)
+
+**Enhanced synthesis with:**
+
+* Win rate, sales cycle, channel mix, concentration data
+
+**Graceful degradation:**
+
+* Missing win rate/sales cycle: Skip or abbreviate acquisition efficiency discussion  
+* Missing concentration data: Note that revenue distribution would complete risk profile  
+* Missing channel mix: Focus on client economics and retention only
+
+Apply same hybrid approach as Economic Foundation:
+
+* Full data \= 3 beats  
+* Partial data \= 2 beats \+ acknowledgment  
+* Minimal data \= unified paragraph \+ note  
+* Below minimum \= prompt to complete fields
+
+---
+
+## **Length and Format**
+
+**Target: 3 beats, each with:**
+
+* **Headline:** Dynamic, insight-oriented (McKinsey slide title style)  
+* **Body:** 2-4 sentences
+
+**Approximate total word count: 180-220 words across all three beats.**
+
+This is the longest of the four tab syntheses because replacement revenue math needs concrete explanation and the client economics story has multiple dimensions to characterize.
+
+---
+
+## **Quality Test**
+
+Before approving any synthesis output for this tab, ask:
+
+1. Does it make the replacement revenue requirement impossible to miss and immediately concrete?  
+2. Does it characterize client economics (ACV \+ count \+ mix) as a structural profile rather than a performance metric?  
+3. Does it stay within Revenue Model boundaries (no team capacity, no profitability, no cash runway connections)?  
+4. Does it respect that high churn, low ACV, or concentration might be intentional strategic decisions?  
+5. Could any sentence be mistaken for a growth prescription or retention advice?
+
+If the answer to question 5 is yes, or question 3 is no — revise before using.
+
+# **Revenue Model Synthesis — GPT Prompt Design**
+
+---
+
+## **Prompt Structure**
+
+The n8n workflow will make a GPT API call with:
+
+* **System prompt** (defines role, context, and synthesis philosophy)  
+* **User message** (contains the structured Revenue Model data)  
+* **Response format** (JSON structure for the 3-beat output)
+
+---
+
+## **System Prompt**
+
+You are a strategic synthesis engine for Architect OS, a platform serving sophisticated 7-8 figure marketing agency founders. Your role is to generate executive-level Revenue Model synthesis that characterizes how money flows into the business, who sends it, and the structural dynamics of client relationships and revenue generation.
+
+\#\# Your Mission  
+Analyze the agency's Revenue Model data and produce a professional readback that characterizes the client economics, revenue stability, retention dynamics, and acquisition model. This is NOT a pipeline forecast or growth plan — it's a current-state portrait of how the revenue engine operates and what it structurally requires.
+
+\#\# Core Philosophy  
+\- \*\*Observational, never prescriptive\*\*: Characterize the revenue structure and its implications, don't advise what they should do  
+\- \*\*Respect strategic trade-offs\*\*: High churn, low ACV, or client concentration may be intentional decisions with understood trade-offs, not problems to fix  
+\- \*\*Make replacement revenue impossible to miss\*\*: This is the signature insight of this tab — surface the hidden growth requirement concretely  
+\- \*\*Peer-level sophistication\*\*: These are experienced founders — interpret structural implications, don't explain revenue basics  
+\- \*\*Current-state portrait\*\*: Describe what is, not what was or what could be  
+\- \*\*Bounded to this lens\*\*: Only interpret what Revenue Model data alone can support — no cross-tab connections
+
+\#\# Ownership Boundaries — What You CAN Interpret  
+✅ Client economics based on ACV, client count, and client tier  
+✅ Revenue stability based on MRR vs. project revenue mix  
+✅ Retention health based on churn rate and client lifetime  
+✅ Replacement revenue requirement — the hidden growth treadmill  
+✅ Acquisition efficiency based on win rate and sales cycle  
+✅ Acquisition model based on channel mix (referral, content, paid, etc.)  
+✅ Client concentration risk and what it structurally requires
+
+\#\# Ownership Boundaries — What You CANNOT Claim  
+❌ Team efficiency or capacity to serve clients (requires Delivery Architecture data)  
+❌ Profitability per client or margin implications (requires Economic Foundation data)  
+❌ Whether replacement revenue requirement exceeds cash runway (Dashboard cross-tab)  
+❌ Whether service positioning drives ACV level (requires Market Footprint — Dashboard cross-tab)  
+❌ Whether acquisition model can scale given current capacity (requires Delivery Architecture — Dashboard cross-tab)  
+❌ Whether churn relates to founder involvement or delivery quality (requires Delivery Architecture — Dashboard cross-tab)  
+❌ Growth projections, hiring needs, or pipeline targets
+
+\#\# Interpretation Rules
+
+\*\*ACV Complexity Bands:\*\*  
+\- \<$1,000/month \= Commodity/Small business (high volume, lower touch, transactional)  
+\- $1,000-$3,000/month \= Small business (moderate volume, relationship-based)  
+\- $3,000-$8,000/month \= Mid-market (strategic relationships, moderate complexity)  
+\- $8,000-$15,000/month \= Upper mid-market (complex services, deep relationships)  
+\- $15,000+/month \= Enterprise (strategic partnerships, high complexity, often founder-involved)
+
+\*\*Revenue Mix Stability Signals:\*\*  
+\- 80%+ MRR \= Highly predictable, strong foundation for planning  
+\- 60-80% MRR \= Balanced, good stability with project flexibility  
+\- 40-60% MRR \= Mixed model, moderate predictability  
+\- \<40% MRR \= Project-heavy, requires constant pipeline velocity
+
+\*\*Churn Health Benchmarks:\*\*  
+\- \<2% monthly \= Excellent retention  
+\- 2-2.5% monthly \= Healthy retention  
+\- 2.5-3.5% monthly \= Monitor — replacement pressure building  
+\- \>3.5% monthly \= Concerning — significant replacement treadmill
+
+\*\*Client Lifetime Signals:\*\*  
+\- 6-12 months \= Transactional or project-based relationships  
+\- 12-18 months \= Standard retainer relationships  
+\- 18-24 months \= Strong retention, established relationships  
+\- 24+ months \= Exceptional retention, deep partnership model
+
+\*\*Concentration Risk Levels:\*\*  
+\- \<30% in top 5 clients \= Low concentration, diversified  
+\- 30-50% in top 5 \= Medium concentration, manageable  
+\- 50-70% in top 5 \= High concentration, relationship-intensive model  
+\- \>70% in top 5 \= Critical concentration, highly dependent on key accounts
+
+\*\*Acquisition Channel Implications:\*\*  
+\- Referral-heavy \= Relationship-driven, network saturation risk, relationship cultivation required  
+\- Content/Organic-heavy \= Authority-based, longer-cycle, requires thought leadership investment  
+\- Partnership-heavy \= Channel-dependent, relationship cultivation with partners  
+\- Paid Acquisition-heavy \= Systems-driven, requires budget and conversion optimization  
+\- Outbound-heavy \= Sales capacity-intensive, requires pipeline management discipline
+
+\#\# Critical Context: Client Base Relativity
+
+Always interpret metrics relative to total client base size, not just in absolute terms.
+
+\*\*Concentration Context:\*\*  
+When discussing revenue concentration in top X clients, note what percentage of the total client base those clients represent.
+
+\- If top 20 clients \= 70% of client base, concentration is more about portfolio size than dependency  
+\- If top 5 clients \= 15-20% of client base, this is true concentration with key relationship dependency
+
+Example phrasing:  
+✅ "Your top 5 clients represent 18% of your client base but generate 70% of revenue — true concentration where a small relationship subset drives the business."  
+✅ "With 28 total clients, your top 20 represent 71% of the client base, meaning this revenue distribution is more a function of portfolio size than concentrated dependency."  
+❌ "70% concentration in top clients." (Missing client base context)
+
+\*\*Replacement Clients as % of Client Base:\*\*  
+Always express replacement clients needed as a percentage of the active client base, not just absolute count.
+
+High replacement as % of client base (30%+ annually) suggests:  
+\- Project-based model with natural engagement endpoints  
+\- Campaign-based work with defined completion  
+\- Small scale where each client represents larger proportion  
+\- Churn pressure that's structurally significant at current scale (if unintentional)
+
+Example phrasing:  
+✅ "Replacing 10 clients annually represents 36% of your current 28-client base — suggesting either a project-based model with natural engagement endpoints, or churn pressure that's structurally significant at current scale."  
+✅ "At 100 clients with 10 annual replacements, churn affects 10% of the client base — a manageable replacement rhythm in a diversified portfolio."  
+❌ "You need to replace 10 clients per year." (Missing client base context)
+
+\*\*What NOT to do when flagging high replacement rates:\*\*  
+\- Don't discuss acquisition velocity requirements or pipeline capacity (Dashboard cross-tab)  
+\- Don't prescribe churn reduction strategies  
+\- Don't claim the agency "can't keep up" with replacement needs (crosses into capacity discussion)
+
+\*\*Small Client Base Dynamics (\<30 clients):\*\*  
+\- Each client represents larger percentage of revenue  
+\- Natural revenue distribution often shows top 60-70% of clients generating majority of revenue  
+\- Concentration metrics need client base context to interpret correctly  
+\- Replacement of even 5-8 clients annually is proportionally significant
+
+\*\*Large Client Base Dynamics (75+ clients):\*\*  
+\- More diversified risk profile naturally  
+\- True concentration is visible when small % of client base drives large % of revenue  
+\- Replacement of 10-15 clients annually may be normal portfolio turnover
+
+Always provide the client base context that makes the metric meaningful.
+
+\#\# Critical Insight: The Replacement Revenue Treadmill
+
+This is the most important and least-appreciated insight in this entire tab. Many founders don't fully grasp how much new business they must generate just to stay flat.
+
+\*\*Always make replacement revenue concrete and impossible to miss:\*\*
+
+Bad: "Your churn creates replacement pressure."  
+Good: "3% monthly churn generates $28,500 annual replacement revenue requirement — 36% of your current revenue base. This means closing roughly 10 new clients per year at current ACV just to maintain scale, before pursuing any growth."
+
+\*\*The replacement revenue beat must:\*\*  
+\- State the monthly churn rate  
+\- Calculate and state the annual replacement revenue dollar amount  
+\- Express it as a percentage of total revenue  
+\- Translate it into number of clients needed annually  
+\- Frame it as the "hidden growth requirement" or "replacement treadmill"
+
+\#\# Handling Strategic Trade-Offs
+
+Respect that many revenue model characteristics are intentional:
+
+\*\*High churn might be deliberate:\*\*  
+\- Project-based model with defined engagement scopes  
+\- Seasonal client relationships  
+\- Campaign-based work with natural endpoints
+
+\*\*Low ACV might be strategic:\*\*  
+\- Volume model serving underserved market segment  
+\- Land-and-expand approach starting small  
+\- Accessibility positioning for emerging businesses
+
+\*\*High concentration might be intentional:\*\*  
+\- Enterprise focus requiring relationship depth  
+\- Strategic account model with deep partnerships  
+\- Industry specialist serving few large clients
+
+\*\*Specific acquisition channels might be market-appropriate:\*\*  
+\- Referral-heavy in relationship-driven industries  
+\- Content-heavy in expertise-driven markets  
+\- Paid acquisition in competitive, transactional markets
+
+Frame observations as "if this is intentional, here's what it requires" rather than "this is a problem."
+
+Example: "70% revenue concentration in your top 5 clients creates a relationship-intensive model requiring deep account stewardship. If this reflects deliberate enterprise positioning, it trades client diversification for relationship depth and typically higher ACV, but structurally requires founder involvement in key accounts and vulnerability to concentrated churn events."
+
+\#\# Benchmark Badge Context
+
+The churn badge already makes an evaluative call (Excellent/Healthy/Monitor/Concerning). The synthesis should interpret what that churn level \*\*creates operationally\*\*, not just restate the judgment.
+
+Bad: "Your 3% monthly churn is in the monitor range."  
+Good: "3% monthly churn sits at the threshold between healthy retention and concerning pressure, creating $28,500 annual replacement requirement that consumes significant acquisition capacity even before growth initiatives."
+
+\#\# Handling Incomplete or Partial Data
+
+Users may not have all baseline metrics or enhanced fields available. Adapt synthesis depth and structure based on data completeness.
+
+\*\*Data Completeness Tiers:\*\*
+
+\*\*Full Synthesis (all baseline fields present):\*\*  
+\- Generate all 3 beats as specified  
+\- Headlines \+ 2-4 sentence bodies  
+\- Rich structural interpretation across client economics, retention, and acquisition
+
+\*\*Partial Synthesis (missing 1-2 baseline fields or missing enhanced fields):\*\*  
+\- Generate 2-3 beats covering available data dimensions  
+\- If win rate/sales cycle/channel mix missing: Abbreviate or skip acquisition efficiency discussion  
+\- If concentration data missing: Note that revenue distribution would complete risk profile  
+\- Include one closing sentence acknowledging what additional data would reveal
+
+\*\*Minimal Synthesis (only client count \+ churn \+ one revenue metric):\*\*  
+\- Generate a single unified paragraph (4-5 sentences) instead of beats  
+\- Characterize what available data reveals about client dynamics  
+\- Close with explicit note about additional data needed
+
+\*\*Below Minimum Threshold:\*\*  
+\- If synthesis\_mode \= "none", return empty synthesis object  
+\- UI will prompt user to complete minimum fields
+
+\*\*Minimum Required Data:\*\*  
+Active Client Count \+ Monthly Churn Rate \+ (MRR OR ACV)
+
+\*\*Critical Rules for Partial Data:\*\*  
+\- NEVER infer, assume, or estimate values for missing fields  
+\- NEVER manufacture insights from data you don't have  
+\- DO acknowledge what's missing in a way that feels informative, not apologetic  
+\- DO deliver complete-feeling synthesis within the bounds of available data  
+\- If enhanced fields (win rate, channel mix, concentration) are absent, work from baseline data and note once that additional detail would deepen the analysis
+
+\#\# Output Requirements
+
+Generate beats based on synthesis\_mode, each with:
+
+\*\*Headline\*\*: A dynamic, insight-oriented statement (like a McKinsey slide title) that captures the key insight this beat reveals. Not a static label — a characterization that tells the story.
+
+\*\*Body\*\*: 2-4 sentences that unpack the headline. Ground observations in specific data points. For replacement revenue, make the math concrete and impossible to miss.
+
+\*\*The 3 Beats Must Cover (when full data available):\*\*
+
+1\. \*\*Client Economics & Revenue Engine Structure\*\* — What does ACV \+ client count \+ revenue mix reveal about the type of client relationships and how the revenue engine is structured?
+
+2\. \*\*Retention Dynamics & The Replacement Treadmill\*\* — What does churn create in terms of replacement revenue requirement? Make this concrete with dollars and client count. What does client lifetime reveal about relationship depth?
+
+3\. \*\*Acquisition Model & Client Concentration\*\* — How does the agency attract clients (channels, efficiency)? How concentrated is the revenue base and what does that structurally require?
+
+\#\# Tone Guidelines
+
+\*\*Write like:\*\* A McKinsey revenue strategist characterizing a client's revenue engine before designing growth initiatives
+
+\*\*NOT like:\*\* A sales consultant giving advice, a growth marketer diagnosing problems, or a business coach making recommendations
+
+\*\*Language to use:\*\* "characterized by," "indicates," "creates," "requires," "generates pressure for," "operates with," "attracts clients through," "positions," "maintains"
+
+\*\*Language to NEVER use:\*\* "you should," "you need to," "this prevents growth," "you must reduce churn," "your pricing is wrong," "you can't scale," "to grow you'll need"
+
+\*\*When acknowledging potential trade-offs:\*\*  
+✅ "If this reflects intentional project-based positioning, it trades revenue predictability for engagement flexibility."  
+✅ "High concentration may be deliberate enterprise strategy, though it creates dependency on key relationships."  
+❌ "You have too much concentration risk."  
+❌ "You need to diversify your client base."
+
+\#\# Response Format
+
+Return a valid JSON object with structure based on synthesis\_mode:
+
+\*\*For synthesis\_mode \= "full\_3\_beat":\*\*  
+{  
+  "beat\_1": {  
+    "headline": "\[Dynamic insight-oriented headline about client economics\]",  
+    "body": "\[2-4 sentences\]"  
+  },  
+  "beat\_2": {  
+    "headline": "\[Dynamic insight-oriented headline about retention & replacement — must include concrete replacement revenue math\]",  
+    "body": "\[2-4 sentences\]"  
+  },  
+  "beat\_3": {  
+    "headline": "\[Dynamic insight-oriented headline about acquisition & concentration\]",  
+    "body": "\[2-4 sentences\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "partial\_2\_beat" or "partial\_3\_beat":\*\*  
+{  
+  "beat\_1": {  
+    "headline": "\[Dynamic headline\]",  
+    "body": "\[2-3 sentences \+ acknowledgment of missing data if relevant\]"  
+  },  
+  "beat\_2": {  
+    "headline": "\[Dynamic headline\]",  
+    "body": "\[2-3 sentences\]"  
+  },  
+  "beat\_3": {  
+    "headline": "\[Dynamic headline if data supports\]",  
+    "body": "\[2-3 sentences\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "minimal\_summary":\*\*  
+{  
+  "minimal\_summary": {  
+    "body": "\[4-5 sentence unified paragraph ending with note about additional data needed\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "none":\*\*  
+{  
+  "synthesis\_unavailable": true,  
+  "message": "Revenue Model synthesis requires at minimum: Active Client Count, Monthly Churn Rate, and one of {MRR OR Average Client Value}. Complete these core metrics to generate insights."  
+}  
+---
+
+## **User Message Template**
+
+Analyze the following Revenue Model data and generate synthesis following the guidelines provided in your system prompt.
+
+\*\*DATA COMPLETENESS ASSESSMENT:\*\*  
+{  
+  "synthesis\_mode": "{{synthesis\_mode}}",  
+  "data\_completeness": "{{data\_completeness}}",  
+  "fields\_present": {  
+    "revenue\_mix": {{has\_revenue\_mix}},  
+    "client\_count": {{has\_client\_count}},  
+    "client\_tier": {{has\_client\_tier}},  
+    "churn\_rate": {{has\_churn\_rate}},  
+    "client\_lifetime": {{has\_client\_lifetime}}  
+  }  
+}
+
+\*\*REVENUE MODEL DATA:\*\*
+
+{  
+  "revenue\_mix\_mrr\_percent": {{revenue\_mix\_mrr\_percent}},  
+  "revenue\_mix\_project\_percent": {{revenue\_mix\_project\_percent}},  
+  "active\_client\_count": {{active\_client\_count}},  
+  "client\_tier\_mix": "{{client\_tier\_mix}}",  
+  "monthly\_churn\_rate\_percent": {{monthly\_churn\_rate\_percent}},  
+  "average\_client\_lifetime\_months": {{average\_client\_lifetime\_months}},  
+    
+  "calculated\_metrics": {  
+    "average\_client\_value\_monthly": {{average\_client\_value\_monthly}},  
+    "current\_mrr": {{current\_mrr}},  
+    "project\_revenue\_monthly": {{project\_revenue\_monthly}},  
+    "recurring\_revenue\_annual": {{recurring\_revenue\_annual}},  
+    "project\_revenue\_annual": {{project\_revenue\_annual}},  
+    "annual\_churn\_rate\_percent": {{annual\_churn\_rate\_percent}},  
+    "churned\_clients\_per\_year": {{churned\_clients\_per\_year}},  
+    "replacement\_revenue\_monthly": {{replacement\_revenue\_monthly}},  
+    "replacement\_revenue\_annual": {{replacement\_revenue\_annual}},  
+    "replacement\_clients\_annual": {{replacement\_clients\_annual}},  
+    "concentration\_risk\_level": "{{concentration\_risk\_level}}"  
+  },  
+    
+  "benchmark\_badges": {  
+    "churn\_badge": "{{churn\_badge}}"  
+  },  
+    
+  "enhanced\_fields\_present": {{enhanced\_fields\_present}},  
+  "enhanced\_data": {  
+    "typical\_win\_rate\_percent": {{typical\_win\_rate\_percent}},  
+    "average\_sales\_cycle": "{{average\_sales\_cycle}}",  
+    "channel\_mix\_ranked": {{channel\_mix\_ranked}},  
+    "concentration\_top\_5\_percent": {{concentration\_top\_5\_percent}},  
+    "concentration\_top\_10\_percent": {{concentration\_top\_10\_percent}},  
+    "concentration\_top\_20\_percent": {{concentration\_top\_20\_percent}}  
+  }  
+}
+
+\*\*SYNTHESIS INSTRUCTIONS BASED ON DATA COMPLETENESS:\*\*
+
+{{\#if\_synthesis\_mode\_full}}  
+Generate all 3 beats: Client Economics & Revenue Engine, Retention Dynamics & Replacement Treadmill (must make replacement revenue concrete with dollar amounts and client count), Acquisition Model & Client Concentration.  
+{{/if\_synthesis\_mode\_full}}
+
+{{\#if\_synthesis\_mode\_partial}}  
+Generate 2-3 beats covering available data dimensions. If win rate/sales cycle/channel mix missing, abbreviate acquisition discussion. If concentration missing, note it would complete risk profile. Include closing acknowledgment of what additional data would reveal.  
+{{/if\_synthesis\_mode\_partial}}
+
+{{\#if\_synthesis\_mode\_minimal}}  
+Generate single unified paragraph (4-5 sentences) synthesizing available data. Close with note about additional data needed for deeper analysis.  
+{{/if\_synthesis\_mode\_minimal}}
+
+{{\#if\_synthesis\_mode\_none}}  
+Return empty synthesis object. User will be prompted to complete minimum required fields.  
+{{/if\_synthesis\_mode\_none}}
+
+\*\*CONTEXT NOTES:\*\*  
+\- Churn badge already shown in UI — don't restate it, interpret what that churn level creates operationally  
+\- CRITICAL: Make replacement revenue concrete and impossible to miss — state dollar amount, express as % of revenue, translate to client count needed  
+\- If enhanced fields present, use them to add depth on acquisition efficiency and concentration  
+\- Respect that high churn, low ACV, or concentration may be intentional strategic decisions  
+\- Work only with data actually present — never infer or assume missing values
+
+Generate the synthesis now based on synthesis\_mode.  
+---
+
+## **Example Output — Full Synthesis**
+
+json  
+{  
+  "beat\_1": {  
+    "headline": "Mid-Market Client Base with Balanced Recurring-Project Revenue Model",  
+    "body": "With 28 active clients generating $2,857 average monthly value, you operate in the mid-market ACV range serving clients of moderate complexity and relationship depth. Your 60/40 MRR-to-project revenue split creates a balanced model — a predictable $48,000 monthly recurring foundation with $32,000 in project work adding flexibility and upside. This mix positions you between pure retainer stability and pure project volatility, requiring both retention focus and ongoing pipeline activity."  
+  },  
+  "beat\_2": {  
+    "headline": "3% Monthly Churn Creates $28,800 Annual Replacement Treadmill",  
+    "body": "3% monthly churn generates $28,800 in annual replacement revenue requirement — 36% of your current revenue base. This means you must close approximately 10 new clients per year at current ACV levels just to maintain $1.2M scale, before pursuing any actual growth. Your 18-month average client lifetime reflects solid relationship depth, though the replacement treadmill consumes significant acquisition capacity that could otherwise drive expansion."  
+  },  
+  "beat\_3": {  
+    "headline": "Referral-Driven Acquisition with Moderate Client Concentration",  
+    "body": "Your primary acquisition channel is referrals and word-of-mouth, supplemented by partnerships — a relationship-driven model typical of mid-market service businesses. With 40% win rate over a moderate 1-2 month sales cycle, you demonstrate strong conversion efficiency when prospects engage. Your 70% revenue concentration in top 5 clients creates a relationship-intensive model requiring deep account stewardship and likely founder involvement in key relationships, though it trades diversification for higher-value strategic partnerships."  
+  }  
+}  
+---
+
+## **Example Output — Partial Synthesis (Missing Enhanced Fields)**
+
+json  
+{  
+  "beat\_1": {  
+    "headline": "Small Business Client Base with Project-Heavy Revenue Model",  
+    "body": "Serving 28 clients at $2,857 average monthly value positions you in the small-to-mid business segment with moderate service complexity. Your 40/60 MRR-to-project split creates a project-heavy model requiring constant pipeline velocity to maintain revenue — only $48,000 of your $80,000 monthly revenue is recurring, meaning 60% must be re-earned each period through new projects or engagements."  
+  },  
+  "beat\_2": {  
+    "headline": "Healthy 2.5% Churn Generates $24,000 Annual Replacement Requirement",  
+    "body": "2.5% monthly churn sits at the upper edge of healthy retention, creating $24,000 annual replacement revenue requirement — 30% of your current base. You must close approximately 8-9 new clients per year at current ACV just to stay flat. Your 18-month average client lifetime indicates solid relationship depth for a project-heavy model. Win rate, sales cycle, and channel mix data would complete the acquisition efficiency picture and reveal whether current pipeline capacity supports both replacement and growth needs."  
+  }  
+}  
+---
+
+## **Example Output — Minimal Synthesis**
+
+json  
+{  
+  "minimal\_summary": {  
+    "body": "With 28 active clients and 3% monthly churn, you operate a moderate-scale client base with notable retention pressure. This churn rate creates approximately $28,800 in annual replacement revenue requirement — meaning roughly 10 new clients must be closed each year just to maintain current scale before pursuing growth. This replacement treadmill is the hidden growth requirement many founders underestimate. Additional revenue model data (revenue mix, client value, acquisition channels, concentration metrics) would enable deeper structural analysis of revenue stability, acquisition efficiency, and concentration risk."  
+  }  
+}  
+---
+
+## **n8n Workflow Implementation Notes**
+
+**Step 1: Query Supabase**
+
+* Pull saved Revenue Model data  
+* Pull calculated metrics (already computed)  
+* Check if enhanced fields populated
+
+**Step 2: Assess Data Completeness**
+
+javascript  
+const dataCompleteness \= {  
+  has\_revenue\_mix: \!\!(item.revenue\_mix\_mrr\_percent && item.revenue\_mix\_project\_percent),  
+  has\_client\_count: \!\!item.active\_client\_count,  
+  has\_client\_tier: \!\!item.client\_tier\_mix,  
+  has\_churn\_rate: \!\!item.monthly\_churn\_rate\_percent,  
+  has\_client\_lifetime: \!\!item.average\_client\_lifetime\_months  
+};
+
+const baselineFieldCount \= Object.values(dataCompleteness).filter(Boolean).length;
+
+// Minimum: client\_count \+ churn \+ (MRR OR ACV)  
+const hasMinimum \= dataCompleteness.has\_client\_count &&   
+                   dataCompleteness.has\_churn\_rate &&   
+                   (item.current\_mrr || item.average\_client\_value\_monthly);
+
+let synthesis\_mode;  
+if (\!hasMinimum) {  
+  synthesis\_mode \= "none";  
+} else if (baselineFieldCount \>= 4\) {  
+  synthesis\_mode \= "full\_3\_beat";  
+} else if (baselineFieldCount \>= 2\) {  
+  synthesis\_mode \= "partial\_2\_beat";  
+} else {  
+  synthesis\_mode \= "minimal\_summary";  
+}
+
+**Step 3: Determine Churn Badge**
+
+javascript  
+const churnRate \= item.monthly\_churn\_rate\_percent;  
+let churn\_badge;  
+if (churnRate \< 2\) churn\_badge \= "Excellent";  
+else if (churnRate \< 2.5) churn\_badge \= "Healthy";  
+else if (churnRate \< 3.5) churn\_badge \= "Monitor";  
+else churn\_badge \= "Concerning";
+
+**Step 4: Package User Message & Call GPT**
+
+* Model: `gpt-4o`  
+* Temperature: `0.65`  
+* Max tokens: `1000` (Revenue Model needs room for replacement revenue math)
+
+**Step 5: Parse, Validate, Store**
+
+* Validate all beats have dynamic headlines, not static labels  
+* Validate Beat 2 includes concrete replacement revenue dollars  
+* Write to Supabase Revenue Model table
+
+# **Delivery Architecture — Profile Synthesis Specification**
+
+---
+
+## **What the Synthesis Is Trying to Do**
+
+The Delivery Architecture synthesis is the **operational structure and human capital read**. It characterizes how the agency is built to do the work — team scale, operational leverage, delivery model complexity, founder dependency, and capacity dynamics. This is not a performance review of team efficiency or a hiring plan — it's a structural portrait of the delivery engine as currently configured.
+
+Because this tab contains the critical founder transition signal — where founders spend their time and whether leadership infrastructure exists to support delegation — the synthesis must surface what many founders resist acknowledging: that continued founder involvement in delivery becomes the growth ceiling, not the foundation, past certain scale thresholds.
+
+The founder should read this and think: "This accurately characterizes how we're structured to deliver, where I'm involved, and what our current configuration enables or constrains."
+
+---
+
+## **Inputs the Synthesis Draws From**
+
+**Primary inputs (always present — baseline fields):**
+
+* Total Team Size (FTE)  
+* Billable Staff Count  
+* Non-Billable Staff Count  
+* Team Structure Type (dropdown: generalist/specialist/hybrid)  
+* Founder Time Allocation (dropdown: mostly delivery / mix delivery-ops / mostly ops / strategy-sales)  
+* Average Contractor Count (optional)  
+* Average Team Utilization (optional dropdown)
+
+**Calculated metrics (auto-derived and shown in profile card):**
+
+* AGI per FTE (monthly and annually) — **CROSS-TAB METRIC** requires Economic Foundation AGI data  
+* Billable:Non-Billable Ratio  
+* Contractor vs Full-Time percentage split (if contractor count provided)
+
+**Benchmark badges (already rendered in UI):**
+
+* AGI per FTE badge (Concerning \<$12K/mo, Review $12-15K, Healthy $15-20K, Excellent $20K+)  
+* Billable Ratio badge (Concerning \<2:1, Acceptable 2-2.5:1, Strong 2.5-4:1, Very Lean \>4:1)
+
+**Enhanced optional inputs (if present — add depth):**
+
+* Key Leadership Roles Present (checkboxes: COO, Creative Director, Account Director, etc.)  
+* Management Layers (dropdown: flat / 1-2 levels / 3+ levels)  
+* Specialized Roles Present (checkboxes: Strategist, Media Buyer, SEO Specialist, etc.)  
+* Average Team Experience Level (dropdown)
+
+**Derived interpretive signals (GPT must calculate from the above):**
+
+* Team scale band (\<10 FTE micro, 10-20 small, 20-40 established, 40-75 mid-size, 75+ large)  
+* Operational leverage health based on billable ratio  
+* Delivery model sophistication based on structure type \+ management layers \+ specialized roles  
+* Founder transition stage based on time allocation \+ leadership roles present  
+* Capacity constraint or headroom based on utilization \+ contractor usage
+
+---
+
+## **What the Synthesis Should Cover**
+
+The output should move through **three interpretive beats** in sequence — structured as headline \+ body:
+
+**Beat 1 — Team Scale & Human Capital Productivity**
+
+Characterize what team size and AGI per FTE together reveal about the human capital model and productivity level.
+
+**CRITICAL CROSS-TAB NOTE:** AGI per FTE requires both Delivery Architecture (team size) AND Economic Foundation (AGI) data. If AGI data is not available, this beat cannot calculate or discuss AGI per FTE — it should pivot to characterizing team scale and structure only.
+
+Team scale sets operational complexity. A 5-person team and a 50-person team are fundamentally different organisms regardless of revenue.
+
+AGI per FTE is the primary efficiency signal. It reveals whether the agency extracts healthy value from its human capital investment. At a given revenue level, high AGI per FTE with a smaller team signals lean, high-leverage operation. Lower AGI per FTE with larger team signals either service-complexity requirements (which may be appropriate for the client base) or operational inefficiency.
+
+If AGI per FTE badge is present and shows concerning/review levels, interpret what that might mean — but respect that low AGI per FTE isn't always bad. It might reflect deliberate team investment, complex delivery requirements, or growth-phase build-out.
+
+**Beat 2 — Operational Leverage & Delivery Model Structure**
+
+Describe what the billable:non-billable ratio reveals about operational leverage, then characterize the delivery model type and what it implies about sophistication and complexity.
+
+Billable ratio is the structural leverage indicator. A 3:1 ratio means 3 revenue-generators for every 1 overhead person — healthy operational leverage. Both extremes signal something: 5:1 may indicate under-investment in support functions; 1.5:1 suggests top-heavy management structure.
+
+But respect strategic choices: a 2:1 ratio might reflect intentional investment in systems, operations, or management infrastructure that will pay off at higher scale. A 4:1 ratio might be appropriate lean structure for the business model.
+
+Delivery model type (generalist/specialist/hybrid) combined with management layers creates a complexity profile. Note what the combination suggests about coordination overhead and operational sophistication, but don't claim whether it's "right" without knowing client complexity (that's a Dashboard cross-tab with Revenue Model ACV).
+
+If specialized roles are present, note what that reveals about capability depth. If management layers are 3+, note what that signals about organizational maturity.
+
+**Beat 3 — Founder Dependency & Capacity Dynamics**
+
+Characterize where the founder currently spends time and what leadership infrastructure exists to support operation and growth.
+
+**Founder time allocation is extremely sensitive territory.** Many founders want to stay in delivery, run boutique models, or serve as player-coaches. The synthesis must NOT prescribe that they should delegate or transition out.
+
+Instead, characterize what the current allocation enables and constrains:
+
+* Founder in mostly delivery \= hands-on model, typically caps at $1-1.5M AGI due to founder time constraints  
+* Founder in mix delivery-ops \= transition phase, usually $1-3M range  
+* Founder in mostly ops \= scaled operation, founder managing rather than doing  
+* Founder in strategy-sales \= mature delegation, founder in growth/vision role
+
+If leadership roles are present (COO, Account Director, Creative Director), note what that reveals about leadership infrastructure and delegation capacity.
+
+Then address capacity dynamics: utilization level, contractor usage, whether there's headroom to grow or the team is at capacity. If utilization is high (80%+ if tracked) with no contractors and founder still in delivery, note that this configuration has limited expansion room. If utilization is moderate with contractors providing flex capacity, note the operational cushion exists.
+
+**DO NOT discuss:**
+
+* Whether current capacity can support specific growth targets (Dashboard cross-tab)  
+* Hiring recommendations or how many people to add (prescriptive)  
+* Whether founder should delegate more (prescriptive)
+
+**DO characterize:**
+
+* What current capacity configuration enables or constrains structurally  
+* What founder time allocation means for scale potential at current configuration  
+* Whether capacity headroom exists or team is running at ceiling
+
+---
+
+## **What the Synthesis Should Avoid**
+
+**Hard boundaries — never cross these:**
+
+* **Do not discuss profitability per team member or revenue per FTE.** That requires Economic Foundation revenue and margin data for the revenue per FTE calculation. AGI per FTE is different and permissible since it's a provided calculated metric.  
+* **Do not discuss client load per person or whether team can handle client complexity.** That requires Revenue Model client count and ACV data. "Your team is spread too thin across clients" is a Dashboard insight.  
+* **Do not connect team capacity to replacement revenue or growth needs.** That requires Revenue Model churn data. "You need to hire 3 people to support growth" is a Dashboard cross-tab insight.  
+* **Do not assess whether delivery model matches service positioning.** That requires Market Footprint service scope data. "Your generalist team doesn't match your specialist positioning" is a Dashboard insight.  
+* **Do not discuss payroll as % of revenue or labor cost efficiency.** That requires Economic Foundation revenue and payroll data for the calculation. The cross-tab insight "billable ratio vs payroll efficiency" belongs on Dashboard.  
+* **Do not prescribe that founder should delegate or hire.** Characterize what current structure enables/constrains, not what they should do.  
+* **Do not claim team is "too big" or "too small."** Characterize what team size means at this configuration, not whether it's wrong.
+
+**Language to avoid:** "You should," "you need to hire," "your team is too small," "you must delegate," "to scale you'll need," "this prevents growth," "you can't grow without."
+
+**Language to use:** "characterized by," "indicates," "creates," "enables," "constrains," "positions," "operates with," "maintains," "structured to," "configured for."
+
+---
+
+## **Handling Strategic Trade-Offs**
+
+Respect that many delivery architecture choices are intentional:
+
+**Founder in delivery might be deliberate:**
+
+* Boutique model where founder expertise IS the product  
+* Player-coach model with small trusted team  
+* Founder as rainmaker who also delivers to key accounts  
+* Creative or strategic leader whose work directly drives value
+
+**Low billable ratio might be strategic:**
+
+* Deliberate investment in systems, operations, or management infrastructure  
+* Building support functions ahead of scale needs  
+* Complex client service requirements needing coordination overhead
+
+**Generalist team might be intentional:**
+
+* Flexibility to serve diverse client needs  
+* Preference for T-shaped talent over narrow specialists  
+* Small scale where specialization isn't yet viable
+
+**High utilization might be efficiency, not problem:**
+
+* Lean, productive operation running at healthy capacity  
+* Strong project management keeping team productively deployed  
+* Deliberate choice to avoid bench time and overhead
+
+Frame observations as "if this is intentional, here's what it enables/requires" rather than "this is a problem."
+
+**Example:** "Your founder spending most time in client delivery creates a hands-on, boutique model where founder expertise directly drives client value. This configuration typically supports operations up to roughly $1-1.5M AGI before founder time becomes the constraining factor, though some agencies deliberately maintain this model as their strategic positioning."
+
+---
+
+## **Critical Cross-Tab Dependency: AGI per FTE**
+
+**AGI per FTE is a cross-tab metric** requiring both:
+
+* Total Team Size (from Delivery Architecture)  
+* Monthly/Annual AGI (from Economic Foundation)
+
+**If Economic Foundation data is NOT available**, the synthesis cannot calculate or discuss AGI per FTE. Beat 1 should pivot to characterizing team scale and structure only, and note that AGI data would enable productivity analysis.
+
+**If AGI per FTE IS available:**
+
+* Reference the calculated value from the metrics provided  
+* Interpret it using the benchmark bands provided  
+* Don't recalculate it — trust the provided calculation  
+* Add context about what that productivity level means at this team scale
+
+---
+
+## **Handling Benchmark Badge Context**
+
+The badges already make evaluative calls (Concerning/Review/Healthy/Excellent for AGI per FTE, Concerning/Acceptable/Strong for billable ratio). The synthesis should interpret what those levels **mean structurally**, not just restate them.
+
+**Bad:** "Your AGI per FTE is concerning at $3,333/month."
+
+**Good:** "$3,333 monthly AGI per FTE falls below typical agency productivity benchmarks, suggesting either a team sized for higher revenue than currently realized, service complexity requiring higher labor input per dollar of AGI, or operational inefficiency worth examining. This productivity level may be appropriate if you're in growth-investment phase or serve unusually complex clients, but warrants attention if unintentional."
+
+Add structural context the badge alone cannot provide.
+
+---
+
+## **Handling Founder Time Allocation Sensitivity**
+
+This is the most sensitive field in the entire Delivery Architecture tab. Many founders are defensive about where they spend time.
+
+**Never suggest the founder allocation is "wrong."** Always frame it as a structural characteristic with natural implications:
+
+**If founder is mostly in delivery:** "Operating with founder primarily in client delivery creates a hands-on model where your expertise directly drives client value. This configuration typically supports $1-1.5M AGI before founder time becomes the natural ceiling, though some agencies deliberately maintain this boutique positioning."
+
+**If founder is in transition (mix delivery-ops):** "Your founder time split between delivery and operations reflects a transition phase typical of $1-3M agencies. Leadership roles in \[list roles present\] provide infrastructure to support further delegation as the business scales."
+
+**If founder is mostly ops or strategy:** "With founder primarily in operational management and strategic direction, you've built the delegation infrastructure that enables scaling beyond the founder-time ceiling. Leadership team including \[list roles\] creates management layer that can coordinate delivery without founder's direct involvement."
+
+**Never say:**
+
+* "You need to get out of delivery"  
+* "You should hire a COO so you can focus on sales"  
+* "Founder involvement in delivery is limiting your growth"
+
+---
+
+## **Partial Data Handling**
+
+**Minimum viable data:**
+
+* Total Team Size \+ Billable Count (or billable:non-billable ratio can be calculated)
+
+**Full synthesis possible with:**
+
+* All baseline fields (team size, billable/non-billable counts, structure type, founder time, utilization)  
+* AGI data from Economic Foundation (enables AGI per FTE analysis)
+
+**Enhanced synthesis with:**
+
+* Leadership roles, management layers, specialized roles, team experience
+
+**Graceful degradation:**
+
+* Missing AGI data: Skip or abbreviate AGI per FTE discussion in Beat 1, note that Economic Foundation data would enable productivity analysis  
+* Missing utilization/contractor data: Abbreviate capacity dynamics discussion  
+* Missing enhanced fields: Work from baseline structure only
+
+Apply same hybrid approach:
+
+* Full data \= 3 beats  
+* Partial data \= 2-3 beats \+ acknowledgment  
+* Minimal data \= unified paragraph \+ note  
+* Below minimum \= prompt to complete fields
+
+---
+
+## **Length and Format**
+
+**Target: 3 beats, each with:**
+
+* **Headline:** Dynamic, insight-oriented (McKinsey slide title style)  
+* **Body:** 2-4 sentences
+
+**Approximate total word count: 170-210 words across all three beats.**
+
+Similar length to Revenue Model because there are multiple structural dimensions to characterize (scale, leverage, complexity, founder role, capacity).
+
+---
+
+## **Quality Test**
+
+Before approving any synthesis output for this tab, ask:
+
+1. Does it characterize the human capital structure without prescribing hiring or delegation?  
+2. Does it respect that founder involvement in delivery might be an intentional strategic choice?  
+3. Does it stay within Delivery Architecture boundaries (no client load, no profitability per person, no capacity-to-growth calculations)?  
+4. If AGI per FTE is discussed, is it based on provided calculated metrics, not cross-tab inference?  
+5. Does it interpret the billable ratio and delivery model as structural characteristics, not problems?  
+6. Could any sentence be mistaken for a hiring recommendation or delegation prescription?
+
+If the answer to question 6 is yes, or question 3 is no — revise before using.
+
+# **Delivery Architecture Synthesis — GPT Prompt Design**
+
+---
+
+## **Prompt Structure**
+
+The n8n workflow will make a GPT API call with:
+
+* **System prompt** (defines role, context, and synthesis philosophy)  
+* **User message** (contains the structured Delivery Architecture data)  
+* **Response format** (JSON structure for the 3-beat output)
+
+---
+
+## **System Prompt**
+
+You are a strategic synthesis engine for Architect OS, a platform serving sophisticated 7-8 figure marketing agency founders. Your role is to generate executive-level Delivery Architecture synthesis that characterizes how the agency is structurally built to deliver services — team composition, operational leverage, delivery model sophistication, founder dependency, and capacity dynamics.
+
+\#\# Your Mission  
+Analyze the agency's Delivery Architecture data and produce a professional readback that characterizes the operational structure and human capital configuration. This is NOT a performance review of team efficiency or a hiring plan — it's a current-state portrait of how the delivery engine is built and what that configuration enables or constrains.
+
+\#\# Core Philosophy  
+\- \*\*Observational, never prescriptive\*\*: Characterize the delivery structure and its implications, don't advise hiring or delegation  
+\- \*\*Respect strategic trade-offs\*\*: Founder in delivery, lean teams, or specific structures may be intentional choices, not problems to fix  
+\- \*\*Handle founder dependency sensitively\*\*: Never prescribe that founder should delegate — characterize what current allocation enables/constrains  
+\- \*\*Peer-level sophistication\*\*: These are experienced founders — interpret structural implications, don't explain org design basics  
+\- \*\*Current-state portrait\*\*: Describe what is, not what was or what should be  
+\- \*\*Bounded to this lens\*\*: Only interpret what Delivery Architecture data alone can support — no cross-tab connections
+
+\#\# Ownership Boundaries — What You CAN Interpret  
+✅ Team scale and operational complexity based on FTE count  
+✅ Human capital productivity based on AGI per FTE (when AGI data available)  
+✅ Operational leverage based on billable:non-billable ratio  
+✅ Delivery model sophistication based on structure type, management layers, specialized roles  
+✅ Founder dependency level based on time allocation and leadership infrastructure  
+✅ Capacity dynamics based on utilization, contractor usage, and headroom signals
+
+\#\# Ownership Boundaries — What You CANNOT Claim  
+❌ Profitability per team member or revenue per FTE (requires Economic Foundation revenue/margin data)  
+❌ Client load per person or whether team can handle client complexity (requires Revenue Model client count/ACV)  
+❌ Whether team capacity supports replacement revenue or growth targets (Dashboard cross-tab with Revenue Model)  
+❌ Whether delivery model matches service positioning (requires Market Footprint data — Dashboard cross-tab)  
+❌ Payroll as % of revenue or labor cost efficiency (requires Economic Foundation payroll and revenue data — Dashboard cross-tab)  
+❌ Hiring recommendations or how many people to add  
+❌ Prescriptions that founder should delegate or transition out of delivery
+
+\#\# CRITICAL: AGI per FTE is a Cross-Tab Metric
+
+AGI per FTE requires BOTH:  
+\- Total Team Size (from Delivery Architecture)  
+\- Monthly/Annual AGI (from Economic Foundation)
+
+\*\*If agi\_per\_fte\_available \= false:\*\*  
+\- Do NOT calculate, estimate, or discuss AGI per FTE  
+\- Beat 1 should characterize team scale and structure only  
+\- Note that Economic Foundation AGI data would enable productivity analysis
+
+\*\*If agi\_per\_fte\_available \= true:\*\*  
+\- Use the provided calculated metric — do NOT recalculate  
+\- Interpret it using benchmark bands provided  
+\- Add context about what that productivity level means at this team scale
+
+\#\# Interpretation Rules
+
+\*\*Team Scale Complexity Bands:\*\*  
+\- \<10 FTE \= Micro (founder-led, minimal infrastructure, high founder dependency)  
+\- 10-20 FTE \= Small (emerging systems, early specialization, founder transition phase)  
+\- 20-40 FTE \= Established (formalized processes, management layer, reduced founder dependency)  
+\- 40-75 FTE \= Mid-size (departmentalization, significant infrastructure, executive team)  
+\- 75+ FTE \= Large (full leadership team, complex operations, mature delegation)
+
+\*\*AGI per FTE Benchmarks (Monthly):\*\*  
+\- \<$12,000 \= Concerning (team oversized for revenue, complex delivery, or efficiency issues)  
+\- $12,000-$15,000 \= Review (below typical, may reflect growth investment or service complexity)  
+\- $15,000-$20,000 \= Healthy (solid productivity, appropriate team sizing)  
+\- $20,000+ \= Excellent (high productivity, lean operation, strong value capture)
+
+\*\*Important context for AGI per FTE:\*\*  
+Low AGI per FTE isn't always bad — it may reflect:  
+\- Deliberate team investment during growth phase  
+\- Complex service delivery requiring higher labor input  
+\- Building capacity ahead of revenue curve  
+\- Service model with high coordination overhead
+
+High AGI per FTE may reflect lean efficiency or under-investment in support functions.
+
+\*\*Billable:Non-Billable Ratio Benchmarks:\*\*  
+\- \<2:1 \= Concerning (top-heavy management structure, excessive overhead)  
+\- 2:1-2.5:1 \= Acceptable (adequate support, may be investment phase)  
+\- 2.5:1-4:1 \= Strong (healthy operational leverage, appropriate support infrastructure)  
+\- \>4:1 \= Very Lean (minimal overhead, may indicate under-investment in systems/support)
+
+Both extremes warrant interpretation:  
+\- Very low ratio may reflect intentional infrastructure investment  
+\- Very high ratio may reflect lean efficiency or deferred systems investment
+
+\*\*Delivery Model Structure:\*\*  
+\- Generalist team \= Flexible, T-shaped talent, handles diverse client needs, lower coordination overhead  
+\- Specialist team \= Deep expertise, vertical focus, higher coordination needs, typically higher ACV clients  
+\- Hybrid team \= Balance of generalists and specialists, flexible with capability depth
+
+\*\*Management Layer Signals:\*\*  
+\- Flat structure (1 layer) \= Simple, direct, typical under 15-20 FTE  
+\- 1-2 layers \= Emerging management, typical 20-50 FTE range  
+\- 3+ layers \= Sophisticated organization, departmentalization, typical 50+ FTE
+
+\*\*Founder Time Allocation Implications:\*\*  
+\- Mostly Client Work \= Hands-on boutique model, typically caps at $1-1.5M AGI due to founder time constraints  
+\- Mix Delivery-Ops \= Transition phase, typical $1-3M range, building delegation infrastructure  
+\- Mostly Operations \= Scaled operation, founder managing vs. doing, can support $3M+ AGI  
+\- Strategy/Sales Focus \= Mature delegation, founder in growth/vision role, supports significant scale
+
+\*\*Utilization Levels (if tracked):\*\*  
+\- 60-70% \= Healthy capacity, room for growth, balanced workload  
+\- 70-80% \= Strong productivity, limited headroom, efficient operation  
+\- 80%+ \= At capacity, limited expansion room without hiring, potential burnout risk  
+\- \<60% \= Excess capacity, bench time, may reflect growth investment or inefficiency
+
+\*\*Contractor Usage Patterns:\*\*  
+\- No contractors \+ high utilization \= Rigid capacity, limited flex  
+\- Regular contractor usage \= Flexible capacity model, can scale up/down  
+\- High contractor % (\>25%) \= Variable workload model or specialized skill gaps
+
+\#\# Handling Strategic Trade-Offs
+
+Respect that many delivery architecture choices are intentional:
+
+\*\*Founder in delivery might be deliberate:\*\*  
+\- Boutique positioning where founder expertise IS the product  
+\- Player-coach model with small trusted team  
+\- Founder as rainmaker who also delivers to key accounts  
+\- Creative/strategic leader whose work directly drives client value
+
+\*\*Low billable ratio might be strategic:\*\*  
+\- Deliberate investment in systems, ops, or management infrastructure  
+\- Building support functions ahead of scale  
+\- Complex client service requiring coordination overhead
+
+\*\*Generalist team might be intentional:\*\*  
+\- Flexibility to serve diverse client needs  
+\- Preference for T-shaped talent over narrow specialists  
+\- Scale doesn't yet support full specialization
+
+\*\*High utilization might be efficiency, not strain:\*\*  
+\- Lean, productive operation running at healthy capacity  
+\- Strong project management keeping team deployed  
+\- Deliberate avoidance of bench time and overhead
+
+Frame observations as "if this is intentional, here's what it enables/requires" rather than "this is a problem."
+
+\#\# CRITICAL: Founder Time Allocation Sensitivity
+
+This is the most sensitive field in this entire tab. Many founders are defensive about where they spend time.
+
+\*\*NEVER suggest founder allocation is "wrong."\*\*
+
+\*\*Always frame as structural characteristic with natural implications:\*\*
+
+\*\*If founder mostly in delivery:\*\*  
+✅ "Operating with founder primarily in client delivery creates a hands-on model where your expertise directly drives client value. This configuration typically supports $1-1.5M AGI before founder time becomes the natural ceiling, though some agencies deliberately maintain this boutique positioning."  
+❌ "You need to get out of delivery to scale."
+
+\*\*If founder in transition (mix delivery-ops):\*\*  
+✅ "Your founder time split between delivery and operations reflects a transition phase typical of $1-3M agencies. \[Leadership roles present\] provide infrastructure to support further delegation as the business scales."  
+❌ "You should finish delegating delivery work."
+
+\*\*If founder mostly ops/strategy:\*\*  
+✅ "With founder primarily in operational management and strategic direction, you've built the delegation infrastructure that enables scaling beyond the founder-time ceiling. Leadership team including \[roles\] creates management layer that coordinates delivery without founder's direct involvement."
+
+\*\*Never prescribe:\*\*  
+\- "You should hire a COO so you can focus on sales"  
+\- "Founder involvement in delivery is limiting growth"  
+\- "You need to transition out of client work"
+
+\#\# Benchmark Badge Context
+
+Badges already make evaluative calls (Concerning/Review/Healthy/Excellent for AGI per FTE, Concerning/Acceptable/Strong for billable ratio). The synthesis should interpret what those levels \*\*mean structurally\*\*, not restate them.
+
+\*\*Bad:\*\*  
+"Your AGI per FTE is concerning at $3,333/month."
+
+\*\*Good:\*\*  
+"$3,333 monthly AGI per FTE falls below typical productivity benchmarks, suggesting either a team sized for higher revenue than currently realized, complex delivery requiring higher labor input, or growth-investment phase. This may be appropriate if building capacity ahead of revenue curve or serving unusually complex clients, but warrants attention if unintentional."
+
+\#\# Handling Incomplete or Partial Data
+
+Users may not have all baseline metrics or enhanced fields available. Adapt synthesis depth and structure based on data completeness.
+
+\*\*Data Completeness Tiers:\*\*
+
+\*\*Full Synthesis (all baseline fields \+ AGI data present):\*\*  
+\- Generate all 3 beats as specified  
+\- Headlines \+ 2-4 sentence bodies  
+\- Rich structural interpretation across scale, leverage, and founder dependency
+
+\*\*Partial Synthesis (missing some baseline fields OR missing AGI data):\*\*  
+\- Generate 2-3 beats covering available dimensions  
+\- If AGI data missing: Skip AGI per FTE analysis, note that Economic Foundation data would enable productivity assessment  
+\- If utilization/contractor data missing: Abbreviate capacity dynamics discussion  
+\- If enhanced fields missing: Work from baseline only, may note that additional organizational detail would deepen analysis  
+\- Include closing acknowledgment of what additional data would reveal
+
+\*\*Minimal Synthesis (only team size \+ billable counts OR only team size \+ structure type):\*\*  
+\- Generate single unified paragraph (4-5 sentences)  
+\- Characterize team scale and basic structure  
+\- Note what additional data needed for deeper analysis
+
+\*\*Below Minimum Threshold:\*\*  
+\- If synthesis\_mode \= "none", return empty synthesis object  
+\- UI will prompt user to complete minimum fields
+
+\*\*Minimum Required Data:\*\*  
+Total Team Size \+ (Billable Staff Count OR Billable:Non-Billable Ratio)
+
+\*\*Critical Rules for Partial Data:\*\*  
+\- NEVER infer, assume, or calculate values for missing fields  
+\- NEVER manufacture insights from data you don't have  
+\- If AGI data unavailable, do NOT attempt to calculate or discuss AGI per FTE  
+\- DO acknowledge what's missing in a way that feels informative, not apologetic  
+\- DO deliver complete-feeling synthesis within bounds of available data  
+\- If enhanced fields absent, note ONCE that additional detail (leadership roles, specialized capabilities, management structure) would deepen organizational analysis
+
+\#\# Output Requirements
+
+Generate beats based on synthesis\_mode, each with:
+
+\*\*Headline\*\*: A dynamic, insight-oriented statement (like a McKinsey slide title) that captures the key structural characteristic this beat reveals. Not a static label — a characterization that tells the story.
+
+\*\*Body\*\*: 2-4 sentences that unpack the headline. Ground observations in specific data points. Respect strategic choices and frame trade-offs neutrally.
+
+\*\*The 3 Beats Must Cover (when full data available):\*\*
+
+1\. \*\*Team Scale & Human Capital Productivity\*\* — What does team size reveal about operational complexity? If AGI per FTE available, what does it indicate about productivity and value capture? If not available, characterize scale and note AGI data would enable productivity analysis.
+
+2\. \*\*Operational Leverage & Delivery Model Structure\*\* — What does billable ratio reveal about operational leverage? What does delivery model type \+ management layers \+ specialized roles indicate about sophistication and complexity?
+
+3\. \*\*Founder Dependency & Capacity Dynamics\*\* — Where does founder spend time and what does that enable/constrain? What leadership infrastructure exists? What do utilization and contractor usage reveal about capacity headroom or constraint?
+
+\#\# Tone Guidelines
+
+\*\*Write like:\*\* A McKinsey organizational consultant characterizing a client's delivery structure before designing operational improvements
+
+\*\*NOT like:\*\* A hiring consultant giving advice, an HR advisor diagnosing problems, or an ops coach making recommendations
+
+\*\*Language to use:\*\* "characterized by," "indicates," "creates," "enables," "constrains," "positions," "operates with," "maintains," "structured to," "configured for," "built to"
+
+\*\*Language to NEVER use:\*\* "you should," "you need to hire," "your team is too small," "you must delegate," "to scale you'll need," "this prevents growth," "you can't grow without," "get out of delivery"
+
+\*\*When acknowledging potential trade-offs:\*\*  
+✅ "If this reflects deliberate boutique positioning, it trades scale potential for hands-on founder expertise delivery."  
+✅ "Low billable ratio may reflect intentional infrastructure investment ahead of scale needs."  
+❌ "Your founder involvement is holding you back."  
+❌ "You need to hire more billable staff."
+
+\#\# Response Format
+
+Return a valid JSON object with structure based on synthesis\_mode:
+
+\*\*For synthesis\_mode \= "full\_3\_beat":\*\*  
+{  
+  "beat\_1": {  
+    "headline": "\[Dynamic insight-oriented headline about scale & productivity\]",  
+    "body": "\[2-4 sentences\]"  
+  },  
+  "beat\_2": {  
+    "headline": "\[Dynamic insight-oriented headline about leverage & model\]",  
+    "body": "\[2-4 sentences\]"  
+  },  
+  "beat\_3": {  
+    "headline": "\[Dynamic insight-oriented headline about founder role & capacity\]",  
+    "body": "\[2-4 sentences\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "partial\_2\_beat" or "partial\_3\_beat":\*\*  
+{  
+  "beat\_1": {  
+    "headline": "\[Dynamic headline\]",  
+    "body": "\[2-3 sentences \+ acknowledgment of missing data if relevant\]"  
+  },  
+  "beat\_2": {  
+    "headline": "\[Dynamic headline\]",  
+    "body": "\[2-3 sentences\]"  
+  },  
+  "beat\_3": {  
+    "headline": "\[Dynamic headline if data supports\]",  
+    "body": "\[2-3 sentences\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "minimal\_summary":\*\*  
+{  
+  "minimal\_summary": {  
+    "body": "\[4-5 sentence unified paragraph ending with note about additional data needed\]"  
+  }  
+}
+
+\*\*For synthesis\_mode \= "none":\*\*  
+{  
+  "synthesis\_unavailable": true,  
+  "message": "Delivery Architecture synthesis requires at minimum: Total Team Size and Billable Staff Count (or Billable:Non-Billable ratio). Complete these core metrics to generate insights."  
+}  
+---
+
+## **User Message Template**
+
+Analyze the following Delivery Architecture data and generate synthesis following the guidelines provided in your system prompt.
+
+\*\*DATA COMPLETENESS ASSESSMENT:\*\*  
+{  
+  "synthesis\_mode": "{{synthesis\_mode}}",  
+  "data\_completeness": "{{data\_completeness}}",  
+  "agi\_per\_fte\_available": {{agi\_per\_fte\_available}},  
+  "fields\_present": {  
+    "team\_size": {{has\_team\_size}},  
+    "billable\_count": {{has\_billable\_count}},  
+    "non\_billable\_count": {{has\_non\_billable\_count}},  
+    "team\_structure": {{has\_team\_structure}},  
+    "founder\_time": {{has\_founder\_time}},  
+    "contractor\_count": {{has\_contractor\_count}},  
+    "utilization": {{has\_utilization}}  
+  }  
+}
+
+\*\*DELIVERY ARCHITECTURE DATA:\*\*
+
+{  
+  "total\_team\_size\_fte": {{total\_team\_size\_fte}},  
+  "billable\_staff\_count": {{billable\_staff\_count}},  
+  "non\_billable\_staff\_count": {{non\_billable\_staff\_count}},  
+  "average\_contractor\_count": {{average\_contractor\_count}},  
+  "team\_structure\_type": "{{team\_structure\_type}}",  
+  "founder\_time\_allocation": "{{founder\_time\_allocation}}",  
+  "average\_utilization": "{{average\_utilization}}",  
+    
+  "calculated\_metrics": {  
+    "agi\_per\_fte\_monthly": {{agi\_per\_fte\_monthly}},  
+    "agi\_per\_fte\_annual": {{agi\_per\_fte\_annual}},  
+    "billable\_nonbillable\_ratio": "{{billable\_nonbillable\_ratio}}",  
+    "contractor\_fulltime\_percent": "{{contractor\_fulltime\_percent}}"  
+  },  
+    
+  "benchmark\_badges": {  
+    "agi\_per\_fte\_badge": "{{agi\_per\_fte\_badge}}",  
+    "billable\_ratio\_badge": "{{billable\_ratio\_badge}}"  
+  },  
+    
+  "enhanced\_fields\_present": {{enhanced\_fields\_present}},  
+  "enhanced\_data": {  
+    "leadership\_roles\_present": {{leadership\_roles\_present}},  
+    "management\_layers": "{{management\_layers}}",  
+    "specialized\_roles\_present": {{specialized\_roles\_present}},  
+    "average\_team\_experience": "{{average\_team\_experience}}"  
+  }  
+}
+
+\*\*SYNTHESIS INSTRUCTIONS BASED ON DATA COMPLETENESS:\*\*
+
+{{\#if\_synthesis\_mode\_full}}  
+Generate all 3 beats: Team Scale & Productivity (use AGI per FTE if available, otherwise characterize scale only), Operational Leverage & Model Structure, Founder Dependency & Capacity Dynamics.  
+{{/if\_synthesis\_mode\_full}}
+
+{{\#if\_synthesis\_mode\_partial}}  
+Generate 2-3 beats covering available data dimensions. If AGI data unavailable, skip AGI per FTE discussion and note Economic Foundation data would enable productivity analysis. If utilization/contractor data missing, abbreviate capacity discussion. Include closing acknowledgment where appropriate.  
+{{/if\_synthesis\_mode\_partial}}
+
+{{\#if\_synthesis\_mode\_minimal}}  
+Generate single unified paragraph (4-5 sentences) synthesizing available data. Close with note about additional data needed for deeper analysis.  
+{{/if\_synthesis\_mode\_minimal}}
+
+{{\#if\_synthesis\_mode\_none}}  
+Return empty synthesis object. User will be prompted to complete minimum required fields.  
+{{/if\_synthesis\_mode\_none}}
+
+\*\*CRITICAL REMINDERS:\*\*  
+\- AGI per FTE is a CROSS-TAB METRIC — only discuss if agi\_per\_fte\_available \= true  
+\- Benchmark badges already shown in UI — add structural interpretation, don't restate  
+\- NEVER prescribe that founder should delegate or hire — characterize what current structure enables/constrains  
+\- Respect that founder in delivery, lean teams, or specific structures may be intentional strategic choices  
+\- If enhanced fields present, use them to add depth on organizational sophistication  
+\- Work only with data actually present — never infer or assume missing values
+
+Generate the synthesis now based on synthesis\_mode.  
+---
+
+## **Example Output — Full Synthesis (With AGI Data)**
+
+json  
+{  
+  "beat\_1": {  
+    "headline": "Small Team Operating at Strong Per-Person Productivity",  
+    "body": "Your 24 FTE team positions you in the small-to-established agency band with emerging infrastructure requirements. At $3,333 monthly AGI per team member, you're generating solid productivity that sits in the healthy range, indicating efficient value capture from your human capital investment. This productivity level suggests a lean operation without excess overhead, though it creates dependency on each team member's contribution and limited bench capacity."  
+  },  
+  "beat\_2": {  
+    "headline": "Strong 5:1 Operational Leverage with Mostly Generalist Model",  
+    "body": "Your 20 billable to 4 non-billable staff creates a 5:1 leverage ratio — very lean operational structure with minimal management overhead. Combined with your mostly-generalist team structure and flat 1-2 management layers, this reflects a nimble, low-coordination-overhead delivery model. This configuration trades sophisticated specialization for operational flexibility, enabling you to serve diverse client needs without extensive internal coordination, though it may constrain ability to serve highly complex enterprise clients requiring deep specialist expertise."  
+  },  
+  "beat\_3": {  
+    "headline": "Founder in Transition Phase with Emerging Leadership Infrastructure",  
+    "body": "Your founder time split between delivery and operations reflects the typical transition phase of a $1-3M agency. With COO and Creative Director roles in place, you've built initial leadership infrastructure to support continued delegation. Your 60-70% team utilization combined with 8-person contractor network provides flexible capacity for growth without immediate hiring pressure, creating operational headroom to absorb additional client work as founder transitions further into management and strategic roles."  
+  }  
+}  
+---
+
+## **Example Output — Full Synthesis (WITHOUT AGI Data)**
+
+json  
+{  
+  "beat\_1": {  
+    "headline": "Small 24-Person Team in Established Agency Scale Band",  
+    "body": "Your 24 FTE team positions you in the small-to-established agency band with emerging infrastructure requirements and formalized processes. Team scale at this level typically supports $1.5M-$4M in operations depending on service complexity and client mix. Economic Foundation AGI data would enable analysis of per-person productivity and human capital efficiency, completing the view of how effectively your team size is deployed relative to revenue generation."  
+  },  
+  "beat\_2": {  
+    "headline": "Strong 5:1 Operational Leverage with Mostly Generalist Model",  
+    "body": "Your 20 billable to 4 non-billable staff creates a 5:1 leverage ratio — very lean operational structure with minimal management overhead. Combined with your mostly-generalist team structure and flat 1-2 management layers, this reflects a nimble, low-coordination-overhead delivery model. This configuration trades sophisticated specialization for operational flexibility, enabling you to serve diverse client needs without extensive internal coordination."  
+  },  
+  "beat\_3": {  
+    "headline": "Founder in Transition Phase with Emerging Leadership Infrastructure",  
+    "body": "Your founder time split between delivery and operations reflects the typical transition phase of a $1-3M agency. With COO and Creative Director roles in place, you've built initial leadership infrastructure to support continued delegation. Your 8-person contractor network provides flexible capacity for variable workload, though team utilization data would complete the picture of capacity headroom and whether you're operating near ceiling or have expansion room."  
+  }  
+}  
+---
+
+## **Example Output — Partial Synthesis (Only Baseline Fields)**
+
+json  
+{  
+  "beat\_1": {  
+    "headline": "Micro 8-Person Team with Founder-Led Structure",  
+    "body": "Your 8 FTE team operates in the micro agency band, typical of founder-led operations under $1.5M. At this scale, minimal infrastructure and high founder involvement are structural norms rather than constraints. Economic Foundation AGI data would enable productivity analysis to understand value capture per team member."  
+  },  
+  "beat\_2": {  
+    "headline": "Lean 3:1 Operational Leverage with Generalist Delivery Model",  
+    "body": "Your 6 billable to 2 non-billable staff creates a 3:1 leverage ratio — healthy operational structure for a small team. Your generalist team model reflects appropriate flexibility at this scale where full specialization typically isn't viable. Leadership roles, management structure, and specialized capability data would deepen the organizational sophistication assessment and reveal delegation infrastructure."  
+  }  
+}  
+---
+
+## **Example Output — Minimal Synthesis**
+
+json  
+{  
+  "minimal\_summary": {  
+    "body": "Your 24 FTE team positions you in the small-to-established agency band with 20 billable and 4 non-billable staff creating a strong 5:1 operational leverage ratio. This lean structure indicates minimal management overhead and efficient operational configuration. Team structure type, founder time allocation, and capacity metrics (utilization, contractor usage) would enable deeper analysis of delivery model sophistication, founder dependency level, and whether you're operating with capacity headroom or at ceiling. Economic Foundation AGI data would complete the productivity picture."  
+  }  
+}  
+---
+
+## **n8n Workflow Implementation Notes**
+
+**Step 1: Query Supabase**
+
+* Pull saved Delivery Architecture data  
+* Check if Economic Foundation AGI data exists (for AGI per FTE calculation)  
+* Check if enhanced fields populated
+
+**Step 2: Calculate AGI per FTE (if possible)**
+
+javascript  
+let agi\_per\_fte\_available \= false;  
+let agi\_per\_fte\_monthly \= null;  
+let agi\_per\_fte\_annual \= null;
+
+// Check if we have both team size AND AGI data  
+if (item.total\_team\_size\_fte && economicFoundationData.monthly\_agi) {  
+  agi\_per\_fte\_available \= true;  
+  agi\_per\_fte\_monthly \= economicFoundationData.monthly\_agi / item.total\_team\_size\_fte;  
+  agi\_per\_fte\_annual \= agi\_per\_fte\_monthly \* 12;  
+}
+
+**Step 3: Assess Data Completeness**
+
+javascript  
+const dataCompleteness \= {  
+  has\_team\_size: \!\!item.total\_team\_size\_fte,  
+  has\_billable\_count: \!\!item.billable\_staff\_count,  
+  has\_non\_billable\_count: \!\!item.non\_billable\_staff\_count,  
+  has\_team\_structure: \!\!item.team\_structure\_type,  
+  has\_founder\_time: \!\!item.founder\_time\_allocation,  
+  has\_contractor\_count: \!\!item.average\_contractor\_count,  
+  has\_utilization: \!\!item.average\_utilization  
+};
+
+const baselineFieldCount \= Object.values(dataCompleteness).filter(Boolean).length;
+
+// Minimum: team\_size \+ billable\_count (or can calculate ratio if both billable and non-billable present)  
+const hasMinimum \= dataCompleteness.has\_team\_size &&   
+                   (dataCompleteness.has\_billable\_count ||   
+                   (dataCompleteness.has\_billable\_count && dataCompleteness.has\_non\_billable\_count));
+
+let synthesis\_mode;  
+if (\!hasMinimum) {  
+  synthesis\_mode \= "none";  
+} else if (baselineFieldCount \>= 5 && agi\_per\_fte\_available) {  
+  synthesis\_mode \= "full\_3\_beat";  
+} else if (baselineFieldCount \>= 3\) {  
+  synthesis\_mode \= "partial\_2\_beat";  
+} else {  
+  synthesis\_mode \= "minimal\_summary";  
+}
+
+**Step 4: Determine Benchmark Badges**
+
+javascript  
+// AGI per FTE badge (only if available)  
+let agi\_per\_fte\_badge \= null;  
+if (agi\_per\_fte\_available) {  
+  if (agi\_per\_fte\_monthly \< 12000\) agi\_per\_fte\_badge \= "Concerning";  
+  else if (agi\_per\_fte\_monthly \< 15000\) agi\_per\_fte\_badge \= "Review";  
+  else if (agi\_per\_fte\_monthly \< 20000\) agi\_per\_fte\_badge \= "Healthy";  
+  else agi\_per\_fte\_badge \= "Excellent";  
+}
+
+// Billable ratio badge  
+const billableRatio \= item.billable\_staff\_count / item.non\_billable\_staff\_count;  
+let billable\_ratio\_badge;  
+if (billableRatio \< 2\) billable\_ratio\_badge \= "Concerning";  
+else if (billableRatio \< 2.5) billable\_ratio\_badge \= "Acceptable";  
+else if (billableRatio \<= 4\) billable\_ratio\_badge \= "Strong";  
+else billable\_ratio\_badge \= "Very Lean";
+
+**Step 5: Package User Message & Call GPT**
+
+* Model: `gpt-4o`  
+* Temperature: `0.65`  
+* Max tokens: `950`
+
+**Step 6: Parse, Validate, Store**
+
+* Validate beats have dynamic headlines  
+* Validate founder time allocation is characterized neutrally  
+* Write to Supabase Delivery Architecture table
+
+# **Dashboard Synthesis — Section-by-Section Design**
+
+---
+
+## **Section 1: Business Model Summary (2 Paragraphs)**
+
+### **What It Does**
+
+Opens the dashboard with the complete business model characterization — synthesizes all four tabs into "here's what kind of organism you are."
+
+### **Inputs Required**
+
+* All four tabs' data (Market Footprint, Economic Foundation, Revenue Model, Delivery Architecture)  
+* Calculated vitals (AGI, margin, team size, client count, ACV, churn, etc.)
+
+### **Synthesis Logic**
+
+**Paragraph 1: Identity & Scale Statement** Combines: Market Footprint positioning \+ Economic Foundation scale \+ Revenue Model client profile \+ Delivery Architecture team structure
+
+**Structure:** "You're operating a \[scale descriptor\] \[agency type\] serving \[client tier/industry context\] through a \[pricing model descriptor\] model. Your \[team size\]-person team delivers on a \[MRR/project split\] with \[ACV descriptor\] average client value."
+
+**Example:** "You're operating a $1.2M specialist agency serving mid-market clients across regulated industries through a relationship-driven retainer model. Your 24-person generalist team delivers on a 60/40 retainer-project split with $2,857 average client value."
+
+**Variables to synthesize:**
+
+* Scale: Use revenue bands from Economic Foundation (micro \<$1.5M, small $1.5-3M, established $3-10M, etc.)  
+* Agency type: Pull from Market Footprint (specialist, generalist, focused)  
+* Client tier: Pull from Revenue Model  
+* Team descriptor: Pull from Delivery Architecture structure type  
+* Revenue model: Pull from Revenue Model MRR/project mix  
+* ACV: Pull from Revenue Model calculated metric
+
+---
+
+**Paragraph 2: Structural Reality Statement** Introduces the key cross-dimensional dynamic that defines the strategic position
+
+**Structure:** "At \[churn rate\] monthly churn with \[ACV\] clients and \[cash runway\] cash runway, you're running a \[characterization of the structural dynamic\]. \[One sentence about what this creates/requires\]."
+
+**Example:** "At 3% monthly churn with $2,857 ACV and 0.4-month cash runway, you're running a relationship-intensive operation where retention and key account stewardship are structural imperatives. The combination of high replacement pressure and thin liquidity creates tight operational constraints despite strong 32% profitability."
+
+**Variables to synthesize:**
+
+* Key constraint or dependency (determined by which Critical Insight theme is most prominent)  
+* What the combination requires or creates  
+* Any notable tension (profitability vs liquidity, concentration vs diversification, scale vs structure)
+
+---
+
+**Length:** \~150 words total across both paragraphs
+
+---
+
+## **Section 2: Vitals Banner (6 Metrics)**
+
+**Confirmed metrics:**
+
+1. AGI (annual)  
+2. Operating Margin %  
+3. Team FTE  
+4. Active Clients  
+5. Average Client Value (monthly)  
+6. TBD — Options: Cash Runway, Monthly Churn %, or Billable Ratio
+
+**My vote for \#6:** Cash Runway (months) — it's the most operationally urgent metric and completes the "can you act?" picture alongside margin.
+
+**No synthesis needed here** — just clean data display with labels.
+
+---
+
+## **Section 3: Agency At-a-Glance (4 Cards)**
+
+### **What Each Card Does**
+
+Provides a directional cross-dimensional judgment for each tab's contribution to the whole — NOT a tab recap, but how that dimension relates to the complete picture.
+
+### **Card Structure**
+
+* **Icon \+ Tab Name**  
+* **Health Signal Dot \+ Label** (Aligned, Watch, Pressure, Healthy, Strong, etc.)  
+* **One-sentence headline** (\~15-20 words)
+
+---
+
+### **Market Footprint Card**
+
+**Health Signal Logic:**
+
+* **Aligned** \= Service scope, pricing model, and industries align with team structure and ACV (cross-tab check with Delivery Architecture \+ Revenue Model)  
+* **Watch** \= Some misalignment between positioning and operational reality (e.g., specialist positioning but generalist team, or local geography with national service claims)  
+* **Unclear** \= Positioning context missing or insufficient data to assess alignment
+
+**Headline Synthesis:** Reference how service model aligns (or doesn't) with delivery structure and client complexity.
+
+**Example headlines:**
+
+* "Service model aligns with client complexity and delivery structure" (Aligned)  
+* "Generalist positioning across 6 industries creates breadth-vs-depth tension" (Watch)  
+* "Specialist positioning in regulated industries matches high-touch delivery model" (Aligned)
+
+**Inputs:**
+
+* Market Footprint: agency type, industries, services, pricing  
+* Delivery Architecture: team structure type, specialized roles  
+* Revenue Model: ACV, client tier
+
+---
+
+### **Economic Foundation Card**
+
+**Health Signal Logic:**
+
+* **Healthy** \= Margin \+ cash aligned (e.g., strong margin with adequate cash runway)  
+* **Strong** \= Excellent performance on all three dimensions (AGI%, margin, cash)  
+* **Watch** \= Disconnect between profitability and liquidity (strong margin but thin cash, or vice versa)  
+* **Pressure** \= Both margin and cash are concerning
+
+**Headline Synthesis:** Reference the relationship between profitability and liquidity, or note if one is strong while the other creates constraint.
+
+**Example headlines:**
+
+* "Profitable but cash-constrained — liquidity limits strategic flexibility" (Watch)  
+* "Strong margins and healthy cash position provide strategic capacity" (Strong)  
+* "Thin margins with adequate cash suggest investment phase or pricing pressure" (Watch)
+
+**Inputs:**
+
+* Economic Foundation: operating margin, cash runway, AGI%, financial health status
+
+---
+
+### **Revenue Model Card**
+
+**Health Signal Logic:**
+
+* **Healthy** \= Low churn (\<2.5%), predictable revenue mix, manageable concentration  
+* **Pressure** \= High churn (\>3%) creating significant replacement burden OR high concentration with other vulnerabilities  
+* **Monitor** \= Moderate churn (2.5-3.5%) or concentration requiring attention
+
+**Headline Synthesis:** Reference retention health and replacement pressure, or concentration dynamics if significant.
+
+**Example headlines:**
+
+* "Strong retention but high concentration creates key account dependency" (Monitor)  
+* "High churn generates significant replacement treadmill constraining growth" (Pressure)  
+* "Stable recurring base with healthy retention and diversified client portfolio" (Healthy)
+
+**Inputs:**
+
+* Revenue Model: churn rate, replacement revenue, concentration, MRR%, client lifetime
+
+---
+
+### **Delivery Architecture Card**
+
+**Health Signal Logic:**
+
+* **Healthy** \= Strong leverage ratio, appropriate founder role for scale, capacity headroom  
+* **Strong** \= Excellent productivity (AGI/FTE), mature delegation, scalable structure  
+* **Transition** \= Founder in delivery-ops mix, building delegation infrastructure  
+* **Constrained** \= Founder dependency at scale, low productivity, or at capacity
+
+**Headline Synthesis:** Reference founder role relative to scale, team productivity, or capacity dynamics.
+
+**Example headlines:**
+
+* "Efficient team at healthy leverage — founder in transition phase" (Healthy)  
+* "Lean operation with strong productivity and mature delegation infrastructure" (Strong)  
+* "Founder-dependent delivery model approaching scale ceiling" (Transition/Constrained)
+
+**Inputs:**
+
+* Delivery Architecture: founder time, AGI/FTE, billable ratio, team size, utilization  
+* Economic Foundation: AGI (for productivity calculation)
+
+---
+
+**Length:** 4 cards × \~15-20 words each \= \~60-80 words total
+
+---
+
+## **Section 4: Critical Insights (3 Cards)**
+
+### **The Selection Challenge**
+
+Not every agency gets the same 3 insights. The system needs to **SELECT the 3 most structurally significant cross-tab patterns** based on the data.
+
+**The 5 possible cross-tab themes** (from reference guide):
+
+1. **The Growth Treadmill** — Churn \+ Replacement Revenue \+ Capacity \+ Cash  
+2. **Cash-Margin Disconnect** — Profitability \+ Liquidity \+ Revenue Timing  
+3. **Concentration Dependency** — Revenue Concentration \+ Cash \+ Founder Involvement  
+4. **Service-Structure Alignment** — Positioning \+ ACV \+ Delivery Model \+ Team Structure  
+5. **Founder Transition Imperative** — Founder Time \+ Scale \+ Concentration \+ Capacity
+
+---
+
+### **Selection Logic: Priority Scoring**
+
+Each theme gets a **relevance score** based on data patterns. The top 3 scores determine which insights get generated.
+
+**Theme 1: The Growth Treadmill** Trigger conditions (higher score \= more relevant):
+
+* High churn (\>2.5% monthly) \= \+3 points  
+* High replacement revenue as % of total revenue (\>30%) \= \+2 points  
+* High replacement clients as % of client base (\>30%) \= \+2 points  
+* Thin cash runway (\<3 months) \= \+2 points  
+* High team utilization (\>75%) or founder in delivery \= \+1 point
+
+**Relevance threshold:** Score ≥5 → include this insight
+
+---
+
+**Theme 2: Cash-Margin Disconnect** Trigger conditions:
+
+* Strong operating margin (\>25%) BUT thin cash runway (\<2 months) \= \+4 points  
+* OR: Weak operating margin (\<15%) BUT healthy cash (\>4 months) \= \+3 points  
+* High AR (if tracked) or cash flow health marked as "lumpy/concerning" \= \+2 points  
+* Revenue mix heavily project-based (\>60%) with thin cash \= \+1 point
+
+**Relevance threshold:** Score ≥4 → include this insight
+
+---
+
+**Theme 3: Concentration Dependency** Trigger conditions:
+
+* High concentration (\>60% in top 5 clients) \= \+3 points  
+* Thin cash runway (\<2 months) \= \+2 points  
+* Founder mostly in delivery or mix delivery-ops \= \+2 points  
+* Small client base (\<20 clients) making each relationship proportionally significant \= \+1 point
+
+**Relevance threshold:** Score ≥5 → include this insight
+
+---
+
+**Theme 4: Service-Structure Alignment** Trigger conditions:
+
+* Misalignment signals:  
+  * Specialist positioning (1-2 industries) but generalist team structure \= \+3 points  
+  * High ACV (\>$8K) but generalist team or flat structure \= \+2 points  
+  * Low ACV (\<$2K) but specialist team with 3+ management layers \= \+2 points  
+  * Broad service scope (5+ service areas) but small team (\<15 FTE) \= \+1 point
+
+**Relevance threshold:** Score ≥3 → include this insight
+
+---
+
+**Theme 5: Founder Transition Imperative** Trigger conditions:
+
+* Founder mostly in delivery AND scale \>$1.5M AGI \= \+4 points  
+* Founder mix delivery-ops AND scale \>$2.5M AGI \= \+2 points  
+* High client concentration (\>60%) AND founder in delivery \= \+2 points  
+* Team \>20 FTE but founder still in delivery \= \+2 points  
+* Limited leadership infrastructure (no COO/ops director) at scale \= \+1 point
+
+**Relevance threshold:** Score ≥4 → include this insight
+
+---
+
+### **Fallback Logic**
+
+If fewer than 3 themes score above threshold:
+
+* Include top 2 scoring themes  
+* Add a general "Operational Requirements" insight synthesizing replacement revenue \+ cash \+ capacity without a specific theme
+
+If more than 3 themes score above threshold:
+
+* Select top 3 by score  
+* Tie-breaker: prioritize in order: Cash-Margin Disconnect, Growth Treadmill, Concentration Dependency, Founder Transition, Service-Structure Alignment
+
+---
+
+### **Insight Card Structure (for each selected theme)**
+
+**Headline:** Theme name ("The Growth Treadmill", "Cash-Margin Disconnect", etc.)
+
+**Body:** 2-3 sentences explaining the cross-tab dynamic with specific data points
+
+**"→ So what" callout:** One sentence stating the structural implication
+
+**Example: The Growth Treadmill**
+
+**Headline:** The Growth Treadmill
+
+**Body:** Your 3% monthly churn creates $28.5K annual replacement revenue requirement to maintain current $1.2M scale — consuming 36% of your revenue base before any growth. With 28 active clients, this means closing 10 new clients per year just to stay flat. At 70% team utilization with founder split between delivery and operations, growth beyond replacement requires either strategic hiring or full founder transition — and 0.5-month cash runway limits hiring flexibility.
+
+**→ So what:** You're not growing from a standing start — you're running uphill. Every growth target must account for replacement pressure first, and current capacity \+ cash position constrain how fast you can climb.
+
+---
+
+**Length per insight:** \~80-100 words × 3 insights \= \~240-300 words total
+
+---
+
+## **Section 5: Operating Implications (4-6 Bullets)**
+
+### **What It Does**
+
+Translates the Critical Insights into concrete structural requirements — framed as "Operating at your current state requires:"
+
+### **Synthesis Logic**
+
+Pull the most important operational requirements from the 3 selected Critical Insights and express as factual bullets.
+
+**Potential bullet types:**
+
+**Revenue/Client Requirements:**
+
+* "$X annual replacement revenue to offset churn (before any growth)"  
+* "X new clients per year at current ACV to maintain scale"
+
+**Cash/Financial Requirements:**
+
+* "Tight cash flow management with X-month buffer limiting hiring/investment flexibility"  
+* "Active AR collection discipline to convert profitability to liquidity"
+
+**Relationship/Account Requirements:**
+
+* "Active management of top X client relationships representing Y% of revenue"  
+* "Founder stewardship of key accounts given concentration dynamics"
+
+**Capacity/Resource Requirements:**
+
+* "Strategic hiring or founder delegation to expand beyond current X% utilization"  
+* "Contractor network or bench capacity to absorb growth without permanent hires"
+
+**Operational/Founder Requirements:**
+
+* "Founder involvement in delivery oversight and key account retention"  
+* "Leadership infrastructure development to enable further founder delegation"
+
+### **Selection Logic**
+
+Based on which 3 Critical Insights were selected:
+
+**If Growth Treadmill was included:**
+
+* Add replacement revenue bullet  
+* Add replacement clients bullet  
+* Add capacity constraint bullet
+
+**If Cash-Margin Disconnect was included:**
+
+* Add cash management bullet  
+* Add AR/AP or cash flow discipline bullet (if data present)
+
+**If Concentration Dependency was included:**
+
+* Add key account management bullet  
+* Add founder stewardship bullet
+
+**If Service-Structure Alignment was included:**
+
+* Add team specialization or structure bullet
+
+**If Founder Transition was included:**
+
+* Add delegation infrastructure bullet  
+* Add founder role requirement bullet
+
+**Aim for 4-6 bullets total** — select the most operationally significant requirements across the 3 insights.
+
+---
+
+**Length:** 4-6 bullets × \~10-15 words each \= \~60-90 words total
+
+---
+
+## **Section 6: Next Steps (CTAs)**
+
+**Context sentence:** "This snapshot establishes your current operational baseline. To understand your stage of agency evolution and identify which capabilities matter most at your scale, complete:"
+
+**Primary CTA:** Complete AE Ladder Assessment →
+
+**Secondary CTA:** Explore Growth Velocity Calculator →
+
+**Length:** \~30 words
+
+---
+
+## **Total Dashboard Synthesis Flow**
+
+1. **Business Model Summary** → "Here's what kind of organism you are"  
+2. **Vitals Banner** → Quick numerical skeleton  
+3. **At-a-Glance Cards** → Each dimension's contribution to the whole (cross-dimensional directional judgments)  
+4. **Critical Insights** → The 3 most significant cross-tab patterns for this specific agency (selection logic)  
+5. **Operating Implications** → What maintaining current state structurally requires (translated from insights)  
+6. **Next Steps** → Natural handoff to AE Ladder and GVC
+
+**Total synthesis:** \~540-660 words of high-density cross-dimensional intelligence
+
+# **Dashboard Synthesis — GPT Prompt \+ Database Schema Design**
+
+---
+
+## **Part 1: Database Schema Proposal**
+
+### **Table: `agency_snapshot_dashboard`**
+
+This table stores all dashboard synthesis outputs for a given agency snapshot session.
+
+sql  
+CREATE TABLE agency\_snapshot\_dashboard (  
+  id UUID PRIMARY KEY DEFAULT uuid\_generate\_v4(),  
+  user\_id UUID NOT NULL REFERENCES auth.users(id),  
+  snapshot\_session\_id UUID NOT NULL, \-- Links to the snapshot session across all 4 tabs  
+    
+  \-- Business Model Summary (2 paragraphs)  
+  summary\_paragraph\_1 TEXT,  
+  summary\_paragraph\_2 TEXT,  
+    
+  \-- At-a-Glance Cards (4 cards, structured as JSONB for flexibility)  
+  market\_footprint\_card JSONB, \-- {health\_signal: "Aligned", health\_label: "Aligned", headline: "..."}  
+  economic\_foundation\_card JSONB,  
+  revenue\_model\_card JSONB,  
+  delivery\_architecture\_card JSONB,  
+    
+  \-- Critical Insights (array of 3 insight objects)  
+  critical\_insights JSONB, \-- \[{theme: "Growth Treadmill", body: "...", so\_what: "..."}, {...}, {...}\]  
+    
+  \-- Operating Implications (array of bullet strings)  
+  operating\_implications JSONB, \-- \["bullet 1", "bullet 2", ...\]  
+    
+  \-- Metadata  
+  insights\_selected TEXT\[\], \-- \["growth\_treadmill", "cash\_margin\_disconnect", "concentration\_dependency"\]  
+  insight\_scores JSONB, \-- {growth\_treadmill: 7, cash\_margin\_disconnect: 5, ...} for debugging  
+    
+  created\_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),  
+  updated\_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()  
+);
+
+### **Why JSONB for Cards and Insights?**
+
+* **Flexibility:** Card structure might evolve (add fields, change health signal options)  
+* **Atomic updates:** Can update a single card without touching others  
+* **Query capability:** Can still query/filter by health\_signal using JSONB operators  
+* **Clean frontend consumption:** Frontend can directly map JSONB to UI components
+
+---
+
+## **Part 2: Data Dependencies (What Dashboard Needs from Each Tab)**
+
+The dashboard synthesis workflow needs to query all 4 tab tables and pull specific fields:
+
+### **From `market_footprint` table:**
+
+javascript  
+{  
+  agency\_types: \[...\],  
+  industries\_served: \[...\],  
+  industry\_count: N,  
+  geographic\_scope: "...",  
+  pricing\_strategies: \[...\],  
+  services\_offered: \[...\],  
+  positioning\_synthesis: {...} // The 3-beat synthesis from Market Footprint  
+}
+
+### **From `economic_foundation` table:**
+
+javascript  
+{  
+  monthly\_revenue: N,  
+  monthly\_agi: N,  
+  monthly\_payroll: N,  
+  profit\_margin\_percent: N,  
+  cash\_available: N,  
+    
+  // Calculated metrics  
+  agi\_percentage: N,  
+  annual\_revenue: N,  
+  annual\_agi: N,  
+  operating\_profit\_margin: N,  
+  cash\_runway\_months: N,  
+    
+  // Badges  
+  agi\_badge: "...",  
+  margin\_badge: "...",  
+  cash\_runway\_badge: "...",  
+    
+  foundation\_synthesis: {...} // The 3-beat synthesis from Economic Foundation  
+}
+
+### **From `revenue_model` table:**
+
+javascript  
+{  
+  revenue\_mix\_mrr\_percent: N,  
+  active\_client\_count: N,  
+  client\_tier\_mix: "...",  
+  monthly\_churn\_rate\_percent: N,  
+  average\_client\_lifetime\_months: N,  
+    
+  // Calculated metrics  
+  average\_client\_value\_monthly: N,  
+  current\_mrr: N,  
+  annual\_churn\_rate\_percent: N,  
+  replacement\_revenue\_annual: N,  
+  replacement\_clients\_annual: N,  
+  concentration\_risk\_level: "...",  
+    
+  // Enhanced (if present)  
+  typical\_win\_rate\_percent: N,  
+  concentration\_top\_5\_percent: N,  
+    
+  // Badges  
+  churn\_badge: "...",  
+    
+  revenue\_synthesis: {...} // The 3-beat synthesis from Revenue Model  
+}
+
+### **From `delivery_architecture` table:**
+
+javascript  
+{  
+  total\_team\_size\_fte: N,  
+  billable\_staff\_count: N,  
+  non\_billable\_staff\_count: N,  
+  team\_structure\_type: "...",  
+  founder\_time\_allocation: "...",  
+  average\_utilization: "...",  
+    
+  // Calculated metrics  
+  agi\_per\_fte\_monthly: N, // Cross-tab with Economic Foundation  
+  billable\_nonbillable\_ratio: "...",  
+    
+  // Enhanced (if present)  
+  leadership\_roles\_present: \[...\],  
+  management\_layers: "...",  
+    
+  // Badges  
+  agi\_per\_fte\_badge: "...",  
+  billable\_ratio\_badge: "...",  
+    
+  architecture\_synthesis: {...} // The 3-beat synthesis from Delivery Architecture  
+}  
+---
+
+## **Part 3: n8n Workflow — Dashboard Synthesis Flow**
+
+### **Step 1: Query All 4 Tab Tables**
+
+// Fetch data from all 4 tabs for this snapshot\_session\_id  
+const marketFootprint \= await querySupabase('market\_footprint', snapshot\_session\_id);  
+const economicFoundation \= await querySupabase('economic\_foundation', snapshot\_session\_id);  
+const revenueModel \= await querySupabase('revenue\_model', snapshot\_session\_id);  
+const deliveryArchitecture \= await querySupabase('delivery\_architecture', snapshot\_session\_id);
+
+### **Step 2: Calculate Insight Theme Scores**
+
+javascript  
+// Theme 1: Growth Treadmill  
+let growthTreadmillScore \= 0;  
+if (revenueModel.monthly\_churn\_rate\_percent \> 2.5) growthTreadmillScore \+= 3;  
+if ((revenueModel.replacement\_revenue\_annual / economicFoundation.annual\_revenue) \> 0.30) growthTreadmillScore \+= 2;  
+if ((revenueModel.replacement\_clients\_annual / revenueModel.active\_client\_count) \> 0.30) growthTreadmillScore \+= 2;  
+if (economicFoundation.cash\_runway\_months \< 3\) growthTreadmillScore \+= 2;  
+if (deliveryArchitecture.average\_utilization \=== "70-80%" || deliveryArchitecture.average\_utilization \=== "80%+") growthTreadmillScore \+= 1;  
+if (deliveryArchitecture.founder\_time\_allocation \=== "Mostly client work" || deliveryArchitecture.founder\_time\_allocation \=== "Mix delivery-ops") growthTreadmillScore \+= 1;
+
+// Theme 2: Cash-Margin Disconnect  
+let cashMarginScore \= 0;  
+if (economicFoundation.profit\_margin\_percent \> 25 && economicFoundation.cash\_runway\_months \< 2\) cashMarginScore \+= 4;  
+if (economicFoundation.profit\_margin\_percent \< 15 && economicFoundation.cash\_runway\_months \> 4\) cashMarginScore \+= 3;  
+if (revenueModel.revenue\_mix\_mrr\_percent \< 40 && economicFoundation.cash\_runway\_months \< 3\) cashMarginScore \+= 1;
+
+// Theme 3: Concentration Dependency  
+let concentrationScore \= 0;  
+if (revenueModel.concentration\_top\_5\_percent \> 60\) concentrationScore \+= 3;  
+if (economicFoundation.cash\_runway\_months \< 2\) concentrationScore \+= 2;  
+if (deliveryArchitecture.founder\_time\_allocation \=== "Mostly client work" || deliveryArchitecture.founder\_time\_allocation \=== "Mix delivery-ops") concentrationScore \+= 2;  
+if (revenueModel.active\_client\_count \< 20\) concentrationScore \+= 1;
+
+// Theme 4: Service-Structure Alignment  
+let alignmentScore \= 0;  
+if (marketFootprint.industry\_count \<= 2 && deliveryArchitecture.team\_structure\_type \=== "Mostly generalists") alignmentScore \+= 3;  
+if (revenueModel.average\_client\_value\_monthly \> 8000 && deliveryArchitecture.team\_structure\_type \=== "Mostly generalists") alignmentScore \+= 2;  
+if (revenueModel.average\_client\_value\_monthly \< 2000 && deliveryArchitecture.team\_structure\_type \=== "Mostly specialists") alignmentScore \+= 2;  
+if (marketFootprint.services\_offered.length \>= 5 && deliveryArchitecture.total\_team\_size\_fte \< 15\) alignmentScore \+= 1;
+
+// Theme 5: Founder Transition Imperative  
+let founderTransitionScore \= 0;  
+if (deliveryArchitecture.founder\_time\_allocation \=== "Mostly client work" && economicFoundation.annual\_agi \> 1500000\) founderTransitionScore \+= 4;  
+if (deliveryArchitecture.founder\_time\_allocation \=== "Mix delivery-ops" && economicFoundation.annual\_agi \> 2500000\) founderTransitionScore \+= 2;  
+if (revenueModel.concentration\_top\_5\_percent \> 60 && deliveryArchitecture.founder\_time\_allocation \=== "Mostly client work") founderTransitionScore \+= 2;  
+if (deliveryArchitecture.total\_team\_size\_fte \> 20 && deliveryArchitecture.founder\_time\_allocation \=== "Mostly client work") founderTransitionScore \+= 2;  
+if (\!deliveryArchitecture.leadership\_roles\_present.includes("COO") && economicFoundation.annual\_agi \> 2000000\) founderTransitionScore \+= 1;
+
+// Determine top 3 themes  
+const themeScores \= {  
+  growth\_treadmill: growthTreadmillScore,  
+  cash\_margin\_disconnect: cashMarginScore,  
+  concentration\_dependency: concentrationScore,  
+  service\_structure\_alignment: alignmentScore,  
+  founder\_transition\_imperative: founderTransitionScore  
+};
+
+// Sort by score and select top 3 that meet thresholds  
+const thresholds \= {  
+  growth\_treadmill: 5,  
+  cash\_margin\_disconnect: 4,  
+  concentration\_dependency: 5,  
+  service\_structure\_alignment: 3,  
+  founder\_transition\_imperative: 4  
+};
+
+let selectedThemes \= Object.entries(themeScores)  
+  .filter((\[theme, score\]) \=\> score \>= thresholds\[theme\])  
+  .sort((a, b) \=\> b\[1\] \- a\[1\])  
+  .slice(0, 3\)  
+  .map((\[theme\]) \=\> theme);
+
+// Fallback if fewer than 3 themes qualify  
+if (selectedThemes.length \< 3\) {  
+  selectedThemes \= Object.entries(themeScores)  
+    .sort((a, b) \=\> b\[1\] \- a\[1\])  
+    .slice(0, 3\)  
+    .map((\[theme\]) \=\> theme);  
+}
+
+### **Step 3: Package Data for GPT Call**
+
+const dashboardPayload \= {  
+  // All 4 tabs' data  
+  market\_footprint: marketFootprint,  
+  economic\_foundation: economicFoundation,  
+  revenue\_model: revenueModel,  
+  delivery\_architecture: deliveryArchitecture,  
+    
+  // Theme selection  
+  selected\_insight\_themes: selectedThemes,  
+  theme\_scores: themeScores,  
+    
+  // Vitals for quick reference  
+  vitals: {  
+    annual\_agi: economicFoundation.annual\_agi,  
+    operating\_margin: economicFoundation.profit\_margin\_percent,  
+    team\_fte: deliveryArchitecture.total\_team\_size\_fte,  
+    active\_clients: revenueModel.active\_client\_count,  
+    average\_client\_value: revenueModel.average\_client\_value\_monthly,  
+    cash\_runway\_months: economicFoundation.cash\_runway\_months  
+  }  
+};  
+\`\`\`
+
+\---
+
+\#\# Part 4: System Prompt for Dashboard Synthesis  
+\`\`\`  
+You are a strategic synthesis engine for Architect OS, a platform serving sophisticated 7-8 figure marketing agency founders. Your role is to generate executive-level Dashboard synthesis that reveals the complete business model organism by synthesizing insights across all four dimensions: Market Footprint, Economic Foundation, Revenue Model, and Delivery Architecture.
+
+\#\# Your Mission  
+Analyze data from all four tabs and produce cross-dimensional synthesis that reveals structural patterns, dependencies, constraints, and leverage points that only become visible when all four lenses combine. This is NOT a summary of the four tabs — it's the revelation of what they CREATE together.
+
+\#\# Core Philosophy  
+\- \*\*Cross-dimensional revelation, not recap\*\*: Surface patterns that couldn't exist in any single tab  
+\- \*\*Structural implications, not prescriptions\*\*: Characterize what the combination creates/requires, don't advise what to do  
+\- \*\*Elevated insight\*\*: Create "aha moments" that advance understanding beyond what the tabs provided  
+\- \*\*Peer-level sophistication\*\*: These are experienced founders — reveal non-obvious structural dynamics  
+\- \*\*Platform journey handoff\*\*: Position next steps (AE Ladder, Growth Velocity Calculator) as natural progression
+
+\#\# Dashboard Structure You'll Generate
+
+You will produce 5 sections in a single JSON response:
+
+1\. \*\*Business Model Summary\*\* (2 paragraphs)  
+2\. \*\*Agency At-a-Glance Cards\*\* (4 cards with health signals and headlines)  
+3\. \*\*Critical Insights\*\* (3 cross-dimensional insight cards)  
+4\. \*\*Operating Implications\*\* (4-6 bullet points)  
+5\. \*Next Steps is static, not generated\*
+
+\#\# Section 1: Business Model Summary (2 Paragraphs)
+
+\*\*Paragraph 1: Identity & Scale Statement\*\*  
+Synthesize Market Footprint positioning \+ Economic Foundation scale \+ Revenue Model client profile \+ Delivery Architecture team structure into complete business model characterization.
+
+Structure: "You're operating a \[scale descriptor\] \[agency type\] serving \[client tier/industry context\] through a \[pricing model descriptor\] model. Your \[team size\]-person team delivers on a \[MRR/project split\] with \[ACV descriptor\] average client value."
+
+Example: "You're operating a $1.2M specialist agency serving mid-market clients across regulated industries through a relationship-driven retainer model. Your 24-person generalist team delivers on a 60/40 retainer-project split with $2,857 average client value."
+
+\*\*Paragraph 2: Structural Reality Statement\*\*  
+Introduce the key cross-dimensional dynamic that defines strategic position. Reference the dominant Critical Insight theme.
+
+Structure: "At \[key metric\] with \[key metric\] and \[key metric\], you're running a \[characterization of structural dynamic\]. \[What this creates/requires\]."
+
+Example: "At 3% monthly churn with $2,857 ACV and 0.4-month cash runway, you're running a relationship-intensive operation where retention and key account stewardship are structural imperatives. The combination of replacement pressure and thin liquidity creates tight operational constraints despite strong 32% profitability."
+
+\*\*Length:\*\* \~150 words total
+
+\#\# Section 2: Agency At-a-Glance Cards (4 Cards)
+
+Generate one card for each tab with cross-dimensional directional judgment.
+
+\*\*Each card structure:\*\*  
+{  
+  "health\_signal": "Aligned|Watch|Pressure|Healthy|Strong|Transition|Constrained",  
+  "health\_label": "\[Same as health\_signal or custom 1-2 word label\]",  
+  "headline": "\[One sentence, 15-20 words, cross-dimensional characterization\]"  
+}
+
+\*\*Market Footprint Card:\*\*  
+\- Health Signal Logic: Aligned \= service scope/pricing aligns with team structure and ACV; Watch \= some misalignment  
+\- Headline: Reference how service model aligns with delivery structure and client complexity  
+\- Example: "Service model aligns with client complexity and delivery structure" (Aligned)
+
+\*\*Economic Foundation Card:\*\*  
+\- Health Signal Logic: Healthy/Strong \= margin \+ cash aligned; Watch \= disconnect between profitability and liquidity  
+\- Headline: Reference relationship between profitability and liquidity  
+\- Example: "Profitable but cash-constrained — liquidity limits strategic flexibility" (Watch)
+
+\*\*Revenue Model Card:\*\*  
+\- Health Signal Logic: Healthy \= low churn \+ manageable concentration; Pressure \= high churn or concentration creating burden  
+\- Headline: Reference retention health, replacement pressure, or concentration dynamics  
+\- Example: "High churn generates significant replacement treadmill constraining growth" (Pressure)
+
+\*\*Delivery Architecture Card:\*\*  
+\- Health Signal Logic: Healthy/Strong \= good leverage, appropriate founder role; Transition \= founder in delegation phase; Constrained \= dependency or capacity issues  
+\- Headline: Reference founder role relative to scale, productivity, or capacity  
+\- Example: "Efficient team at healthy leverage — founder in transition phase" (Healthy)
+
+\#\# Section 3: Critical Insights (3 Cards)
+
+You will be told which 3 themes to generate based on the scoring logic. Generate insights for ONLY the selected themes.
+
+\*\*Available themes:\*\*  
+1\. growth\_treadmill  
+2\. cash\_margin\_disconnect  
+3\. concentration\_dependency  
+4\. service\_structure\_alignment  
+5\. founder\_transition\_imperative
+
+\*\*Each insight card structure:\*\*  
+{  
+  "theme": "\[theme\_name\]",  
+  "headline": "\[Theme display name like 'The Growth Treadmill'\]",  
+  "body": "\[2-3 sentences with specific data points explaining the cross-tab dynamic\]",  
+  "so\_what": "\[One sentence structural implication\]"  
+}
+
+\#\#\# Theme 1: Growth Treadmill
+
+\*\*Headline:\*\* "The Growth Treadmill"
+
+\*\*Body content:\*\* Reference churn rate, replacement revenue dollar amount and %, replacement clients needed, team utilization/capacity, and cash runway. Make the math concrete and impossible to miss.
+
+\*\*Example body:\*\* "Your 3% monthly churn creates $28.5K annual replacement revenue requirement to maintain $1.2M scale — consuming 36% of your revenue base before any growth. With 28 active clients, this means closing 10 new clients per year just to stay flat. At 70% team utilization with founder split between delivery and operations, growth beyond replacement requires either strategic hiring or full founder transition — and 0.5-month cash runway limits hiring flexibility."
+
+\*\*So what:\*\* Frame as "you're running uphill" — growth targets must account for replacement first, and capacity/cash constrain climb speed.
+
+\#\#\# Theme 2: Cash-Margin Disconnect
+
+\*\*Headline:\*\* "Cash-Margin Disconnect" or "Profitability Without Liquidity"
+
+\*\*Body content:\*\* Reference operating margin, cash runway, what creates the disconnect (project timing, AR/AP, distributions, replacement revenue consuming cash generation).
+
+\*\*Example body:\*\* "Your 32% operating margin generates $22K monthly profit, but 0.4-month cash runway reveals a disconnect: profitability isn't translating to liquidity. With $28.5K annual replacement revenue requirement from churn, profit is consumed by the growth treadmill before building reserves. This explains strong margins alongside critical cash position."
+
+\*\*So what:\*\* Strong margins don't translate to strategic flexibility when cash is tied up. Growth investment structurally constrained despite profitability.
+
+\#\#\# Theme 3: Concentration Dependency
+
+\*\*Headline:\*\* "Concentration Dependency" or "Key Account Vulnerability"
+
+\*\*Body content:\*\* Reference concentration %, number of clients, cash runway, founder involvement, ACV level. Characterize what concentration creates/requires.
+
+\*\*Example body:\*\* "With 70% of revenue concentrated in your top 5 clients and 0.4-month cash runway, a single key account loss creates existential liquidity pressure before replacement revenue materializes. At $12.5K ACV with founder still in delivery, these relationships require personal stewardship. Your business model isn't a diversification problem — it's a relationship-intensive operation where key account retention is the growth foundation."
+
+\*\*So what:\*\* Business stability depends on relationship continuity at the founder level. Delegation must account for maintaining key accounts.
+
+\#\#\# Theme 4: Service-Structure Alignment
+
+\*\*Headline:\*\* "Service-Structure Alignment" or "Model-Structure Tension"
+
+\*\*Body content:\*\* Reference positioning (specialist vs generalist), industry count, ACV level, team structure type, management layers. Note alignment or misalignment.
+
+\*\*Example body:\*\* "Your specialist positioning in 2 regulated industries suggests deep vertical expertise, but your mostly-generalist team structure with flat management creates a tension: clients likely expect specialist depth, but delivery model is built for flexibility across diverse needs. At $8.5K ACV, client complexity may be outpacing team specialization infrastructure."
+
+\*\*So what:\*\* If intentional hybrid model, it requires strong coordination. If unintentional, it signals either team evolution needed or positioning refinement.
+
+\#\#\# Theme 5: Founder Transition Imperative
+
+\*\*Headline:\*\* "Founder Transition Imperative" or "Delegation Ceiling"
+
+\*\*Body content:\*\* Reference founder time allocation, AGI/revenue scale, team size, concentration, leadership infrastructure present/absent.
+
+\*\*Example body:\*\* "At $2.8M AGI with 35-person team, you've scaled beyond typical founder-delivery limits, yet founder remains primarily in client work. With 65% revenue concentration in top 5 clients and no COO or Operations Director in place, key account retention and delivery oversight remain founder-dependent. This configuration creates a delegation ceiling: further scale requires leadership infrastructure that can maintain client relationships and delivery quality without founder's direct involvement."
+
+\*\*So what:\*\* Founder time is the constraint on next growth phase. Delegation infrastructure (not just more team) is the unlock.
+
+\#\# Section 4: Operating Implications (4-6 Bullets)
+
+Translate the 3 Critical Insights into concrete structural requirements.
+
+Frame as: "Operating at your current state requires:"
+
+\*\*Pull bullets from the selected insight themes:\*\*
+
+\*\*If Growth Treadmill selected:\*\*  
+\- "$\[amount\] annual replacement revenue to offset churn (before any growth)"  
+\- "\[X\] new clients per year at current ACV to maintain scale"  
+\- "Strategic hiring or founder delegation to expand beyond \[X\]% utilization" (if capacity constrained)
+
+\*\*If Cash-Margin Disconnect selected:\*\*  
+\- "Tight cash flow management with \[X\]-month buffer limiting hiring/investment flexibility"  
+\- "Active AR collection discipline to convert profitability to liquidity" (if AR data present)
+
+\*\*If Concentration Dependency selected:\*\*  
+\- "Active management of top \[X\] client relationships representing \[Y\]% of revenue"  
+\- "Founder stewardship of key accounts given concentration dynamics"
+
+\*\*If Service-Structure Alignment selected:\*\*  
+\- "Team specialization development or positioning refinement to align model and structure"
+
+\*\*If Founder Transition selected:\*\*  
+\- "Leadership infrastructure development to enable founder delegation"  
+\- "Founder involvement in delivery oversight and key account retention" (if still in delivery)
+
+\*\*Select 4-6 most operationally significant bullets\*\* across the 3 themes.
+
+\*\*Length:\*\* 4-6 bullets, \~10-15 words each
+
+\#\# Tone Guidelines
+
+\*\*Write like:\*\* A McKinsey consultant presenting the synthesis of a multi-week diagnostic engagement
+
+\*\*NOT like:\*\* A business coach giving advice, a consultant selling services, or a report summarizing findings
+
+\*\*Language to use:\*\* "characterized by," "creates," "requires," "generates," "positions," "operates," "maintains," "depends on," "constrains," "enables"
+
+\*\*Language to NEVER use:\*\* "you should," "we recommend," "you need to," "to scale you must," "this is a problem," "you're doing wrong"
+
+\*\*When noting tensions or misalignments:\*\* Frame as structural observations, not judgments. "This creates X requirement" not "this is preventing Y."
+
+\#\# Response Format
+
+Return a valid JSON object with this exact structure:
+
+{  
+  "business\_model\_summary": {  
+    "paragraph\_1": "\[Identity & scale statement, \~75 words\]",  
+    "paragraph\_2": "\[Structural reality statement, \~75 words\]"  
+  },  
+  "at\_a\_glance\_cards": {  
+    "market\_footprint": {  
+      "health\_signal": "\[Aligned|Watch|...\]",  
+      "health\_label": "\[Same or custom\]",  
+      "headline": "\[15-20 words\]"  
+    },  
+    "economic\_foundation": {  
+      "health\_signal": "\[Healthy|Watch|Strong|Pressure\]",  
+      "health\_label": "\[Same or custom\]",  
+      "headline": "\[15-20 words\]"  
+    },  
+    "revenue\_model": {  
+      "health\_signal": "\[Healthy|Pressure|Monitor\]",  
+      "health\_label": "\[Same or custom\]",  
+      "headline": "\[15-20 words\]"  
+    },  
+    "delivery\_architecture": {  
+      "health\_signal": "\[Healthy|Strong|Transition|Constrained\]",  
+      "health\_label": "\[Same or custom\]",  
+      "headline": "\[15-20 words\]"  
+    }  
+  },  
+  "critical\_insights": \[  
+    {  
+      "theme": "\[theme\_key\]",  
+      "headline": "\[Theme display name\]",  
+      "body": "\[2-3 sentences with specific data, 80-100 words\]",  
+      "so\_what": "\[One sentence structural implication\]"  
+    },  
+    {  
+      "theme": "\[theme\_key\]",  
+      "headline": "\[Theme display name\]",  
+      "body": "\[2-3 sentences with specific data, 80-100 words\]",  
+      "so\_what": "\[One sentence structural implication\]"  
+    },  
+    {  
+      "theme": "\[theme\_key\]",  
+      "headline": "\[Theme display name\]",  
+      "body": "\[2-3 sentences with specific data, 80-100 words\]",  
+      "so\_what": "\[One sentence structural implication\]"  
+    }  
+  \],  
+  "operating\_implications": \[  
+    "\[Bullet 1, 10-15 words\]",  
+    "\[Bullet 2, 10-15 words\]",  
+    "\[Bullet 3, 10-15 words\]",  
+    "\[Bullet 4, 10-15 words\]",  
+    "\[Bullet 5 if needed\]",  
+    "\[Bullet 6 if needed\]"  
+  \]  
+}  
+\`\`\`
+
+\---
+
+\#\# Part 5: User Message Template  
+\`\`\`  
+Generate comprehensive dashboard synthesis for this agency based on all four dimensions.
+
+\*\*SELECTED INSIGHT THEMES (generate insights for these 3 only):\*\*  
+{{selected\_insight\_themes}}
+
+\*\*THEME SCORES (for your context):\*\*  
+{{theme\_scores}}
+
+\*\*MARKET FOOTPRINT DATA:\*\*  
+{{market\_footprint}}
+
+\*\*ECONOMIC FOUNDATION DATA:\*\*  
+{{economic\_foundation}}
+
+\*\*REVENUE MODEL DATA:\*\*  
+{{revenue\_model}}
+
+\*\*DELIVERY ARCHITECTURE DATA:\*\*  
+{{delivery\_architecture}}
+
+\*\*VITALS SUMMARY (for quick reference):\*\*  
+\- Annual AGI: {{vitals.annual\_agi}}  
+\- Operating Margin: {{vitals.operating\_margin}}%  
+\- Team FTE: {{vitals.team\_fte}}  
+\- Active Clients: {{vitals.active\_clients}}  
+\- Avg Client Value: ${{vitals.average\_client\_value}}/month  
+\- Cash Runway: {{vitals.cash\_runway\_months}} months
+
+\*\*SYNTHESIS INSTRUCTIONS:\*\*
+
+1\. Generate Business Model Summary (2 paragraphs) synthesizing all 4 dimensions  
+2\. Generate 4 At-a-Glance Cards with health signals and cross-dimensional headlines  
+3\. Generate 3 Critical Insights for ONLY the selected themes: {{selected\_insight\_themes}}  
+4\. Generate 4-6 Operating Implications bullets derived from the 3 insights
+
+\*\*CRITICAL REMINDERS:\*\*  
+\- This is cross-dimensional synthesis, not tab recaps — reveal what the COMBINATION creates  
+\- Make replacement revenue math concrete and impossible to miss in Growth Treadmill theme  
+\- Respect that structural characteristics may be intentional strategic choices  
+\- Frame Operating Implications as "what maintaining current state requires" not "what you should do"  
+\- Use specific data points throughout — dollar amounts, percentages, client counts
+
+Generate the complete dashboard synthesis now in the required JSON format.
+
+## **Part 6: n8n Workflow — Step 4: Call GPT & Parse Response**
+
+javascript  
+// Call GPT API  
+const gptResponse \= await callOpenAI({  
+  model: "gpt-4o",  
+  temperature: 0.7,  
+  max\_tokens: 2000,  
+  messages: \[  
+    { role: "system", content: DASHBOARD\_SYSTEM\_PROMPT },  
+    { role: "user", content: formattedUserMessage }  
+  \]  
+});
+
+// Parse JSON response  
+const dashboardSynthesis \= JSON.parse(gptResponse.content);
+
+// Validate structure  
+if (\!dashboardSynthesis.business\_model\_summary ||  
+    \!dashboardSynthesis.at\_a\_glance\_cards ||  
+    \!dashboardSynthesis.critical\_insights ||  
+    \!dashboardSynthesis.operating\_implications) {  
+  throw new Error("Invalid dashboard synthesis structure");  
+}
+
+// Store to Supabase  
+await supabase  
+  .from('agency\_snapshot\_dashboard')  
+  .upsert({  
+    user\_id: userId,  
+    snapshot\_session\_id: snapshotSessionId,  
+      
+    // Business Model Summary  
+    summary\_paragraph\_1: dashboardSynthesis.business\_model\_summary.paragraph\_1,  
+    summary\_paragraph\_2: dashboardSynthesis.business\_model\_summary.paragraph\_2,  
+      
+    // At-a-Glance Cards  
+    market\_footprint\_card: dashboardSynthesis.at\_a\_glance\_cards.market\_footprint,  
+    economic\_foundation\_card: dashboardSynthesis.at\_a\_glance\_cards.economic\_foundation,  
+    revenue\_model\_card: dashboardSynthesis.at\_a\_glance\_cards.revenue\_model,  
+    delivery\_architecture\_card: dashboardSynthesis.at\_a\_glance\_cards.delivery\_architecture,  
+      
+    // Critical Insights  
+    critical\_insights: dashboardSynthesis.critical\_insights,  
+      
+    // Operating Implications  
+    operating\_implications: dashboardSynthesis.operating\_implications,  
+      
+    // Metadata  
+    insights\_selected: selectedThemes,  
+    insight\_scores: themeScores,  
+      
+    updated\_at: new Date()  
+  });  
+---
+
+## **Part 7: Frontend Data Consumption**
+
+The frontend queries the `agency_snapshot_dashboard` table and renders:
+
+javascript  
+// Fetch dashboard data  
+const { data: dashboard } \= await supabase  
+  .from('agency\_snapshot\_dashboard')  
+  .select('\*')  
+  .eq('snapshot\_session\_id', sessionId)  
+  .single();
+
+// Render Business Model Summary  
+\<div className="business-model-summary"\>  
+  \<p\>{dashboard.summary\_paragraph\_1}\</p\>  
+  \<p\>{dashboard.summary\_paragraph\_2}\</p\>  
+\</div\>
+
+// Render At-a-Glance Cards  
+{\['market\_footprint', 'economic\_foundation', 'revenue\_model', 'delivery\_architecture'\].map(tab \=\> (  
+  \<Card key={tab}\>  
+    \<HealthSignal color={getSignalColor(dashboard\[\`${tab}\_card\`\].health\_signal)} /\>  
+    \<HealthLabel\>{dashboard\[\`${tab}\_card\`\].health\_label}\</HealthLabel\>  
+    \<Headline\>{dashboard\[\`${tab}\_card\`\].headline}\</Headline\>  
+  \</Card\>  
+))}
+
+// Render Critical Insights  
+{dashboard.critical\_insights.map(insight \=\> (  
+  \<InsightCard key={insight.theme}\>  
+    \<Headline\>{insight.headline}\</Headline\>  
+    \<Body\>{insight.body}\</Body\>  
+    \<SoWhat\>→ {insight.so\_what}\</SoWhat\>  
+  \</InsightCard\>  
+))}
+
+// Render Operating Implications  
+\<ul\>  
+  {dashboard.operating\_implications.map((bullet, i) \=\> (  
+    \<li key={i}\>{bullet}\</li\>  
+  ))}  
+\</ul\>  
+---
+
+## **Summary: What You Now Have**
+
+✅ **Database schema** for storing dashboard synthesis outputs ✅ **Data dependency map** showing what fields dashboard needs from each tab ✅ **Theme selection logic** with scoring rules for all 5 insight themes ✅ **Complete GPT system prompt** for generating all dashboard sections ✅ **User message template** with data packaging structure ✅ **n8n workflow logic** for calculating scores, selecting themes, calling GPT, and storing results ✅ **Frontend consumption pattern** for rendering the dashboard
+

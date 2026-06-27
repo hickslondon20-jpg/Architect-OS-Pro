@@ -1,0 +1,2444 @@
+All 3 files in 05-maturity-models category are now complete:
+✅ forecasting-maturity-ladder.md — 5 stages of forecasting sophistication
+✅ kpi-evolution-by-stage.md — How KPIs mean different things across stages
+✅ agency-kpi-maturity-map.md — Comprehensive stage-by-stage matrix
+
+
+The maturity model files are now ready to be saved to /src/knowledge/kpis/05-maturity-models/ in our project structure.
+
+
+File 1: forecasting-maturity-ladder.md
+
+---
+title: Forecasting Maturity Ladder
+category: maturity-models
+subcategory: forecasting
+updated: 2025-01-09
+version: 1.0
+---
+
+# Forecasting Maturity Ladder
+
+A framework for understanding the five stages of forecasting sophistication, from reactive gut-feel to predictive enterprise systems.
+
+## Overview
+
+Forecasting maturity evolves through distinct stages, each unlocking new capabilities and requiring different tools, processes, and mindsets. Understanding where you are—and what's required to progress—is essential for scaling predictably.
+
+## The Five Stages of Forecasting Maturity
+```
+Level 5: Proactive (Forecast-Driven Enterprise)
+    ↑
+Level 4: Predictive (Operational GPS)
+    ↑
+Level 3: Structured (Dashboard Discipline)
+    ↑
+Level 2: Emerging (Spreadsheet Stage)
+    ↑
+Level 1: Reactive (Gut & Guess)
+```
+
+---
+
+## Level 1: Reactive (Gut & Guess)
+
+### Typical Revenue Range
+**<$1M AGI** (though can persist longer if founder doesn't prioritize)
+
+### Core Forecasting Behavior
+
+**What it looks like:**
+- No formal forecast exists
+- Founder keeps mental tallies of clients, invoices, and upcoming deals
+- Planning horizon: 30 days max
+- Decisions made reactively based on current cash
+
+**Forecasting "process":**
+- "We have about $X coming in next month"
+- Based on memory of client retainers and pipeline
+- No written documentation
+- Updated constantly in founder's head
+
+### Data Infrastructure Reality
+
+**What exists:**
+- QuickBooks or similar (for invoicing only)
+- Maybe a CRM with opportunities
+- Spreadsheets scattered across computers
+- No centralized data
+
+**What's missing:**
+- Systematic pipeline tracking
+- Client churn predictions
+- Weighted probability logic
+- Historical data analysis
+
+### Decision-Making Patterns
+
+**Hiring:**
+- Reactive to pain ("We're drowning, hire someone!")
+- No lead time planning
+- Often too late or too early
+
+**Capacity planning:**
+- Doesn't exist formally
+- "We'll figure it out when work comes in"
+- Constant firefighting
+
+**Cash management:**
+- Month-to-month survival mode
+- No buffer planning
+- Stress high around payment dates
+
+### Success Metrics
+
+**What "good" looks like at this stage:**
+- Revenue consistently positive month-over-month
+- Payroll met every month
+- Founder has rough sense of next 30 days
+
+**Forecast accuracy:**
+- Not measured (no forecast to measure against)
+- Reality often surprises
+- High variance acceptable because expectations low
+
+### Operational Implications
+
+**Strengths:**
+- Fast decision-making (no process to slow down)
+- Highly flexible and adaptive
+- Low overhead (no forecasting tools/process)
+
+**Constraints:**
+- Feast/famine cycles common
+- High founder stress
+- Growth = accidental, not architected
+- Can't delegate planning (it's all in founder's head)
+- Scaling impossible
+
+### What Triggers Level 2 Transition
+
+**Common catalysts:**
+- First major cash crisis (payroll scare)
+- Hiring mistake from poor planning
+- Founder burnout from constant uncertainty
+- Advisor or investor demands visibility
+- Desire to actually plan vacation without panic
+
+**Required mindset shift:**
+- From "winging it" to "let's track this"
+- Accepting that time spent planning saves time later
+- Recognition that memory isn't scalable
+
+---
+
+## Level 2: Emerging (Spreadsheet Stage)
+
+### Typical Revenue Range
+**$1M-3M AGI** (transition point for most agencies)
+
+### Core Forecasting Behavior
+
+**What it looks like:**
+- Rudimentary forecasts via Excel or Google Sheets
+- Pipeline and revenue projections updated irregularly (monthly if disciplined)
+- Planning horizon: 60-90 days
+- Some structure but still heavily manual
+
+**Forecasting process:**
+- Monthly or bi-weekly forecast review
+- Spreadsheet with client list, MRR, pipeline deals
+- Basic probability weighting (if at all)
+- Founder still primary forecaster
+
+### Data Infrastructure Reality
+
+**What exists:**
+- CRM with pipeline stages
+- Basic pipeline reports
+- Spreadsheet linking clients + deals
+- Monthly revenue tracking
+
+**What's missing:**
+- Automated data pulls
+- Real-time dashboard visibility
+- Cross-team data sharing
+- Historical trend analysis
+- Churn prediction models
+
+**Data quality:**
+- 60-70% complete
+- Manual entry errors common
+- Stale data frequent (updated sporadically)
+- No data validation processes
+
+### Decision-Making Patterns
+
+**Hiring:**
+- Based on forecast but still reactive
+- 30-60 day lead time (better than Level 1)
+- Often wrong due to forecast inaccuracy
+
+**Capacity planning:**
+- Rough utilization tracking
+- "We'll need someone in Q3" level of planning
+- Better than reactive but still loose
+
+**Cash management:**
+- 1-2 month buffer building
+- Some runway visibility
+- Still stress but less crisis
+
+### Success Metrics
+
+**What "good" looks like:**
+- Forecast exists and is reviewed monthly
+- Revenue projections within ±30-40%
+- Team knows general direction
+
+**Forecast accuracy:**
+- 60-70% accuracy at 90 days
+- High variance still normal
+- Learning from misses inconsistent
+
+**Capability unlocked:**
+- Can have meaningful conversations about future
+- Can make hiring decisions with some confidence
+- Can plan 60-90 days ahead
+
+### Operational Implications
+
+**Strengths:**
+- Visibility improving
+- Decisions less reactive
+- Team alignment emerging
+- Can start delegating some forecasting tasks
+
+**Constraints:**
+- Forecast seen as "report" not "management tool"
+- Low trust in numbers
+- Manual process limits frequency
+- Founder still bottleneck for interpretation
+- Data hygiene issues
+
+### Common Failure Modes
+
+**False precision:**
+- Spreadsheet looks sophisticated
+- But data quality poor
+- Creates false confidence
+
+**Update fatigue:**
+- Process too manual
+- Falls behind quickly
+- Becomes stale and ignored
+
+**No feedback loop:**
+- Forecast made, then forgotten
+- No variance analysis
+- No learning from misses
+
+### What Triggers Level 3 Transition
+
+**Common catalysts:**
+- Team size reaches 10-15 (coordination needs)
+- Major forecast miss causes crisis
+- Need to hire ahead of revenue
+- Investor or board demands better visibility
+- Founder exhausted from manual process
+
+**Required mindset shift:**
+- From "tracking" to "managing with data"
+- Forecast is tool, not report
+- Worth investing in infrastructure
+- Team needs access to information
+
+---
+
+## Level 3: Structured (Dashboard Discipline)
+
+### Typical Revenue Range
+**$3M-7M AGI** (scale-up phase)
+
+### Core Forecasting Behavior
+
+**What it looks like:**
+- Dedicated dashboards pulling from CRM + financials
+- Monthly forecasting cadence (some weekly reviews)
+- Planning horizon: 6 months with confidence
+- Forecast informs hiring and cash flow proactively
+
+**Forecasting process:**
+- Standardized monthly review meeting
+- Dashboard updated weekly (some automation)
+- Weighted pipeline methodology implemented
+- Multiple people contribute to forecast
+- Variance analysis beginning
+
+### Data Infrastructure Reality
+
+**What exists:**
+- Integrated CRM → dashboard tools
+- Automated data pulls (mostly)
+- Shared dashboards for leadership
+- Historical data captured systematically
+- Basic churn and retention tracking
+
+**What's improved:**
+- 80-85% data completeness
+- Real-time or daily updates
+- Defined data owners per metric
+- Quality checks in place
+- Accessible across team
+
+**What's still missing:**
+- Full automation (some manual still)
+- Predictive modeling
+- Scenario planning tools
+- AI/ML forecasting support
+
+### Decision-Making Patterns
+
+**Hiring:**
+- Forecast-driven with 60-90 day lead time
+- Capacity models inform timing
+- Confidence higher, misses fewer
+
+**Capacity planning:**
+- Systematic utilization tracking
+- Resource planning tied to forecast
+- Can see capacity constraints 90 days out
+
+**Cash management:**
+- 3-6 month buffer maintained
+- Runway visible and managed
+- Strategic about reinvestment timing
+
+**Operational coordination:**
+- Monthly ops meeting reviews forecast
+- Sales, delivery, finance aligned
+- Adjustments made proactively
+
+### Success Metrics
+
+**What "good" looks like:**
+- Forecast accuracy ±20% at 90 days
+- Team trusts and uses forecasts actively
+- Decisions made with data, not gut
+- Variance reviewed and learned from
+
+**Forecast accuracy:**
+- 80% accuracy at 90 days
+- 70% accuracy at 6 months
+- Improving over time with learning
+
+**Capability unlocked:**
+- Can confidently plan 6 months ahead
+- Can model hiring scenarios
+- Can forecast cash needs accurately
+- Can coordinate cross-functionally
+
+### Operational Implications
+
+**Strengths:**
+- Predictable operations
+- Proactive resource planning
+- Team confidence high
+- Scalability emerging
+- Data-driven culture forming
+
+**Constraints:**
+- Still reliant on manual data hygiene
+- Forecast quality depends on individual discipline
+- Can't model complex scenarios easily
+- Limited predictive capability
+
+### Common Success Patterns
+
+**Dashboard becomes management rhythm:**
+- Weekly/monthly reviews non-negotiable
+- Entire leadership uses it
+- Drives accountability
+
+**Variance analysis drives improvement:**
+- Track forecast vs. actual systematically
+- Learn from misses
+- Adjust methodology continuously
+
+**Cross-functional alignment:**
+- Sales knows capacity
+- Delivery knows pipeline
+- Finance knows runway
+- Everyone synchronized
+
+### What Triggers Level 4 Transition
+
+**Common catalysts:**
+- Growth accelerating (need more precision)
+- Multiple offices/teams (complexity)
+- Acquisition interest (need enterprise-grade)
+- Want scenario planning capability
+- Seeking competitive advantage in planning
+
+**Required mindset shift:**
+- From "good enough" to "operational GPS"
+- Forecasting as competitive advantage
+- Worth significant investment
+- Predictive vs. reactive mindset
+
+---
+
+## Level 4: Predictive (Operational GPS)
+
+### Typical Revenue Range
+**$7M-15M+ AGI** (mature growth phase)
+
+### Core Forecasting Behavior
+
+**What it looks like:**
+- Forecasting fully integrated across systems
+- Real-time dashboard visibility
+- Weekly forecast updates (some daily monitoring)
+- Planning horizon: 12 months with scenarios
+- Used for strategic planning and resource allocation
+
+**Forecasting process:**
+- Automated data sync (CRM, PM tools, finance)
+- Weekly ops reviews with live data
+- Monthly strategic forecast sessions
+- Quarterly board-level presentations
+- Variance analysis drives continuous improvement
+
+**Sophistication level:**
+- Weighted pipeline with historical calibration
+- Churn prediction models
+- Scenario planning ("what-if" analysis)
+- Cohort-based retention forecasting
+- Leading indicator tracking
+
+### Data Infrastructure Reality
+
+**What exists:**
+- Fully integrated tech stack
+- Real-time or near-real-time data
+- Automated dashboards with drill-down
+- Historical trends and pattern recognition
+- Data warehouse or centralized repository
+
+**Data quality:**
+- 90-95% completeness and accuracy
+- Automated validation checks
+- Clear data ownership and governance
+- Consistent definitions across systems
+- Audit trails for changes
+
+**What's elevated:**
+- Predictive analytics (churn risk, deal probability)
+- Automated alerts for variance
+- Mobile/remote access
+- Role-based views
+- Integration with financial systems
+
+### Decision-Making Patterns
+
+**Hiring:**
+- Forecast-driven with 90-180 day lead time
+- Scenario-tested ("if we close these deals...")
+- Capacity modeling sophisticated
+- Rarely caught off-guard
+
+**Capacity planning:**
+- Department-level capacity forecasts
+- Skill-specific resource planning
+- Utilization predicted 6 months out
+- Buffer management systematic
+
+**Cash management:**
+- Rolling 12-month cash forecast
+- Scenario planning for different outcomes
+- Strategic about debt/investment timing
+- Never surprised by cash needs
+
+**Strategic planning:**
+- Annual planning informed by forecast models
+- M&A scenarios modeled
+- Market expansion timing data-driven
+- Pricing changes impact-tested
+
+### Success Metrics
+
+**What "good" looks like:**
+- Forecast accuracy ±10% at 90 days
+- Variance under 15% at 6 months
+- Strategic decisions made with scenario confidence
+- Board/investors trust projections
+
+**Forecast accuracy:**
+- 90% accuracy at 90 days
+- 80-85% accuracy at 6 months
+- 70-75% accuracy at 12 months
+- Consistent improvement trend
+
+**Capability unlocked:**
+- Can model complex scenarios confidently
+- Can plan strategic initiatives 12+ months out
+- Can optimize resource allocation dynamically
+- Can communicate future with investor confidence
+
+### Operational Implications
+
+**Strengths:**
+- Enterprise-grade operational visibility
+- Strategic agility (can scenario plan)
+- High leadership confidence
+- Acquisition-ready metrics
+- Competitive advantage in planning
+
+**Constraints:**
+- Requires ongoing investment to maintain
+- Depends on team discipline (garbage in, garbage out)
+- Can create false precision if not careful
+- Risk of over-relying on models vs. market reality
+
+### Organizational Characteristics
+
+**Leadership behavior:**
+- Forecasting reviewed weekly minimum
+- Variance discussed openly
+- Adjustments made proactively
+- Data literacy high across team
+
+**Culture indicators:**
+- "What does the forecast say?" is common question
+- Decisions defended with data
+- Experimentation tracked and measured
+- Continuous improvement mindset
+
+**Process maturity:**
+- Documented forecast methodology
+- Training for new team members
+- Regular calibration sessions
+- External benchmarking
+
+### What Triggers Level 5 Transition
+
+**Common catalysts:**
+- Multi-entity operations (multiple agencies/brands)
+- Private equity ownership
+- Preparing for exit/acquisition
+- Significant capital deployment decisions
+- Portfolio-level management needs
+
+**Required mindset shift:**
+- From operational tool to enterprise system
+- Forecasting as institutional capability
+- Finance-grade rigor
+- Portfolio thinking
+
+---
+
+## Level 5: Proactive (Forecast-Driven Enterprise)
+
+### Typical Revenue Range
+**$15M+ AGI** or multi-office/portfolio operations
+
+### Core Forecasting Behavior
+
+**What it looks like:**
+- Forecasting built into enterprise planning models
+- Scenario, sensitivity, and "what-if" analysis standard
+- Real-time variance monitoring with automated alerts
+- Planning horizon: 18-24 months with rolling updates
+- Integrated with capital allocation and M&A strategy
+
+**Forecasting process:**
+- Automated daily/weekly updates
+- Monthly strategic review
+- Quarterly board presentations with scenarios
+- Annual strategic planning with 3-5 year models
+- Continuous refinement and calibration
+
+**Sophistication level:**
+- Multiple scenario models (optimistic, base, conservative)
+- Monte Carlo simulation for uncertainty
+- Cohort-based predictive modeling
+- Market condition sensitivity analysis
+- Portfolio-level consolidation (if applicable)
+
+### Data Infrastructure Reality
+
+**What exists:**
+- Enterprise data warehouse
+- Business intelligence platform
+- API integrations across all systems
+- Real-time data pipelines
+- Advanced analytics and ML models
+
+**Data quality:**
+- 95%+ completeness and accuracy
+- Automated validation and anomaly detection
+- Data governance framework
+- Compliance-ready audit trails
+- Version control and change tracking
+
+**What's mastered:**
+- Predictive modeling at scale
+- Natural language querying
+- Automated insight generation
+- Cross-entity consolidation
+- Regulatory-grade reporting
+
+### Decision-Making Patterns
+
+**Capital allocation:**
+- Forecast drives investment decisions
+- M&A scenarios modeled extensively
+- Debt vs. equity timing optimized
+- Distribution strategies data-informed
+
+**Strategic initiatives:**
+- New market entry modeled pre-launch
+- Pricing strategy impact-tested
+- Organizational changes scenario-planned
+- Risk quantified and managed
+
+**Portfolio management (if applicable):**
+- Entity-level forecasts roll up
+- Cross-portfolio resource allocation
+- Performance variance tracked across entities
+- Strategic moves coordinated
+
+**Board/investor relations:**
+- Forecast as primary management tool
+- Variance explained with insight
+- Scenario planning demonstrates strategic thinking
+- Confidence built through accuracy track record
+
+### Success Metrics
+
+**What "good" looks like:**
+- Forecast accuracy ±5% at 90 days
+- Variance under 10% at 12 months
+- Board/investors rarely surprised
+- Strategic options clearly quantified
+
+**Forecast accuracy:**
+- 95% accuracy at 90 days
+- 90% accuracy at 6 months
+- 85% accuracy at 12 months
+- Predictable variance patterns understood
+
+**Capability unlocked:**
+- Can model any strategic scenario
+- Can optimize portfolio allocation
+- Can manage enterprise complexity
+- Can deploy capital with confidence
+- Can communicate strategy with precision
+
+### Operational Implications
+
+**Strengths:**
+- Best-in-class operational visibility
+- Strategic optionality maximized
+- Risk management sophisticated
+- Institutional knowledge preserved
+- Competitive moat in decision speed and quality
+
+**Constraints:**
+- High maintenance cost (systems, people, process)
+- Risk of over-engineering
+- Can slow decision-making if not careful
+- Dependent on market stability assumptions
+
+### Organizational Characteristics
+
+**Leadership sophistication:**
+- CFO or finance function formalized
+- Data/analytics team or role
+- Institutional planning rhythms
+- Strategic thinking systematic
+
+**Culture hallmarks:**
+- Data literacy universal
+- Forecast variance reviewed without blame
+- Learning culture embedded
+- Long-term thinking normalized
+
+**Process excellence:**
+- Documented and auditable
+- Scalable across entities
+- Compliant with external standards
+- Continuously optimized
+
+**Strategic capabilities:**
+- Can execute complex strategies
+- Can integrate acquisitions smoothly
+- Can expand to new markets confidently
+- Can optimize across portfolio
+
+### Characteristics of Level 5 Organizations
+
+**What sets them apart:**
+- Forecasting is institutional capability, not individual skill
+- Systems can run without founder/CEO
+- Decision-making delegated with confidence
+- Variance is low and understood
+- Strategic agility despite size
+
+---
+
+## Progression Logic & Key Transitions
+
+### The Capability Cascade
+
+Each stage unlocks specific capabilities that compound:
+
+| From Level | To Level | Capability Unlocked |
+|------------|----------|---------------------|
+| 1 → 2 | Visibility | "We finally have numbers in one place." |
+| 2 → 3 | Accountability | "We can see what's off and who owns it." |
+| 3 → 4 | Predictability | "We can anticipate resource and cash needs." |
+| 4 → 5 | Optionality | "We can scale, sell, or acquire with confidence." |
+
+### What Drives Progression
+
+**It's not just about size:**
+- A $10M agency can operate at Level 2
+- A $3M agency can reach Level 4
+- Revenue alone doesn't determine maturity
+
+**Required elements for progression:**
+1. **Leadership commitment** to forecasting discipline
+2. **Investment** in systems and tools
+3. **Team capability** to maintain data quality
+4. **Cultural acceptance** of data-driven decisions
+5. **Process discipline** to sustain practices
+
+### Common Stall Points
+
+**Level 1 → 2:**
+- Founder won't let go of "winging it"
+- Believes forecasting is waste of time
+- Too busy to implement
+
+**Level 2 → 3:**
+- Won't invest in tools ($$$)
+- Data hygiene too hard to maintain
+- Team doesn't see value
+
+**Level 3 → 4:**
+- "Good enough" mindset
+- Don't need more precision
+- Systems integration too complex
+
+**Level 4 → 5:**
+- Diminishing returns perceived
+- Complexity vs. value trade-off
+- Not pursuing enterprise scale
+
+---
+
+## How to Use This Ladder
+
+### As Diagnostic Tool
+
+**Assess current state:**
+1. Read each level description
+2. Identify which matches closest
+3. Note gaps to next level
+4. Prioritize what to improve
+
+**Questions to ask:**
+- What's our forecast accuracy at 90 days?
+- How often do we update forecasts?
+- Who uses forecast data actively?
+- What decisions are forecast-informed?
+- How much do we trust our projections?
+
+### As Roadmap
+
+**Set target level:**
+- Based on current stage and growth goals
+- Identify specific capabilities needed
+- List gaps to close
+- Estimate investment required
+
+**Typical progression:**
+- Level 1→2: 3-6 months
+- Level 2→3: 6-12 months  
+- Level 3→4: 12-18 months
+- Level 4→5: 18-24 months
+
+**Not always linear:**
+- Can skip levels with right investment
+- Can regress if discipline lapses
+- Different timelines for different agencies
+
+### As Team Alignment Tool
+
+**Common language:**
+- "We're operating at Level 2, targeting Level 3"
+- Everyone understands what that means
+- Clear vision for improvement
+
+**Goal setting:**
+- "This quarter, improve forecast accuracy to 80%"
+- "By EOY, achieve Level 3 characteristics"
+- Measurable, shared objectives
+
+---
+
+## Strategic "So What"
+
+### 1. Forecasting Maturity = Leadership Maturity
+
+**The pattern:**
+- Reactive forecasting → Reactive leadership
+- Predictive forecasting → Strategic leadership
+
+**The shift:**
+- From intuition to instrumentation
+- From heroics to systems
+- From chaos to orchestration
+
+### 2. The Inflection Point Is Level 3
+
+**Below Level 3:**
+- Forecasting is report
+- Limited decision impact
+- Scaling constrained
+
+**At Level 3+:**
+- Forecasting is management tool
+- Drives major decisions
+- Scaling enabled
+
+**The threshold:**
+- Where agencies either professionalize or plateau
+- Where systems thinking replaces founder dependence
+- Where growth becomes architected vs. accidental
+
+### 3. Each Level Has Different ROI
+
+**Early levels (1-3):**
+- High ROI from basics
+- Visibility alone drives improvement
+- Low investment, high return
+
+**Later levels (4-5):**
+- Incremental ROI
+- Precision and optionality benefits
+- Higher investment required
+- Worthwhile only if pursuing scale/exit
+
+### 4. Progression Requires Investment
+
+**Not just technology:**
+- Time (founder/leadership attention)
+- Money (tools, systems, people)
+- Discipline (process adherence)
+- Patience (building over time)
+
+**The cost of not progressing:**
+- Growth constrained by chaos
+- Decisions remain reactive
+- Stress remains high
+- Scaling impossible
+
+### 5. Trust Is the Real Metric
+
+**At each level:**
+- Team trust in forecast data increases
+- Decision confidence improves
+- Strategic options expand
+
+**The ultimate goal:**
+- Numbers trusted more than gut
+- Data informs, doesn't dictate
+- Confidence compounds into competitive advantage
+
+---
+
+## Related Files
+
+- `/01-core-definitions/forecasting-kpis.md` — Core metrics
+- `/02-benchmarks/retention-targets.md` — Churn benchmarks
+- `/03-directional-diagnostics/forecasting-trend-interpretation.md` — Trend meanings
+- `/04-system-dynamics/forecasting-pipeline-dynamics.md` — System interactions
+
+
+
+File 2: kpi-evolution-by-stage.md
+
+---
+title: KPI Evolution by Agency Stage
+category: maturity-models
+subcategory: evolution
+updated: 2025-01-09
+version: 1.0
+---
+
+# KPI Evolution by Agency Stage
+
+Understanding how the same KPIs mean different things—and serve different purposes—as agencies mature through the Agency Evolution Ladder.
+
+## Core Principle
+
+**The metrics don't change — the meaning does.**
+
+The same 10-12 KPIs form the skeleton of every healthy agency, but as you climb the AE Ladder, you start reading them through different lenses:
+- **Rising:** Survival and rhythm
+- **Striving:** Efficiency and control
+- **Thriving:** Predictability and leadership leverage
+- **Driving:** Optionality and enterprise value
+
+---
+
+## The Agency Evolution Ladder Context
+
+### Stage Definitions
+
+| Stage | Revenue Range | Primary Focus | Leadership Mode |
+|-------|--------------|---------------|-----------------|
+| **Rising** | ≤$1.5M AGI | Stabilize & Earn | Practitioner-Manager |
+| **Striving** | $1.5M-3M AGI | Systemize & Control | Manager-CEO |
+| **Thriving** | $3M-7M AGI | Scale & Predict | CEO |
+| **Driving** | $7M-15M+ AGI | Optimize & Capitalize | CEO-Advisor |
+
+---
+
+## Financial Performance KPIs: Evolution by Stage
+
+### AGI (Agency Gross Income)
+
+| Stage | Focus | Question Answered | Success Metric | Common Issue |
+|-------|-------|-------------------|----------------|--------------|
+| **Rising** | Build consistent monthly AGI | "Can we make money every month?" | Positive AGI 10+ months/year | Revenue volatility |
+| **Striving** | Improve AGI quality (reduce pass-throughs) | "Can we keep what we earn?" | 80-90% AGI% | Pass-through dependency |
+| **Thriving** | Diversify AGI streams | "Can we scale predictably?" | 85-92% AGI%, multiple revenue streams | Service concentration risk |
+| **Driving** | Optimize AGI yield per account | "Can we scale profitably at volume?" | 90-95% AGI%, high-value client mix | Maintaining quality at scale |
+
+**Interpretation Evolution:**
+
+**Rising:** "Did we hit our number?"
+- Simple top-line focus
+- Success = consistent revenue
+- Volatility acceptable
+
+**Striving:** "How much of revenue do we actually keep?"
+- Understanding pass-through impact
+- Success = improving AGI%
+- Quality focus emerging
+
+**Thriving:** "Is our revenue model scalable?"
+- Service mix optimization
+- Success = predictable, high-quality AGI
+- Diversification important
+
+**Driving:** "Are we maximizing client value?"
+- Premium positioning
+- Success = exceptional AGI% with volume
+- Enterprise-grade operations
+
+---
+
+### EBITDA Margin
+
+| Stage | Target Range | Purpose | Decision Enabled | Investment Focus |
+|-------|-------------|---------|------------------|------------------|
+| **Rising** | 10-25% | Survival to stability | Can we pay ourselves? | Minimal—focus on revenue |
+| **Striving** | 20-30% | Margin control discipline | Can we reinvest? | Process improvement |
+| **Thriving** | 30-35% | Strong profitability | Can we scale? | Leadership & systems |
+| **Driving** | 35-45% | Enterprise-grade margins | Can we optimize valuation? | Technology & innovation |
+
+**Interpretation Evolution:**
+
+**Rising:** "Are we profitable enough to survive?"
+- Breaking even → 10% feels like victory
+- Any profit is progress
+- Focus: Don't go negative
+
+**Striving:** "Are our margins healthy enough to grow?"
+- 20-30% becomes target
+- Reinvestment capacity matters
+- Focus: Protect margins while scaling
+
+**Thriving:** "Are we as efficient as we should be?"
+- 30-35% expected
+- Benchmark against best-in-class
+- Focus: Optimize without sacrificing quality
+
+**Driving:** "Can we demonstrate enterprise value?"
+- 35-45% creates acquisition premium
+- Margin stability valued highly
+- Focus: Sustain margins at scale
+
+---
+
+### AGI per FTE
+
+| Stage | Target Range | Meaning | Hiring Philosophy | Risk to Monitor |
+|-------|-------------|---------|-------------------|-----------------|
+| **Rising** | $140K-160K | Learning workload balance | Hiring ahead acceptable | Overcapacity |
+| **Striving** | $160K-180K | Establishing efficiency | Balance growth & margin | Over-hiring |
+| **Thriving** | $180K-200K | Predictable leverage | Forecast-driven hiring | Under-investment |
+| **Driving** | $200K-225K+ | Sustainable plateau | Strategic capacity | Over-leverage |
+
+**Interpretation Evolution:**
+
+**Rising:** "Can we cover payroll?"
+- Basic viability test
+- Low expectations acceptable
+- Focus: Build baseline
+
+**Striving:** "Are we getting more efficient per person?"
+- Productivity improvements tracked
+- Systems creating leverage
+- Focus: Efficiency without burnout
+
+**Thriving:** "Can we predict the impact of our next hire?"
+- Hiring ROI quantifiable
+- Capacity modeling sophisticated
+- Focus: Maintain efficiency at scale
+
+**Driving:** "Have we hit optimal leverage?"
+- Plateau acceptable
+- Further gains require different levers
+- Focus: Sustain without extraction
+
+---
+
+## Forecasting & Pipeline KPIs: Evolution by Stage
+
+### Forecast Accuracy
+
+| Stage | Accuracy Target | Time Horizon | Purpose | Update Frequency |
+|-------|----------------|--------------|---------|------------------|
+| **Rising** | ±40% (or not tracked) | 30 days | Cash visibility | Ad hoc |
+| **Striving** | ±30% | 90 days | Basic planning | Monthly |
+| **Thriving** | ±15-20% | 6 months | Capacity planning | Weekly |
+| **Driving** | ±10% | 12 months | Strategic planning | Daily/weekly |
+
+**Interpretation Evolution:**
+
+**Rising:** "Will we make payroll next month?"
+- Survival-focused
+- Short time horizon
+- High variance acceptable
+
+**Striving:** "Can we plan 90 days ahead?"
+- Hiring timeline planning
+- Some confidence building
+- Learning from variance
+
+**Thriving:** "Can we confidently plan 6 months out?"
+- Leadership leverage unlocking
+- Resource coordination possible
+- Variance analyzed systematically
+
+**Driving:** "Can we model strategic scenarios?"
+- Long-range planning confident
+- Variance well-understood
+- Optionality maximized
+
+---
+
+### Net MRR Movement
+
+| Stage | Focus | Success Definition | Acceptable Performance | Growth Strategy |
+|-------|-------|-------------------|------------------------|-----------------|
+| **Rising** | Positive or flat | Not shrinking | Breaking even on MRR | Just retain what you win |
+| **Striving** | Consistent positive | Growing steadily | +5-10% monthly | Retention + modest expansion |
+| **Thriving** | Predictable growth | Compounding | +10-15% monthly | Systematic expansion |
+| **Driving** | NRR >100% | Self-funding | +15-20%+ monthly | Expansion primary driver |
+
+**Interpretation Evolution:**
+
+**Rising:** "Are we replacing churn?"
+- Net zero acceptable
+- Just don't shrink
+- Focus: Stop the bleeding
+
+**Striving:** "Are we growing the base?"
+- Positive momentum important
+- Consistency matters
+- Focus: Build growth rhythm
+
+**Thriving:** "Is growth predictable?"
+- Compounding visible
+- Expansion systematic
+- Focus: Make growth repeatable
+
+**Driving:** "Is expansion driving growth?"
+- New business supplemental
+- Existing clients primary engine
+- Focus: Maximize client LTV
+
+---
+
+## Client Retention & Account Health: Evolution by Stage
+
+### Client Retention Rate
+
+| Stage | Target | Mindset | Retention Strategy | When It's a Problem |
+|-------|--------|---------|-------------------|---------------------|
+| **Rising** | 75-85% | Learning to deliver consistently | Reactive firefighting | <70% |
+| **Striving** | 85-90% | Systematic retention practices | Proactive account management | <80% |
+| **Thriving** | 90-95% | Predictable retention engine | Strategic account planning | <88% |
+| **Driving** | 92-98% | Enterprise-grade retention | Portfolio-level management | <90% |
+
+**Interpretation Evolution:**
+
+**Rising:** "Did we lose any important clients?"
+- Count-based thinking
+- Every loss feels significant
+- Focus: Keep who you have
+
+**Striving:** "Is churn under control?"
+- Percentage-based tracking
+- Patterns emerging
+- Focus: Reduce systematic issues
+
+**Thriving:** "Is retention predictable?"
+- Cohort analysis
+- Leading indicators tracked
+- Focus: Prevent churn proactively
+
+**Driving:** "Is churn noise or signal?"
+- Expected churn modeled
+- Strategic accounts never churn
+- Focus: Maintain excellence at scale
+
+---
+
+### NPS (Net Promoter Score)
+
+| Stage | Target | Purpose | Action Based On | Survey Discipline |
+|-------|--------|---------|----------------|-------------------|
+| **Rising** | 35-50% | Basic satisfaction gauge | React to detractors | Inconsistent |
+| **Striving** | 45-60% | Systematic feedback | Improve systematically | Quarterly |
+| **Thriving** | 55-70% | Leading indicator | Predict churn, identify advocates | Monthly |
+| **Driving** | 60-75%+ | Competitive differentiator | Drive strategic improvements | Continuous |
+
+**Interpretation Evolution:**
+
+**Rising:** "Are clients generally happy?"
+- Directional measure
+- General sentiment
+- Focus: Don't upset people
+
+**Striving:** "Can we systematically improve satisfaction?"
+- Actionable feedback
+- Improvement tracking
+- Focus: Build better systems
+
+**Thriving:** "Can we predict retention from NPS?"
+- Leading indicator understood
+- Early warning system
+- Focus: Prevent problems early
+
+**Driving:** "Is NPS a competitive advantage?"
+- Brand differentiator
+- Advocacy at scale
+- Focus: World-class experience
+
+---
+
+## Sales & Marketing Efficiency: Evolution by Stage
+
+### Customer Acquisition Cost (CAC)
+
+| Stage | Acceptable Range | Purpose | What It Funds | Payback Expectation |
+|-------|-----------------|---------|---------------|---------------------|
+| **Rising** | Establish baseline | Learn costs | Survival growth | <12 months |
+| **Striving** | $4K-8K | Improve efficiency | Controlled growth | 6-9 months |
+| **Thriving** | Model benchmark | Optimize channels | Strategic growth | 4-6 months |
+| **Driving** | 25% below benchmark | Competitive advantage | Market leadership | 3-4 months |
+
+**Interpretation Evolution:**
+
+**Rising:** "How much does it cost to get a client?"
+- Just starting to track
+- High variance acceptable
+- Focus: Measure it
+
+**Striving:** "Can we make acquisition more efficient?"
+- Comparing to benchmarks
+- Optimizing actively
+- Focus: Reduce cost per client
+
+**Thriving:** "Which channels are most efficient?"
+- Channel-level optimization
+- Portfolio approach
+- Focus: Optimize mix
+
+**Driving:** "Is CAC a competitive moat?"
+- Best-in-class efficiency
+- Hard to replicate
+- Focus: Sustain advantage
+
+---
+
+### LTV:CAC Ratio
+
+| Stage | Target | Meaning | Business Model Signal | Strategic Priority |
+|-------|--------|---------|----------------------|-------------------|
+| **Rising** | 2:1+ (if tracked) | Unit economics viable | Can we survive? | Prove viability |
+| **Striving** | 3:1+ | Sustainable growth | Can we scale? | Improve efficiency |
+| **Thriving** | 4:1-5:1 | Strong unit economics | Self-funding growth | Optimize and protect |
+| **Driving** | 5:1+ | Exceptional efficiency | Competitive advantage | Leverage for options |
+
+**Interpretation Evolution:**
+
+**Rising:** "Are we making more than we spend?"
+- Basic viability check
+- Rough math sufficient
+- Focus: Be net positive
+
+**Striving:** "Can this business model scale?"
+- Proving sustainability
+- Benchmarking against standards
+- Focus: Hit 3:1 minimum
+
+**Thriving:** "How healthy are our economics?"
+- Comparing to best-in-class
+- Building competitive moat
+- Focus: Maintain 4:1+
+
+**Driving:** "Do we have best-in-class economics?"
+- Valuation multiplier
+- Strategic optionality
+- Focus: Sustain and showcase
+
+---
+
+## Productivity & Capacity KPIs: Evolution by Stage
+
+### Utilization Rate
+
+| Stage | Target Range | Purpose | Acceptable Variance | Management Approach |
+|-------|-------------|---------|-------------------|---------------------|
+| **Rising** | 65-75% | Find rhythm | ±15% | Reactive |
+| **Striving** | 70-80% | Balance efficiency | ±10% | Systematic |
+| **Thriving** | 75-85% | Predictable output | ±5% | Proactive |
+| **Driving** | 75-85% sustained | Sustained excellence | ±3% | Automated alerts |
+
+**Interpretation Evolution:**
+
+**Rising:** "Are people busy enough?"
+- Feast/famine acceptable
+- High variance normal
+- Focus: Build baseline
+
+**Striving:** "Can we maintain healthy utilization?"
+- Targeting consistency
+- Reducing spikes
+- Focus: Smooth the curve
+
+**Thriving:** "Is utilization predictable?"
+- Low variance achieved
+- Forecasting accurate
+- Focus: Maintain rhythm
+
+**Driving:** "Are we optimally loaded?"
+- Balance perfected
+- Buffer maintained
+- Focus: Never deviate
+
+---
+
+## The Meta-Pattern: Lens Shift Across Stages
+
+### Dimension: Revenue KPIs
+
+| Stage | Lens | Question |
+|-------|------|----------|
+| **Rising** | Growth speed | "Are we growing at all?" |
+| **Striving** | Growth quality | "Is growth profitable?" |
+| **Thriving** | Growth predictability | "Can we forecast growth?" |
+| **Driving** | Growth profitability | "Does growth create value?" |
+
+### Dimension: Profit KPIs
+
+| Stage | Lens | Question |
+|-------|------|----------|
+| **Rising** | Can we pay ourselves? | "Is there any margin?" |
+| **Striving** | Can we keep margin? | "Are margins sustainable?" |
+| **Thriving** | Can we reinvest? | "Do we have growth capital?" |
+| **Driving** | Can we multiply enterprise value? | "Are margins exceptional?" |
+
+### Dimension: People KPIs
+
+| Stage | Lens | Question |
+|-------|------|----------|
+| **Rising** | Can we hire help? | "Can we afford someone?" |
+| **Striving** | Are we overworking? | "Is the team sustainable?" |
+| **Thriving** | Do leaders have leverage? | "Can founders step back?" |
+| **Driving** | Is leadership autonomous? | "Does it run without me?" |
+
+### Dimension: Forecasting KPIs
+
+| Stage | Lens | Question |
+|-------|------|----------|
+| **Rising** | Are we busy next month? | "Will there be work?" |
+| **Striving** | Do we have 90-day visibility? | "Can we plan a quarter?" |
+| **Thriving** | Do we have 6-month confidence? | "Can we plan two quarters?" |
+| **Driving** | Can we plan capital deployment? | "Can we model scenarios?" |
+
+### Dimension: Client KPIs
+
+| Stage | Lens | Question |
+|-------|------|----------|
+| **Rising** | Are we keeping clients? | "Did anyone leave?" |
+| **Striving** | Are clients profitable? | "Are they worth keeping?" |
+| **Thriving** | Are clients expanding? | "Are relationships growing?" |
+| **Driving** | Are clients advocates? | "Are they referring?" |
+
+---
+
+## Practical Application: Using This Framework
+
+### As Diagnostic Tool
+
+**Identify current stage:**
+1. Read each KPI's stage descriptions
+2. Match current interpretation to stage
+3. Note disconnects (measuring wrong things for stage)
+
+**Example:**
+- Agency at $5M AGI (Thriving stage)
+- But tracking KPIs with Rising-stage mentality
+- Missing opportunity for leverage
+- Need to evolve interpretation
+
+### As Roadmap
+
+**Plan progression:**
+1. Understand current KPI usage
+2. Identify next-stage interpretation needed
+3. Plan capability investments
+4. Set timeline for evolution
+
+**Example progression:**
+- Currently: Manual monthly forecast review (Striving)
+- Next: Weekly dashboard with variance analysis (Thriving)
+- Timeline: 6-9 months
+- Investment: Dashboard tools + training
+
+### As Communication Tool
+
+**Align team:**
+- "We're measuring like a Rising agency"
+- "We need to start measuring like Striving"
+- Everyone understands the shift needed
+- Clear expectations set
+
+---
+
+## Strategic "So What"
+
+### 1. Sophistication Follows Maturity
+
+**You can't skip stages:**
+- Rising agency can't interpret KPIs like Driving
+- Need operational foundation first
+- Must evolve through stages
+
+**But can accelerate:**
+- With right investment
+- With experienced guidance
+- With intentional focus
+
+### 2. Mismatched Interpretation Creates Problems
+
+**Too advanced for stage:**
+- Overwhelming complexity
+- Analysis paralysis
+- Resource waste
+
+**Too basic for stage:**
+- Missing leverage opportunities
+- Under-optimizing
+- Competitive disadvantage
+
+**Right match:**
+- Clear actionability
+- Appropriate investment
+- Maximum value
+
+### 3. The Same Numbers Tell Different Stories
+
+**Example: 85% client retention**
+
+**Rising stage:** "Great! We're keeping most clients!"
+**Striving stage:** "Concerning—need to hit 90%"
+**Thriving stage:** "Unacceptable—should be 92%+"
+**Driving stage:** "Crisis—what's wrong?"
+
+**The number didn't change—the standard did.**
+
+### 4. Evolution Requires Investment
+
+**Each stage transition needs:**
+- New tools/systems
+- New skills/training
+- New processes/discipline
+- Time to build capability
+
+**Can't just "decide" to be more sophisticated:**
+- Must invest to enable
+- Must build to sustain
+- Must maintain to compound
+
+### 5. Maturity Is About Context, Not Just Numbers
+
+**Two agencies, same $5M AGI:**
+
+**Agency A:**
+- Measures like Rising stage
+- Reactive, chaotic
+- Limited leverage
+
+**Agency B:**
+- Measures like Thriving stage
+- Proactive, systematic
+- High leverage
+
+**Same revenue, different operational maturity:**
+- B has higher valuation
+- B scales more easily
+- B has more optionality
+
+---
+
+## Related Files
+
+- `/01-core-definitions/` — All core KPI definitions
+- `/02-benchmarks/` — Stage-specific target ranges
+- `/03-directional-diagnostics/` — How to interpret trends
+- `/05-maturity-models/agency-kpi-maturity-map.md` — Comprehensive stage matrix
+
+
+
+File 3: agency-kpi-maturity-map.md
+
+---
+title: Agency KPI Maturity Map
+category: maturity-models
+subcategory: comprehensive-matrix
+updated: 2025-01-09
+version: 1.0
+---
+
+# Agency KPI Maturity Map
+
+A comprehensive stage-by-stage matrix showing which KPIs to track, how to track them, what they mean, and what decisions they should inform at each level of agency maturity.
+
+## How to Use This Map
+
+This is a **reference matrix** for understanding:
+1. Which KPIs matter most at your stage
+2. How sophisticated your tracking should be
+3. What decisions each KPI should inform
+4. When to add complexity vs. keep it simple
+
+**Navigation:**
+- Each stage has its own section
+- KPIs organized by category within each stage
+- Includes tracking method, interpretation, and decision impact
+
+---
+
+## Rising Stage ($500K-$1.5M AGI)
+
+### Stage Characteristics
+
+**Leadership mode:** Practitioner-Manager (founder wearing all hats)
+**Primary challenge:** Establish viable, repeatable business model
+**Operational maturity:** Low—building foundation
+**Planning horizon:** 30-60 days
+**Team size:** 2-8 people
+**Decision style:** Reactive, founder-centric
+
+### Core KPI Priorities
+
+**Track these (minimum viable dashboard):**
+1. AGI (monthly)
+2. Operating profit margin
+3. Cash runway
+4. Client retention (simple count)
+5. Utilization (rough estimate)
+
+**Don't worry about yet:**
+- Detailed pipeline forecasts
+- Cohort analysis
+- NPS surveys
+- Complex project profitability
+
+---
+
+### Financial Performance KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **AGI (Monthly)** | QuickBooks or simple spreadsheet | Consistent positive AGI 10+ months/year | Can we survive? Should we keep going? |
+| **AGI%** | Calculate: AGI ÷ Total Revenue | 75-85% minimum | Are we too reliant on pass-through? |
+| **Operating Profit Margin** | QuickBooks P&L | 10-25%, positive most months | Can founder pay themselves? |
+| **Compensation %** | Payroll ÷ AGI | ≤50% (includes founder) | Can we afford this team? |
+| **Cash Runway** | Bank balance ÷ monthly burn | 1-3 months (build to 3) | Do we have time to fix problems? |
+
+**Tracking method:**
+- Monthly P&L review (30 minutes)
+- Simple spreadsheet tracking AGI, costs, margin
+- Bank balance visible weekly
+
+**Interpretation at this stage:**
+- Positive = winning
+- Trending up = progress
+- Don't obsess over variance—focus on direction
+
+**Common mistakes:**
+- Over-analyzing small fluctuations
+- Comparing to mature agency benchmarks
+- Tracking too many metrics
+
+---
+
+### Forecasting & Pipeline KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Current Client MRR** | Manual list of retainer clients | Stable or growing count | How much base revenue do we have? |
+| **New Business Pipeline** | List in CRM or spreadsheet | 2-3 active opportunities always | Will we have work next month? |
+| **Forecast Accuracy** | Don't track formally yet | N/A—just estimate next 30 days | Can we make payroll? |
+
+**Tracking method:**
+- Weekly: Update client list and pipeline
+- Monthly: Review what closed vs. what was projected
+- No formal variance analysis
+
+**Interpretation at this stage:**
+- "Will there be work next month?" is the only question
+- High variance acceptable
+- Focus on keeping pipeline from going empty
+
+**What NOT to do:**
+- Complex weighted forecasts
+- Formal variance reviews
+- Quarterly planning cycles
+
+---
+
+### Client Retention & Account Health
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Client Retention (Count)** | Simple headcount monthly | Losing <2 clients per year | Are clients generally satisfied? |
+| **Churn Rate** | Optional—not critical yet | ≤15-20% annually acceptable | Do we have fundamental delivery issues? |
+| **Client Results** | Informal—founder knows | Clients get tangible wins | Are we delivering value? |
+
+**Tracking method:**
+- Count clients at end of each month
+- Note who churned and why (informal)
+- No formal NPS or surveys yet
+
+**Interpretation at this stage:**
+- Every lost client feels significant (small base)
+- Learn from each loss informally
+- Don't need sophisticated tracking
+
+**What to watch for:**
+- Churn >25% annually = major delivery issue
+- Pattern in why clients leave = systemic problem
+- Client complaining = immediate attention
+
+---
+
+### Sales & Marketing Efficiency
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **New Clients Won** | Simple count | 1-2 per month | Are we growing? |
+| **Win Rate** | Rough estimate | >25-30% | Is sales working at all? |
+| **CAC** | Optional—hard to calculate cleanly | Establish baseline | How much does growth cost? |
+
+**Tracking method:**
+- Count proposals sent and won
+- Estimate marketing/sales costs monthly
+- Don't stress precision
+
+**Interpretation at this stage:**
+- Focus on momentum, not efficiency
+- Any predictable new business = success
+- Don't optimize prematurely
+
+**What NOT to worry about:**
+- LTV:CAC ratios
+- Payback period calculations
+- Channel-specific ROI
+
+---
+
+### Productivity & Capacity
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Utilization** | Rough estimate—hours worked | 60-75% average | Are we overwhelmed or underworked? |
+| **AGI per FTE** | AGI ÷ team size | $140K-160K | Can we afford our team? |
+| **Overtime** | Feel vs. formal tracking | Occasional, not constant | Is team burning out? |
+
+**Tracking method:**
+- Weekly team check-ins
+- General sense of workload
+- No formal time tracking yet
+
+**Interpretation at this stage:**
+- Team feels sustainable = good
+- Constant firefighting = capacity issue
+- Idle time = growth needed
+
+**What to watch for:**
+- Utilization >90% sustained = hire soon
+- Utilization <50% sustained = revenue problem
+- Team complaining of overwork = take seriously
+
+---
+
+### Rising Stage Summary Table
+
+| Category | Priority Level | Tracking Effort | Decision Frequency |
+|----------|---------------|----------------|-------------------|
+| **Financial** | Critical | Low (monthly P&L) | Monthly |
+| **Forecasting** | Important | Minimal (list updates) | Weekly informal |
+| **Retention** | Important | Minimal (count clients) | Monthly |
+| **Sales/Marketing** | Moderate | Minimal (count deals) | Monthly |
+| **Productivity** | Moderate | None (gut feel) | Weekly informal |
+
+**Time investment:** 2-4 hours/month on KPI tracking
+**Primary tool:** Spreadsheet + QuickBooks
+**Meeting rhythm:** Monthly founder review
+
+---
+
+## Striving Stage ($1.5M-3M AGI)
+
+### Stage Characteristics
+
+**Leadership mode:** Manager-CEO (building team, delegating)
+**Primary challenge:** Systemize operations, control chaos
+**Operational maturity:** Medium—processes emerging
+**Planning horizon:** 90 days with some confidence
+**Team size:** 8-20 people
+**Decision style:** More proactive, team-informed
+
+### Core KPI Priorities
+
+**Track these (growing dashboard):**
+1. All Rising metrics (more rigorously)
+2. Detailed pipeline forecast
+3. Net MRR movement
+4. Client churn rate (%)
+5. Billable utilization (tracked)
+6. Project profitability
+7. CAC and basic payback
+
+**Elevated tracking:**
+- Monthly KPI reviews (formal)
+- Quarterly planning sessions
+- Department-level metrics
+
+---
+
+### Financial Performance KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **AGI (Monthly)** | Automated from accounting system | Predictable growth, <20% variance | Can we hire? Should we invest? |
+| **AGI%** | Automated calculation | 80-90%, improving | Should we restructure pricing? |
+| **EBITDA Margin** | Monthly P&L, calculate EBITDA | 20-30% sustained | Can we reinvest in systems? |
+| **Compensation %** | Payroll ÷ AGI, tracked monthly | ≤45%, controlled | Can we afford next hire? |
+| **SG&A %** | Non-payroll costs ÷ AGI | ≤20%, monitored | Where can we cut waste? |
+| **Operating Profit %** | EBITDA % (similar at this stage) | 20-30% | Are we healthy enough to grow? |
+| **AGI per FTE** | AGI ÷ FTE count | $160K-180K, improving | Is team size right for revenue? |
+
+**Tracking method:**
+- Monthly formal P&L review (1-2 hours)
+- Simple dashboard (Google Sheets or basic BI tool)
+- Compare to prior month and quarter
+
+**Interpretation at this stage:**
+- Variance <15% month-over-month = good control
+- Margins improving = systems working
+- Cost ratios stable = discipline in place
+
+**What to watch for:**
+- Margin declining while growing = efficiency problem
+- Compensation % creeping up = over-hiring risk
+- AGI per FTE declining = productivity issue
+
+---
+
+### Forecasting & Pipeline KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Current Clients Forecast** | MRR list with renewal dates | Accurate within ±15% at 90 days | How stable is our base? |
+| **New Business Pipeline** | CRM with weighted stages | 3-5x pipeline coverage | Should we hire ahead of growth? |
+| **Total Forecast** | Current + Pipeline | Within ±30% at 90 days | Can we plan next quarter? |
+| **Net MRR Movement** | Monthly change in MRR | Positive 6+ months/year | Are we growing organically? |
+| **Client Churn Rate** | Monthly churn % | ≤2.5% monthly, ≤25% annually | Do we have retention problem? |
+| **Churn Value** | $ lost to churn monthly | Stable or declining | How much backfilling needed? |
+
+**Tracking method:**
+- Weekly pipeline updates in CRM
+- Monthly forecast review meeting (1 hour)
+- Track forecast vs. actual
+- Begin variance analysis
+
+**Interpretation at this stage:**
+- Forecast accuracy improving = building confidence
+- Net MRR positive = growth sustainable
+- Churn <25% annually = acceptable for stage
+
+**What to watch for:**
+- Forecast always wrong = process needs work
+- Negative Net MRR = growth unsustainable
+- Churn >30% = delivery crisis
+
+---
+
+### Client Retention & Account Health
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Retention Rate** | (Start clients - Churn) ÷ Start clients | 85-90% annually | Is delivery consistent? |
+| **Client Churn Rate** | Inverse of retention | ≤10-15% annually | Where are systematic issues? |
+| **NPS** | Quarterly survey (start implementing) | 45-60% | Are clients advocates or just satisfied? |
+| **Client Tenure** | Average months active | 18-24 months | Are relationships deepening? |
+| **Upsell Revenue** | Track separately | 10-15% of total revenue | Are clients growing with us? |
+
+**Tracking method:**
+- Monthly retention calculation
+- Quarterly NPS survey (start simple)
+- Track reasons for churn
+- Begin cohort analysis (basic)
+
+**Interpretation at this stage:**
+- Retention 85-90% = acceptable, room to improve
+- NPS 50+ = generally satisfied
+- Upsells emerging = value recognized
+
+**What to watch for:**
+- Retention declining quarter-over-quarter = investigate
+- NPS <40% = satisfaction crisis
+- Zero upsells = value perception problem
+
+---
+
+### Sales & Marketing Efficiency
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **MQLs** | Marketing platform tracking | Consistent flow | Is marketing working? |
+| **SQLs** | CRM tracking | 20-30% of MQLs | Is lead quality good? |
+| **Win Rate** | Closed-won ÷ Opportunities | 30-40% | Is positioning working? |
+| **Deal Size (Avg)** | Average first-year contract | $30K-60K (varies by type) | Are we attracting right clients? |
+| **Sales Cycle** | Days from lead to close | 45-90 days | Is process efficient? |
+| **CAC** | Sales + Marketing costs ÷ New clients | $4K-8K (varies by model) | Can we afford to grow? |
+| **Payback Period** | CAC ÷ Monthly margin per client | 6-9 months | How quickly do we recover? |
+| **LTV:CAC** | Customer LTV ÷ CAC | 3:1 minimum | Are economics healthy? |
+
+**Tracking method:**
+- CRM with pipeline stages
+- Monthly sales metrics dashboard
+- Quarterly deep-dive on economics
+- Track by channel
+
+**Interpretation at this stage:**
+- Win rate 30-40% = healthy
+- CAC establishing baseline
+- LTV:CAC 3:1+ = sustainable unit economics
+
+**What to watch for:**
+- Win rate declining = positioning issue
+- CAC rising without LTV rising = efficiency declining
+- Payback >12 months = cash flow constraint
+
+---
+
+### Productivity & Capacity
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Billable Utilization** | Time tracking system | 70-80% average | Is team capacity right? |
+| **Billable:Non-Billable Ratio** | Billable hours ÷ Total | 3:1 (75% billable) | Is infrastructure balanced? |
+| **AGI per FTE** | AGI ÷ FTE count | $160K-180K, stable | Are we getting more efficient? |
+| **Capacity Utilization** | Booked hours ÷ Available | 75-85% | Should we hire? |
+| **Project Profitability** | Project margin tracking | 25-30% on average | Which projects/clients are profitable? |
+| **Unbilled Hours** | Hours worked not billed | <5% of capacity | Where is time leaking? |
+
+**Tracking method:**
+- Weekly time tracking (required)
+- Monthly utilization reports
+- Quarterly project profitability review
+- Dashboard with real-time visibility
+
+**Interpretation at this stage:**
+- Utilization 70-80% = healthy
+- Project margins 25-30% = good
+- Unbilled <5% = disciplined
+
+**What to watch for:**
+- Utilization >85% sustained = hire soon
+- Project margins declining = pricing or efficiency issue
+- Unbilled >10% = significant leakage
+
+---
+
+### Striving Stage Summary Table
+
+| Category | Priority Level | Tracking Effort | Decision Frequency |
+|----------|---------------|----------------|-------------------|
+| **Financial** | Critical | Medium (monthly formal) | Monthly |
+| **Forecasting** | Critical | Medium (weekly updates) | Weekly informal, monthly formal |
+| **Retention** | Important | Medium (quarterly NPS) | Monthly |
+| **Sales/Marketing** | Critical | Medium (CRM + monthly) | Monthly |
+| **Productivity** | Important | Medium (time tracking) | Weekly |
+
+**Time investment:** 6-10 hours/month on KPI tracking + review
+**Primary tools:** CRM, time tracking, basic BI dashboard, accounting software
+**Meeting rhythm:** Weekly ops review (30 min), Monthly deep dive (2 hours), Quarterly planning (half day)
+
+---
+
+## Thriving Stage ($3M-7M AGI)
+
+### Stage Characteristics
+
+**Leadership mode:** CEO (leading through team)
+**Primary challenge:** Scale predictably, build leadership leverage
+**Operational maturity:** High—systems mature
+**Planning horizon:** 6 months with confidence
+**Team size:** 20-50 people
+**Decision style:** Proactive, data-driven, team-distributed
+
+### Core KPI Priorities
+
+**Track these (mature dashboard):**
+1. All Striving metrics (with more precision)
+2. Cohort analysis (retention, LTV)
+3. Leading indicators tracked
+4. Department-level metrics
+5. Predictive analytics emerging
+6. Variance analysis systematic
+
+**Elevated sophistication:**
+- Weekly executive dashboard reviews
+- Monthly board-level reporting
+- Scenario planning capability
+- Cross-functional metric alignment
+
+---
+
+### Financial Performance KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **AGI (Monthly)** | Automated, real-time visibility | <10% variance month-over-month | Investment timing, expansion decisions |
+| **AGI%** | Automated, tracked by service line | 85-92%, optimized | Service mix decisions |
+| **EBITDA Margin** | Automated monthly P&L | 30-35%, stable | Reinvestment capacity, valuation positioning |
+| **Compensation %** | Real-time dashboard | ≤45%, controlled tightly | Hiring models, comp strategy |
+| **SG&A %** | Real-time dashboard | ≤18-20%, efficient | Infrastructure investment decisions |
+| **Operating Profit %** | Same as EBITDA at this stage | 30-35% | Strategic optionality |
+| **AGI per FTE** | Automated, tracked by role | $180K-200K, predictable | Hiring ROI modeling |
+| **Revenue per Client** | Average annual contract value | Growing annually | Client mix strategy |
+
+**Tracking method:**
+- Real-time or daily dashboard updates
+- Weekly leadership review (30-45 min)
+- Monthly board report (polished)
+- Quarterly strategic review (deep)
+
+**Interpretation at this stage:**
+- Variance <10% = strong control
+- Margins 30-35% = healthy for scale
+- Metrics predictable = operations mature
+
+**What to watch for:**
+- Any margin compression = investigate immediately
+- Variance increasing = losing control
+- AGI per FTE plateauing = need new leverage levers
+
+---
+
+### Forecasting & Pipeline KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Current Clients Forecast** | Automated from CRM + PM tools | ±10% accuracy at 90 days | Capacity planning confidence |
+| **New Business Pipeline** | Weighted by stage, automated | 4-5x coverage, accurate | Hiring ahead of growth |
+| **Total Forecast** | Integrated dashboard | ±15-20% at 6 months | Strategic planning, M&A |
+| **Net MRR Movement** | Tracked weekly | +10-15% monthly | Growth trajectory confidence |
+| **Client Churn Rate** | Automated, cohort-based | ≤1.5-2% monthly | Leading indicator tracking |
+| **Churn Value** | Tracked weekly | Predictable, contained | Forecasting adjustment |
+| **Forecast Accuracy** | Variance tracked systematically | <15% variance at 90 days | Process refinement |
+
+**Tracking method:**
+- Automated daily/weekly updates
+- Weekly forecast review with team
+- Monthly variance deep-dive
+- Scenario planning capability
+
+**Interpretation at this stage:**
+- Forecast accuracy <15% at 90 days = excellent
+- Net MRR 10%+ monthly = strong growth
+- Churn predictable = mature operations
+
+**What to watch for:**
+- Forecast accuracy declining = process breaking
+- Net MRR volatile = retention or sales issues
+- Churn surprises = early warning system failed
+
+---
+
+### Client Retention & Account Health
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Retention Rate** | Cohort analysis, automated | 90-95% annually | Client success strategy |
+| **Client Churn Rate** | Automated, leading indicators | ≤1-1.5% monthly | Account management allocation |
+| **NPS** | Monthly surveying, automated | 55-70% | Experience optimization |
+| **Client Tenure** | Average months, cohort-based | 30-36 months | Relationship depth assessment |
+| **Upsell Revenue** | Tracked as % of growth | 20-30% of new revenue | Account management focus |
+| **Referral Rate** | New clients from referrals | 20-30% of new business | Brand strength indicator |
+| **Client Health Score** | Automated scoring model | 80%+ accounts "healthy" | Early warning and intervention |
+
+**Tracking method:**
+- Automated health scoring
+- Monthly NPS automated surveys
+- Cohort retention analysis
+- Client success dashboard
+
+**Interpretation at this stage:**
+- Retention 92%+ = excellent
+- NPS 60+ = strong advocacy emerging
+- Upsells 25%+ = expansion engine working
+
+**What to watch for:**
+- Retention declining even slightly = investigate
+- NPS declining = experience degrading
+- Referrals flat = advocacy not scaling
+
+---
+
+### Sales & Marketing Efficiency
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **MQLs** | Marketing automation platform | Predictable volume | Marketing budget allocation |
+| **SQLs** | CRM with scoring | 30-40% of MQLs | Marketing-sales alignment |
+| **Win Rate** | CRM, tracked by segment | 35-50% | Positioning refinement |
+| **Deal Size (Avg)** | Tracked by segment/service | Growing 5-10% annually | Service mix strategy |
+| **Sales Cycle** | CRM, tracked by segment | 30-60 days average | Process optimization |
+| **CAC** | Full cost tracking by channel | Below industry avg | Channel optimization |
+| **Payback Period** | Calculated monthly | 4-6 months | Growth velocity planning |
+| **LTV:CAC** | Cohort-based calculation | 4:1-5:1 | Unit economics health |
+| **CAC by Channel** | Attribution tracking | Optimized mix | Budget allocation |
+
+**Tracking method:**
+- Full marketing automation stack
+- Multi-touch attribution (emerging)
+- Weekly sales dashboard
+- Monthly economics review
+- Quarterly channel optimization
+
+**Interpretation at this stage:**
+- Win rate 40%+ = strong positioning
+- LTV:CAC 4:1+ = healthy economics
+- CAC by channel optimized = mature acquisition
+
+**What to watch for:**
+- Win rate declining = competitive pressure
+- CAC rising = efficiency degrading
+- Channel mix suboptimal = rebalance
+
+---
+
+### Productivity & Capacity
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Billable Utilization** | Automated time tracking | 75-85%, consistent | Capacity planning precision |
+| **Billable:Non-Billable Ratio** | Automated calculation | 3:1 maintained | Infrastructure balance |
+| **AGI per FTE** | Automated, by role/dept | $180K-200K, predictable | Role design, hiring models |
+| **Capacity Utilization** | Forward-looking dashboard | 80-85% forecast | Hiring timing |
+| **Project Profitability** | Automated project accounting | 30-35% average | Client/project selection |
+| **Unbilled Hours** | Tracked weekly | <3% of capacity | Process tightening |
+| **ARPE** | AGI per employee, annualized | $180K-200K | Leverage assessment |
+| **Overtime** | Tracked as % of capacity | <5% | Team health monitoring |
+
+**Tracking method:**
+- Integrated time tracking + project management
+- Real-time utilization dashboard
+- Weekly capacity reviews
+- Monthly profitability analysis
+- Automated alerts for variance
+
+**Interpretation at this stage:**
+- Utilization 75-85% consistently = optimal
+- Project margins 30%+ = strong
+- Unbilled <3% = excellent discipline
+
+**What to watch for:**
+- Utilization >85% sustained = hire
+- Project margins declining = pricing or efficiency
+- Overtime rising = capacity constraint
+
+---
+
+### Thriving Stage Summary Table
+
+| Category | Priority Level | Tracking Effort | Decision Frequency |
+|----------|---------------|----------------|-------------------|
+| **Financial** | Critical | Low (automated) | Weekly leadership, monthly board |
+| **Forecasting** | Critical | Low (automated) | Weekly leadership, monthly strategic |
+| **Retention** | Critical | Medium (automated surveys) | Weekly health scores, monthly deep dive |
+| **Sales/Marketing** | Critical | Low (automated) | Weekly pipeline, monthly economics |
+| **Productivity** | Important | Low (automated) | Weekly capacity, monthly analysis |
+
+**Time investment:** 4-6 hours/month on KPI review (less tracking, more analysis)
+**Primary tools:** Integrated tech stack, BI platform, automated dashboards, data warehouse emerging
+**Meeting rhythm:** Daily standup (metrics check), Weekly leadership (45 min), Monthly board report, Quarterly strategy (full day)
+
+---
+
+## Driving Stage ($7M-15M+ AGI)
+
+### Stage Characteristics
+
+**Leadership mode:** CEO-Advisor (enterprise operations, strategic optionality)
+**Primary challenge:** Optimize enterprise value, prepare for scale/exit
+**Operational maturity:** Enterprise-grade
+**Planning horizon:** 12-24 months with scenarios
+**Team size:** 50-150+ people
+**Decision style:** Strategic, portfolio-minded, board-level thinking
+
+### Core KPI Priorities
+
+**Track these (enterprise dashboard):**
+1. All Thriving metrics (with predictive analytics)
+2. Portfolio-level consolidation (if multi-entity)
+3. Enterprise value metrics
+4. Board-level KPIs
+5. Scenario planning models
+6. Market benchmarking systematic
+
+**Elevated sophistication:**
+- Real-time executive dashboards
+- Board-ready monthly reporting
+- Predictive modeling and scenarios
+- External benchmarking continuous
+- Acquisition-ready metrics
+
+---
+
+### Financial Performance KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **AGI (Monthly)** | Automated, consolidated | <5% variance, predictable | Capital deployment, M&A, distributions |
+| **AGI%** | Automated by entity/service | 90-95%, optimized | Portfolio optimization |
+| **EBITDA Margin** | Automated, benchmarked | 35-45%, stable | Valuation maximization |
+| **Compensation %** | Automated, role-based | ≤45%, efficient | Comp strategy, incentive design |
+| **SG&A %** | Automated, controlled | ≤15-18% | Infrastructure ROI |
+| **Operating Profit %** | Same as EBITDA | 35-45% | Exit readiness, distributions |
+| **AGI per FTE** | Automated, benchmarked | $200K-225K+, sustained | Leverage assessment |
+| **Rule of 40** | Growth % + EBITDA % | ≥40% | SaaS-style efficiency benchmark |
+| **Enterprise Value Estimate** | Based on multiples | Tracking trajectory | Exit planning, strategic moves |
+
+**Tracking method:**
+- Real-time consolidated dashboards
+- Weekly CEO review
+- Monthly board packet (investor-grade)
+- Quarterly strategic planning
+- Annual valuation assessment
+
+**Interpretation at this stage:**
+- Variance <5% = enterprise control
+- EBITDA 40%+ = exceptional
+- Rule of 40 achieved = world-class
+
+**What to watch for:**
+- Any margin degradation = immediate attention
+- Variance increasing = scale issues
+- Benchmark comparison declining = competitive concern
+
+---
+
+### Forecasting & Pipeline KPIs
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Current Clients Forecast** | Automated, predictive | ±5% accuracy at 90 days | Precision capacity planning |
+| **New Business Pipeline** | Automated, AI-assisted | 4-5x coverage, calibrated | Strategic hiring, M&A timing |
+| **Total Forecast** | Integrated, scenario-based | ±10% at 12 months | Annual planning, capital allocation |
+| **Net MRR Movement** | Real-time tracking | +15-20%+ monthly | Growth sustainability |
+| **NRR (Net Revenue Retention)** | Cohort-based, automated | >100% (expansion > churn) | Business model strength |
+| **Forecast Accuracy** | Variance tracked continuously | <10% at 90 days | Process continuous improvement |
+| **Scenario Models** | Built-in forecasting tool | 3-5 scenarios modeled | Strategic optionality |
+
+**Tracking method:**
+- Automated real-time dashboards
+- Daily monitoring (alerts for variance)
+- Weekly CEO + CFO review
+- Monthly board presentation
+- Quarterly scenario planning
+
+**Interpretation at this stage:**
+- Forecast accuracy <10% at 90 days = world-class
+- NRR >100% = expansion driving growth
+- Scenario capability = strategic preparedness
+
+**What to watch for:**
+- Forecast accuracy declining = investigate immediately
+- NRR dropping below 100% = expansion engine weakening
+- Scenario assumptions becoming stale = update models
+
+---
+
+### Client Retention & Account Health
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Retention Rate** | Automated, segmented | 92-98% annually | Client success investment |
+| **Logo Churn** | Tracked separately from revenue | <8% annually | Brand strength |
+| **Dollar Churn** | Revenue-weighted churn | <5-8% annually (offset by expansion) | Account management strategy |
+| **NPS** | Continuous automated tracking | 60-75%+ | Competitive differentiation |
+| **Client Tenure** | Cohort-based analysis | 36-48+ months average | Relationship capital |
+| **Upsell Revenue** | Tracked as % of total growth | 30-40% of revenue growth | Expansion engine assessment |
+| **Referral Rate** | % of new business from referrals | 30-40%+ | Brand moat strength |
+| **NRR** | Expansion - churn, by cohort | >110% | Business model quality |
+| **Client Health Score** | Automated, predictive | 85%+ "healthy" | Proactive intervention |
+| **Client LTV** | Cohort-based calculation | Growing year-over-year | Unit economics optimization |
+
+**Tracking method:**
+- Automated client health platform
+- Real-time NPS tracking
+- Predictive churn models
+- Weekly at-risk review
+- Monthly cohort analysis
+
+**Interpretation at this stage:**
+- Retention 95%+ = world-class
+- NRR >110% = expansion dominant
+- NPS 70+ = strong advocacy at scale
+
+**What to watch for:**
+- Any retention decline = investigate immediately
+- NRR declining = expansion slowing
+- Strategic accounts at risk = CEO-level intervention
+
+---
+
+### Sales & Marketing Efficiency
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **MQLs** | Marketing automation, AI-optimized | Predictable, quality-controlled | Marketing strategy |
+| **SQLs** | CRM with ML scoring | 35-45% of MQLs | Sales-marketing efficiency |
+| **Win Rate** | Automated by segment | 40-60% | Competitive positioning |
+| **Deal Size (Avg)** | Tracked by segment, growing | 10-15% annual growth | Service evolution |
+| **Sales Cycle** | Automated, benchmarked | 30-45 days (or understood for segment) | Process optimization |
+| **CAC** | Full attribution, by channel | Best-in-class for segment | Competitive advantage |
+| **Payback Period** | Calculated by cohort | 3-4 months | Growth velocity |
+| **LTV:CAC** | Cohort-based, predictive | 5:1-7:1+ | Unit economics excellence |
+| **CAC Payback Efficiency** | LTV:CAC × (1/Payback months) | >1.5 | Capital efficiency |
+| **Sales Efficiency (Magic Number)** | Net new ARR ÷ S&M spend | >0.75 | Go-to-market ROI |
+
+**Tracking method:**
+- Integrated marketing + sales stack
+- Multi-touch attribution
+- Real-time dashboards
+- Weekly performance reviews
+- Monthly board metrics
+- Quarterly optimization
+
+**Interpretation at this stage:**
+- Win rate 50%+ = dominant positioning
+- LTV:CAC 6:1+ = exceptional economics
+- Sales efficiency >0.75 = strong GTM
+
+**What to watch for:**
+- Win rate declining = competitive pressure
+- LTV:CAC compressing = unit economics weakening
+- CAC rising across channels = market saturation
+
+---
+
+### Productivity & Capacity
+
+| KPI | How to Track | What Success Looks Like | Key Decision Impact |
+|-----|-------------|------------------------|---------------------|
+| **Billable Utilization** | Automated, real-time | 75-85%, sustained | Enterprise capacity planning |
+| **Billable:Non-Billable Ratio** | Automated by department | 3:1 maintained | Org design optimization |
+| **AGI per FTE** | Automated, role/dept level | $200K-225K+, sustained | Leverage assessment |
+| **Capacity Utilization** | Predictive model | 80-85% forecasted | Strategic hiring |
+| **Project Profitability** | Automated, client/segment level | 30-35%+ average | Portfolio optimization |
+| **Unbilled Hours** | Tracked continuously | <2% of capacity | Process excellence |
+| **ARPE** | Annualized AGI per employee | $200K-225K+ | Productivity plateau assessment |
+| **Overtime** | Tracked and alerted | <3%, rarely triggered | Capacity health |
+| **Revenue per Leader** | AGI ÷ leadership headcount | $1M-2M+ per leader | Leadership leverage |
+
+**Tracking method:**
+- Enterprise resource planning (ERP) integration
+- Real-time capacity dashboards
+- Automated project accounting
+- Predictive utilization models
+- Weekly capacity reviews
+- Monthly profitability analysis
+
+**Interpretation at this stage:**
+- Utilization 75-85% consistently = optimal
+- AGI per FTE $220K+ = excellent leverage
+- Project margins 35%+ = world-class
+
+**What to watch for:**
+- Utilization variance increasing = losing control
+- AGI per FTE declining = leverage degrading
+- Project margins compressing = pricing or efficiency issue
+
+---
+
+### Driving Stage Summary Table
+
+| Category | Priority Level | Tracking Effort | Decision Frequency |
+|----------|---------------|----------------|-------------------|
+| **Financial** | Critical | Minimal (automated) | Daily monitoring, weekly CEO, monthly board |
+| **Forecasting** | Critical | Minimal (automated) | Daily monitoring, weekly strategic |
+| **Retention** | Critical | Minimal (automated) | Real-time alerts, weekly review |
+| **Sales/Marketing** | Critical | Minimal (automated) | Daily monitoring, weekly optimization |
+| **Productivity** | Important | Minimal (automated) | Real-time capacity, weekly review |
+
+**Time investment:** 2-4 hours/month on KPI review (analysis only, no tracking)
+**Primary tools:** Enterprise BI platform, data warehouse, predictive analytics, board reporting system
+**Meeting rhythm:** Daily dashboard check (5 min), Weekly leadership (1 hour), Monthly board report (polished), Quarterly strategy (multi-day)
+
+---
+
+## Cross-Stage Progression Patterns
+
+### The Measurement Paradox
+
+**As agencies mature:**
+- **Time spent tracking:** Decreases (automation)
+- **Quality of insights:** Increases (better data)
+- **Decision confidence:** Increases (trust in numbers)
+- **Number of KPIs tracked:** Similar (same core metrics)
+
+**The shift:**
+- **Rising:** High manual effort, low precision, directional insights
+- **Striving:** Medium effort, improving precision, actionable insights
+- **Thriving:** Low effort, high precision, predictive insights
+- **Driving:** Minimal effort, extreme precision, strategic insights
+
+---
+
+### Common Progression Mistakes
+
+**Mistake 1: Tracking Too Much Too Soon**
+- Rising agency implements Driving-stage dashboard
+- Overwhelmed by complexity
+- Data quality poor
+- Abandons metrics entirely
+
+**Better approach:**
+- Start simple (10-12 core KPIs)
+- Build foundation of good data
+- Add complexity gradually
+
+---
+
+**Mistake 2: Staying Too Simple Too Long**
+- $5M agency still using Rising-stage spreadsheets
+- Missing strategic opportunities
+- Can't scale operations
+- Leadership has no leverage
+
+**Better approach:**
+- Recognize stage transition triggers
+- Invest in infrastructure proactively
+- Accept that sophistication enables scale
+
+---
+
+**Mistake 3: Measuring Without Meaning**
+- Tracking 50 metrics
+- But not using them for decisions
+- Dashboard theater
+- No change in behavior
+
+**Better approach:**
+- Every metric must inform specific decision
+- If not used, stop tracking
+- Focus on actionable insights
+
+---
+
+**Mistake 4: Benchmarking Against Wrong Stage**
+- Rising agency compares to Driving benchmarks
+- Feels like failure
+- Misses progress being made
+
+**Better approach:**
+- Compare to appropriate stage benchmarks
+- Celebrate stage-appropriate wins
+- Understand progression is journey
+
+---
+
+## How to Use This Map
+
+### As Assessment Tool
+
+**Self-diagnosis:**
+1. Find your revenue stage
+2. Compare your KPI tracking to stage description
+3. Identify gaps (too simple or too complex)
+4. Note decision-making mismatches
+
+**Questions to ask:**
+- Are we tracking the right KPIs for our stage?
+- Is our tracking method appropriate?
+- Are we using KPIs to inform the right decisions?
+- Are we benchmarking against the right standards?
+
+---
+
+### As Roadmap
+
+**Planning progression:**
+1. Identify current stage
+2. Note target stage (12-24 months)
+3. List capability gaps
+4. Estimate investment needed
+5. Create implementation timeline
+
+**Typical investments by transition:**
+- **Rising → Striving:** CRM, time tracking, basic BI ($10K-30K)
+- **Striving → Thriving:** Integrated dashboard, automation ($30K-75K)
+- **Thriving → Driving:** Enterprise BI, data warehouse, predictive analytics ($75K-200K+)
+
+---
+
+### As Team Alignment Tool
+
+**Creating shared language:**
+- "We're at Striving stage, moving toward Thriving"
+- Everyone understands maturity level
+- Clear expectations for sophistication
+- Realistic timelines for improvement
+
+**Setting expectations:**
+- What KPIs we track now
+- Why we track them
+- What decisions they inform
+- When we'll add complexity
+
+---
+
+## Strategic "So What"
+
+### 1. Sophistication Follows Revenue, But Shouldn't Lag
+
+**The pattern:**
+- Natural to add sophistication as you grow
+- But don't wait too long
+- Lack of metrics constrains growth
+
+**The timing:**
+- Invest in infrastructure 6-12 months before you need it
+- Systems take time to build
+- Data quality takes time to establish
+
+---
+
+### 2. The Real Goal Is Decision Quality, Not Dashboard Complexity
+
+**What matters:**
+- Making better decisions faster
+- With more confidence
+- Based on reliable data
+
+**What doesn't matter:**
+- Number of KPIs tracked
+- Sophistication of tools
+- Impressiveness of dashboards
+
+**The test:**
+- Are decisions demonstrably better with KPIs?
+- If no, simplify or change approach
+
+---
+
+### 3. Stage Mismatch Creates Problems Both Ways
+
+**Under-sophisticated:**
+- Missing growth opportunities
+- Can't scale operations
+- Leadership overwhelmed
+
+**Over-sophisticated:**
+- Analysis paralysis
+- Resource waste
+- Complexity burden
+
+**Right-fit:**
+- Appropriate sophistication for stage
+- Actionable insights
+- Enabling growth
+
+---
+
+### 4. Maturity Is Measured by Trust, Not Tools
+
+**At each stage:**
+- Team trust in KPIs should increase
+- Decision confidence should grow
+- Strategic optionality should expand
+
+**The ultimate maturity:**
+- KPIs are decision infrastructure
+- Not report generation
+- Not dashboard theater
+- Genuine competitive advantage
+
+---
+
+### 5. You Can Accelerate, But Can't Skip
+
+**With investment:**
+- Can progress faster than revenue alone
+- Can build infrastructure ahead of need
+- Can learn from others' mistakes
+
+**But can't skip:**
+- Foundation of data quality
+- Culture of measurement
+- Discipline of process
+- Learning through cycles
+
+**The reality:**
+- Each stage builds on previous
+- Shortcuts create hidden debt
+- Better to build right than build twice
+
+---
+
+## Related Files
+
+- `/01-core-definitions/` — Core KPI definitions across all stages
+- `/02-benchmarks/` — Stage-specific target ranges
+- `/03-directional-diagnostics/` — Interpreting trends at each stage
+- `/04-system-dynamics/` — How KPIs interact within systems
+- `/05-maturity-models/forecasting-maturity-ladder.md` — Forecasting evolution detail
+- `/05-maturity-models/kpi-evolution-by-stage.md` — How same KPIs mean different things

@@ -1,0 +1,772 @@
+# Growth Velocity Index (GVI) — Formula Specification
+
+**Architect OS | Version 1.0 — Locked**
+**Status:** Formula Resolution Complete — Ready for Implementation
+**Audience:** Antigravity — Front-End Implementation Reference
+**Last Updated:** February 2026
+
+---
+
+## How to Use This Document
+
+This file is the canonical reference for the GVI scoring formula. It lives in the repo and should be kept open alongside any implementation work involving the Growth Velocity Simulator or its output dashboard.
+
+**Implementation sequence this document supports:**
+
+1. **Calculation Layer** — Sections 1 through 5. Wire the formula into the scoring function before touching any UI. Confirm math outputs match the three test scenarios in Section 9 before proceeding.
+2. **Composition Layer** — Section 6. Derive Friction Share from values the scoring function already produces. No new inputs. Conditional display only.
+3. **Watch Signal Layer** — Section 7. Run proximity checks alongside the scoring function. Populate a `watchSignals` flags object. Feed that object into the card layer and synthesis narrative separately.
+4. **Output Dashboard** — Sections 7 and 8. Build top-to-bottom: score hero → metrics table → pressure family expandable cards → bottom synthesis narrative.
+
+**Constraints that must be respected throughout:**
+- This is a **front-end-only calculation**. No backend schema changes, no new Supabase tables, no n8n workflow changes.
+- All output language must be **observational**. No prescriptive framing ("you should..."). The formula surfaces implications — it does not direct action.
+- The score is **clamped at 0 minimum and 100 maximum**. It cannot go negative.
+- **Band names are locked.** Do not rename or reorder them.
+
+---
+
+## Table of Contents
+
+1. [Formula Architecture Overview](#1-formula-architecture-overview)
+2. [Component A — Ambition Mass Multiplier](#2-component-a--ambition-mass-multiplier)
+3. [Component B — Operational Pace Deductions](#3-component-b--operational-pace-deductions)
+4. [Component C — Structural Friction Deductions](#4-component-c--structural-friction-deductions)
+5. [Variable Resolution — Explicit, Implied, and Proxy](#5-variable-resolution--explicit-implied-and-proxy)
+6. [Score Composition Layer](#6-score-composition-layer)
+7. [Near-Threshold Watch Signal Logic](#7-near-threshold-watch-signal-logic)
+8. [Scoring Bands](#8-scoring-bands)
+9. [Formula Validation — Three Test Scenarios](#9-formula-validation--three-test-scenarios)
+10. [Complete Penalty Weight Rationale Table](#10-complete-penalty-weight-rationale-table)
+11. [Implementation Checklist](#11-implementation-checklist)
+12. [Appendix — Available Simulator Inputs Reference](#12-appendix--available-simulator-inputs-reference)
+
+---
+
+## 1. Formula Architecture Overview
+
+The GVI is a composite score from **0 to 100** built on a physics metaphor. The business is a vehicle attempting to accelerate toward a growth target. The score expresses how much structural strain that acceleration creates given the current state of the business.
+
+A **higher score** means less strain. A **lower score** means more strain.
+
+The GVI is explicitly a comparative tool. Its primary value is revealed when a founder runs multiple scenarios and observes how the score shifts — and which pressure families drive the change.
+
+### Core Formula
+
+```
+GVI = 100 − (min(Pace Total, 25) × Mass Multiplier) − Friction Total
+
+Clamped: max(0, min(100, result))
+```
+
+### Three-Layer Architecture
+
+| Layer | What It Measures | How It Enters the Formula |
+|---|---|---|
+| **Ambition Mass** | CAGR-derived multiplier — how ambitious the target is relative to the timeframe | Multiplies all Pace deductions |
+| **Operational Pace** | How hard the business must work to execute the scenario | Summed, capped at 25 pts, then multiplied by Mass |
+| **Structural Friction** | Foundational constraints that resist growth regardless of execution quality | Applied flat — not multiplied by Mass |
+
+### What the GVI Is Not
+
+- Not a forecast or prediction of whether a goal is achievable
+- Not a performance rating of the current business
+- Not a pass/fail threshold — every score has strategic meaning
+- Not prescriptive — it surfaces implications without telling founders what to do
+
+### Quick Reference — Complete Formula at a Glance
+
+```
+─────────────────────────────────────────────────────────
+STEP 1 — RESOLVE VARIABLES
+  Resolve all inputs via Explicit → Implied → Proxy hierarchy
+  (See Section 5 for full derivation logic)
+
+STEP 2 — AMBITION MASS MULTIPLIER
+  CAGR = (Target AGI / Current AGI)^(1/Years) − 1
+  CAGR < 15%  → Mass = 1.0x
+  CAGR 15–39% → Mass = 1.5x
+  CAGR ≥ 40%  → Mass = 2.0x
+
+STEP 3 — PACE DEDUCTIONS (capped at 25 pts total)
+  Sales Pace:        0 / 5 / 10 / 15 pts  (ratio tiers)
+  Hiring Pace:       0 / 5 / 10 / 15 pts  (quarterly rate tiers)
+  Capacity Util.:    0 / 8 / 15 pts        (AGI per FTE at target state)
+  Pace Total = min(Sales + Hiring + Capacity, 25)
+
+STEP 4 — FRICTION DEDUCTIONS (flat, no multiplier)
+  Retention:         0 / 10 / 20 pts       (rate tiers)
+  Profit Margin:     0 / 3 / 8 / 13 / 18 pts (five-tier graduation)
+  Concentration:     0 / 10 pts            (binary: < 10 clients)
+  Positioning:       0 / 5 / 10 pts        (ACV delta tiers)
+  Friction Total = sum of all active friction deductions
+
+STEP 5 — SCORE
+  GVI = 100 − (Pace Total × Mass) − Friction Total
+  GVI = max(0, min(100, GVI))  ← clamp
+
+STEP 6 — COMPOSITION LAYER
+  Friction Share = Friction Total / ((Pace Total × Mass) + Friction Total)
+  0–20%  → Ambition-Driven Pressure
+  21–50% → Mixed Pressure
+  51–79% → Structure-Driven Pressure
+  80%+   → Structural Constraint
+
+STEP 7 — WATCH SIGNALS
+  Run proximity checks for all 7 components
+  Populate watchSignals{} object
+  Surface in expandable cards + synthesis narrative
+─────────────────────────────────────────────────────────
+```
+
+---
+
+## 2. Component A — Ambition Mass Multiplier
+
+The multiplier is derived from the Compound Annual Growth Rate (CAGR) between current and target AGI over the selected timeframe.
+
+### CAGR Calculation
+
+```
+CAGR = (Target AGI / Current AGI)^(1 / Years) − 1
+```
+
+### Multiplier Tiers
+
+| CAGR Range | Multiplier | Label | Rationale |
+|---|---|---|---|
+| < 15% | 1.0x | Organic | Pace penalties apply at face value — maintenance-mode growth |
+| 15% – 39% | 1.5x | Active Growth | Execution demands exceed steady state — pace strain is amplified |
+| ≥ 40% | 2.0x | Aggressive Scaling | Maximum amplification — revised down from original 2.5x |
+
+> **Multiplier Revision Note:** The original spec listed 2.5x for aggressive scaling. Revised to 2.0x because at 2.5x combined with a realistic Pace load at the 25-point cap, the formula produced scores below 0 in legitimate heavy-friction scenarios, removing the score's ability to differentiate within that territory. At 2.0x, meaningful differentiation is preserved at the lower bands while still communicating that aggressive scaling materially amplifies execution demands.
+
+---
+
+## 3. Component B — Operational Pace Deductions
+
+Pace deductions measure the execution demands the scenario places on the business. All three components are summed, **capped at 25 points**, then multiplied by the Ambition Mass Multiplier.
+
+### Pace Cap — 25 Points Pre-Multiplication
+
+The total Pace deduction is capped at 25 points before the Mass multiplier is applied. This prevents arithmetic compounding from collapsing the score in scenarios where multiple Pace components fire simultaneously. The cap is reached only when multiple components are under serious stress. It does not suppress meaningful signals — it prevents the formula from losing differentiation at the lower bands.
+
+**Maximum post-multiplier Pace contributions:**
+- Organic (1.0x): 25 × 1.0 = **25 pts**
+- Active Growth (1.5x): 25 × 1.5 = **37.5 pts**
+- Aggressive Scaling (2.0x): 25 × 2.0 = **50 pts**
+
+---
+
+### 3.1 Sales Pace
+
+Measures required new client acquisition velocity relative to estimated current baseline pace.
+
+**Calculation:**
+```
+Churn Replacement/yr = Current Clients × (1 − Retention Rate)
+Required Total/yr    = Churn Replacement + (Target Clients − Current Clients) / Years
+Ratio                = Required Total / Churn Replacement
+```
+
+**Penalty Tiers:**
+
+| Ratio | Deduction | Label |
+|---|---|---|
+| < 1.5x | 0 pts | Within current capacity |
+| 1.5x – 1.99x | 5 pts | Moderate stretch |
+| 2.0x – 2.99x | 10 pts | Significant acceleration |
+| ≥ 3.0x | 15 pts | Structural transformation required |
+
+---
+
+### 3.2 Hiring Pace
+
+Measures quarterly net new hires as a percentage of current total headcount.
+
+**Calculation:**
+```
+Net New Per Quarter = (Target FTEs − Current FTEs) / (Years × 4)
+Quarterly Rate      = Net New Per Quarter / Current FTEs
+```
+
+**Penalty Tiers:**
+
+| Quarterly Rate | Deduction | Label |
+|---|---|---|
+| ≤ 10% | 0 pts | Manageable growth |
+| 11% – 20% | 5 pts | Elevated pace |
+| 21% – 30% | 10 pts | Culture strain threshold |
+| > 30% | 15 pts | Structural integration risk |
+
+> **Managerial Threshold Penalties — Removed:** The original spec included −10 pt deductions at 8, 15, and 25 FTE milestones. These have been removed. The Hiring Pace graduated tiers already capture speed-of-growth risk. Milestone-based deductions would require organizational structure data not available in the Simulator and would double-count risk already measured by hiring rate.
+
+---
+
+### 3.3 Capacity Utilization
+
+Measures AGI per FTE at the **target state** against efficiency benchmarks.
+
+**Calculation:**
+```
+Target AGI per FTE = Target AGI / Target FTEs
+```
+
+**Penalty Tiers:**
+
+| AGI per FTE (Target State) | Deduction | Label |
+|---|---|---|
+| ≥ $160,000 | 0 pts | Healthy leverage |
+| $140,000 – $159,999 | 8 pts | Efficiency under pressure |
+| < $140,000 | 15 pts | Delivery model strain |
+
+---
+
+## 4. Component C — Structural Friction Deductions
+
+Friction deductions represent constraints baked into the current business structure that resist growth regardless of execution pace. Applied **flat** — not multiplied by the Mass Multiplier.
+
+---
+
+### 4.1 Retention Friction
+
+Annual client retention rate and its compounding effect on the acquisition burden the business carries into the growth scenario.
+
+| Retention Rate | Deduction | Label |
+|---|---|---|
+| ≥ 85% | 0 pts | Healthy retention |
+| 75% – 84% | 10 pts | Replacement drag |
+| < 75% | 20 pts | Treadmill effect |
+
+> **Why the maximum rises to 20 points:** The original spec set a single −15 pt trigger at below 85%. The revised graduated structure reaches 20 pts at the bottom tier to reflect the non-linear relationship between churn and growth difficulty. Below 75% retention, 25%+ of the client base must be replaced annually just to stay flat — at that rate, a growth scenario is mathematically a different problem, not just a harder version of the same one.
+
+**Replacement burden reference:**
+
+| Retention | Annual Replacement | Net New Needed to Grow 20% |
+|---|---|---|
+| 90% | 10% of base | 30% of base |
+| 85% | 15% of base | 35% of base |
+| 80% | 20% of base | 40% of base |
+| 75% | 25% of base | 45% of base |
+| 70% | 30% of base | 50% of base |
+
+---
+
+### 4.2 Profit Friction
+
+Current gross profit margin as a measure of the capital buffer available to fund execution costs during the growth push.
+
+| Margin | Deduction | Label |
+|---|---|---|
+| ≥ 25% | 0 pts | Full tank |
+| 20% – 24% | 3 pts | Adequate fuel |
+| 15% – 19% | 8 pts | Half tank |
+| 10% – 14% | 13 pts | Low fuel |
+| < 10% | 18 pts | Empty tank |
+
+---
+
+### 4.3 Concentration Friction
+
+Whether the current client portfolio carries meaningful single-client concentration risk.
+
+**Proxy Calculation (front-end derivable, no individual client data needed):**
+```
+If (1.5 × Average ACV) / Current AGI > 0.15
+  → Simplified: If Client Count < 10, flag fires
+```
+
+| Condition | Deduction | Label |
+|---|---|---|
+| Client Count ≥ 10 | 0 pts | Distributed portfolio |
+| Client Count < 10 | 10 pts | Concentration risk |
+
+> **Why binary:** Concentration Friction is intentionally kept as a binary signal. The risk it represents — a single client departure as a trajectory event — is largely binary in nature. At fewer than 10 clients, the statistical likelihood that at least one client exceeds 15% of AGI is sufficient to flag without further graduation.
+
+---
+
+### 4.4 Positioning Pressure *(Replaces Channel Friction)*
+
+Measures the degree to which the growth scenario requires targeting a materially different client profile than the business currently serves.
+
+**Calculation:**
+```
+ACV Delta % = (Target ACV − Current ACV) / Current ACV × 100
+```
+
+| ACV Delta | Deduction | Label |
+|---|---|---|
+| < 25% | 0 pts | Pricing evolution |
+| 25% – 49% | 5 pts | Upmarket shift |
+| ≥ 50% | 10 pts | Repositioning event |
+
+> **Why Positioning Pressure replaces Channel Friction:** Channel Friction depended on Acquisition Channel Mix from the Snapshot — an input that may not be present during a Simulator session. It also partially duplicated the Sales Pace signal by using required sales velocity as a trigger. Positioning Pressure uses only inputs already in the Simulator form (Current ACV, Target ACV), measures a genuinely distinct structural condition (client profile repositioning risk), and is valid in both MRR and Project physics models without conditional logic.
+
+> **Key distinction from Sales Pace:** Higher target ACV simultaneously *helps* Sales Pace (fewer deals needed) and *may trigger* Positioning Pressure (harder deals to close against a different buyer). Both effects are real and appear independently in the score.
+
+---
+
+## 5. Variable Resolution — Explicit, Implied, and Proxy
+
+The formula should **never receive raw inputs directly**. Before the scoring function runs, all required variables must be resolved through a three-tier hierarchy.
+
+### Resolution Hierarchy
+
+| Tier | Definition | Output Handling |
+|---|---|---|
+| **Explicit** | Founder entered the value directly in the Simulator form | Use as-is. No flag needed. |
+| **Implied** | Derived from two or more related inputs the founder did provide | Use derived value. Surface inline note in output. |
+| **Proxy** | Neither explicit nor implied — formula assumption applied | Use assumption. Flag transparently with indicator in output. |
+
+### Key Derivation Logic
+
+| Variable | Explicit Input | Implied From | Proxy If Neither |
+|---|---|---|---|
+| Target ACV | Target ACV field | Target AGI ÷ Target Client Count | Hold Current ACV constant — flag in output |
+| Current ACV | Current ACV field | Current AGI ÷ Current Client Count | Always derivable from required inputs |
+| Target Client Count | Target Client Count field | Target AGI ÷ Target ACV | Derive from Target AGI ÷ Current ACV |
+| Target FTEs | Target Headcount field | Target AGI ÷ $180K benchmark | Apply benchmark — flag in output |
+| Churn Replacement Vol. | Always derived | Current Clients × (1 − Retention Rate) | If Retention not entered: apply 85% — flag |
+| CAGR | Always derived | Current AGI, Target AGI, Timeframe | Cannot be proxied — required inputs |
+
+### Default Proxy — Target ACV When Only AGI Provided
+
+When a founder provides a revenue target but no client count and no target ACV:
+
+- **Option A (Price-Led):** Hold Client Count constant → implies revenue growth through pricing → produces real ACV delta signal
+- **Option B (Volume-Led):** Hold ACV constant → implies revenue growth through client acquisition → ACV delta = 0, Positioning Pressure does not fire
+
+**Default: Option B (Volume-Led)** — the conservative assumption. Avoids triggering a Positioning Pressure flag that the founder did not signal. If the founder wants to model a price-led scenario, they should input a Target ACV explicitly and rerun.
+
+### Output Transparency Requirements
+
+- Any derived or proxy value must surface in the output with a brief inline indicator
+- The output should prompt the founder to adjust derived values and rerun
+- Example prompt: *"Based on your inputs, we estimated your target ACV at $X — adjust this to see how it affects your score."*
+- This prevents the formula from functioning as a black box and creates a natural engagement loop
+
+---
+
+## 6. Score Composition Layer
+
+The GVI score is a single number. The Score Composition Layer adds a second signal that contextualizes **what drove that number** — whether it reflects execution demands, structural constraints, or both. This does not change the score. It changes how the score is interpreted.
+
+### Friction Share Calculation
+
+```
+Friction Share = Friction Total / Total Deductions (post-multiplier)
+
+Where:
+  Total Deductions = (Pace Subtotal × Mass Multiplier) + Friction Total
+```
+
+### Composition Tiers
+
+| Friction Share | Label | What It Communicates |
+|---|---|---|
+| 0% – 20% | **Ambition-Driven Pressure** | Score is almost entirely a function of the growth target's demands. Structural foundation is clean. |
+| 21% – 50% | **Mixed Pressure** | Score reflects execution demands and structural constraints working against each other simultaneously. |
+| 51% – 79% | **Structure-Driven Pressure** | Score is primarily a function of current business constraints, not the ambition of the target. |
+| 80%+ | **Structural Constraint** | Score is almost entirely driven by foundational friction. The growth target is secondary to the structural reality. |
+
+### Output Format
+
+```
+[Score] — [Band Name] / [Composition Label]
+
+Example: 60 — Active Pressure / Ambition-Driven
+Example: 67 — Healthy Velocity / Structure-Driven
+Example: 22 — Heavy Friction / Mixed Pressure
+```
+
+### Sample Composition Notes by Label
+
+These one-sentence notes are appended to the score output to shift the interpretive frame based on what drove the result.
+
+| Label | Sample Note |
+|---|---|
+| Ambition-Driven | "The pressure in this scenario is a direct expression of the growth target's demands on a structurally sound business — not a signal of foundational weakness." |
+| Mixed Pressure | "This score reflects both structural constraints and execution demands working against each other — addressing either dimension in isolation will produce a limited improvement without progress on the other." |
+| Structure-Driven | "The pressure in this scenario is primarily structural — current business constraints are contributing more to this score than the demands of the growth target itself." |
+| Structural Constraint | "This score is almost entirely driven by the current state of the business. The growth target is not the primary variable — the foundation is." |
+
+> **Implementation note:** The Score Composition Layer is a front-end calculation derived entirely from values the formula already produces. No new inputs required. Compute Friction Share from Friction Total and post-multiplier Total Deductions, then apply conditional display logic for label and note. No backend changes required.
+
+---
+
+## 7. Near-Threshold Watch Signal Logic
+
+When a formula component does **not** fire a deduction but the underlying metric falls within meaningful proximity of a penalty threshold, the system surfaces a **Watch Signal**.
+
+Watch Signals do not affect the GVI score. They provide forward-looking context about structural proximity to risk.
+
+### Proximity Definition
+
+A Watch Signal fires when a metric is **within 15% of a penalty threshold** in the direction of risk.
+
+### Watch Signal Proximity Zones
+
+| Component | Penalty Threshold | Watch Signal Zone |
+|---|---|---|
+| Retention | < 85% fires | 85% – 88% |
+| Profit Margin | < 20% fires | 20% – 23% |
+| Concentration | < 10 clients fires | 10 – 11 clients |
+| Positioning Pressure | ≥ 25% ACV delta fires | 20% – 24% ACV delta |
+| Sales Pace | ≥ 1.5x ratio fires | 1.3x – 1.49x ratio |
+| Hiring Pace | ≥ 11% quarterly fires | 8% – 10% quarterly |
+| Capacity Utilization | < $160K fires | $160K – $175K / FTE |
+
+### What Watch Signals Are — and Are Not
+
+- ✅ Forward-looking proximity flags
+- ✅ Observational in tone — they name a condition and its implication
+- ✅ Growth journey context — relevant to where the business is heading
+- ❌ Not deductions — they do not affect the GVI score under any circumstances
+- ❌ Not warnings — language is never alarming or prescriptive
+- ❌ Not always present — only surface when the metric genuinely falls in the proximity zone
+- ❌ Not prescriptive — they never tell the founder what to do
+
+### Two UI Surfaces
+
+#### 1. Pressure Family Expandable Cards
+
+Each pressure family has an expandable detail card. When a Watch Signal is active for that family, the card surfaces a brief inline flag — one sentence, observational in tone. Visible only when the founder expands the card. Intentional — rewards curiosity without cluttering the primary output.
+
+**Example — Concentration at 11 clients:**
+> *"Client concentration is within threshold at 11 clients — one client departure during the growth period would bring this below the risk boundary."*
+
+**Example — Positioning Pressure at 20.5% ACV delta:**
+> *"Target ACV represents a 20.5% increase over current — just below the upmarket shift threshold. If actual pricing moves above [X] during execution, this crosses into scored territory and will increase structural friction."*
+
+#### 2. Bottom Synthesis Narrative
+
+The synthesis at the bottom of the output pulls together the full picture — score, composition label, active deductions, and Watch Signals — into a cohesive plain-language paragraph. Watch Signals appear here as contextual notes woven into the narrative, not listed separately.
+
+> **Implementation note:** Watch Signals are a conditional display layer. Run proximity checks alongside the scoring calculation and populate a separate `watchSignals` flags object. That object feeds both the expandable card layer and the synthesis narrative generator. No new inputs or scoring logic changes required.
+
+---
+
+## 8. Scoring Bands
+
+Five bands are locked. Names and ranges are not subject to change. Descriptions are observational in tone — written for a sophisticated agency founder who does not need encouragement or instruction, only structural clarity.
+
+| Band | Range | Description |
+|---|---|---|
+| **High Momentum** | 80 – 100 | The growth target sits within the structural carrying capacity of the current business — sales velocity requirements are absorbed by existing infrastructure, capacity economics hold at the target state, and no foundational constraints create meaningful resistance to execution. The risk factors worth monitoring at this score are market and execution consistency, not internal structural limits. |
+| **Healthy Velocity** | 61 – 79 | The scenario activates one or two pressure signals — a notable step-up in acquisition pace, a single structural constraint, or mild friction in the delivery model — but none of these rise to the level of a constraint that must be resolved before growth can proceed. The business retains enough structural capacity to absorb these pressures through deliberate management, without requiring foundational change as a prerequisite. |
+| **Active Pressure** | 41 – 60 | The scenario creates friction across multiple dimensions simultaneously — execution demands, structural constraints, or both are working against each other in ways that will materialize during the growth push rather than before it. This score range does not signal that the target is unreachable; it signals that key pressure points require sequenced investment and deliberate management to prevent compounding. |
+| **Heavy Friction** | 21 – 40 | The current structural state of the business and the demands of the growth target are materially misaligned across several dimensions at once. Executing against this target without first addressing one or more foundational constraints carries elevated risk of capital strain, capacity degradation, or execution breakdown — not because the goal is wrong, but because the structural platform underneath it is not yet configured to carry the weight. |
+| **Critical Strain** | 0 – 20 | The scenario places structural demands on the business that its current foundation is unlikely to absorb without material changes to its economics, delivery model, or market positioning. This score reflects the magnitude of the gap between current structure and target requirements — it is a diagnostic signal about alignment, not a verdict on the goal's validity or the founder's capability. |
+
+---
+
+## 9. Formula Validation — Three Test Scenarios
+
+The formula was validated against three scenarios representing meaningfully different founder situations.
+
+---
+
+### Scenario A — High Performing Agency, High Growth Ambition
+
+**Inputs:**
+
+| Input | Current State | Target (18 months) |
+|---|---|---|
+| AGI | $2,400,000 | $4,200,000 |
+| Profit Margin | 32% | — |
+| Active Clients | 14 | 20 |
+| ACV | $171,000 | $210,000 |
+| Retention Rate | 91% | — |
+| Team FTEs | 13 | 22 |
+
+**Step-by-Step Calculation:**
+
+```
+CAGR = (4,200,000 / 2,400,000)^(1/1.5) − 1 = 49.2% → Mass: 2.0x
+
+Sales Pace:
+  Churn replacement = 14 × 0.09 = 1.26 clients/yr
+  Required total    = 1.26 + (20−14)/1.5 = 5.26 clients/yr
+  Ratio             = 5.26 / 1.26 = 4.17x → 15 pts
+
+Hiring Pace:
+  Net new/qtr = (22−13) / (1.5×4) = 1.5 FTEs/qtr
+  Rate        = 1.5 / 13 = 11.5% → 5 pts
+
+Capacity Utilization:
+  $4,200,000 / 22 = $190,909/FTE → 0 pts
+
+Pace Subtotal = 15 + 5 + 0 = 20 pts (under 25-pt cap)
+Pace × Mass   = 20 × 2.0 = 40 pts
+
+Retention (91%)    → 0 pts
+Margin (32%)       → 0 pts
+Concentration (14) → 0 pts
+Positioning (22.8% delta) → 0 pts
+
+Friction Total = 0 pts
+
+GVI = 100 − 40 − 0 = 60
+```
+
+**Result:** `60 — Active Pressure / Ambition-Driven`
+
+```
+Friction Share = 0 / 40 = 0% → Ambition-Driven
+```
+
+**Interpretation:** This is a structurally sound business asking a genuinely hard question. The foundation is completely clean — retention, margin, capacity economics, and portfolio concentration contribute zero friction. The score of 60 is entirely driven by the pace demands of the growth scenario, amplified by the aggressive scaling multiplier. The primary constraint is sales velocity: the scenario requires finding roughly five qualified clients per year above baseline — more than four times the current replacement pace. The path forward runs through sales motion capacity, not internal structural repair.
+
+**Watch Signals:** None active.
+
+---
+
+### Scenario B — Moderate Agency, Ambitious but Manageable Target
+
+**Inputs:**
+
+| Input | Current State | Target (24 months) |
+|---|---|---|
+| AGI | $1,100,000 | $1,800,000 |
+| Profit Margin | 19% | — |
+| Active Clients | 11 | 15 |
+| ACV | $100,000 | $120,000 |
+| Retention Rate | 82% | — |
+| Team FTEs | 7 | 11 |
+
+**Step-by-Step Calculation:**
+
+```
+CAGR = (1,800,000 / 1,100,000)^(1/2) − 1 = 27.9% → Mass: 1.5x
+
+Sales Pace:
+  Churn replacement = 11 × 0.18 = 1.98 clients/yr
+  Required total    = 1.98 + (15−11)/2 = 3.98 clients/yr
+  Ratio             = 3.98 / 1.98 = 2.01x → 10 pts
+
+Hiring Pace:
+  Net new/qtr = (11−7) / (2×4) = 0.5 FTEs/qtr
+  Rate        = 0.5 / 7 = 7.1% → 0 pts
+
+Capacity Utilization:
+  $1,800,000 / 11 = $163,636/FTE → 0 pts
+
+Pace Subtotal = 10 + 0 + 0 = 10 pts (under 25-pt cap)
+Pace × Mass   = 10 × 1.5 = 15 pts
+
+Retention (82%)     → 10 pts (75–84% tier)
+Margin (19%)        → 8 pts (15–19% tier)
+Concentration (11)  → 0 pts (≥ 10, watch signal fires)
+Positioning (20% delta) → 0 pts (watch signal fires)
+
+Friction Total = 18 pts
+
+GVI = 100 − 15 − 18 = 67
+```
+
+**Result:** `67 — Healthy Velocity / Structure-Driven`
+
+```
+Friction Share = 18 / 33 = 54.5% → Structure-Driven
+```
+
+**Interpretation:** This is a business that is functionally capable of reaching its target. The score of 67 is not a warning about the target — it is a signal about the platform the target is being launched from. At 82% retention, a meaningful portion of sales effort is permanently allocated to staying flat rather than growing. At 19% margin, the capital buffer available to fund execution costs is thin. Together, these two structural constraints account for 54% of the total deduction. The sales pace signal is real but moderate — a 2x acquisition rate is achievable through deliberate process improvement. Hiring and capacity are both clean.
+
+**Watch Signals:**
+- **Concentration (11 clients):** One client departure during the growth period brings this below the concentration threshold.
+- **Positioning (20% ACV delta):** Just below the 25% upmarket shift threshold — any pricing move above $125K during execution crosses into scored territory.
+
+---
+
+### Scenario C — Modestly Successful Agency, High Ambition
+
+**Inputs:**
+
+| Input | Current State | Target (18 months) |
+|---|---|---|
+| AGI | $750,000 | $1,600,000 |
+| Profit Margin | 16% | — |
+| Active Clients | 9 | 16 |
+| ACV | $83,000 | $100,000 |
+| Retention Rate | 79% | — |
+| Team FTEs | 6 | 12 |
+
+**Step-by-Step Calculation:**
+
+```
+CAGR = (1,600,000 / 750,000)^(1/1.5) − 1 = 64.2% → Mass: 2.0x
+
+Sales Pace:
+  Churn replacement = 9 × 0.21 = 1.89 clients/yr
+  Required total    = 1.89 + (16−9)/1.5 = 6.56 clients/yr
+  Ratio             = 6.56 / 1.89 = 3.47x → 15 pts
+
+Hiring Pace:
+  Net new/qtr = (12−6) / (1.5×4) = 1.0 FTE/qtr
+  Rate        = 1.0 / 6 = 16.7% → 5 pts
+
+Capacity Utilization:
+  $1,600,000 / 12 = $133,333/FTE → 15 pts
+  NOTE: Current state is $750,000 / 6 = $125,000/FTE
+  — already below $140K floor entering the scenario
+
+Pace Subtotal = 15 + 5 + 15 = 35 pts → CAPPED AT 25
+Pace × Mass   = 25 × 2.0 = 50 pts
+
+Retention (79%)     → 10 pts (75–84% tier)
+Margin (16%)        → 8 pts (15–19% tier)
+Concentration (9)   → 10 pts (< 10 clients)
+Positioning (20.5% delta) → 0 pts (watch signal fires)
+
+Friction Total = 28 pts
+
+GVI = 100 − 50 − 28 = 22
+```
+
+**Result:** `22 — Heavy Friction / Mixed Pressure`
+
+```
+Friction Share = 28 / 78 = 35.9% → Mixed Pressure
+```
+
+**Pace Cap behavior:** Without the cap, this scenario would score `100 − 70 − 28 = 2`. The cap produces 22 instead — maintaining meaningful differentiation from a truly catastrophic scenario while still communicating severe multi-dimensional pressure.
+
+**Interpretation:** This scenario describes a business attempting to more than double revenue in 18 months from a foundation already showing strain. The Pace cap fires — all three Pace components are active simultaneously. On the friction side, three of four components are active. The Mixed Pressure composition label is accurate and important: this isn't purely a story about structural weakness, and it isn't purely a story about an overambitious target — it's both working against each other simultaneously. The current AGI/FTE of $125K is already below the $140K floor — the delivery model enters the growth scenario under-leveraged, not just projecting toward under-leverage at the target state.
+
+**Watch Signals:**
+- **Positioning (20.5% ACV delta):** Just below the 25% upmarket shift threshold. Any pricing adjustment above $104K during execution crosses into scored territory.
+- **Capacity Utilization (current state):** Current $125K/FTE confirms the delivery model is already under-leveraged entering the scenario — not just at the projected target state.
+
+---
+
+### Score Distribution Summary
+
+| Scenario | GVI | Band | Composition | Pace Cap Fired |
+|---|---|---|---|---|
+| A — High performer, high ambition | 60 | Active Pressure | Ambition-Driven | No |
+| B — Moderate, manageable target | 67 | Healthy Velocity | Structure-Driven | No |
+| C — Modest foundation, high ambition | 22 | Heavy Friction | Mixed Pressure | Yes |
+
+Distribution spans three distinct bands with meaningfully different composition profiles. Formula produces differentiated, directionally accurate scores across the realistic range of founder situations.
+
+---
+
+## 10. Complete Penalty Weight Rationale Table
+
+| Component | Category | Tier | Deduction | Max | One-Sentence Rationale |
+|---|---|---|---|---|---|
+| Sales Pace | Pace | 1.5x–1.99x ratio | 5 pts | 5 | Moderate acceleration signals sales function demand beginning to exceed steady-state capacity, but remains solvable through process improvement. |
+| Sales Pace | Pace | 2.0x–2.99x ratio | 10 pts | 10 | Doubling required acquisition rate introduces non-linear strain on pipeline, conversion capacity, and sales bandwidth that cannot be absorbed through optimization alone. |
+| Sales Pace | Pace | ≥ 3.0x ratio | 15 pts | 15 | Tripling acquisition velocity is a structural transformation requirement — a fundamentally different sales motion, not an incremental lift in existing processes. |
+| Hiring Pace | Pace | 11–20%/qtr | 5 pts | 5 | Elevated headcount growth places meaningful demand on onboarding and integration without yet exceeding most agencies' absorption capacity. |
+| Hiring Pace | Pace | 21–30%/qtr | 10 pts | 10 | At this rate, management bandwidth and institutional knowledge transfer begin to degrade simultaneously during the growth push. |
+| Hiring Pace | Pace | > 30%/qtr | 15 pts | 15 | Growth at this pace effectively rebuilds the team every three quarters — a categorically different risk profile than fast hiring. |
+| Capacity Util. | Pace | $140K–$160K/FTE | 8 pts | 8 | AGI/FTE approaching $140K signals that revenue growth is diluting delivery leverage rather than compounding it. |
+| Capacity Util. | Pace | < $140K/FTE | 15 pts | 15 | Sub-$140K AGI/FTE represents a delivery model subsidizing its own operation — growth investment must be funded from margin that doesn't reliably exist. |
+| **Pace Cap** | — | All tiers | **25 pts max** | 25 | Multi-component pace stress rarely materializes in perfect linear combination — the cap prevents arithmetic compounding from collapsing differentiation at lower bands. |
+| Retention | Friction | 75%–84% | 10 pts | 10 | Annual replacement burden meaningfully elevates required acquisition volume above what a standard growth scenario would demand. |
+| Retention | Friction | < 75% | 20 pts | 20 | Below 75%, the replacement treadmill is severe enough that a growth scenario is mathematically a different problem — not just a harder version. |
+| Profit Margin | Friction | 20%–24% | 3 pts | 3 | Adequate margin leaves limited buffer to absorb the execution variance that growth scenarios reliably produce. |
+| Profit Margin | Friction | 15%–19% | 8 pts | 8 | Below 20%, capital available to fund sales capacity and talent at growth velocity is meaningfully constrained. |
+| Profit Margin | Friction | 10%–14% | 13 pts | 13 | Low-teen margins eliminate the financial buffer to absorb mid-execution setbacks without creating a liquidity event. |
+| Profit Margin | Friction | < 10% | 18 pts | 18 | Below 10%, growth investment must effectively be borrowed against future revenue — there is no fuel reserve for what the scenario requires. |
+| Concentration | Friction | < 10 clients | 10 pts | 10 | At fewer than ten clients, a single client departure is a trajectory event during a growth push, not just a revenue event. |
+| Positioning | Friction | ACV +25–49% | 5 pts | 5 | A meaningful upmarket shift implies real conversion and retention risk as the business moves between its current and target client profile. |
+| Positioning | Friction | ACV ≥ 50% | 10 pts | 10 | A 50%+ ACV increase requires qualitative market repositioning — different buyer, different sales motion, different fulfillment expectations — that runs structurally parallel to execution demands. |
+
+### Maximum Score Impact Summary
+
+```
+Maximum Friction (flat, uncapped):
+  Retention (20) + Profit (18) + Concentration (10) + Positioning (10) = 58 pts
+
+Maximum Pace × Multiplier:
+  Organic (1.0x):           25 × 1.0 = 25 pts
+  Active Growth (1.5x):     25 × 1.5 = 37.5 pts
+  Aggressive Scaling (2.0x): 25 × 2.0 = 50 pts
+
+Theoretical minimums (pre-clamp):
+  Organic + max friction:            100 − 25 − 58 = 17  → Critical Strain ✓
+  Active Growth + max friction:      100 − 37.5 − 58 = 4.5 → Critical Strain ✓
+  Aggressive Scaling + max friction: 100 − 50 − 58 = −8 → clamped to 0 ✓
+```
+
+The clamp fires only in the most extreme configuration possible — maximum Pace at maximum multiplier plus maximum Friction simultaneously. In that scenario, landing at 0 rather than −8 is appropriate. In any scenario short of that maximum configuration, the formula produces a positive score with meaningful differentiation.
+
+---
+
+## 11. Implementation Checklist
+
+Everything in this specification is **front-end only**. No backend schema changes, no new Supabase tables, no n8n workflow changes are required. The formula is a client-side calculation.
+
+### Pre-Calculation — Variable Resolution
+
+- [ ] Build resolved variable object from Simulator inputs before scoring function runs
+- [ ] Implement Explicit → Implied → Proxy resolution hierarchy for all variables
+- [ ] Apply default proxy (hold ACV constant) when only Target AGI is provided
+- [ ] Derive Current ACV from Current AGI ÷ Current Client Count when not entered
+- [ ] Derive Target FTEs from Target AGI ÷ $180K when not entered — flag in output
+- [ ] Surface inline indicator for any derived or proxy values used
+- [ ] Include interaction prompt inviting founder to adjust derived values and rerun
+
+### Scoring Function
+
+- [ ] Calculate CAGR and assign Mass Multiplier (1.0x / 1.5x / 2.0x)
+- [ ] Calculate Sales Pace ratio with graduated tiers (0 / 5 / 10 / 15 pts)
+- [ ] Calculate Hiring Pace quarterly rate with graduated tiers (0 / 5 / 10 / 15 pts)
+- [ ] Calculate Capacity Utilization at target state with graduated tiers (0 / 8 / 15 pts)
+- [ ] Apply 25-point cap to Pace subtotal before multiplication
+- [ ] Calculate Retention Friction with graduated tiers (0 / 10 / 20 pts)
+- [ ] Calculate Profit Friction with five-tier graduation (0 / 3 / 8 / 13 / 18 pts)
+- [ ] Calculate Concentration Friction with binary trigger (0 / 10 pts)
+- [ ] Calculate Positioning Pressure with graduated tiers (0 / 5 / 10 pts)
+- [ ] Apply formula: `100 − (min(Pace, 25) × Mass) − Friction`
+- [ ] Clamp output: `max(0, min(100, result))`
+
+### Score Composition Layer
+
+- [ ] Calculate Friction Share: `Friction Total / Total Deductions (post-multiplier)`
+- [ ] Assign Composition Label based on Friction Share tier (0–20% / 21–50% / 51–79% / 80%+)
+- [ ] Display as: `[Score] — [Band Name] / [Composition Label]`
+- [ ] Append appropriate one-sentence composition note to output
+
+### Watch Signal Layer
+
+- [ ] Run proximity checks against all seven watch signal thresholds
+- [ ] Populate `watchSignals` flags object with any active signals
+- [ ] Surface inline one-sentence flag in relevant Pressure Family expandable card
+- [ ] Weave active watch signals into bottom synthesis narrative paragraph
+
+### Output Layer
+
+- [ ] Display GVI score with band label and composition label
+- [ ] Show pressure family breakdown with individual component signals and deduction values
+- [ ] Surface active watch signals in expandable pressure family cards
+- [ ] Generate bottom synthesis narrative: score + composition + active signals + watch signals combined
+- [ ] Include interaction prompt for any proxy values used in calculation
+- [ ] Ensure all output language is observational — no prescriptive "you should" framing
+
+---
+
+## 12. Appendix — Available Simulator Inputs Reference
+
+All inputs listed below are either required or optional fields in the Simulator form. The formula uses only these inputs — no additional fields are needed.
+
+| Input | Type | Required | Used In |
+|---|---|---|---|
+| Current AGI | Dollar amount | Yes | CAGR, AGI/FTE, implied ACV |
+| Target AGI | Dollar amount | Yes | CAGR, Revenue gap |
+| Timeframe | 12 / 24 / 36 months | Yes | CAGR, pace denominators |
+| Current Client Count | Integer | Yes | Sales pace, concentration proxy, implied ACV |
+| Target Client Count | Integer | Recommended | Sales pace (implied if not entered) |
+| Current ACV | Dollar amount | Recommended | Sales pace, positioning pressure (implied if not entered) |
+| Target ACV | Dollar amount | Recommended | Positioning pressure (implied if not entered) |
+| Retention Rate | Percentage | Yes | Retention friction, sales pace |
+| Current FTEs | Integer | Yes | Hiring pace, AGI/FTE |
+| Target FTEs | Integer | Recommended | Hiring pace, capacity utilization (implied if not entered) |
+| Profit Margin % | Percentage | Yes | Profit friction |
+
+---
+
+*Formula Status: LOCKED — All components defined. All values set. All edge cases handled. Ready for front-end implementation.*
+*Document Owner: Architect OS Product — Do not modify formula values without updating version number and running test scenarios in Section 9.*

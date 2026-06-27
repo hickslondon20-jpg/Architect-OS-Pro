@@ -1,0 +1,2010 @@
+ DOCUMENT 4: GPT Integration & Synthesis Specification  
+Growth Velocity Calculator — AI-Powered Strategic Analysis
+
+Context: What GPT Synthesis Does  
+The GPT synthesis layer transforms raw calculation results into contextual strategic insights by combining:
+
+Hard Math: Calculated deltas, pressure indicators, benchmarks  
+Soft Context: Agency Snapshot qualitative data (acquisition model, founder role, delivery structure)  
+Coaching Frameworks: Project knowledge from AE Ladder, Growth Mastery materials  
+Business Intelligence: Industry benchmarks, healthy ranges, pattern recognition
+
+The Goal: Make the calculator feel like a strategic advisor, not just a math engine.
+
+Two Synthesis Modes  
+Mode 1: Single Scenario Analysis (Tab 1\)  
+Purpose: Interpret one growth scenario with context  
+Key Sections:
+
+Reality Check — Feasibility assessment using Snapshot context  
+Capacity Warning — Operational implications and bottlenecks  
+One Big Lever — Highest-leverage improvement opportunity  
+Watch-Outs — Active pressure family alerts with specific guidance
+
+Tone: Observational, non-prescriptive, business-aware
+
+Mode 2: Comparative Analysis (Tab 2, Pro Tier)  
+Purpose: Compare 2-3 scenarios and explain trade-offs  
+Key Sections:
+
+Scenario Summary — Quick overview of each path  
+Trade-Off Analysis — What each scenario optimizes for vs. what it sacrifices  
+Strategic Verdict — Which dimensions favor which scenario  
+Path Selection Guidance — Questions to help user choose
+
+Tone: Comparative, trade-off focused, decision-supportive
+
+Data Payload Structure  
+What Gets Sent to GPT  
+typescriptinterface GPTSynthesisRequest {  
+  mode: 'single' | 'comparative';  
+  user\_id: string;  
+  agency\_id: string;  
+    
+  // Mode 1: Single scenario  
+  calculation?: {  
+    calculation\_id: string;  
+    baseline\_inputs: BaselineInputs;  
+    target\_inputs: TargetInputs;  
+    output\_deltas: CalculationOutputs;  
+    pressure\_alerts: PressureFamilyAlerts;  
+  };  
+    
+  // Mode 2: Comparative (2-3 scenarios)  
+  scenarios?: Array\<{  
+    scenario\_id: string;  
+    scenario\_name: string;  
+    calculation: CalculationData;  
+  }\>;  
+    
+  // Context from Agency Snapshot (CRITICAL for quality)  
+  snapshot\_context: {  
+    // Qualitative factors  
+    primary\_industry\_focus?: string;  
+    primary\_icp?: string;  
+    services\_offered?: string;  
+    delivery\_model?: string;  
+    engagement\_structure?: string;  
+    primary\_sales\_motion?: string;  
+    pipeline\_constraint?: string;  
+      
+    // Current state metrics  
+    current\_revenue: number;  
+    current\_team\_size: number;  
+    current\_client\_count: number;  
+    current\_retention\_rate: number;  
+    current\_profit\_margin: number;  
+    current\_agi\_per\_fte: number;  
+    current\_utilization: number;  
+      
+    // Growth patterns (if available from historical data)  
+    recent\_growth\_rate?: number;  
+    avg\_monthly\_new\_clients?: number;  
+  };  
+    
+  // Benchmarks (for reference)  
+  benchmarks: {  
+    healthy\_agi\_per\_fte: { min: 180000, target: 200000, max: 240000 };  
+    healthy\_retention: { min: 0.80, target: 0.90 };  
+    healthy\_margin: { min: 0.20, target: 0.35 };  
+    healthy\_utilization: { min: 0.70, target: 0.80, max: 0.90 };  
+  };  
+}
+
+Prompt Templates  
+Mode 1: Single Scenario Synthesis  
+typescriptconst SINGLE\_SCENARIO\_PROMPT \= \`  
+You are a strategic business advisor analyzing a growth scenario for a marketing agency founder.
+
+\# CONTEXT
+
+\#\# Agency Profile  
+\- Industry Focus: {snapshot\_context.primary\_industry\_focus}  
+\- Primary ICP: {snapshot\_context.primary\_icp}  
+\- Services: {snapshot\_context.services\_offered}  
+\- Delivery Model: {snapshot\_context.delivery\_model}  
+\- Sales Motion: {snapshot\_context.primary\_sales\_motion}  
+\- Pipeline Constraint: {snapshot\_context.pipeline\_constraint}
+
+\#\# Current State  
+\- Revenue: ${calculation.baseline\_inputs.baseline\_revenue.toLocaleString()}  
+\- Team Size: {calculation.baseline\_inputs.baseline\_team\_size} FTEs  
+\- Active Clients: {calculation.baseline\_inputs.baseline\_client\_count}  
+\- Retention Rate: {(calculation.baseline\_inputs.baseline\_retention\_rate \* 100).toFixed(1)}%  
+\- Profit Margin: {(calculation.baseline\_inputs.baseline\_profit\_margin \* 100).toFixed(1)}%  
+\- AGI per FTE: ${calculation.baseline\_inputs.baseline\_agi\_per\_fte.toLocaleString()}  
+\- Utilization: {(snapshot\_context.current\_utilization \* 100).toFixed(1)}%
+
+\#\# Growth Target  
+\- Target Revenue: ${calculation.target\_inputs.target\_revenue.toLocaleString()}  
+\- Timeframe: {calculation.target\_inputs.target\_timeframe\_months} months  
+\- Required CAGR: {(calculation.output\_deltas.required\_cagr \* 100).toFixed(1)}%
+
+\#\# Calculated Requirements  
+\- Net New Clients: {calculation.output\_deltas.net\_new\_clients}  
+\- Monthly Sales Velocity: {calculation.output\_deltas.monthly\_sales\_velocity.toFixed(1)} deals/month  
+\- Sales Velocity Multiplier: {calculation.output\_deltas.velocity\_multiplier.toFixed(1)}x current pace  
+\- New Hires Required: {calculation.output\_deltas.headcount\_delta.toFixed(1)} FTEs  
+\- Hiring Pace: {calculation.output\_deltas.hiring\_pace\_per\_quarter.toFixed(1)} per quarter  
+\- Target Profit: ${calculation.output\_deltas.target\_profit.toLocaleString()}  
+\- Profit Delta: ${calculation.output\_deltas.profit\_delta.toLocaleString()}
+
+\#\# Pressure Family Alerts  
+{Object.entries(calculation.pressure\_alerts).map((\[family, alert\]) \=\>   
+  \\\`- \\${family}: \[\\${alert.severity}\] \\${alert.message}\\\`  
+).join('\\\\n')}
+
+\#\# Industry Benchmarks  
+\- Healthy AGI/FTE: $180K-$240K (target: $200K)  
+\- Healthy Retention: 80-95% (target: 90%)  
+\- Healthy Margin: 20-40% (target: 35%)  
+\- Healthy Utilization: 70-90% (target: 80%)
+
+\# YOUR TASK
+
+Provide strategic synthesis in 4 sections. Use the agency's actual context (acquisition model, founder role, delivery structure) to make insights specific and actionable.
+
+\#\# Section 1: Reality Check (2-3 sentences)  
+Assess the feasibility of required sales velocity given their current acquisition model and pipeline constraint. Reference their actual sales motion (referral, outbound, paid, etc.).
+
+Example: "You need 5 new clients per month. Your Snapshot indicates you rely on 100% referral acquisition, which typically caps at 1-2 deals/month. This velocity requires building outbound or paid channels."
+
+\#\# Section 2: Capacity Warning (2-3 sentences)  
+Identify the primary operational bottleneck this growth creates. Consider founder role, team structure, and delivery model.
+
+Example: "You need to hire 2 people per quarter. Since your Snapshot shows you're 80% in client delivery, you'll become the hiring bottleneck—can't interview and onboard while maintaining delivery quality."
+
+\#\# Section 3: One Big Lever (2-3 sentences)  
+Identify THE single highest-leverage improvement that would most reduce pressure. Compare the impact of improving retention vs. ACV vs. efficiency.
+
+Example: "Improving retention from 80% to 90% eliminates the need for 2 deals/month. This is higher-leverage than building new acquisition channels—fix the bucket before turning up the hose."
+
+\#\# Section 4: Watch-Outs (Bullet list)  
+For each YELLOW or RED pressure family alert, provide a specific action-oriented watch-out.
+
+Format:  
+\- ⚠️ \[Alert Name\]: \[Specific implication\]. \[Concrete action to take\].
+
+Example:  
+\- ⚠️ Capacity Wall: Your hiring pace requires adding 40% headcount in 12 months. Promote or hire an operations manager before executing this plan, or delivery quality collapses.
+
+\# CRITICAL GUIDELINES
+
+1\. \*\*Use their actual context.\*\* Don't say "you may need to hire" if their data shows they're already understaffed. Don't suggest "improve sales" if they're 100% referral-based—be specific about WHAT sales channel.
+
+2\. \*\*Be directional, not prescriptive.\*\* Say "This requires..." not "You should..." Say "This implies..." not "You must..."
+
+3\. \*\*Quantify where possible.\*\* Don't say "improve retention"—say "Improving retention from 80% to 90% reduces required deals from 5/mo to 3/mo."
+
+4\. \*\*No false precision.\*\* Don't say "hire a Sales Director" unless you know their structure. Say "requires expanding sales capacity."
+
+5\. \*\*Keep each section concise.\*\* 2-3 sentences per section. Bullet points for watch-outs only.
+
+6\. \*\*No preamble.\*\* Start directly with Section 1\. No "Based on your inputs..." introduction.
+
+Provide your analysis now:  
+\`;
+
+Mode 2: Comparative Scenario Synthesis  
+typescriptconst COMPARATIVE\_SCENARIO\_PROMPT \= \`  
+You are a strategic business advisor helping a marketing agency founder compare growth scenarios.
+
+\# CONTEXT
+
+\#\# Agency Profile  
+\- Industry Focus: {snapshot\_context.primary\_industry\_focus}  
+\- Primary ICP: {snapshot\_context.primary\_icp}  
+\- Services: {snapshot\_context.services\_offered}  
+\- Delivery Model: {snapshot\_context.delivery\_model}  
+\- Sales Motion: {snapshot\_context.primary\_sales\_motion}
+
+\#\# Current State (Baseline)  
+\- Revenue: ${baseline.revenue.toLocaleString()}  
+\- Team Size: {baseline.team\_size} FTEs  
+\- Active Clients: {baseline.client\_count}  
+\- Retention: {(baseline.retention\_rate \* 100).toFixed(1)}%  
+\- Margin: {(baseline.profit\_margin \* 100).toFixed(1)}%
+
+\# SCENARIOS TO COMPARE
+
+{scenarios.map((scenario, idx) \=\> \\\`  
+\#\# Scenario ${idx \+ 1}: ${scenario.scenario\_name}
+
+\#\#\# Targets  
+\- Target Revenue: $${scenario.calculation.target\_revenue.toLocaleString()}  
+\- Timeframe: ${scenario.calculation.target\_timeframe\_months} months
+
+\#\#\# Requirements  
+\- Sales Velocity: ${scenario.calculation.monthly\_sales\_velocity.toFixed(1)} deals/month (${scenario.calculation.velocity\_multiplier.toFixed(1)}x baseline)  
+\- New Hires: ${scenario.calculation.headcount\_delta.toFixed(1)} FTEs  
+\- Hiring Pace: ${scenario.calculation.hiring\_pace\_per\_quarter.toFixed(1)} per quarter  
+\- Target Profit: $${scenario.calculation.target\_profit.toLocaleString()}
+
+\#\#\# Pressure Alerts  
+${Object.entries(scenario.calculation.pressure\_alerts)  
+  .filter((\[\_, alert\]) \=\> alert.severity \!== 'GREEN')  
+  .map((\[family, alert\]) \=\> \\\`- ${family}: \[${alert.severity}\] ${alert.message}\\\`)  
+  .join('\\\\n')}  
+\\\`).join('\\\\n')}
+
+\# YOUR TASK
+
+Compare these scenarios and help the founder understand trade-offs. Provide 4 sections:
+
+\#\# Section 1: Scenario Summary (1 sentence per scenario)  
+Characterize each path in one sentence. What does each optimize for?
+
+Example:  
+\- Scenario A optimizes for speed (high revenue fast) at the cost of team strain.  
+\- Scenario B optimizes for sustainability (manageable pace) at the cost of slower growth.
+
+\#\# Section 2: Trade-Off Analysis (3-4 sentences)  
+Explain the primary dimension where scenarios differ and what's being exchanged.
+
+Example: "The core trade-off is volume vs. value. Scenario A reaches higher revenue through client volume (requires 5 deals/month), creating sales pressure. Scenario B reaches similar revenue through pricing (requires 2 deals/month), creating market positioning pressure. Scenario A trades sales complexity for operational simplicity; Scenario B trades operational complexity for sales simplicity."
+
+\#\# Section 3: Strategic Verdict (2-3 sentences)  
+Given their ACTUAL context (sales motion, team structure, constraints), which scenario plays to their strengths?
+
+Example: "Given your 100% referral acquisition model, Scenario B is more aligned—you cannot realistically scale to 5 deals/month through referrals alone. However, Scenario B requires confidence in pricing power, which depends on your market positioning and client results."
+
+\#\# Section 4: Path Selection Questions (3 bullet points)  
+Provide 3 questions to help them choose. Frame as business questions, not math questions.
+
+Example:  
+\- Can you realistically build an outbound or paid acquisition channel in 6 months? (Required for Scenario A)  
+\- Do your current clients see enough value to accept 30% higher pricing? (Required for Scenario B)  
+\- Which is your bigger constraint: sales capacity or delivery capacity?
+
+\# CRITICAL GUIDELINES
+
+1\. \*\*Focus on the PRIMARY dimension of difference.\*\* Don't list 10 differences—identify the ONE core trade-off.
+
+2\. \*\*Use their context to assess fit.\*\* Reference their actual sales motion, delivery model, constraints.
+
+3\. \*\*Avoid "Scenario X is better."\*\* Both paths are valid—help them see which matches their capabilities and constraints.
+
+4\. \*\*Quantify trade-offs.\*\* Show the exchange rate: "To get X more revenue, you give up Y in margin" or "To reduce hiring by 3 people, you need 2x more sales velocity."
+
+5\. \*\*Keep concise.\*\* Total synthesis should be \~250-350 words.
+
+Provide your comparative analysis now:  
+\`;
+
+Prompt Variable Injection  
+Template Processing Function  
+typescriptfunction injectPromptVariables(  
+  template: string,  
+  data: GPTSynthesisRequest  
+): string {  
+  let prompt \= template;  
+    
+  // Replace simple variables  
+  Object.entries(data.snapshot\_context).forEach((\[key, value\]) \=\> {  
+    const regex \= new RegExp(\`\\\\{snapshot\_context\\\\.${key}\\\\}\`, 'g');  
+    prompt \= prompt.replace(regex, String(value || 'Not specified'));  
+  });  
+    
+  // Replace calculation variables  
+  if (data.calculation) {  
+    Object.entries(data.calculation.baseline\_inputs).forEach((\[key, value\]) \=\> {  
+      const regex \= new RegExp(\`\\\\{calculation\\\\.baseline\_inputs\\\\.${key}\\\\}\`, 'g');  
+      prompt \= prompt.replace(regex, String(value));  
+    });  
+      
+    Object.entries(data.calculation.output\_deltas).forEach((\[key, value\]) \=\> {  
+      const regex \= new RegExp(\`\\\\{calculation\\\\.output\_deltas\\\\.${key}\\\\}\`, 'g');  
+      prompt \= prompt.replace(regex, String(value));  
+    });  
+  }  
+    
+  // Handle complex injections (arrays, objects)  
+  // Pressure alerts  
+  if (data.calculation?.pressure\_alerts) {  
+    const alertsList \= Object.entries(data.calculation.pressure\_alerts)  
+      .map((\[family, alert\]) \=\> \`- ${family}: \[${alert.severity}\] ${alert.message}\`)  
+      .join('\\n');  
+    prompt \= prompt.replace(/\\{pressure\_alerts\_list\\}/g, alertsList);  
+  }  
+    
+  return prompt;  
+}
+
+Edge Function Implementation  
+API Route: /api/growth-velocity-synthesis  
+typescript// app/api/growth-velocity-synthesis/route.ts
+
+import { createClient } from '@supabase/supabase-js';  
+import Anthropic from '@anthropic-ai/sdk';
+
+export async function POST(request: Request) {  
+  const payload: GPTSynthesisRequest \= await request.json();  
+    
+  // 1\. Check if synthesis already exists (caching)  
+  if (payload.calculation?.calculation\_id) {  
+    const cached \= await checkCachedSynthesis(payload.calculation.calculation\_id);  
+    if (cached) {  
+      return Response.json({ synthesis: cached, cached: true });  
+    }  
+  }  
+    
+  // 2\. Gather additional context from Project Knowledge  
+  const projectContext \= await fetchProjectKnowledge(\[  
+    'AE Ladder frameworks',  
+    'Growth Mastery principles',  
+    'Healthy agency benchmarks'  
+  \]);  
+    
+  // 3\. Build prompt  
+  const prompt \= payload.mode \=== 'single'   
+    ? buildSingleScenarioPrompt(payload, projectContext)  
+    : buildComparativePrompt(payload, projectContext);  
+    
+  // 4\. Call Anthropic API  
+  const anthropic \= new Anthropic({  
+    apiKey: process.env.ANTHROPIC\_API\_KEY,  
+  });  
+    
+  const message \= await anthropic.messages.create({  
+    model: 'claude-sonnet-4-20250514',  
+    max\_tokens: 2000,  
+    temperature: 0.7,  
+    system: \`You are a strategic business advisor for marketing agency founders. You provide direct, contextual, non-prescriptive insights based on their actual business data. You never use generic advice or fail to reference their specific context.\`,  
+    messages: \[{  
+      role: 'user',  
+      content: prompt  
+    }\]  
+  });  
+    
+  const synthesis \= message.content\[0\].type \=== 'text'   
+    ? message.content\[0\].text   
+    : '';  
+    
+  // 5\. Cache synthesis in database  
+  if (payload.calculation?.calculation\_id) {  
+    await cacheSynthesis(payload.calculation.calculation\_id, synthesis);  
+  }  
+    
+  // 6\. Return synthesis  
+  return Response.json({   
+    synthesis,   
+    cached: false,  
+    tokens\_used: message.usage.output\_tokens  
+  });  
+}
+
+// Helper: Check cached synthesis  
+async function checkCachedSynthesis(calculationId: string): Promise\<string | null\> {  
+  const supabase \= createClient(  
+    process.env.SUPABASE\_URL\!,  
+    process.env.SUPABASE\_SERVICE\_KEY\!  
+  );  
+    
+  const { data } \= await supabase  
+    .from('growth\_calculations')  
+    .select('gpt\_synthesis\_text')  
+    .eq('calculation\_id', calculationId)  
+    .single();  
+    
+  return data?.gpt\_synthesis\_text || null;  
+}
+
+// Helper: Cache synthesis  
+async function cacheSynthesis(calculationId: string, synthesis: string) {  
+  const supabase \= createClient(  
+    process.env.SUPABASE\_URL\!,  
+    process.env.SUPABASE\_SERVICE\_KEY\!  
+  );  
+    
+  await supabase  
+    .from('growth\_calculations')  
+    .update({ gpt\_synthesis\_text: synthesis })  
+    .eq('calculation\_id', calculationId);  
+}
+
+// Helper: Fetch project knowledge context  
+async function fetchProjectKnowledge(topics: string\[\]): Promise\<string\> {  
+  // This would use Project Knowledge Search tool or similar  
+  // For now, return empty string \- implement based on available tools  
+  return '';  
+}
+
+Response Parsing & Formatting  
+Frontend Display Component  
+typescript// components/GPTSynthesisDisplay.tsx
+
+interface GPTSynthesisDisplayProps {  
+  calculationId: string;  
+  mode: 'single' | 'comparative';  
+  onComplete?: () \=\> void;  
+}
+
+export function GPTSynthesisDisplay({ calculationId, mode, onComplete }: GPTSynthesisDisplayProps) {  
+  const \[synthesis, setSynthesis\] \= useState\<string | null\>(null);  
+  const \[isLoading, setIsLoading\] \= useState(true);  
+  const \[error, setError\] \= useState\<string | null\>(null);  
+    
+  useEffect(() \=\> {  
+    generateSynthesis();  
+  }, \[calculationId\]);  
+    
+  async function generateSynthesis() {  
+    setIsLoading(true);  
+      
+    try {  
+      // Gather all required data  
+      const calculation \= await fetchCalculation(calculationId);  
+      const snapshotContext \= await fetchSnapshotContext();  
+        
+      // Call synthesis API  
+      const response \= await fetch('/api/growth-velocity-synthesis', {  
+        method: 'POST',  
+        headers: { 'Content-Type': 'application/json' },  
+        body: JSON.stringify({  
+          mode,  
+          calculation,  
+          snapshot\_context: snapshotContext,  
+          benchmarks: STANDARD\_BENCHMARKS  
+        })  
+      });  
+        
+      const { synthesis: text, cached } \= await response.json();  
+        
+      setSynthesis(text);  
+      setIsLoading(false);  
+        
+      if (onComplete) onComplete();  
+        
+    } catch (err) {  
+      setError('Failed to generate synthesis. Please try again.');  
+      setIsLoading(false);  
+    }  
+  }  
+    
+  if (isLoading) {  
+    return (  
+      \<div className="synthesis-loading"\>  
+        \<Spinner /\>  
+        \<p\>Analyzing your growth scenario...\</p\>  
+      \</div\>  
+    );  
+  }  
+    
+  if (error) {  
+    return (  
+      \<div className="synthesis-error"\>  
+        \<AlertCircle /\>  
+        \<p\>{error}\</p\>  
+        \<Button onClick={generateSynthesis}\>Retry\</Button\>  
+      \</div\>  
+    );  
+  }  
+    
+  return (  
+    \<div className="synthesis-display"\>  
+      \<SynthesisHeader mode={mode} /\>  
+      \<SynthesisContent text={synthesis} /\>  
+    \</div\>  
+  );  
+}
+
+Synthesis Content Parser  
+typescript// Parse synthesis into structured sections
+
+function parseSynthesisContent(text: string): SynthesisSection\[\] {  
+  const sections: SynthesisSection\[\] \= \[\];  
+    
+  // Split by section headers (\#\# Section X:)  
+  const sectionRegex \= /\#\# Section \\d+: (.+?)\\n(\[\\s\\S\]+?)(?=\#\# Section \\d+:|$)/g;  
+  let match;  
+    
+  while ((match \= sectionRegex.exec(text)) \!== null) {  
+    sections.push({  
+      title: match\[1\].trim(),  
+      content: match\[2\].trim()  
+    });  
+  }  
+    
+  return sections;  
+}
+
+// Display component  
+function SynthesisContent({ text }: { text: string }) {  
+  const sections \= parseSynthesisContent(text);  
+    
+  return (  
+    \<div className="synthesis-sections"\>  
+      {sections.map((section, idx) \=\> (  
+        \<div key={idx} className="synthesis-section"\>  
+          \<h3 className="section-title"\>{section.title}\</h3\>  
+          \<div className="section-content"\>  
+            {formatSectionContent(section.content)}  
+          \</div\>  
+        \</div\>  
+      ))}  
+    \</div\>  
+  );  
+}
+
+// Format content (convert bullet points, emphasis, etc.)  
+function formatSectionContent(content: string): JSX.Element {  
+  // Convert markdown-style bullets to HTML  
+  const formatted \= content  
+    .replace(/^- ⚠️/gm, '\<div class="alert-item"\>⚠️')  
+    .replace(/^- /gm, '\<li\>')  
+    .replace(/\\n(?\!\<)/g, '\</div\>\\n');  
+    
+  return \<div dangerouslySetInnerHTML={{ \_\_html: formatted }} /\>;  
+}
+
+Caching Strategy  
+Cache Logic  
+typescriptinterface CacheDecision {  
+  shouldCache: boolean;  
+  cacheKey: string;  
+  ttl?: number; // Time to live in seconds  
+}
+
+function decideCaching(  
+  mode: 'single' | 'comparative',  
+  calculationId: string,  
+  scenarioIds?: string\[\]  
+): CacheDecision {  
+  if (mode \=== 'single') {  
+    // Single scenario: Cache permanently by calculation\_id  
+    return {  
+      shouldCache: true,  
+      cacheKey: calculationId,  
+      ttl: null // Permanent  
+    };  
+  } else {  
+    // Comparative: Cache temporarily by scenario combination  
+    const cacheKey \= scenarioIds?.sort().join('-');  
+    return {  
+      shouldCache: true,  
+      cacheKey: \`comparison-${cacheKey}\`,  
+      ttl: 3600 \* 24 \* 7 // 7 days  
+    };  
+  }  
+}
+
+Cache Invalidation  
+typescript// When should we invalidate cache?
+
+// 1\. User edits a saved scenario  
+async function onScenarioEdit(scenarioId: string) {  
+  // Find all comparisons involving this scenario  
+  const comparisons \= await supabase  
+    .from('growth\_scenario\_comparisons')  
+    .select('\*')  
+    .contains('scenario\_ids', \[scenarioId\]);  
+    
+  // Delete cached syntheses for those comparisons  
+  for (const comparison of comparisons.data || \[\]) {  
+    await supabase  
+      .from('growth\_calculations')  
+      .update({ gpt\_synthesis\_text: null })  
+      .eq('calculation\_id', comparison.calculation\_id);  
+  }  
+}
+
+// 2\. User's Agency Snapshot changes significantly  
+async function onSnapshotUpdate(agencyId: string, changes: string\[\]) {  
+  const significantFields \= \[  
+    'primary\_sales\_motion',  
+    'pipeline\_constraint',  
+    'delivery\_model',  
+    'team\_size\_fte',  
+    'retention\_rate'  
+  \];  
+    
+  const hasSignificantChange \= changes.some(field \=\>   
+    significantFields.includes(field)  
+  );  
+    
+  if (hasSignificantChange) {  
+    // Invalidate all syntheses for this agency  
+    await supabase  
+      .from('growth\_calculations')  
+      .update({ gpt\_synthesis\_text: null })  
+      .eq('agency\_id', agencyId);  
+  }  
+}
+
+Quality Assurance: GPT Output Validation  
+Post-Processing Checks  
+typescriptfunction validateGPTSynthesis(synthesis: string): ValidationResult {  
+  const issues: string\[\] \= \[\];  
+    
+  // Check 1: Contains required sections  
+  const requiredSections \= \['Reality Check', 'Capacity Warning', 'One Big Lever', 'Watch-Outs'\];  
+  for (const section of requiredSections) {  
+    if (\!synthesis.includes(section)) {  
+      issues.push(\`Missing section: ${section}\`);  
+    }  
+  }  
+    
+  // Check 2: Not too short (probable error)  
+  if (synthesis.length \< 200\) {  
+    issues.push('Synthesis suspiciously short \- may be incomplete');  
+  }  
+    
+  // Check 3: Not too long (exceeded token limit?)  
+  if (synthesis.length \> 3000\) {  
+    issues.push('Synthesis exceeds recommended length');  
+  }  
+    
+  // Check 4: Contains forbidden phrases (generic advice)  
+  const forbiddenPhrases \= \[  
+    'you may want to consider',  
+    'it might be worth',  
+    'generally speaking',  
+    'in most cases',  
+    'typically agencies'  
+  \];  
+    
+  for (const phrase of forbiddenPhrases) {  
+    if (synthesis.toLowerCase().includes(phrase)) {  
+      issues.push(\`Contains generic phrase: "${phrase}"\`);  
+    }  
+  }  
+    
+  // Check 5: References user's actual context  
+  const requiredContextReferences \= \[  
+    'referral', 'outbound', 'paid', // Sales motion  
+    'delivery', 'capacity', // Operations  
+    'retention', 'margin' // Metrics  
+  \];  
+    
+  const hasContextReferences \= requiredContextReferences.some(term \=\>  
+    synthesis.toLowerCase().includes(term)  
+  );  
+    
+  if (\!hasContextReferences) {  
+    issues.push('Does not reference specific user context');  
+  }  
+    
+  return {  
+    isValid: issues.length \=== 0,  
+    issues,  
+    shouldRetry: issues.length \> 2 // Retry if multiple issues  
+  };  
+}
+
+// Usage in API  
+const synthesis \= await callAnthropicAPI(prompt);  
+const validation \= validateGPTSynthesis(synthesis);
+
+if (\!validation.isValid && validation.shouldRetry) {  
+  // Retry with adjusted prompt or temperature  
+  synthesis \= await callAnthropicAPI(prompt, { temperature: 0.5 });  
+}
+
+if (\!validation.isValid) {  
+  // Log for review  
+  console.error('Synthesis quality issues:', validation.issues);  
+}
+
+Project Knowledge Integration  
+How to Use Project Knowledge Context  
+typescriptasync function fetchProjectKnowledgeContext(  
+  snapshotContext: AgencySnapshotContext,  
+  pressureAlerts: PressureFamilyAlerts  
+): Promise\<string\> {  
+  const relevantTopics: string\[\] \= \[\];  
+    
+  // 1\. If high retention pressure, fetch retention frameworks  
+  if (pressureAlerts.treadmill.severity \=== 'RED') {  
+    relevantTopics.push('client retention strategies');  
+    relevantTopics.push('reducing churn');  
+  }  
+    
+  // 2\. If high hiring pressure, fetch team scaling guidance  
+  if (pressureAlerts.capacity\_wall.severity \=== 'RED') {  
+    relevantTopics.push('scaling team structure');  
+    relevantTopics.push('hiring best practices');  
+  }  
+    
+  // 3\. If sales pressure, fetch acquisition frameworks  
+  if (pressureAlerts.sales\_capability.severity \=== 'RED') {  
+    relevantTopics.push('scaling client acquisition');  
+    relevantTopics.push(snapshotContext.primary\_sales\_motion \+ ' acquisition');  
+  }  
+    
+  // 4\. Always include relevant AE Ladder stage guidance  
+  relevantTopics.push('AE Ladder frameworks');  
+    
+  // Call project knowledge search  
+  // (This would use the project\_knowledge\_search tool or similar)  
+  const knowledgeResults \= await searchProjectKnowledge(relevantTopics.join(', '));  
+    
+  // Format as context snippet  
+  return \`  
+\#\# Relevant Coaching Frameworks
+
+${knowledgeResults.map(result \=\> \`  
+\#\#\# ${result.title}  
+${result.content.substring(0, 300)}...  
+\`).join('\\n')}  
+  \`.trim();  
+}
+
+// Include in prompt  
+const projectContext \= await fetchProjectKnowledgeContext(  
+  payload.snapshot\_context,  
+  payload.calculation.pressure\_alerts  
+);
+
+const enhancedPrompt \= \`  
+${basePrompt}
+
+\# RELEVANT FRAMEWORKS & GUIDANCE  
+${projectContext}
+
+Now provide your analysis considering these frameworks:  
+\`;
+
+Error Handling & Fallbacks  
+Graceful Degradation  
+typescriptasync function generateSynthesisWithFallback(  
+  payload: GPTSynthesisRequest  
+): Promise\<string\> {  
+  try {  
+    // Attempt full synthesis with context  
+    return await generateFullSynthesis(payload);  
+      
+  } catch (error) {  
+    console.error('Full synthesis failed:', error);  
+      
+    try {  
+      // Fallback 1: Simplified prompt without project knowledge  
+      return await generateSimplifiedSynthesis(payload);  
+        
+    } catch (error2) {  
+      console.error('Simplified synthesis failed:', error2);  
+        
+      // Fallback 2: Template-based insights (no GPT)  
+      return generateTemplateSynthesis(payload);  
+    }  
+  }  
+}
+
+function generateTemplateSynthesis(payload: GPTSynthesisRequest): string {  
+  const { calculation } \= payload;  
+    
+  return \`  
+\#\# Growth Analysis
+
+Based on your target of $${calculation.target\_inputs.target\_revenue.toLocaleString()} in ${calculation.target\_inputs.target\_timeframe\_months} months:
+
+\#\#\# Requirements  
+\- You need ${calculation.output\_deltas.net\_new\_clients} net new clients  
+\- This requires ${calculation.output\_deltas.monthly\_sales\_velocity.toFixed(1)} deals per month  
+\- You'll need to hire ${calculation.output\_deltas.headcount\_delta.toFixed(0)} people  
+\- Target profit pool: $${calculation.output\_deltas.target\_profit.toLocaleString()}
+
+\#\#\# Pressure Points  
+${Object.entries(calculation.pressure\_alerts)  
+  .filter((\[\_, alert\]) \=\> alert.severity \!== 'GREEN')  
+  .map((\[\_, alert\]) \=\> \`- ${alert.label}: ${alert.message}\`)  
+  .join('\\n')}
+
+\*Note: Full strategic synthesis temporarily unavailable. Core metrics displayed above.\*  
+  \`.trim();  
+}
+
+Performance Optimization  
+Streaming Response (Future Enhancement)  
+typescript// For better UX, stream GPT response in real-time
+
+async function streamSynthesis(payload: GPTSynthesisRequest): Promise\<ReadableStream\> {  
+  const anthropic \= new Anthropic({ apiKey: process.env.ANTHROPIC\_API\_KEY });  
+    
+  const stream \= await anthropic.messages.stream({  
+    model: 'claude-sonnet-4-20250514',  
+    max\_tokens: 2000,  
+    messages: \[{ role: 'user', content: buildPrompt(payload) }\]  
+  });  
+    
+  return new ReadableStream({  
+    async start(controller) {  
+      for await (const chunk of stream) {  
+        if (chunk.type \=== 'content\_block\_delta' && chunk.delta.type \=== 'text\_delta') {  
+          controller.enqueue(new TextEncoder().encode(chunk.delta.text));  
+        }  
+      }  
+      controller.close();  
+    }  
+  });  
+}
+
+// Frontend consumption  
+const response \= await fetch('/api/growth-velocity-synthesis', {  
+  method: 'POST',  
+  body: JSON.stringify(payload)  
+});
+
+const reader \= response.body?.getReader();  
+const decoder \= new TextDecoder();
+
+while (true) {  
+  const { done, value } \= await reader.read();  
+  if (done) break;  
+    
+  const text \= decoder.decode(value);  
+  setSynthesis(prev \=\> prev \+ text); // Append to display  
+}
+
+Testing & Quality Control  
+Synthesis Quality Checklist  
+Before deploying to production, test that synthesis:  
+✅ References actual user context (not generic)
+
+ Mentions their sales motion (referral/outbound/paid)  
+ Considers their delivery model  
+ References their constraint (pipeline, capacity, funding)
+
+✅ Quantifies implications
+
+ Shows specific numbers (not "improve retention" but "from 80% to 90%")  
+ Calculates impact ("reduces deals needed from 5/mo to 3/mo")
+
+✅ Maintains non-prescriptive tone
+
+ Uses "This requires..." not "You should..."  
+ Observes implications without judging feasibility
+
+✅ Provides actionable insights
+
+ Watch-outs are specific (not "be careful")  
+ One Big Lever is quantified and clear
+
+✅ Appropriate length
+
+ Single scenario: 250-400 words  
+ Comparative: 300-500 words
+
+### **GVI Calculator**
+
+GROWTH VELOCITY CALCULATOR — STRUCTURAL BUILD SPECIFICATION  
+ANTIGRAVITY/LOVABLE BUILD PROMPT
+
+---
+
+CONTEXT
+
+You are building the **Growth Velocity Calculator** within the Tools & Assessments section of Architect OS, a strategic operating system for agency founders. This tool tests whether a founder's growth ambition is structurally feasible by revealing the pressure points, capability requirements, and strategic implications of their target.
+
+**Current Status:** The bare wireframe exists with routes and empty page containers.
+
+**This Build:** Create the complete calculator structure with input forms, output placeholders, and visual containers. This is a **structural/skeleton build**—forms and layouts are functional, but calculations, data persistence, and AI synthesis are not yet implemented.
+
+**Key Principle:** This tool doesn't judge feasibility; it reveals **pressure implications**. The tone is observational, not prescriptive. It shows "what this requires" not "whether you can do it."
+
+---
+
+#### GROWTH VELOCITY CALCULATOR STRUCTURE
+
+**Route:** `/tools/gv-simulator/calculator`
+
+**Page Flow:**
+
+1. Input Section (Current State \+ Target State \+ Advanced Features)  
+2. Processing Animation (on "Run Scenario Analysis" click)  
+3. Output Section (GVI Score \+ Metrics \+ Pressure Dashboard \+ Charts \+ Table \+ Synthesis)
+
+---
+
+#### INPUT SECTION
+
+### **Section Header**
+
+Icon: 📊  
+Heading: "Growth Velocity Calculator"
+
+Subheading: "Model your growth and identify strategic constraints"
+
+### **Tab Navigation (If in Multi-Tab Context)**
+
+* If this is within the GV Simulator parent container with Scenario Planner:  
+  * Horizontal tabs: **"Growth Calculator"** (active) | "Scenario Planning" (Pro badge)  
+  * Route: `/tools/gv-simulator` (parent) → `/calculator` (this page) | `/scenario-planner` (Pro)
+
+---
+
+### **COMPONENT A: QUICK START PRESETS (Optional Dropdown)**
+
+**Placement:** Top of input section, full-width
+
+**Component:**
+
+Label: "Quick Start Presets (Optional)"  
+Dropdown Select Component:  
+  \- Placeholder: "-- Select a scenario preset \--"  
+  \- Options:  
+    \- "Aggressive Growth"  
+    \- "Efficiency Play"  
+    \- "Premium Pivot"
+
+    \- "Cash Preservation"
+
+**Behavior:**
+
+* When selected: Auto-fills **Target State fields only** with preset values  
+* Current State remains unchanged  
+* User can manually edit any auto-filled field  
+* Selecting blank option clears all Target State fields  
+* Helper text below: "Not sure what to test? Select a strategic archetype and adjust from there."
+
+**Preset Values (Placeholder for Now):**
+
+* These will be defined later, but dropdown should support 4-6 options  
+* For wireframe: Just show dropdown with options, no actual auto-fill logic
+
+---
+
+### **COMPONENT B: MISSING DATA WARNINGS**
+
+**Placement:** Below Quick Start Presets, above Current State section
+
+**Warning Cards (Conditional Display):**
+
+**Global Warning (if Snapshot incomplete):**
+
+┌─────────────────────────────────────────────────────┐  
+│ 💡 INFO                                             │  
+│ Complete your Agency Snapshot for more accurate     │  
+│ results and context-aware insights.                 │  
+│ \[Complete Snapshot →\]                               │
+
+└─────────────────────────────────────────────────────┘
+
+**Specific Warning (if Revenue Mix missing):**
+
+┌─────────────────────────────────────────────────────┐  
+│ ⚠️ REVENUE MIX DATA MISSING                         │  
+│ Complete the Growth & Pipeline section in your      │  
+│ Agency Snapshot to enable revenue model-specific    │  
+│ insights (MRR vs. Project calculations).            │  
+│ \[Complete Growth & Pipeline →\]                      │
+
+└─────────────────────────────────────────────────────┘
+
+**Design Notes:**
+
+* Light blue background for Info (💡)  
+* Light yellow/orange background for Warning (⚠️)  
+* Subtle border, not alarming  
+* CTA links route to appropriate Snapshot sections  
+* For wireframe: Show both warnings as placeholders (not conditional yet)
+
+---
+
+### **COMPONENT C: CURRENT STATE (Left Column, 50% Width)**
+
+**Section Header:**
+
+Icon: 📍  
+Heading: "Current State"
+
+Subheading: "Where you are today"
+
+**Sync Snapshot Toggle:**
+
+Toggle Component (shadcn/ui Switch):  
+  Label: "Sync Snapshot"  
+  Default: ON  
+  Helper text: "Pre-fills from your Agency Snapshot data. 
+
+                Turn off to manually adjust values."
+
+**Form Fields (8 Fields):**
+
+**1\. Revenue (AGI)**
+
+Label: "Revenue (AGI)"  
+Input Type: Number (currency)  
+Prefix: $  
+Placeholder: "0"  
+Pre-fill: From Snapshot (if toggle ON)
+
+Helper text: "Annual gross income (revenue minus pass-through costs)"
+
+**2\. Profit Margin**
+
+Label: "Profit Margin"  
+Input Type: Number (percentage)  
+Suffix: %  
+Placeholder: "0"  
+Pre-fill: From Snapshot
+
+Helper text: "Current EBITDA or net profit margin"
+
+**3\. Profit (Implied)**
+
+Label: "Profit (Implied)"  
+Input Type: Number (currency, disabled/read-only)  
+Prefix: $  
+Auto-calculated: Revenue × (Margin / 100\)  
+Helper text: "Calculated from revenue × margin"
+
+Visual: Grayed out / disabled state
+
+**4\. Team (FTEs)**
+
+Label: "Team (FTEs)"  
+Input Type: Number  
+Placeholder: "0"  
+Pre-fill: From Snapshot
+
+Helper text: "Full-time equivalent employee count"
+
+**5\. Client Count**
+
+Label: "Client Count"  
+Input Type: Number  
+Placeholder: "0"  
+Pre-fill: From Snapshot
+
+Helper text: "Total active clients"
+
+**6\. Retention Rate**
+
+Label: "Retention Rate"  
+Input Type: Number (percentage)  
+Suffix: %  
+Placeholder: "90"  
+Pre-fill: From Snapshot
+
+Helper text: "Annual client/revenue retention percentage"
+
+**7\. Avg Client Value (ACV)**
+
+Label: "Avg Client Value"  
+Input Type: Number (currency, disabled/read-only)  
+Prefix: $  
+Auto-calculated: Revenue ÷ Client Count  
+Helper text: "Calculated from revenue ÷ client count"
+
+Visual: Grayed out / disabled state
+
+**8\. Revenue Mix (Hidden if Snapshot Complete)**
+
+Label: "Revenue Mix"  
+Two Number Inputs (side by side, percentages)  
+  \- Field 1: "% MRR/Recurring" (Suffix: %)  
+  \- Field 2: "% Project" (Suffix: %)  
+Pre-fill: From Snapshot  
+Validation: Must total 100%  
+Helper text: "MRR \+ Project should equal 100%"
+
+Visual: If total ≠ 100%, show red border and error text
+
+**Design Notes:**
+
+* Standard input styling (shadcn/ui)  
+* Labels: Medium weight, left-aligned  
+* Helper text: Light gray, smaller font  
+* Read-only fields: Lighter background, disabled cursor  
+* Spacing: mb-4 between fields
+
+---
+
+### **COMPONENT D: TARGET STATE (Right Column, 50% Width)**
+
+**Section Header:**
+
+Icon: 🎯  
+Heading: "Future Targets"
+
+Subheading: "Where you want to be"
+
+**Timeframe Selector (Prominent):**
+
+Label: "Timeframe"  
+Dropdown Select:  
+  \- "12 months"  
+  \- "18 months"  
+  \- "24 months"  
+  \- "36 months"
+
+Default: "12 months"
+
+**Form Fields (7 Core Fields):**
+
+**1\. Target Revenue (AGI)**
+
+Label: "Target Revenue (AGI)"  
+Input Type: Number (currency)  
+Prefix: $  
+Placeholder: "0"
+
+Helper text: "Your revenue goal for this timeframe"
+
+**2\. Target Margin**
+
+Label: "Target Margin / Profit"
+
+Radio Button Toggle:  
+  ○ Enter as Percentage (%)  
+  ○ Enter as Dollar Amount ($)
+
+\[Based on selection, show appropriate input field\]
+
+If Percentage selected:  
+  Input: Number (percentage), Suffix: %  
+  Placeholder: "0"  
+  Helper text: "Target profit margin percentage"
+
+If Dollar selected:  
+  Input: Number (currency), Prefix: $  
+  Placeholder: "0"
+
+  Helper text: "Target profit dollar amount"
+
+**3\. Target Team (FTEs)**
+
+Label: "Target Team (FTEs)"  
+Input Type: Number  
+Placeholder: "Leave blank to calculate via benchmark"  
+Helper text: "If blank, calculated based on target revenue and 
+
+             benchmark efficiency (\~$200k AGI/FTE)"
+
+**4\. Target Client Count**
+
+Label: "Target Client Count"  
+Input Type: Number  
+Placeholder: "Leave blank for 'Constant'"
+
+Helper text: "If blank, assumes constant from current state"
+
+**5\. Target Retention**
+
+Label: "Target Retention"  
+Input Type: Number (percentage)  
+Suffix: %  
+Placeholder: "Leave blank for 'Same as current'"
+
+Helper text: "If blank, assumes same as current retention rate"
+
+**6\. Target ACV**
+
+Label: "Target ACV"  
+Input Type: Number (currency)  
+Prefix: $  
+Placeholder: "Leave blank for 'Same as current'"
+
+Helper text: "If blank, assumes same as current average client value"
+
+**Design Notes:**
+
+* Same styling as Current State section  
+* Placeholder text reinforces "blank \= constant" logic  
+* Radio toggle for Margin field is visually clear  
+* Generous spacing between fields
+
+---
+
+### **COMPONENT E: ADVANCED FEATURES (Collapsible Section)**
+
+**Placement:** Below Target State section, full-width (spans both columns)
+
+**Component:**
+
+Collapsible/Accordion Component (shadcn/ui):  
+  Trigger: "Advanced Features (Optional)"  
+  Icon: Chevron down/up (⌄ / ⌃)
+
+  Default State: Collapsed
+
+**When Expanded:**
+
+**Section 1: Revenue Mix Override**
+
+Heading: "Revenue Mix Override"  
+Info Banner (light blue background):  
+  "ℹ️ If left blank, assumes constant from current state.   
+   Use this to test business model shifts (e.g., moving   
+   from project-based to MRR-based)."
+
+Two Number Inputs (side by side):  
+  \- Field 1: "Target % MRR/Recurring" (Suffix: %)  
+  \- Field 2: "Target % Project" (Suffix: %)  
+    
+Validation: Must total 100%
+
+Helper text: "Target MRR \+ Project should equal 100%"
+
+**Section 2: Repeat Client Rate (Project Agencies)**
+
+Heading: "Repeat Client Rate"  
+Info Banner (light blue background):  
+  "ℹ️ Only applies to project-based agencies. Measures   
+   how often clients return for new projects. If left   
+   blank, won't impact calculations."
+
+Number Input:  
+  Label: "Repeat Client Rate"  
+  Suffix: %  
+  Placeholder: "Leave blank if N/A"
+
+  Helper text: "% of clients who return for additional projects"
+
+**Design Notes:**
+
+* Collapsible section has subtle border  
+* Expanded state shows both sub-sections  
+* Info banners are non-alarming (light blue, not yellow)  
+* Helper text is educational, not prescriptive
+
+---
+
+### **COMPONENT F: RUN BUTTON**
+
+**Placement:** Below all input sections, centered, full-width
+
+**Component:**
+
+Large Primary Button (shadcn/ui):  
+  Text: "Run Scenario Analysis"  
+  Icon: 🚀 or ▶️  
+  Size: Large, prominent
+
+  Color: Brand primary (blue)
+
+**States:**
+
+* Default: Enabled if at least Target Revenue is filled  
+* Disabled: If Target Revenue is empty (validation check)  
+* Loading: Shows spinner when clicked (before processing animation)
+
+---
+
+## **PROCESSING ANIMATION**
+
+### **Component:**
+
+Full-screen overlay (semi-transparent backdrop) with centered card
+
+**Animation Card:**
+
+┌─────────────────────────────────────────────────────┐  
+│                                                     │  
+│              \[Architect OS Logo/Icon\]              │  
+│                                                     │  
+│         ████████████████░░░░░ 75%                  │  
+│                                                     │  
+│      Calculating growth physics...                 │  
+│                                                     │  
+│                  \[Spinner/Animation\]               │  
+│                                                     │
+
+└─────────────────────────────────────────────────────┘
+
+**Stage Progression (Animated Text):**
+
+* Stage 1: "Analyzing growth targets..." (0-25%)  
+* Stage 2: "Calculating pressure implications..." (25-50%)  
+* Stage 3: "Running constraint analysis..." (50-75%)  
+* Stage 4: "Generating strategic synthesis..." (75-100%)
+
+**Duration:** 3-5 seconds (placeholder timing)
+
+**Design Notes:**
+
+* Professional, calm animation  
+* Progress bar fills smoothly  
+* Stage text fades in/out between stages  
+* No playful elements—executive-grade presentation
+
+---
+
+## **OUTPUT SECTION**
+
+**Placement:** Replaces input section OR renders below input (design choice)
+
+**Structure:** Scrollable container with multiple subsections
+
+---
+
+### **OUTPUT A: GROWTH VELOCITY INDEX (Hero Metric)**
+
+**Component:**
+
+┌─────────────────────────────────────────────────────┐  
+│                                                     │  
+│          GROWTH VELOCITY INDEX (GVI)               │  
+│                                                     │  
+│                    ┌─────────┐                     │  
+│                    │   45    │  ← Large number     │  
+│                    │  /100   │                     │  
+│                    └─────────┘                     │  
+│                                                     │  
+│            ■ ■ ■ ■ ■ ■ ■ □ □ □  ← Gauge visual     │  
+│          0  20  40  60  80  100                    │  
+│                                                     │  
+│             HEAVY LIFT                             │  
+│    Your ambition creates significant pressure      │  
+│       across multiple operational areas.           │  
+│                                                     │
+
+└─────────────────────────────────────────────────────┘
+
+**Visual Elements:**
+
+* **Score Display:** Large number (60-80pt font)  
+* **Gauge Visualization:**  
+  * Horizontal bar or semi-circle gauge  
+  * Color-coded segments:  
+    * 0-40: Red (Crushing Lift)  
+    * 40-60: Orange (Heavy Lift)  
+    * 60-80: Yellow (Moderate Lift)  
+    * 80-100: Green (Light Lift)  
+  * Indicator shows where score falls  
+* **Label Below Score:** Dynamic text based on range  
+  * "LIGHT LIFT" (80-100)  
+  * "MODERATE LIFT" (60-79)  
+  * "HEAVY LIFT" (40-59)  
+  * "CRUSHING LIFT" (\<40)  
+* **Contextual Subtext:** One-sentence explanation
+
+**Placeholder Data (Wireframe):**
+
+* Hardcode score to 45  
+* Show "HEAVY LIFT" label  
+* Sample subtext: "Your ambition creates significant pressure across multiple operational areas."
+
+---
+
+### **OUTPUT B: KEY PERFORMANCE METRICS (Metric Cards Grid)**
+
+**Layout:** 2 rows × 3 columns (6 cards total)
+
+**Card Structure (Each):**
+
+┌─────────────────────────┐  
+│ \[Icon\]  Metric Label    │  
+│                         │  
+│      42%                │ ← Large value  
+│                         │  
+│ Annual growth rate      │ ← Context
+
+└─────────────────────────┘
+
+**The 6 Metric Cards:**
+
+**1\. CAGR (Compound Annual Growth Rate)**
+
+Icon: 📈  
+Label: "CAGR"  
+Value: "42%" (placeholder)
+
+Context: "Annual growth rate required"
+
+**2\. Target AGI per FTE**
+
+Icon: 👤  
+Label: "Target AGI per FTE"  
+Value: "$160k" (placeholder)
+
+Context: "vs. current $125k (+28%)"
+
+**3\. Net New Revenue**
+
+Icon: 💰  
+Label: "Net New Revenue"  
+Value: "$1.8M" (placeholder)
+
+Context: "After churn replacement"
+
+**4\. Sales Velocity Required**
+
+Icon: 🎯  
+Label: "Sales Velocity"  
+Value: "4.8 deals/mo" (placeholder)
+
+Context: "vs. current 1.4/mo (3.4x)"
+
+**5\. Hiring Velocity**
+
+Icon: 👥  
+Label: "Hiring Velocity"  
+Value: "1.5 hires/qtr" (placeholder)
+
+Context: "9% quarterly team growth"
+
+**6\. Profit Pool Target**
+
+Icon: 💵  
+Label: "Profit Pool"  
+Value: "$480k" (placeholder)
+
+Context: "vs. current $240k (+100%)"
+
+**Design Notes:**
+
+* shadcn/ui Card components  
+* Clear visual hierarchy (icon → label → value → context)  
+* Responsive: 3 columns desktop, 2 columns tablet, 1 column mobile  
+* Subtle shadows, rounded corners
+
+---
+
+### **OUTPUT C: PRESSURE DASHBOARD (Pressure Family Cards)**
+
+**Layout:** 2 rows × 3 columns (6 cards total)
+
+**Card Structure (Each):**
+
+┌─────────────────────────────────────┐  
+│ 🔴 Retention Pressure               │  
+│                                     │  
+│ Status: HIGH                        │  
+│                                     │  
+│ Churn consumes 45% of required     │  
+│ growth. High friction detected.    │
+
+└─────────────────────────────────────┘
+
+**Status Indicators:**
+
+* 🟢 Green: "LOW" / "STABLE"  
+* 🟡 Yellow: "MODERATE" / "WATCH"  
+* 🔴 Red: "HIGH" / "CRITICAL"  
+* ⚪ Gray: "N/A" (for project agencies)
+
+**The 6 Pressure Family Cards:**
+
+**1\. Retention Pressure (The Treadmill)**
+
+Icon: 🔄  
+Label: "Retention Pressure"  
+Status: 🔴 HIGH (placeholder)  
+Insight: "Churn consumes 45% of required growth. 
+
+          High friction detected."
+
+**2\. Sales/Pipeline Pressure (New Capability)**
+
+Icon: 📊  
+Label: "Sales & Pipeline Pressure"  
+Status: 🔴 HIGH (placeholder)  
+Insight: "Requires 3.4x your current acquisition velocity. 
+
+          New capability needed."
+
+**3\. Capacity/Team Pressure (Capacity Wall)**
+
+Icon: 👥  
+Label: "Capacity & Team Pressure"  
+Status: 🟡 MODERATE (placeholder)  
+Insight: "Hiring pace crosses culture strain threshold. 
+
+          Focused management required."
+
+**4\. Economic Pressure (Profit Trap)**
+
+Icon: 💰  
+Label: "Economic Pressure"  
+Status: 🟡 MODERATE (placeholder)  
+Insight: "Margins compress under hiring load. 
+
+          Cash flow attention needed."
+
+**5\. Structural Risk (Concentration)**
+
+Icon: ⚖️  
+Label: "Structural Risk"  
+Status: 🟢 LOW (placeholder)  
+Insight: "Client distribution remains healthy. 
+
+          No concentration concerns."
+
+**6\. Positioning Pressure**
+
+Icon: 🎯  
+Label: "Positioning Pressure"  
+Status: 🔴 HIGH (placeholder)  
+Insight: "Current referral channel insufficient for 
+
+          required pace. New channel needed."
+
+**Special Case: N/A State (Project Agencies)**
+
+For Retention Pressure card when Revenue Mix \> 80% Project:
+
+┌─────────────────────────────────────┐  
+│ 🔄 Retention Pressure               │  
+│                                     │  
+│ Status: ⚪ N/A (Project Model)     │  
+│                                     │  
+│ Your project-based revenue model   │  
+│ doesn't face traditional churn.    │  
+│ Focus on sales velocity instead.   │
+
+└─────────────────────────────────────┘
+
+**Design Notes:**
+
+* Status color matches icon color  
+* Card background subtly tinted based on status (very light red/yellow/green)  
+* Text is scannable (one-sentence insight)  
+* Responsive: 3 columns desktop, 2 columns tablet, 1 column mobile
+
+---
+
+### **OUTPUT D: VISUAL CHARTS (Placeholder Containers)**
+
+**Layout:** 2 rows × 2 columns OR 1 row × 3 columns (design choice)
+
+**Chart 1: Revenue Growth Trajectory**
+
+┌─────────────────────────────────────────────────────┐  
+│ Revenue Growth Trajectory                           │  
+│                                                     │  
+│                    \[Chart Placeholder\]              │  
+│                                                     │  
+│         Line chart showing current vs.              │  
+│         required revenue trajectory                 │  
+│                                                     │
+
+└─────────────────────────────────────────────────────┘
+
+* Type: Line chart  
+* X-Axis: Months (0 to target timeframe)  
+* Y-Axis: Revenue ($)  
+* Lines: Current trajectory (linear) vs. Required trajectory (curved)
+
+**Chart 2: Profit Growth Comparison**
+
+┌─────────────────────────────────────────────────────┐  
+│ Profit Growth Comparison                            │  
+│                                                     │  
+│                    \[Chart Placeholder\]              │  
+│                                                     │  
+│      Grouped bar chart showing revenue vs.          │  
+│      profit at current and target states            │  
+│                                                     │
+
+└─────────────────────────────────────────────────────┘
+
+* Type: Grouped bar chart  
+* X-Axis: Current | Target  
+* Bars: Revenue (blue) | Profit (gold)
+
+**Chart 3: Team Scaling Timeline**
+
+┌─────────────────────────────────────────────────────┐  
+│ Team Scaling Timeline                               │  
+│                                                     │  
+│                    \[Chart Placeholder\]              │  
+│                                                     │  
+│        Step chart showing hiring ramp-up            │  
+│        trajectory over timeframe                    │  
+│                                                     │
+
+└─────────────────────────────────────────────────────┘
+
+* Type: Step chart or area chart  
+* X-Axis: Quarters  
+* Y-Axis: Team Size (FTEs)
+
+**Chart 4: Churn Replacement Load (Optional)**
+
+┌─────────────────────────────────────────────────────┐  
+│ Churn Replacement Load                              │  
+│                                                     │  
+│                    \[Chart Placeholder\]              │  
+│                                                     │  
+│     Stacked bar showing net growth vs. churn        │  
+│     replacement (The Treadmill visualization)       │  
+│                                                     │
+
+└─────────────────────────────────────────────────────┘
+
+* Type: Stacked bar chart  
+* Segments: Net New Growth (green) vs. Churn Replacement (red)
+
+**Design Notes:**
+
+* Empty containers with placeholder text/icon  
+* Subtle border and light background  
+* Height: 300-400px each  
+* Responsive: 2 columns desktop, 1 column mobile  
+* For wireframe: Just show containers with "Chart Placeholder" text
+
+---
+
+### **OUTPUT E: METRICS COMPARISON TABLE**
+
+**Component:** Data table (shadcn/ui Table)
+
+**Structure:**
+
+| Metric | Current | Target | Delta |
+| ----- | ----- | ----- | ----- |
+| **Revenue (AGI)** | $2.0M | $4.0M | \+$2.0M (+100%) |
+| ↳ MRR Revenue | $1.4M (70%) | $2.8M (70%) | \+$1.4M |
+| ↳ Project Revenue | $600k (30%) | $1.2M (30%) | \+$600k |
+| **Team Size** | 16 FTEs | 25 FTEs | \+9 hires |
+| **Client Count** | 83 | 133 | \+50 clients |
+| **Sales Velocity** | 1.4 deals/mo | 4.8 deals/mo | \+3.4x pace |
+| **Hiring Velocity** | — | 1.5 hires/qtr | 9% growth/qtr |
+| **Sales Breakdown** |  |  |  |
+| ↳ Net New Growth | — | $1.8M | Growth |
+| ↳ Churn Replacement | — | $280k | Friction |
+| **Profit Pool** | $240k | $480k | \+$240k (+100%) |
+
+**Design Notes:**
+
+* Clean table styling (borders, alternating row colors)  
+* Indented sub-rows (↳) show breakdowns  
+* Delta column uses green text for positive, red for negative (or neutral for context)  
+* Bold row headers for major categories  
+* For wireframe: Populate with sample data matching above
+
+---
+
+### **OUTPUT F: STRATEGIC SYNTHESIS (GPT Narrative)**
+
+**Component:** Text content area with structured sections
+
+**Section 1: Reality Check (The Diagnosis)**
+
+Heading: "📋 Reality Check"
+
+Placeholder Content:  
+"To achieve $4M revenue in 18 months requires doubling your   
+business. However, your 80% retention rate means $600k of that   
+growth goes to replacing churned clients. Your true sales target   
+is $2.6M, not $2M.
+
+Additionally, your current efficiency of $125k AGI/FTE indicates   
+operational drag. You're starting from a position of inefficiency, 
+
+which compounds the challenge of scaling."
+
+**Section 2: Capacity & Structural Implications**
+
+Heading: "🏗️ Capacity & Structural Implications"
+
+Placeholder Content:  
+"This journey requires adding 9 people (1.5 hires/quarter). At your   
+current team size of 16, this represents 9% quarterly growth—crossing   
+into the 'culture strain' threshold where onboarding capacity becomes   
+a constraint.
+
+Your target of 25 FTEs also crosses the 'span of control' threshold,   
+meaning you'll need to add a management layer. This isn't just about 
+
+hiring doers—you'll need to hire a non-billable manager by Q3."
+
+**Section 3: Pressure Points & Strategic Considerations**
+
+Heading: "⚡ Pressure Points & Strategic Considerations"
+
+Placeholder Content:  
+"Your primary constraints are:
+
+\- Retention Load: Churn is your highest-friction point. Improving   
+  retention from 80% to 90% would reduce required sales velocity   
+  by 30%.
+
+\- Channel Capacity: Your Snapshot indicates referral-only acquisition.   
+  At 4.8 deals/month, this channel will break. You'll need to build   
+  outbound or paid acquisition capability.
+
+\- Hiring Pace: Adding 1.5 people per quarter at your current scale   
+  means 30% of senior team time will go to interviewing and training.
+
+The highest-leverage action: Focus on retention. Fixing the bucket 
+
+is more strategic than turning up the hose."
+
+**Design Notes:**
+
+* Clean typography (readable font size, good line height)  
+* Section headings with icons  
+* Bullet points for key insights  
+* Generous white space  
+* For wireframe: Use placeholder prose (lorem ipsum style but contextually relevant)
+
+---
+
+### **OUTPUT G: ACTION BUTTONS**
+
+**Placement:** Bottom of output section, horizontally aligned
+
+**Buttons (Left to Right):**
+
+**1\. Save Scenario (Primary)**
+
+Button: Primary style (blue)  
+Text: "Save Scenario"  
+Icon: 💾
+
+Action: (Wireframe: Shows "Save successful" toast, no backend)
+
+**2\. Attach to Vision Horizon (Secondary)**
+
+Button: Secondary style (outline)  
+Text: "Attach to Vision Horizon"  
+Icon: 🔗  
+Action: (Wireframe: Routes to /clarity-compass/vision-state)
+
+Conditional: Only shows if Clarity Compass has been completed
+
+**3\. Download Analysis (Outline)**
+
+Button: Outline style  
+Text: "Download Analysis"  
+Icon: ⬇️
+
+Action: (Wireframe: Shows "Download starting..." toast, no PDF yet)
+
+**4\. Compare Scenarios (Outline, Pro Lock)**
+
+Button: Outline style with lock icon  
+Text: "Compare Scenarios"  
+Icon: 🔒  
+Badge: "Pro"
+
+Action: (Wireframe: Shows upgrade modal if Free tier)
+
+**Design Notes:**
+
+* Buttons spaced evenly  
+* Primary action (Save) most prominent  
+* Lock icon on Pro-gated feature  
+* Responsive: Stack vertically on mobile
+
+---
+
+## **DESIGN SPECIFICATIONS**
+
+### **Visual Hierarchy**
+
+* Use Tailwind CSS v4.0 for all styling  
+* shadcn/ui components: Card, Input, Select, Button, Table, Switch, Accordion  
+* Consistent with Agency Snapshot and Clarity Compass sections  
+* Professional, calm aesthetic (tool interface, not marketing)
+
+### **Form Fields**
+
+* Labels: Medium font weight, clear hierarchy  
+* Inputs: shadcn/ui components with proper focus states  
+* Helper text: Light gray, smaller font (text-sm)  
+* Tooltips: Info icon (ℹ️) next to labels where needed  
+* Currency inputs: Prefix with $ symbol  
+* Percentage inputs: Suffix with % symbol  
+* Read-only fields: Lighter background, disabled appearance
+
+### **Layout**
+
+* **Input Section:**  
+  * Two-column layout (50/50 split) for Current State | Target State  
+  * Advanced Features spans full width  
+  * Max-width container, centered  
+* **Output Section:**  
+  * Full-width container  
+  * Metric cards: 3 columns desktop, 2 tablet, 1 mobile  
+  * Pressure cards: 3 columns desktop, 2 tablet, 1 mobile  
+  * Charts: 2 columns desktop, 1 mobile  
+  * Table: Full-width, horizontally scrollable on mobile
+
+### **Spacing**
+
+* Generous padding between sections (mb-8, mb-12)  
+* Form fields: mb-4 or mb-6  
+* Section headings: mb-6  
+* Card grids: gap-6  
+* Button groups: gap-4
+
+### **Colors**
+
+* Neutral palette (grays for backgrounds, text)  
+* Single brand accent for CTAs (blue/primary)  
+* Status colors: Green (`#22c55e`), Yellow (`#eab308`), Red (`#ef4444`), Gray (`#9ca3af`)  
+* Subtle borders, no harsh lines  
+* Info banners: Light blue background (`#dbeafe`)  
+* Warning banners: Light yellow background (`#fef3c7`)
+
+### **Typography**
+
+* Headings: font-semibold, text-lg to text-2xl  
+* Labels: font-medium, text-sm  
+* Body text: font-normal, text-base  
+* Helper text: font-normal, text-sm, text-gray-600  
+* Metric values: font-bold, text-3xl to text-5xl
+
+### **Responsive Behavior**
+
+* Input section: Stacks vertically on mobile (Current State → Target State)  
+* Metric/Pressure cards: 3 cols → 2 cols → 1 col  
+* Charts: 2 cols → 1 col  
+* Table: Horizontal scroll on mobile  
+* Buttons: Stack vertically on mobile
+
+---
+
+## **WHAT NOT TO BUILD YET**
+
+❌ No actual GVI calculation algorithm (hardcode score to 45 for wireframe) ❌ No pressure family detection logic (hardcode statuses) ❌ No data sync from Agency Snapshot (toggle UI only) ❌ No scenario storage/retrieval (Save button shows toast only) ❌ No PDF generation (Download button shows toast only) ❌ No GPT synthesis generation (use placeholder prose) ❌ No chart rendering (empty containers only) ❌ No real-time calculation on input changes ❌ No Quick Start preset auto-fill logic ❌ No conditional rendering based on revenue mix (show all cards) ❌ No validation logic beyond basic required fields
+
+---
+
+## **WHAT TO BUILD**
+
+✅ Complete page structure with all sections ✅ Two-column input form (Current State | Target State) ✅ Sync Snapshot toggle (UI state change only) ✅ Quick Start Presets dropdown (no auto-fill logic) ✅ Target Margin radio toggle (% vs. $) ✅ Advanced Features collapsible section ✅ All form fields with proper input types and styling ✅ "Run Scenario Analysis" button (triggers processing animation) ✅ Processing animation overlay with stage progression ✅ Output section with all containers:
+
+* GVI gauge (hardcoded to 45\)  
+* 6 metric cards (sample data)  
+* 6 pressure cards (hardcoded statuses)  
+* 4 chart placeholders (empty containers)  
+* Comparison table (sample data)  
+* Synthesis text sections (placeholder prose) ✅ Action buttons (functional routing, toasts, no backend) ✅ Warning banners (hardcoded to visible for wireframe) ✅ Responsive layout ✅ Proper visual hierarchy and spacing
+
+---
+
+## **SUCCESS CRITERIA**
+
+When this build is complete:
+
+1. Navigate to `/tools/gv-simulator/calculator`  
+2. See complete input form:  
+   * Quick Start Presets dropdown visible  
+   * Warning banners displayed (placeholder)  
+   * Current State section with 8 fields (Sync toggle functional)  
+   * Target State section with 7 fields (Margin toggle functional)  
+   * Advanced Features section (collapsible, expands/collapses)  
+3. Enter sample data into Target Revenue field  
+4. Click "Run Scenario Analysis" button  
+5. See processing animation overlay:  
+   * Progress bar animates 0-100%  
+   * Stage text cycles through 4 stages  
+   * Duration: 3-5 seconds  
+6. Processing completes, output section appears:  
+   * GVI gauge shows score of 45 with "HEAVY LIFT" label  
+   * 6 metric cards visible with sample data  
+   * 6 pressure cards visible with color-coded statuses  
+   * 4 chart containers visible (empty, with placeholder text)  
+   * Comparison table visible with sample data  
+   * 3 synthesis sections visible with placeholder prose  
+7. Action buttons clickable:  
+   * "Save Scenario" shows success toast  
+   * "Download Analysis" shows download toast  
+   * "Attach to Vision Horizon" routes to Clarity Compass  
+   * "Compare Scenarios" shows upgrade modal (if Free tier)  
+8. Responsive layout works on mobile:  
+   * Input columns stack vertically  
+   * Metric/Pressure cards adjust to single column  
+   * Charts stack vertically  
+   * Table scrolls horizontally  
+   * Buttons stack vertically  
+9. No console errors  
+10. All navigation works
+
+---
+
+## **BACKEND ARCHITECTURE NOTES (For Later)**
+
+When ready to connect backend, here's the data structure:
+
+### **Tables Needed:**
+
+sql  
+*\-- GV Calculator Scenarios*  
+gv\_scenarios  
+  \- id  
+  \- user\_id  
+  \- scenario\_name  
+  \- created\_at  
+  \- updated\_at  
+    
+  *\-- Current State (Input)*  
+  \- current\_revenue  
+  \- current\_margin  
+  \- current\_team\_size  
+  \- current\_client\_count  
+  \- current\_retention\_rate  
+  \- current\_mrr\_percent  
+  \- current\_project\_percent  
+    
+  *\-- Target State (Input)*  
+  \- target\_revenue  
+  \- target\_margin (nullable if using profit\_dollars)  
+  \- target\_profit\_dollars (nullable if using margin)  
+  \- target\_team\_size (nullable \= calculate via benchmark)  
+  \- target\_client\_count (nullable \= constant)  
+  \- target\_retention\_rate (nullable \= constant)  
+  \- target\_acv (nullable \= constant)  
+  \- target\_mrr\_percent (nullable \= constant)  
+  \- target\_project\_percent (nullable \= constant)  
+  \- target\_repeat\_client\_rate (nullable)  
+  \- timeframe\_months (12, 18, 24, 36)  
+    
+  *\-- Calculated Outputs*  
+  \- gvi\_score  
+  \- cagr  
+  \- target\_agi\_per\_fte  
+  \- net\_new\_revenue  
+  \- sales\_velocity\_required  
+  \- hiring\_velocity  
+  \- profit\_pool\_target  
+    
+  *\-- Pressure Family Statuses*  
+  \- retention\_pressure\_status (green/yellow/red/na)  
+  \- sales\_pressure\_status  
+  \- capacity\_pressure\_status  
+  \- economic\_pressure\_status  
+  \- structural\_pressure\_status  
+  \- channel\_pressure\_status  
+    
+  *\-- Synthesis (GPT-generated)*  
+  \- synthesis\_reality\_check (text)  
+  \- synthesis\_capacity\_implications (text)  
+  \- synthesis\_pressure\_points (text)  
+    
+  *\-- Attachments*  
+  \- attached\_vision\_horizon\_id (FK to clarity\_compass\_vision\_horizons, nullable)  
+\`\`\`
+
+\#\#\# \*\*API Endpoints Needed:\*\*  
+\`\`\`  
+POST /api/gv\-calculator/run\-scenario  
+  \- Input: Current State \+ Target State fields  
+  \- Output: Calculated metrics \+ GVI score \+ pressure statuses \+ synthesis
+
+POST /api/gv\-calculator/save\-scenario  
+  \- Input: Scenario data  
+  \- Output: Scenario ID
+
+GET /api/gv\-calculator/scenarios  
+  \- Output: List of user's saved scenarios
+
+POST /api/gv\-calculator/attach\-to\-vision  
+  \- Input: Scenario ID \+ Vision Horizon ID
+
+  \- Output: Success confirmation
+
+### **Calculation Logic (Backend):**
+
+See earlier readback for complete formulas:
+
+* Revenue segmentation by MRR/Project  
+* Churn replacement calculation (MRR only)  
+* Sales velocity requirements  
+* Hiring pace thresholds  
+* GVI scoring formula  
+* Pressure family threshold triggers
+
+---
+
+## **NOTES FOR NEXT PHASE**
+
+After this structural build:
+
+**Phase 2A:** Implement GVI calculation algorithm **Phase 2B:** Add pressure family detection logic **Phase 2C:** Connect to Agency Snapshot (data sync) **Phase 2D:** Implement scenario storage (Supabase) **Phase 2E:** Build GPT synthesis generation **Phase 2F:** Render actual charts (Chart.js or Recharts) **Phase 2G:** Add form validation **Phase 2H:** Implement Quick Start preset auto-fill **Phase 2I:** Add conditional rendering (revenue mix adaptations)
+
+For now: Just build the structure. Forms work, outputs display, everything looks professional, but calculations and data persistence don't exist yet.
+
+---
+
+## **READY TO IMPLEMENT IN ANTIGRAVITY/LOVABLE**
+
+This specification provides everything needed to build the Growth Velocity Calculator wireframe. The structure is complete, the visual design is specified, and the scope is clearly defined (what to build vs. what to defer).
+
+Proceed with implementation.  
+END OF DOCUMENT 4
+
+Summary: GPT Integration V2  
+✅ Two synthesis modes (single scenario | comparative)  
+✅ Rich context injection (Snapshot qualitative \+ quantitative data)  
+✅ Project knowledge integration (coaching frameworks as context)  
+✅ Comprehensive prompt templates (with variable injection)  
+✅ Caching strategy (permanent for single, 7-day for comparative)  
+✅ Quality validation (post-processing checks)  
+✅ Graceful fallbacks (template-based if GPT fails)  
+✅ Structured display (parsed sections, formatted output)  
+Next: Document 5 (Visual Design Specs & Charts) or Document 6 (Phase-by-Phase Build Guide)?

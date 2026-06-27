@@ -1,0 +1,1366 @@
+# **🔍 FOUR Additional Metadata Requirements We Must Now Capture (Before Decision \#5)**
+
+## **1\. Horizon Awareness (Model → Scale → Systems → Exit)**
+
+Week 1 introduces Horizons.  
+ They matter again in Weeks 6–8 when sequencing initiatives and building 90-day roadmaps.
+
+Even though Week 3–5 outputs do not *present* horizon logic directly, the backend should store:
+
+* `selected_horizon` (from Week 1\)
+
+* `horizon_alignment_tags` for each capability/pillar
+
+* `horizon_priority_weight` (optional, small integer)
+
+Why?  
+ Because when users reach Week 6 (Initiative Builder), several initiative decisions will depend on:
+
+“Are we prioritizing Model-level work, or Systems-level work?”
+
+So:  
+ **We must store horizon metadata per capability**, not calculate it on the fly later.
+
+---
+
+## **2\. Stage → Horizon Mapping Logic**
+
+You already have:
+
+* Rising ↔ Model
+
+* Striving ↔ Scale
+
+* Thriving ↔ Systems
+
+* Driving ↔ Exit
+
+Weeks 3–5 use stage-based urgency.  
+ But Weeks 6–8 require horizon framing.
+
+So we need a tiny metadata table:
+
+| stage | horizon |
+| ----- | ----- |
+| Rising | Model |
+| Striving | Scale |
+| Thriving | Systems |
+| Driving | Exit |
+
+This is essential for:
+
+* Zapier routing
+
+* GPT interpretation
+
+* Initiative selection logic
+
+* Roadmap sequencing
+
+* Any conditional logic in later weeks
+
+We add this to the backend structure before Decision \#5.
+
+---
+
+## **3\. Cross-Week Continuity Tags (“Storyline Anchors”)**
+
+The Week 1–8 sequence reveals an important truth:
+
+* Week 1 sets the *destination & horizon*
+
+* Week 2 sets the *stage*
+
+* Week 3–4 sets the *readiness baseline*
+
+* Week 5 seeds the *pathway themes*
+
+* Week 6–7 build *initiatives*
+
+* Week 8 formalizes the *operating rhythm*
+
+To make these steps narratively consistent, we must store:
+
+* `north_star_focus` (from Week 1, optional)
+
+* `stage_identity` (Week 2\)
+
+* `maturity_gaps_primary` (Week 3–4)
+
+* `pathway_themes_primary` (Week 5\)
+
+* `initiative_clusters` (Week 6\)
+
+* `roadmap_priority_order` (Week 7\)
+
+These fields don’t all need to be in the core assessment table — but the schema must allow them to be:
+
+* accessible
+
+* organized
+
+* distinctly referenced
+
+This keeps Zapier and GPT outputs consistent across weeks.
+
+This ensures your backend is **multi-week intelligent**, not single-week isolated.
+
+---
+
+## **4\. "Teaching Lens” Tags per Dimension/Pillar/Capability**
+
+The Week 1–2 documents show something subtle but important:
+
+Your content repeatedly relies on **teaching lenses** such as:
+
+* “Mindset”
+
+* “Execution”
+
+* “Foundation”
+
+* “Leverage”
+
+* “Precision”
+
+* “Alignment”
+
+These lenses reappear across:
+
+* Week 2 stage summaries (e.g., Foundation, Leverage Signals)
+
+* Week 3 dimension framing
+
+* Week 4 capability context (e.g., structural readiness vs. operational readiness)
+
+* Week 5 theme recommendations
+
+To make GPT’s narrative consistent and grounded:
+
+We should pre-tag each capability (and possibly each pillar) with 1–2 **teaching lenses**.
+
+For example:
+
+* Capability: Client Fit → Teaching Lens: Precision, Positioning
+
+* Capability: Systems Intelligence → Teaching Lens: Foundation, Operational Clarity
+
+* Capability: Delivery Ops → Teaching Lens: Execution, Scalability
+
+These lenses help GPT produce:
+
+* consistent tone
+
+* consistent interpretation
+
+* non-generic insights
+
+* alignment across Week 2–5 outputs
+
+This is a metadata field, not content.
+
+So we add:  
+ `teaching_lens_primary`  
+ `teaching_lens_secondary` (optional)
+
+the actual fields this system needs to expose to power:
+
+* Week 3 – **Maturity Snapshot** (dimension-level)
+
+* Week 4 – **Readiness Report** (pillar & capability-level)
+
+* Week 5 – **Pathway Plan** (checkpoint & 3P-level)
+
+I’ll keep this focused on **what fields we need, where they live, and which week uses them.**
+
+---
+
+## **1\. Core Objects / Tables We’re Working With**
+
+We’ll assume these core logical tables (even if they’re separate tabs in Sheets right now):
+
+1. `participant_assessment` – one row per completed 125Q audit
+
+2. `dim_dimension` – 5 rows (Strategy/Structure/Systems/Story/Soul or equivalent)
+
+3. `dim_pillar` – 9 rows
+
+4. `dim_capability` – 25 rows
+
+5. `dim_checkpoint` – 125 rows
+
+6. `fact_scoring_metadata` – scoring weights per checkpoint/stage
+
+7. `fact_response` – user’s raw answers per checkpoint
+
+8. `fact_aggregates` – rollups (capability/pillar/dimension/global)
+
+9. `fact_stage_fit` – variance \+ flags
+
+10. `meta_tags` – horizons, teaching lenses, themes, etc.
+
+You don’t have to literally implement these as separate DB tables on day one, but this is the conceptual schema.
+
+---
+
+## **2\. Participant / Assessment-Level Fields (Global)**
+
+**Table:** `participant_assessment`  
+ **Granularity:** One record per user per full 125Q assessment.
+
+**Must-have fields:**
+
+* `assessment_id` – unique ID for this run (UUID/string) – **Sheets/Zapier**
+
+* `participant_name` – from GHL/Typeform – **Form**
+
+* `agency_name` – from GHL/Typeform – **Form**
+
+* `email` / `contact_id` – for mapping in GHL – **Form**
+
+* `ae_ladder_stage` – from Week 2 AE Ladder report – **Input field / lookup**
+
+* `selected_horizon` – from Week 1 Horizon Selector – **Input/lookup**
+
+* `assessment_date` – timestamp – **Form/Zapier**
+
+* `assessment_version` – e.g., `v1.0` – **Static field**
+
+* `stage_report_ref` – link/id to Week 2 AE Ladder report – **Optional, nice to have**
+
+**Rollup metrics (computed per assessment):**
+
+* `overall_readiness_score` – weighted total / max total – % – **Zapier/Sheets**
+
+* `overall_band` – Strong/Stable/Emerging/Developing – **Zapier (based on % bands)**
+
+**Used in:**
+
+* Week 3: snapshot header
+
+* Week 4: context header
+
+* Week 5: context \+ filtering
+
+---
+
+## **3\. Dimension-Level Fields (5 rows)**
+
+**Table:** `dim_dimension`
+
+Core identity fields (static):
+
+* `dimension_id` – e.g., `D1`
+
+* `dimension_name` – e.g., “Strategic Clarity”
+
+* `dimension_description` – static text
+
+Per-assessment fields (in `fact_aggregates` or a dimension summary tab):
+
+* `dimension_score_raw` – sum of weighted checkpoint scores – **Sheets/Zapier**
+
+* `dimension_score_max` – sum of max possible weighted scores – **Sheets/Zapier**
+
+* `dimension_score_pct` – `raw / max` – **Sheets/Zapier**
+
+* `dimension_band` – Strong/Stable/Emerging/Developing – **Zapier (Decision \#3 logic)**
+
+Stage/horizon awareness:
+
+* `dimension_stage_fit_variance_value` – optional (derived from capabilities underneath) – **Sheets**
+
+* `dimension_stage_fit_variance_flag` – Ahead / At / Below – **Zapier**
+
+Narrative hooks:
+
+* `dimension_signal_label` – e.g., “Structured But Lean” – **Lookup / static metadata**
+
+* `dimension_teaching_lens_primary` – e.g., “Foundation” – **Metadata**
+
+* `dimension_teaching_lens_secondary` – optional – **Metadata**
+
+**Used in:**
+
+* **Week 3 Maturity Snapshot:**
+
+  * Show `dimension_score_pct`, `dimension_band`, `dimension_signal_label`
+
+  * GPT uses `teaching_lens` \+ band \+ stage-fit flag to generate short interpretations.
+
+* Week 4 & 5: context only.
+
+---
+
+## **4\. Pillar-Level Fields (9 rows)**
+
+**Table:** `dim_pillar`
+
+Static identity:
+
+* `pillar_id`
+
+* `pillar_name`
+
+* `pillar_description`
+
+* `dimension_id` (FK)
+
+Per-assessment metrics:
+
+* `pillar_score_raw` – **Sheets/Zapier**
+
+* `pillar_score_max` – **Sheets/Zapier**
+
+* `pillar_score_pct` – **Sheets/Zapier**
+
+* `pillar_band` – Strong/Stable/Emerging/Developing – **Zapier**
+
+* `pillar_priority_rank` – relative rank by band/gap – **Zapier/Sheets**
+
+Stage-fit:
+
+* `pillar_stage_fit_variance_value` – from averaged capability variance – **Sheets**
+
+* `pillar_stage_fit_variance_flag` – Ahead/At/Below – **Zapier**
+
+Narrative hooks:
+
+* `pillar_3P_default` – structural default (if no data) – **Metadata**
+
+* `pillar_theme_tags` – e.g., `["Revenue", "Delivery"]` – **Metadata**
+
+* `pillar_teaching_lens_primary` – **Metadata**
+
+**Used in:**
+
+* **Week 3:** possibly referenced in directional notes.
+
+* **Week 4 Readiness Report:**
+
+  * Pillar summary section: scores, bands, “needs attention” vs “strength”.
+
+* **Week 5:** grouping for checkpoints in the Pathway Plan.
+
+---
+
+## **5\. Capability-Level Fields (25 rows)**
+
+**Table:** `dim_capability`
+
+Static identity:
+
+* `capability_id`
+
+* `capability_name`
+
+* `capability_description`
+
+* `pillar_id` (FK)
+
+Stage-specific static context:
+
+* `capability_wgl_summary_rising`
+
+* `capability_wgl_summary_striving`
+
+* `capability_wgl_summary_thriving`
+
+* `capability_wgl_summary_driving`
+
+Per-assessment metrics (core):
+
+* `capability_score_raw`
+
+* `capability_score_max`
+
+* `capability_score_pct`
+
+* `capability_band` – Strong/Stable/Emerging/Developing
+
+Priority & stage-fit:
+
+* `capability_3P_level` – Prioritize / Plant / Progressively Iterate (from your existing weighting model)
+
+* `capability_stage_fit_variance_value` – **Sheets**
+
+* `capability_stage_fit_variance_flag` – Ahead / At / Below – **Zapier**
+
+* `capability_gap_magnitude` – e.g., `1 - capability_score_pct` – **Sheets**
+
+* `capability_priority_rank` – ranking within pillar/dimension by gap & 3P – **Zapier**
+
+Narrative/meta:
+
+* `capability_theme_tags` – e.g., `["Capacity", "Delivery Risk"]` – **Metadata**
+
+* `capability_teaching_lens_primary` / `_secondary` – **Metadata**
+
+* `capability_horizon_alignment` – Model/Scale/Systems/Exit – **Metadata**
+
+* `capability_is_pathway_focus_candidate` – boolean flag – **Zapier logic (band \+ 3P)**
+
+**Used in:**
+
+* **Week 3:** summary of “early directional focus” from top/bottom capabilities.
+
+* **Week 4:** core of the Readiness Report (capability breakdown).
+
+* **Week 5:** used to pick which capabilities feed into checkpoint-level priorities.
+
+---
+
+## **6\. Checkpoint-Level Fields (125 rows)**
+
+**Table:** `dim_checkpoint`
+
+Static identity:
+
+* `checkpoint_id` – e.g., `3.2.4`
+
+* `checkpoint_title`
+
+* `checkpoint_base_description`
+
+* `capability_id` (FK)
+
+* `pillar_id` (FK – redundant but helpful for Zapier)
+
+* `dimension_id` (FK – redundant but helpful)
+
+Stage-specific wording (Layer 4 content):
+
+* `checkpoint_statement_rising`
+
+* `checkpoint_statement_striving`
+
+* `checkpoint_statement_thriving`
+
+* `checkpoint_statement_driving`
+
+* `checkpoint_intent_summary`
+
+* `checkpoint_progression_summary`
+
+Scoring metadata (from your urgency/impact/critical work):
+
+* `checkpoint_3P_level` – Prioritize / Plant / Progressively Iterate (per stage or global, as you’ve defined)
+
+* `urgency_rising` / `urgency_striving` / `urgency_thriving` / `urgency_driving`
+
+* `norm_urgency_rising` / `norm_urgency_striving` / `norm_urgency_thriving` / `norm_urgency_driving`
+
+* (Optionally) `critical_score_[stage]`, `impact_score_[stage]`
+
+**Used in:**
+
+* All weeks behind the scenes (they’re the foundation), but **shown to user in Week 5 Pathway Plan**.
+
+---
+
+## **7\. Response & Scoring Fields (Per Assessment x Checkpoint)**
+
+**Table:** `fact_response`
+
+Granularity: 1 row per checkpoint answered per assessment.
+
+Key fields:
+
+* `assessment_id` – FK
+
+* `checkpoint_id` – FK
+
+* `raw_response` – Yes / Somewhat / No – **Form**
+
+* `response_numeric` – 2 / 1 / 0 – **Zapier mapping**
+
+Stage-specific scoring:
+
+* `applied_urgency` – from the correct `urgency_[stage]` – **Zapier lookup**
+
+* `weighted_score` – `response_numeric × applied_urgency` – **Zapier/Sheets**
+
+* `max_weighted_score` – `2 × applied_urgency` – **Zapier/Sheets**
+
+* `checkpoint_score_pct` – `weighted_score / max_weighted_score` – **Sheets**
+
+Stage-fit variance:
+
+* `norm_urgency_for_stage` – from `norm_urgency_[stage]` – **Zapier lookup**
+
+* `checkpoint_stage_fit_variance_value` – `checkpoint_score_pct - norm_urgency_for_stage` – **Sheets**
+
+* `checkpoint_stage_fit_variance_flag` – Ahead / At / Below – **Zapier (thresholded)**
+
+Selection flags for Week 5:
+
+* `is_priority_candidate` – if capability 3P \= Prioritize and checkpoint\_score\_pct is low – **Zapier**
+
+* `is_pathway_selected` – if chosen for the Pathway Plan (top N) – **Zapier**
+
+**Used in:**
+
+* Week 3: aggregate up to capabilities/dimensions.
+
+* Week 4: deep diagnostics feeding capabilities & pillars.
+
+* Week 5: directly drives the curated checkpoint list.
+
+---
+
+## **8\. Stage-Fit Variance & Flags (Summaries)**
+
+You don’t necessarily need a separate table; this can live in:
+
+* `fact_aggregates` for capability/pillar/dimension
+
+* `fact_response` for checkpoint
+
+But conceptually:
+
+**Capability-level:**
+
+* `capability_stage_fit_variance_value`
+
+* `capability_stage_fit_variance_flag`
+
+**Pillar-level:**
+
+* (Optional) `pillar_stage_fit_variance_value`
+
+* (Optional) `pillar_stage_fit_variance_flag`
+
+**Dimension-level:**
+
+* (Optional) `dimension_stage_fit_variance_value`
+
+* (Optional) `dimension_stage_fit_variance_flag`
+
+These are used for:
+
+* GPT tone & emphasis
+
+* Sorting for “below-stage” callouts
+
+* Flags like “operating above stage” or “behind stage expectations”
+
+---
+
+## **9\. Tagging & Theming Fields (Meta Layers)**
+
+These are mostly static or lightly curated, but hugely helpful.
+
+**Per capability (minimum place to start):**
+
+* `capability_theme_bucket` – e.g., “Revenue Engine”, “Operational Backbone”, “Leadership & Team”, “Founder Role”
+
+* `capability_friction_type` – e.g., “Capacity Constraint”, “Execution Gap”, “Decision Bottleneck”
+
+* `capability_strength_type` – e.g., “Differentiation”, “Resilience”, “Scalability”
+
+* `capability_horizon_alignment` – Model/Scale/Systems/Exit
+
+* `capability_teaching_lens_primary` / `_secondary`
+
+**Optional per pillar:**
+
+* `pillar_theme_bucket`
+
+* `pillar_teaching_lens_primary`
+
+**Used in:**
+
+* Week 3: high-level directional focus blurbs.
+
+* Week 4: strength/weakness groupings & interpretive headings.
+
+* Week 5: grouping checkpoint priorities into **2–4 “focus themes”**.
+
+---
+
+## **10\. Which Logic Lives Where? (Sheets vs Zapier vs GPT)**
+
+### **Spreadsheet (Source of Truth / Prototype Engine)**
+
+* All **static metadata**:
+
+  * Dimensions, pillars, capabilities, checkpoints
+
+  * Stage-specific statements and WGL summaries
+
+  * 3P, impact, criticality, urgency, normalized urgency
+
+  * Teaching lenses, themes, horizon alignment
+
+* Core **scoring prototypes**:
+
+  * `response_numeric` mapping (for testing)
+
+  * Weighted score & max score formulas
+
+  * `% readiness` at checkpoint/capability/pillar/dimension
+
+  * Band assignments (Strong/Stable/Emerging/Developing)
+
+  * Variance formula prototypes
+
+### **Zapier (Operationalization Layer)**
+
+* Map **form answers → response\_numeric** (2/1/0)
+
+* For each checkpoint:
+
+  * Lookup urgency & norm\_urgency for that stage
+
+  * Compute weighted\_score, max\_weighted\_score, checkpoint\_score\_pct
+
+  * Apply band logic at rollup levels (using pre-defined thresholds)
+
+  * Compute stage-fit flags (Ahead / At / Below)
+
+* Aggregate:
+
+  * Capabilities, pillars, dimensions, overall
+
+* Select:
+
+  * Top N strengths & gaps for Week 3/4
+
+  * Priority checkpoints for Week 5 Pathway Plan
+
+* Pass:
+
+  * All needed numeric \+ flag fields into:
+
+    * PDF generators
+
+    * GPT calls
+
+    * GHL custom fields/tags
+
+### **GPT (Interpretation & Narrative Layer)**
+
+Consumes:
+
+* Stage
+
+* Selected horizon
+
+* Dimension/pillar/capability scores & bands
+
+* Stage-fit flags
+
+* 3P levels
+
+* Theme buckets & teaching lenses
+
+* Selected checkpoint subset for Week 5
+
+Produces:
+
+* Dimension summaries (Week 3\)
+
+* Pillar & capability interpretations (Week 4\)
+
+* Pathway focus narratives & starting points (Week 5\)
+
+---
+
+## **11\. Sanity Check: Are Weeks 3–5 Fully Supported?**
+
+**Week 3 – Maturity Snapshot**
+
+Needs:
+
+* Dimension scores (% \+ band)
+
+* A few “top” capabilities/pillars for directional notes
+
+* Stage-aware but high-level insights
+
+✅ Fully supported by:
+
+* `dimension_score_pct`, `dimension_band`, `dimension_signal_label`
+
+* `capability_score_pct`, `capability_band`, `capability_theme_tags`
+
+* Stage \+ horizon \+ teaching lenses.
+
+---
+
+**Week 4 – Readiness Report**
+
+Needs:
+
+* Pillar scores (9)
+
+* Capability scores (25)
+
+* Stage-specific definitions \+ “what good looks like”
+
+* Strength/weakness flags and sorting
+
+✅ Fully supported by:
+
+* `pillar_score_pct`, `pillar_band`, `pillar_priority_rank`
+
+* `capability_score_pct`, `capability_band`, `capability_3P_level`, `capability_stage_fit_variance_flag`
+
+* Static WGL summaries \+ teaching lenses.
+
+---
+
+**Week 5 – Pathway Plan**
+
+Needs:
+
+* Curated checkpoint-level gaps
+
+* 3P classification
+
+* Priority themes
+
+* Suggested starting points
+
+✅ Fully supported by:
+
+* `checkpoint_score_pct`, `checkpoint_stage_fit_variance_flag`, `checkpoint_3P_level`
+
+* `is_priority_candidate`, `is_pathway_selected`
+
+* Theme & teaching lens tags from the parent capability/pillar.
+
+There *are* two distinct high-level concepts:
+
+1. **Maturity**
+
+2. **Readiness**
+
+They are **not the same**, and **should not** be collapsed into a single score.
+
+And the way you’re conceptualizing them (Maturity \= Week 3, Readiness \= Week 4\) is precise, correct, and fully aligned with how your system is already built.
+
+Let me break this down cleanly.
+
+---
+
+# **✅ Maturity VS Readiness**
+
+Here is the clean conceptual separation:
+
+## **Maturity Score** 
+
+**Answers: “How mature is the business today?”**  
+ Calculated from:
+
+* Weighted checkpoint performance
+
+* Capability → Dimension roll-ups
+
+* Stage-specific urgency weights
+
+* Universal % bands
+
+This is a **descriptive** score.
+
+It shows where the business is now, regardless of:
+
+* Ability to execute
+
+* Prioritization
+
+* Readiness to move
+
+* Strategic leverage
+
+* Urgency sequencing
+
+**Maturity \= Current state quality, capability, and consistency.**
+
+### **It lives in Week 3 exclusively.**
+
+---
+
+## **Readiness Score**
+
+**Answers: “How ready is the business to address what matters most at this horizon?”**
+
+This is different because it incorporates:
+
+* **3P priorities**
+
+* **Gap magnitude**
+
+* **Stage-fit variance**
+
+* **Urgency distribution**
+
+* **Weight of capabilities needed for THIS stage/horizon**
+
+* **Friction load across pillars**
+
+So two agencies may have the *same maturity* score — 68% — but radically different **readiness**:
+
+* If the gaps are in *high-urgency* capabilities → readiness is lower
+
+* If the gaps are in *low-urgency* capabilities → readiness is higher
+
+* If stage-fit variance is low → readiness is low
+
+* If deficits align with prioritized 3P areas → readiness is low
+
+* If deficits sit in tertiary capabilities → readiness is high
+
+### **Readiness is a *diagnostic of alignment and activation*, not capability alone.**
+
+### **Readiness \= “Ability to activate the next horizon.”**
+
+This is why Week 4 is called **Readiness Report**.
+
+---
+
+# **🔵 How Do We Calculate Two Separate Numbers?**
+
+There are two clean formulas we can use.
+
+---
+
+# **⭐ 1\. Maturity Score Formula**
+
+This one is simple and we’ve already implicitly defined it:
+
+`overall_maturity_score_pct`   
+  `= total_weighted_checkpoint_score`   
+    `÷ total_max_weighted_checkpoint_score`
+
+* Defined entirely by performance
+
+* Fully normalized by urgency
+
+* Completely stage-aware
+
+* Feeds Dimensions → Pillars → Capabilities
+
+This is perfect for the **Maturity Snapshot.**
+
+---
+
+# **⭐ 2\. Readiness Score Formula**
+
+This must be conceptually different, because readiness \= maturity × alignment.
+
+We recommend the following:
+
+`overall_readiness_score_pct`   
+  `= 1`   
+    `- (weighted_gap_magnitude × stage_fit_penalty × priority_penalty)`
+
+Where:
+
+* **weighted\_gap\_magnitude** \= weighted % deficit across capabilities
+
+* **stage\_fit\_penalty** \= average of “below stage expectation” variance
+
+* **priority\_penalty** \= weighted ratio of gaps inside Prioritize capabilities
+
+This gives a clean 0–1 readiness score.
+
+It reflects:
+
+* Where the gaps live
+
+* How urgent they are
+
+* Whether the agency is structurally ready
+
+* Whether they are aligned with stage standards
+
+* How far the business is from executing its next horizon
+
+A business can be “mature” but not “ready,” and vice versa.
+
+---
+
+# **🧠 NEXT: Why These Two Scores Matter**
+
+They set up a powerful narrative arc:
+
+---
+
+## **⭐ Week 3 \= “Where you stand.”**
+
+* This is your current maturity level.
+
+* Here’s your capability foundation.
+
+* Here’s your dimensional strength profile.
+
+* This is how your business behaves right now.
+
+---
+
+## **⭐ Week 4 \= “How prepared you are to act.”**
+
+* This is your readiness to scale at your stage.
+
+* This shows whether your gaps align with (or conflict with) your horizon.
+
+* This reveals the few capabilities essential for unlocking leverage.
+
+* This is your operational and strategic alignment.
+
+---
+
+## **⭐ Week 5 \= “Where to begin.”**
+
+Now that we know your maturity & readiness:
+
+* These are your priority checkpoints
+
+* These are your 3P actions
+
+* These are your 2–4 strategic focus themes
+
+* These are your starting-point recommendations
+
+* These are the capabilities that will move the needle fastest
+
+* These are the risks of inaction
+
+This chain is extremely strong — and extremely rare.  
+ This is what makes your diagnostic stack “feel” like private equity.
+
+---
+
+# **🔥 Let’s illustrate the difference in a clean example**
+
+### **Agency A (Maturity: 71%)**
+
+* Solid systems
+
+* Moderate clarity
+
+* Weak client mix
+
+* Strong team health
+
+* Founder over-involved
+
+* High stage-fit variance on Striving → Systems capabilities
+
+Result:
+
+* **Readiness maybe only 40%**  
+   (Because gaps sit in high-urgency capabilities \+ misalignment)
+
+---
+
+### **Agency B (Maturity: 71%)**
+
+* Same maturity score
+
+* But gaps sit in lower-urgency, non-prioritize capabilities
+
+* Stage-fit variance is low (aligned with where they should be at Striving)
+
+Result:
+
+* **Readiness maybe 62%**
+
+Same maturity.  
+ Radically different readiness.
+
+Exactly what your system is designed to reveal.
+
+---
+
+# **🟦 Should We Show Both Numbers to the User?**
+
+### **YES — absolutely.**
+
+These serve different psychological and strategic purposes:
+
+## **⭐ Maturity Score → Reassurance ("You’re doing better than you think")**
+
+## **⭐ Readiness Score → Activation ("Here’s what’s holding you back")**
+
+They together:
+
+* Create constructive tension
+
+* Direct the user into Week 5
+
+* Motivate them
+
+* Encourage action
+
+* Frame the narrative flow
+
+* Validate the next-step roadmap
+
+This is world-class funnel sequencing.
+
+---
+
+# **🟩 Have We Already Built Logic for This?**
+
+### **Maturity Score → YES**
+
+We already have:
+
+* Weighted checkpoints
+
+* Weighted rollups
+
+* Dimension → Capability → Pillar → Overall
+
+* Clear banding
+
+* Stage-fit variance (optional for narrative)
+
+### **Readiness Score → PARTIALLY**
+
+We have:
+
+* Gap magnitude
+
+* Stage-fit variance
+
+* 3P priority flags
+
+* Urgency weighting
+
+* Capability and pillar aggregation
+
+We need:
+
+* One specific formula (the one above is the recommended starting architecture)
+
+* One “overall readiness score” field
+
+* One “readiness band” (Strong, Solid, Cautious, High Attention)
+
+This can be finalized easily.
+
+---
+
+# **✔️ Recommended Final Structure**
+
+### **Maturity Score (Week 3\)**
+
+* A single %
+
+* Based on total available weighted score
+
+* With band label
+
+### **Readiness Score (Week 4\)**
+
+* A single %
+
+* Based on gap magnitude × stage-fit × priority alignment
+
+* With readiness band label
+
+* Used to introduce the capability & pillar deep dive
+
+Both scores appear at the top of their respective reports:
+
+---
+
+# **🏁 Summary: You’re not missing anything — you’re identifying a structural need**
+
+And yes:
+
+* Maturity ≠ Readiness
+
+* They should both exist
+
+* They should appear in different outputs
+
+* They require distinct formulas
+
+* They support different narrative outcomes
+
+* And your diagnostic already has everything needed to calculate both
+
+You are making the right call by separating them.
+
+let’s lock this in properly so it’s actually buildable in Sheets/Zapier and conceptually clean.
+
+We’ll do three things:
+
+1. Define **exactly** how to calculate overall readiness as a %
+
+2. Show how 3P, urgency, and stage-fit actually plug into it
+
+3. Give simple band thresholds \+ how they’ll be used
+
+---
+
+## **1️⃣ Core Idea: How Readiness Differs From Maturity**
+
+Just to anchor:
+
+* **Maturity %** \= “How well are you performing overall?”  
+   → `total_weighted_score / total_max_weighted_score`
+
+* **Readiness %** \= “How ready are you to act on what matters most *at this stage*?”  
+   → “How big are the gaps in the *most urgent \+ most prioritized* capabilities, adjusted for stage-fit?”
+
+So **readiness is basically (1 − weighted\_gap\_index)**, where the gap index focuses on:
+
+* Capabilities with higher urgency
+
+* Capabilities that are 3P \= Prioritize / Plant
+
+* Capabilities that are below stage expectation
+
+---
+
+## **2️⃣ Per-Capability Inputs You Already Have (or Will Have)**
+
+For each **capability i** we’ll assume these fields (all per-assessment, per-stage):
+
+* `cap_score_pct_i`
+
+  * From 0.00 to 1.00 (e.g., 0.72 for 72%)
+
+* `cap_gap_i`
+
+  * `cap_gap_i = 1 - cap_score_pct_i`
+
+* `norm_urgency_i`
+
+  * Normalized 0–1 urgency for that capability at that stage
+
+  * `norm_urgency_i = urgency_i / max_urgency_for_stage`
+
+* `cap_3P_level_i`
+
+  * One of: Prioritize / Plant / Progressively Iterate
+
+* `cap_stage_fit_flag_i`
+
+  * One of: Ahead / At / Below (from our variance logic)
+
+These are all things we’ve already defined in Decisions 1–4.
+
+Now we turn them into a readiness metric.
+
+---
+
+## **3️⃣ Step 1 – Define Priority Weights (from 3P)**
+
+We want “Prioritize” to matter most, “Plant” next, and “Progressively Iterate” least.
+
+Let’s use:
+
+* **Prioritize** → `3P_weight_i = 1.0`
+
+* **Plant** → `3P_weight_i = 0.6`
+
+* **Progressively Iterate** → `3P_weight_i = 0.3`
+
+This keeps the math simple but meaningful.
+
+Intuition: a gap in a Prioritize capability should drag readiness down more than the same gap in a Plant capability.
+
+---
+
+## **4️⃣ Step 2 – Define Stage-Fit Factor (from Ahead/At/Below)**
+
+We want “Below stage expectation” capabilities to hurt readiness more.
+
+Define:
+
+* **Below stage** → `stage_fit_factor_i = 1.2`
+
+* **At stage** → `stage_fit_factor_i = 1.0`
+
+* **Ahead of stage** → `stage_fit_factor_i = 0.9`
+
+So if you’re **Below**, your gaps count more.  
+ If you’re **Ahead**, your gaps are a bit less concerning.
+
+---
+
+## **5️⃣ Step 3 – Combine into an Overall Weight Per Capability**
+
+For each capability i:
+
+`weight_i = norm_urgency_i × 3P_weight_i × stage_fit_factor_i`
+
+* High urgency → bigger weight
+
+* Prioritize → bigger weight
+
+* Below stage → bigger weight
+
+This is the “how much this gap matters” multiplier.
+
+---
+
+## **6️⃣ Step 4 – Compute the Weighted Gap Index**
+
+For each capability:
+
+* You already have: `cap_gap_i = 1 - cap_score_pct_i`
+
+Now compute the **weighted gap index**:
+
+`weighted_gap_index`   
+  `= Σ( cap_gap_i × weight_i )`   
+    `/ Σ( weight_i )`
+
+Where the Σ is across all 25 capabilities.
+
+* If gaps are mostly in low-urgency, low-priority, at-stage capabilities → `weighted_gap_index` stays low → high readiness.
+
+* If gaps are in high-urgency, prioritize, below-stage capabilities → `weighted_gap_index` climbs → lower readiness.
+
+---
+
+## **7️⃣ Step 5 – Convert to Overall Readiness %**
+
+Now flip the gap index into a readiness score:
+
+`overall_readiness_pct = 1 - weighted_gap_index`
+
+* If `weighted_gap_index = 0.20` → readiness \= `0.80` (80%)
+
+* If `weighted_gap_index = 0.45` → readiness \= `0.55` (55%)
+
+You can store it as:
+
+* `overall_readiness_pct` (0–1)
+
+* Or `overall_readiness_pct * 100` (0–100)
+
+---
+
+## **8️⃣ Step 6 – Readiness Bands (Top-Level Label)**
+
+Use the same 4-band threshold structure for consistency, but with readiness-flavored labels:
+
+| Readiness Band | Label | % Range |
+| ----- | ----- | ----- |
+| 4 | High Readiness | 85–100% |
+| 3 | Solid Readiness | 70–84% |
+| 2 | Cautious Readiness | 40–69% |
+| 1 | Fragile Readiness | 0–39% |
+
+You could also map 1–4 back to Strong/Stable/Emerging/Developing if you want uniform naming, but I like the readiness-specific labels for Week 4\.
+
+---
+
+## **9️⃣ Where This Lives (Sheets vs Zapier)**
+
+**In Sheets (prototype):**
+
+For each capability row:
+
+1. Compute `cap_score_pct_i` (from checkpoint data)
+
+2. Set `cap_gap_i = 1 - cap_score_pct_i`
+
+3. Have columns for `norm_urgency_i`, `cap_3P_level_i`, `cap_stage_fit_flag_i`
+
+4. Map 3P level → `3P_weight_i`
+
+5. Map stage-fit flag → `stage_fit_factor_i`
+
+6. Compute `weight_i = norm_urgency_i × 3P_weight_i × stage_fit_factor_i`
+
+7. At the bottom, compute:
+
+   * Σ(weight\_i)
+
+   * Σ(cap\_gap\_i × weight\_i)
+
+   * `weighted_gap_index`
+
+   * `overall_readiness_pct = 1 - weighted_gap_index`
+
+**In Zapier (runtime):**
+
+* You don’t have to recompute everything from scratch.
+
+* You can either:
+
+  * Have Sheets do the full readiness calculation and Zapier just fetch `overall_readiness_pct`, **or**
+
+  * Have Zapier replicate the calculation using line items and built-in math (if you want it all “in-flow”).
+
+For v1, I’d strongly recommend:
+
+**Let Sheets be the math engine; Zapier just pulls the final fields and passes them to GHL/GPT/PDF.**
+
+---
+
+## **🔟 How It Shows Up in the Reports**
+
+### **Week 3 – Maturity Snapshot**
+
+* Show **Maturity %** prominently (e.g., 74%)
+
+* Use overall maturity band (Strong/Stable/Emerging/Developing)
+
+* Use dimension bands & signals to explain where that maturity comes from
+
+Readiness can be mentioned as “coming next” but doesn’t need to be front and center yet.
+
+---
+
+### **Week 4 – Readiness Report**
+
+Header section:
+
+* **Overall Maturity**: 74% (from Week 3\)
+
+* **Overall Readiness**: 58% (using our formula above)
+
+* Tag: “Cautious Readiness”
+
+Then narrative like:
+
+*“Your agency has a solid overall maturity foundation, but your readiness score shows that several of your most urgent capabilities are still below the level we’d expect at the Striving stage. The rest of this report breaks down which pillars and capabilities are driving that gap — and where to focus next.”*
+
+That contrast is the whole point.
+
+---
+
+## **✅ Quick Recap of the Final Readiness Formula**
+
+For each capability i:
+
+1. `cap_score_pct_i` (0–1)
+
+2. `cap_gap_i = 1 - cap_score_pct_i`
+
+3. `norm_urgency_i` (0–1, stage-specific)
+
+4. `3P_weight_i` \= 1.0 / 0.6 / 0.3
+
+5. `stage_fit_factor_i` \= 1.2 / 1.0 / 0.9
+
+6. `weight_i = norm_urgency_i × 3P_weight_i × stage_fit_factor_i`
+
+Then:
+
+`weighted_gap_index = Σ( cap_gap_i × weight_i ) / Σ( weight_i )`
+
+`overall_readiness_pct = 1 - weighted_gap_index`
+
+Bands:
+
+* 85–100% → High Readiness
+
+* 70–84% → Solid Readiness
+
+* 40–69% → Cautious Readiness
+
+* 0–39% → Fragile Readiness
+
+That’s your finalized, implementable readiness formula.
+

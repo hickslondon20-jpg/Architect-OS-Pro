@@ -1,0 +1,579 @@
+# GVS — Supabase Migration Specification
+
+**Architect OS | Growth Velocity Simulator**
+**Version:** 1.0
+**Status:** Ready for Implementation
+**Audience:** Antigravity — Database Migration + Wiring Reference
+
+---
+
+## How to Use This Document
+
+This spec covers three things in order:
+
+1. **Schema migration** — rename existing tables, add new fields, update triggers
+2. **JSONB payload definitions** — exact structure of every JSONB column
+3. **Calculation architecture** — what runs client-side, what goes to Supabase, what Supabase handles natively
+
+Execute the migration first. Do not begin frontend wiring until the migration is confirmed. The JSONB payload definitions in Section 2 are the contract between the frontend and the database — both must match exactly.
+
+---
+
+## Section 1 — Schema Migration
+
+### 1.1 Rename Tables
+
+```sql
+ALTER TABLE public.growth_scenarios
+  RENAME TO gvs_growth_scenarios;
+
+ALTER TABLE public.saved_growth_scenarios
+  RENAME TO gvs_saved_growth_scenarios;
+```
+
+Update all existing indexes and constraints to reflect new names after rename.
+
+---
+
+### 1.2 Update `gvs_growth_scenarios` (Runtime Table)
+
+This table records every scenario execution. One row per run.
+
+#### Add New Columns
+
+```sql
+-- Lifecycle status for GPT synthesis flow
+ALTER TABLE public.gvs_growth_scenarios
+  ADD COLUMN status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'processing', 'complete', 'error'));
+
+-- GPT-generated synthesis content (separate from deterministic implications)
+ALTER TABLE public.gvs_growth_scenarios
+  ADD COLUMN synthesis_content jsonb NULL;
+
+-- Top-level score pulled out of results JSONB for indexing and analytics
+ALTER TABLE public.gvs_growth_scenarios
+  ADD COLUMN gvi_score integer NULL;
+
+-- Whether this runtime record has been promoted to saved scenarios
+ALTER TABLE public.gvs_growth_scenarios
+  ADD COLUMN is_saved boolean NOT NULL DEFAULT false;
+
+-- Timestamp of when is_saved flipped to true
+ALTER TABLE public.gvs_growth_scenarios
+  ADD COLUMN saved_at timestamp with time zone NULL;
+```
+
+#### Add New Index
+
+```sql
+-- Supports run-count queries for permissioning (count by user within time window)
+CREATE INDEX IF NOT EXISTS idx_gvs_scenarios_user_created
+  ON public.gvs_growth_scenarios USING btree (user_id, created_at DESC);
+
+-- Supports analytics queries on score distribution
+CREATE INDEX IF NOT EXISTS idx_gvs_scenarios_score
+  ON public.gvs_growth_scenarios USING btree (gvi_score);
+
+-- Supports filtering unsaved vs saved runs
+CREATE INDEX IF NOT EXISTS idx_gvs_scenarios_is_saved
+  ON public.gvs_growth_scenarios USING btree (is_saved);
+```
+
+#### Full Table Definition (Post-Migration)
+
+```sql
+create table public.gvs_growth_scenarios (
+  id                uuid not null default gen_random_uuid(),
+  user_id           uuid not null,
+  agency_id         uuid not null,
+  name              text null,
+  status            text not null default 'pending'
+                      check (status in ('pending', 'processing', 'complete', 'error')),
+  inputs            jsonb not null,
+  results           jsonb not null,
+  implications      jsonb null,
+  synthesis_content jsonb null,
+  gvi_score         integer null,
+  is_saved          boolean not null default false,
+  saved_at          timestamp with time zone null,
+  created_at        timestamp with time zone null default now(),
+  constraint gvs_growth_scenarios_pkey primary key (id),
+  constraint gvs_growth_scenarios_agency_id_fkey
+    foreign key (agency_id) references agencies (agency_id),
+  constraint gvs_growth_scenarios_user_id_fkey
+    foreign key (user_id) references auth.users (id)
+);
+```
+
+---
+
+### 1.3 Update `gvs_saved_growth_scenarios` (Saved Scenarios Table)
+
+This table stores scenarios the founder explicitly saves. One row per saved scenario. Loaded without rerunning GPT.
+
+#### Add New Columns
+
+```sql
+-- Link back to the originating runtime record
+ALTER TABLE public.gvs_saved_growth_scenarios
+  ADD COLUMN runtime_scenario_id uuid NULL
+    REFERENCES public.gvs_growth_scenarios (id) ON DELETE SET NULL;
+
+-- GPT-generated synthesis content copied from runtime record at save time
+ALTER TABLE public.gvs_saved_growth_scenarios
+  ADD COLUMN synthesis_content jsonb NULL;
+
+-- Top-level score for display and sorting without parsing results JSONB
+ALTER TABLE public.gvs_saved_growth_scenarios
+  ADD COLUMN gvi_score integer NULL;
+
+-- Allows founder to pin a scenario as primary reference
+ALTER TABLE public.gvs_saved_growth_scenarios
+  ADD COLUMN is_pinned boolean NOT NULL DEFAULT false;
+
+-- Tracks re-saves of a named scenario over time
+ALTER TABLE public.gvs_saved_growth_scenarios
+  ADD COLUMN version integer NOT NULL DEFAULT 1;
+```
+
+#### Add New Index
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_gvs_saved_runtime_id
+  ON public.gvs_saved_growth_scenarios USING btree (runtime_scenario_id);
+
+CREATE INDEX IF NOT EXISTS idx_gvs_saved_pinned
+  ON public.gvs_saved_growth_scenarios USING btree (user_id, is_pinned);
+```
+
+#### Full Table Definition (Post-Migration)
+
+```sql
+create table public.gvs_saved_growth_scenarios (
+  id                    uuid not null default gen_random_uuid(),
+  user_id               uuid not null,
+  agency_id             uuid not null,
+  runtime_scenario_id   uuid null,
+  scenario_name         text not null,
+  inputs                jsonb not null,
+  results               jsonb not null,
+  implications          jsonb null,
+  synthesis_content     jsonb null,
+  gvi_score             integer null,
+  is_pinned             boolean not null default false,
+  version               integer not null default 1,
+  created_at            timestamp with time zone null default now(),
+  updated_at            timestamp with time zone null default now(),
+  constraint gvs_saved_growth_scenarios_pkey primary key (id),
+  constraint gvs_saved_scenarios_agency_id_fkey
+    foreign key (agency_id) references agencies (agency_id) on delete cascade,
+  constraint gvs_saved_scenarios_user_id_fkey
+    foreign key (user_id) references auth.users (id) on delete cascade,
+  constraint gvs_saved_scenarios_runtime_id_fkey
+    foreign key (runtime_scenario_id)
+    references public.gvs_growth_scenarios (id) on delete set null
+);
+```
+
+---
+
+### 1.4 Update Triggers
+
+Rename existing triggers to match new table names and update function references.
+
+```sql
+-- Drop old triggers from original table names (already renamed)
+-- Recreate on new table names
+
+CREATE TRIGGER enforce_gvs_save_limit
+  BEFORE INSERT ON gvs_saved_growth_scenarios
+  FOR EACH ROW EXECUTE FUNCTION check_gvc_save_limit();
+
+CREATE TRIGGER maintain_gvs_saves_count
+  AFTER INSERT OR DELETE ON gvs_saved_growth_scenarios
+  FOR EACH ROW EXECUTE FUNCTION update_gvc_saves_count();
+```
+
+> **Note:** The underlying functions `check_gvc_save_limit()` and `update_gvc_saves_count()` do not need to change unless their internal table references are hardcoded to the old names. Verify and update those function bodies if needed.
+
+---
+
+## Section 2 — JSONB Payload Definitions
+
+These are the exact structures for all JSONB columns. The frontend must write these structures. The n8n workflow reads and writes to the same structure. Do not deviate from these field names.
+
+---
+
+### 2.1 `inputs` — Simulator Form Inputs
+
+Written by the frontend at run time. Contains both raw form values and the resolved variable object produced by `resolveVariables()`.
+
+```json
+{
+  "raw": {
+    "currentAGI": 1200000,
+    "currentGrossRevenue": 1714286,
+    "currentProfitMargin": 0.23,
+    "currentClientCount": 18,
+    "currentACV": 66667,
+    "currentRetentionRate": 0.88,
+    "currentFTEs": 12,
+    "targetAGI": 1800000,
+    "targetGrossRevenue": null,
+    "targetProfitMargin": 0.20,
+    "targetClientCount": 25,
+    "targetACV": 72000,
+    "targetRetentionRate": null,
+    "targetFTEs": 10,
+    "timeframeMonths": 24
+  },
+  "resolved": {
+    "currentAGI": 1200000,
+    "currentGrossRevenue": 1714286,
+    "currentProfitMargin": 0.23,
+    "currentClientCount": 18,
+    "currentACV": 66667,
+    "currentRetentionRate": 0.88,
+    "currentFTEs": 12,
+    "targetAGI": 1800000,
+    "targetGrossRevenue": 2571429,
+    "targetProfitMargin": 0.20,
+    "targetClientCount": 25,
+    "targetACV": 72000,
+    "targetRetentionRate": 0.88,
+    "targetFTEs": 10,
+    "timeframeYears": 2,
+    "isTargetACVImplied": false,
+    "isTargetACVProxy": false,
+    "isTargetFTEsImplied": false,
+    "isTargetFTEsProxy": false,
+    "isTargetClientsImplied": false,
+    "isTargetGrossRevenueImplied": true
+  }
+}
+```
+
+---
+
+### 2.2 `results` — Calculation Engine Output
+
+Written by the frontend immediately after `calculateGVIScore()` runs. Contains all deterministic outputs.
+
+```json
+{
+  "gviScore": 67,
+  "band": "Healthy Velocity",
+  "bandRange": "61-79",
+  "compositionLabel": "Structure-Driven",
+  "frictionShare": 0.545,
+  "massMultiplier": 1.5,
+  "cagr": 0.279,
+  "paceSubtotal": 10,
+  "paceCapFired": false,
+  "pacePostMultiplier": 15,
+  "frictionTotal": 18,
+  "components": {
+    "salesPace": {
+      "ratio": 2.01,
+      "deduction": 10,
+      "tier": "2.0x–2.99x",
+      "label": "Significant acceleration"
+    },
+    "hiringPace": {
+      "quarterlyRate": 0.071,
+      "deduction": 0,
+      "tier": "≤10%",
+      "label": "Manageable growth"
+    },
+    "capacityUtilization": {
+      "targetAGIperFTE": 180000,
+      "deduction": 0,
+      "tier": "≥$160K",
+      "label": "Healthy leverage"
+    },
+    "retentionFriction": {
+      "retentionRate": 0.88,
+      "deduction": 0,
+      "tier": "≥85%",
+      "label": "Healthy retention"
+    },
+    "profitFriction": {
+      "margin": 0.23,
+      "deduction": 3,
+      "tier": "20%–24%",
+      "label": "Adequate fuel"
+    },
+    "concentrationFriction": {
+      "clientCount": 18,
+      "deduction": 0,
+      "tier": "≥10 clients",
+      "label": "Distributed portfolio"
+    },
+    "positioningPressure": {
+      "acvDeltaPct": 0.08,
+      "deduction": 0,
+      "tier": "<25%",
+      "label": "Pricing evolution"
+    }
+  },
+  "watchSignals": {
+    "retention": false,
+    "profitMargin": false,
+    "concentration": true,
+    "positioningPressure": false,
+    "salesPace": false,
+    "hiringPace": false,
+    "capacityUtilization": false
+  },
+  "metricCards": {
+    "cagr": 0.279,
+    "targetAGIperFTE": 180000,
+    "currentAGIperFTE": 100000,
+    "netNewRevenue": 600000,
+    "salesVelocityTarget": 0.8,
+    "salesVelocityCurrent": 0.2,
+    "hiringVelocityTarget": -0.0,
+    "profitPool": 414000,
+    "profitPoolCurrent": 276000
+  }
+}
+```
+
+---
+
+### 2.3 `implications` — Deterministic Pressure Summaries
+
+Written by the frontend. Contains template-driven collapsed and expanded card copy generated from score result values. Structured to be overwritten by GPT content in a future pass — the keys are the same, only the string values change.
+
+```json
+{
+  "salesPressure": {
+    "severity": "CRITICAL",
+    "collapsedSummary": "Sales velocity must increase 3.6x over baseline.",
+    "expandedHeadline": "Sales velocity must increase 3.6x over baseline.",
+    "expandedBody": "Tripling acquisition velocity is a structural transformation requirement — a fundamentally different sales motion, not an incremental lift.",
+    "watchSignalNote": null
+  },
+  "retentionPressure": {
+    "severity": "STABLE",
+    "collapsedSummary": "Retention is healthy, creating a stable platform for growth.",
+    "expandedHeadline": "Retention is healthy, creating a stable platform for growth.",
+    "expandedBody": "Healthy retention minimizes the replacement burden, allowing sales capacity to focus on net new growth.",
+    "watchSignalNote": "Retention is within the proximity zone (85–88%). A small decline would trigger structural friction."
+  },
+  "capacityPressure": {
+    "severity": "STABLE",
+    "collapsedSummary": "Hiring velocity of -4.2% per quarter required.",
+    "expandedHeadline": "Hiring velocity of -4.2% per quarter required.",
+    "expandedBody": "Hiring pace is within manageable range for organic culture absorption.",
+    "watchSignalNote": null
+  },
+  "marginPressure": {
+    "severity": "STABLE",
+    "collapsedSummary": "Healthy margins provide capital buffer for growth execution.",
+    "expandedHeadline": "Healthy margins provide capital buffer for growth execution.",
+    "expandedBody": "At 23% margin, the business retains adequate fuel to absorb execution variance during the growth push.",
+    "watchSignalNote": null
+  },
+  "concentrationRisk": {
+    "severity": "STABLE",
+    "collapsedSummary": "Client portfolio is well distributed.",
+    "expandedHeadline": "Client portfolio is well distributed.",
+    "expandedBody": "At 18 clients, no single client departure constitutes a trajectory event.",
+    "watchSignalNote": "Client concentration is within threshold at 18 clients — one client departure during the growth period would bring this close to the risk boundary."
+  },
+  "positioningPressure": {
+    "severity": "STABLE",
+    "collapsedSummary": "Target ACV represents a modest pricing evolution.",
+    "expandedHeadline": "Target ACV represents a modest pricing evolution.",
+    "expandedBody": "An 8% ACV increase does not signal a client profile repositioning — this scenario grows through volume with a modest price improvement.",
+    "watchSignalNote": null
+  }
+}
+```
+
+---
+
+### 2.4 `synthesis_content` — GPT-Generated Narrative Copy
+
+Written by n8n after GPT call returns. Initially null. When returned, this object overwrites the template-driven strings in `implications` on the frontend — same keys, richer content.
+
+```json
+{
+  "synthesisHeadline": "A structurally sound business facing an aggressive sales motion challenge — not a foundation problem.",
+  "synthesisNarrative": "Full paragraph narrative returned by GPT...",
+  "compositionNote": "The pressure in this scenario is a direct expression of the growth target's demands on a structurally sound business — not a signal of foundational weakness.",
+  "pressureCardContent": {
+    "salesPressure": {
+      "expandedBody": "GPT-generated paragraph for sales pressure card...",
+      "watchSignalNote": null
+    },
+    "retentionPressure": {
+      "expandedBody": "GPT-generated paragraph for retention pressure card...",
+      "watchSignalNote": "GPT-generated watch signal note if active..."
+    },
+    "capacityPressure": { "expandedBody": "...", "watchSignalNote": null },
+    "marginPressure": { "expandedBody": "...", "watchSignalNote": null },
+    "concentrationRisk": { "expandedBody": "...", "watchSignalNote": "..." },
+    "positioningPressure": { "expandedBody": "...", "watchSignalNote": null }
+  }
+}
+```
+
+---
+
+## Section 3 — Calculation Architecture
+
+This section defines what runs where and why. Use this as the decision framework for all wiring work.
+
+---
+
+### 3.1 Client-Side (Frontend — `gviCalculations.ts`)
+
+These calculations run in the browser on every scenario execution. They are deterministic, fast, and require no network call.
+
+| What | Why Client-Side |
+|---|---|
+| Variable resolution (Explicit → Implied → Proxy) | Must be instant — runs before display |
+| CAGR calculation | Simple math, no latency acceptable |
+| Mass multiplier assignment | Lookup against three thresholds |
+| All Pace deductions (Sales, Hiring, Capacity) | Pure arithmetic from resolved variables |
+| Pace cap (25-point ceiling) | Single `Math.min()` operation |
+| All Friction deductions (Retention, Profit, Concentration, Positioning) | Pure arithmetic from resolved variables |
+| GVI score formula and clamp | Two operations |
+| Friction Share and Composition Label | Derived from values already calculated |
+| Watch Signal proximity checks | Seven comparisons against thresholds |
+| Metric card values (CAGR display, AGI/FTE, Net New Revenue, etc.) | All derivable from resolved variables |
+| Template-driven implications strings | String interpolation from score result |
+
+**Output:** The complete `results` object and the template-driven `implications` object. Both written to Supabase immediately after calculation.
+
+---
+
+### 3.2 Written to Supabase by Frontend
+
+Immediately after `calculateGVIScore()` completes, the frontend writes one record to `gvs_growth_scenarios`:
+
+```
+inputs      → full inputs object (raw + resolved)
+results     → full results object
+implications → template-driven implications object
+gvi_score   → results.gviScore (integer, extracted for indexing)
+status      → 'pending'
+```
+
+Then triggers the n8n workflow by calling a Supabase Edge Function or webhook, passing the new record `id`.
+
+---
+
+### 3.3 Supabase-Native (No Application Code Needed)
+
+These operations happen inside Supabase without frontend or n8n involvement:
+
+| What | How |
+|---|---|
+| Save limit enforcement | Existing trigger `enforce_gvs_save_limit` |
+| Save count maintenance | Existing trigger `maintain_gvs_saves_count` |
+| Run count for permissioning | Query: `COUNT(*) WHERE user_id = x AND created_at > now() - interval '24 hours'` — no new function needed |
+| Cascade deletes on user/agency removal | Existing foreign key constraints |
+| `updated_at` maintenance on saved scenarios | Add trigger: `SET updated_at = now()` on UPDATE |
+
+---
+
+### 3.4 n8n Workflow (Backend Automation)
+
+n8n is triggered after the runtime record is written. It handles the GPT synthesis call and writes results back. Detail for this is covered in the n8n prompt — but the database contract is:
+
+**n8n reads from `gvs_growth_scenarios`:**
+- `inputs.resolved` — structured context for GPT prompt
+- `results` — all scores, bands, deductions, watch signals
+
+**n8n writes back to `gvs_growth_scenarios`:**
+- `synthesis_content` — full GPT-returned object
+- `status` → `'complete'` (or `'error'` on failure)
+
+**On Save (frontend action):**
+Frontend copies the complete runtime record — `inputs`, `results`, `implications`, `synthesis_content`, `gvi_score` — into `gvs_saved_growth_scenarios`, sets `runtime_scenario_id` to the source record ID, and flips `is_saved = true` and `saved_at = now()` on the runtime record.
+
+---
+
+### 3.5 What Gets Packaged into the GPT Payload
+
+When n8n triggers the GPT call, it assembles a structured JSON payload from the runtime record. This payload is the context the GPT model receives. Fields included:
+
+```json
+{
+  "scenarioContext": {
+    "gviScore": 67,
+    "band": "Healthy Velocity",
+    "compositionLabel": "Structure-Driven",
+    "frictionShare": 0.545,
+    "cagr": 0.279,
+    "timeframeYears": 2,
+    "massMultiplier": 1.5,
+    "paceCapFired": false
+  },
+  "componentSignals": {
+    "salesPace": { "ratio": 2.01, "deduction": 10, "tier": "2.0x–2.99x" },
+    "hiringPace": { "quarterlyRate": 0.071, "deduction": 0 },
+    "capacityUtilization": { "targetAGIperFTE": 180000, "deduction": 0 },
+    "retentionFriction": { "retentionRate": 0.88, "deduction": 0 },
+    "profitFriction": { "margin": 0.23, "deduction": 3 },
+    "concentrationFriction": { "clientCount": 18, "deduction": 0 },
+    "positioningPressure": { "acvDeltaPct": 0.08, "deduction": 0 }
+  },
+  "watchSignals": {
+    "concentration": true,
+    "retention": false,
+    "profitMargin": false,
+    "positioningPressure": false,
+    "salesPace": false,
+    "hiringPace": false,
+    "capacityUtilization": false
+  },
+  "businessContext": {
+    "currentAGI": 1200000,
+    "targetAGI": 1800000,
+    "currentFTEs": 12,
+    "targetFTEs": 10,
+    "currentClientCount": 18,
+    "targetClientCount": 25,
+    "currentRetentionRate": 0.88,
+    "currentProfitMargin": 0.23
+  }
+}
+```
+
+Note: Raw form inputs are not passed to GPT. Only the resolved, structured values are included. This keeps the payload clean, reduces token count, and ensures the GPT model works from validated data rather than potentially blank fields.
+
+---
+
+## Section 4 — Implementation Checklist
+
+### Migration
+
+- [ ] Rename `growth_scenarios` → `gvs_growth_scenarios`
+- [ ] Rename `saved_growth_scenarios` → `gvs_saved_growth_scenarios`
+- [ ] Add `status`, `synthesis_content`, `gvi_score`, `is_saved`, `saved_at` to runtime table
+- [ ] Add `runtime_scenario_id`, `synthesis_content`, `gvi_score`, `is_pinned`, `version` to saved table
+- [ ] Add all new indexes
+- [ ] Update trigger references to new table names
+- [ ] Verify `check_gvc_save_limit()` and `update_gvc_saves_count()` function bodies reference correct table names
+- [ ] Add `updated_at` auto-update trigger to `gvs_saved_growth_scenarios`
+
+### Frontend Wiring (Next Pass)
+
+- [ ] Update all Supabase client references from old table names to new names
+- [ ] Write `inputs`, `results`, `implications`, `gvi_score` to `gvs_growth_scenarios` on Run Scenario Analysis
+- [ ] Set initial `status = 'pending'` on write
+- [ ] Trigger n8n webhook after write, passing runtime record `id`
+- [ ] Subscribe to runtime record via Supabase realtime — update UI when `status` changes to `complete`
+- [ ] When `synthesis_content` returns, merge GPT content into UI state — replacing template strings with GPT strings using same keys
+- [ ] On Save Scenario — copy full record to `gvs_saved_growth_scenarios`, set `runtime_scenario_id`, flip `is_saved` and `saved_at` on runtime record
+- [ ] On Load Saved Scenario — read from `gvs_saved_growth_scenarios`, populate all UI state from stored JSONB without recalculating
+
+---
+
+*Migration Status: Ready for execution. Complete migration before beginning frontend wiring pass.*
+*Document Owner: Architect OS Product — Update JSONB payload definitions if calculation engine fields change.*

@@ -1,0 +1,504 @@
+# Architect OS — Execution Layer
+## Detailed Functional Spec: Five-Page Experience
+
+**Document Type:** Functional Specification — Pre-Build
+**Follows:** `ArchitectOS_Execution_Layer_Vision.md`
+**Purpose:** Define the specific features, components, interactions, data sources, and decision points for each of the five execution layer pages. This document bridges the conceptual vision and the Antigravity build prompts.
+
+---
+
+## Page 1 — Sprint Launch
+
+### Page Purpose
+The Sprint Launch page is generated at sprint lock and serves as the official opening artifact of the quarter. It is the team alignment document, the executive summary, and the founding record of the sprint — all in one. It lives permanently in the execution section and is accessible for the full duration of the sprint and beyond.
+
+### Trigger & Routing
+- Generated automatically when the founder clicks "Confirm Lock" in the Sprint Lock Review flow
+- Accessible via Execution > Sprint Launch in the navigation
+- If no sprint has been locked yet, the page renders an empty state: *"Your Sprint Launch summary will appear here once you lock your sprint plan."* with a link back to Planning
+- If a sprint is locked, this page always reflects the locked sprint state — not the current editable state
+
+### Page Layout
+
+**Top Section — Sprint Identity Bar**
+A persistent header block that establishes the quarter's identity. Contains:
+- Quarter label (e.g., "Q1 2026")
+- Sprint goal statement — full text, styled prominently
+- Sprint Theme — the AI-generated one-line distillation of the quarter's intent
+- Date range of the sprint
+- Lock date and time — "Sprint locked on [date]"
+- Status badge: ACTIVE / CLOSED
+
+**Primary Content — Executive Summary**
+The main body of the page. Two columns:
+
+Left column (wider):
+- Executive Summary narrative — AI-generated, three paragraphs
+  - Paragraph 1: Context — where this agency is, what stage they are at, why this quarter matters
+  - Paragraph 2: Plan — what the sprint contains at a high level, which capability areas are being prioritized and why, what the 3P classification reflects about their strategic intent
+  - Paragraph 3: What success looks like — what will be meaningfully different about the agency if this sprint is executed well
+- Sprint Plan Summary — a structured breakdown of the full 3P classification:
+  - PRIORITIZE section: three capability areas, each showing initiative names and owner
+  - PLANT section: three capability areas, each showing initiative names
+  - PROGRESSIVELY ITERATE section: three capability areas, each showing initiative name
+  - Total initiative count and total milestone count
+
+Right column (narrower):
+- Sprint Stats block:
+  - Total initiatives: [N]
+  - Total milestones: [N]
+  - Team members involved: [N]
+  - Days in sprint: [N]
+- Team block: avatar + name for each team member involved in the sprint, with initiative count next to their name
+- Capability Score block: maturity scores for each of the 9 selected capability areas at time of sprint lock — these are the baseline scores. They will not update on this page — they are the locked starting point for retrospective comparison.
+
+**Bottom Section — Share & Export**
+- "Share with Team" button — generates a shareable link or PDF export of the executive summary
+- "Edit Summary" button — allows the founder to make manual edits to the AI-generated narrative before sharing. Edits are saved but do not affect the underlying sprint data.
+- "Regenerate Summary" button — triggers a new GPT synthesis if the founder wants a different framing. Previous version is preserved with a timestamp.
+
+### AI Behavior on This Page
+GPT generates three outputs at sprint lock:
+
+**Input context provided to GPT:**
+- Sprint goal (verbatim)
+- All 9 capability areas with their 3P classification
+- All initiative names, success definitions, and owners
+- All milestone names and target months
+- Founder's AE Ladder stage
+- Maturity scores for each selected capability area
+- Agency profile data (size, revenue range, team size — from Agency Snapshot)
+
+**Outputs:**
+1. Executive Summary (three paragraphs as described above)
+2. Sprint Theme (one line — distillation of the quarter's strategic intent)
+3. Sprint Theme Close placeholder — stored now, used at retrospective close
+
+**Regeneration behavior:**
+The founder can regenerate the full summary or individual paragraphs. Each generation is timestamped. The most recent approved version is the one displayed and shareable.
+
+### Data Sources
+| Element | Source |
+|---|---|
+| Sprint goal | sprint_goals table |
+| 3P classifications | sprint_capability_selections table |
+| Initiatives and owners | initiatives table |
+| Milestones | milestones table |
+| Maturity scores (locked) | capability_scores table — snapshot at lock time |
+| Team members | team_members table |
+| AI narrative | GPT synthesis — stored in sprint_summaries table |
+
+### Empty & Edge States
+- Pre-lock: empty state with CTA to complete sprint planning
+- Post-lock, pre-share: page visible to founder only
+- Post-share: shared link renders a read-only version of the summary without the edit/regenerate controls
+- Sprint closed (retrospective complete): page remains accessible, status badge updates to CLOSED, a link to the retrospective appears at the top
+
+---
+
+## Page 2 — Status Tracker
+
+### Page Purpose
+The operational heartbeat of the sprint. Designed for speed — open it, see the current state, make updates, close it. Used in weekly standups, individual check-ins, and quick founder reviews. Every update made here feeds all downstream synthesis.
+
+### Page Layout
+
+**Top Section — Sprint Header**
+Persistent across all views on this page:
+- Sprint goal statement — always visible, styled as a banner (not collapsible)
+- Quarter label and days remaining
+- Summary bar — four metrics displayed horizontally:
+  - Overall completion: percentage of milestones marked Complete
+  - Initiatives: X Active / Y Complete / Z Blocked
+  - Pace: On Track / At Risk / Off Track — a label only, not a calculated velocity. This is a founder-set field — they manually update it based on their read of the quarter. Rationale: calculated pace from milestone completion rates creates false precision given the intentional back-loading or front-loading of some initiatives. The founder's judgment is more accurate here.
+  - Days remaining: countdown
+
+**Filter Bar**
+Below the header, above the milestone table:
+- Filter by: 3P Column / Initiative / Owner / Status / Timeframe (month)
+- All filters are multi-select
+- "Clear All Filters" link appears when any filter is active
+- Active filter state is remembered within the session but resets on page reload — no persistent filter state
+
+**Main Content — Milestone Table**
+The primary view. Each row is one milestone.
+
+Columns:
+| Column | Content | Editable |
+|---|---|---|
+| Select | Checkbox — for bulk status updates | Yes |
+| Milestone | Parent initiative (muted, small) above milestone name (bold) | No — click opens milestone card modal |
+| Status | Dropdown: Not Started / In Progress / Complete / Blocked | Yes — inline |
+| Owner | Avatar + name | No — edit in milestone card modal |
+| Timeframe | Month target | No — edit in milestone card modal |
+| Notes | Free text, single line. Expandable on click. | Yes — inline |
+
+**Row interactions:**
+- Clicking the milestone name opens the full milestone card modal for editing
+- Status column is directly editable inline — clicking the status cell opens a dropdown
+- Notes field is directly editable inline — clicking activates the field
+- Blocked status adds a subtle amber left border to the entire row
+- Complete status adds a muted strikethrough to the milestone name and a green check to the status cell
+- Rows can be selected via checkbox for bulk status update (e.g., select 3 milestones → mark all Complete)
+
+**Grouped View Toggle**
+Above the filter bar, a toggle between:
+- **Flat view** (default): all milestones in a single table, sorted by timeframe then status
+- **Grouped by Initiative view**: milestones nested under their parent initiative, collapsible by initiative. Initiative row shows initiative name, owner, completion percentage, and status badge.
+
+**Add Notes / Standup Mode**
+A "Standup Mode" toggle in the top right of the table area. When active:
+- Columns simplify to: Milestone, Owner, Status, Notes
+- Table rows expand slightly for easier reading on a projected screen
+- A "This Month's Focus" banner appears at the top of the table, automatically filtering to show only milestones targeted for the current month — this is the standup's starting point
+- Toggling off returns to the standard table view
+
+### Data Sources
+| Element | Source |
+|---|---|
+| Milestone list | milestones table joined to initiatives and capability_selections |
+| Status updates | milestones table — status field, updated on change |
+| Notes | milestones table — notes field |
+| Pace label | sprints table — pace field, founder-set |
+| Completion percentage | Calculated: count(status=Complete) / count(*) per sprint |
+
+### No AI on This Page
+Deliberate. The status tracker is a human-maintained ground truth surface. AI synthesis happens on the Momentum Synthesis page, drawing from data updated here.
+
+### Empty & Edge States
+- No milestones yet: prompt to complete sprint planning and add milestones before launching
+- All milestones complete: celebratory state — "All milestones marked complete. Your sprint is ready for retrospective." with CTA to begin retrospective
+- Sprint locked with no updates in 14+ days: a gentle banner — "No updates logged in 14 days. Consider reviewing progress before your next team check-in." — dismissible
+
+---
+
+## Page 3 — Momentum Synthesis
+
+### Page Purpose
+The founder's periodic strategic read on the quarter. Not a dashboard of metrics — a synthesized, narrative account of where the sprint stands and what it means. Always founder-initiated. Generated fresh from current sprint data on demand.
+
+### Page Layout
+
+**Top Section — Sprint Context**
+- Sprint goal statement — persistent banner
+- Quarter label, days elapsed, days remaining
+- Last synthesis date: "Last generated: [date and time]"
+- "Generate New Synthesis" button — primary CTA, always visible
+
+**Primary Content — Synthesis Display**
+
+When no synthesis has been generated yet:
+- Empty state: "When you're ready for a strategic read on your quarter, generate your first momentum synthesis below."
+- A brief description of what the synthesis covers
+- "Generate Synthesis" button
+
+When a synthesis exists:
+Three sections displayed in sequence, each visually distinct:
+
+**Section 1 — Progress Narrative**
+Two to three paragraphs. Written in second person, addressed to the founder. Covers:
+- What has been completed so far and what that represents
+- What is currently in motion
+- An honest account of what has not yet been started and what that implies (without projecting failure)
+
+**Section 2 — Attention Signal**
+One to two specific observations surfaced from the data. Formatted as a distinct callout block, separate from the narrative. Examples:
+- "Your Prioritize area 'Cash Flow Forecasting' has no milestone activity logged this month."
+- "Two of your three Plant initiatives have been seeded — you're ahead of pace in this bucket."
+- "Three milestones are currently flagged as Blocked. Two share the same owner — it may be worth a direct conversation."
+
+These are observations, not alerts. The language is neutral and coaching-oriented. The platform is not judging — it is noticing.
+
+**Section 3 — Encouragement Layer**
+One paragraph. Specific to what this founder has accomplished, at their stage, given what it takes to do strategic development work while running an agency. Not generic. Not formulaic. The GPT prompt specifically instructs against generic praise — the encouragement must be grounded in the actual work done.
+
+**Bottom of Page — Generation History**
+A collapsed list of previous synthesis generations, each showing the date generated and the first line of the Progress Narrative. Expanding a historical entry shows the full synthesis from that date — so the founder can track how the narrative has evolved across the quarter.
+
+### AI Behavior on This Page
+
+**Input context provided to GPT:**
+- Full sprint record (goal, initiatives, milestones, classifications, owners)
+- Current status of every milestone
+- Notes logged in the status tracker
+- Days elapsed and remaining
+- Founder's AE Ladder stage
+- Maturity scores for selected capability areas
+- Blockers flagged (status = Blocked)
+- Capability areas with zero milestone activity since sprint lock
+- Date of last synthesis (so GPT knows how much time has passed and can calibrate appropriately)
+
+**System prompt guidance for GPT:**
+- Write in second person, addressed directly to the founder
+- Do not project or predict — describe what has happened and what is currently true
+- Attention signals must be grounded in specific data points — no generic observations
+- Encouragement must reference specific completions or efforts — not generic motivational language
+- Maintain the platform's tone: sophisticated, observational, peer-level — not corporate, not cheerleading
+
+**Regeneration:**
+Each generation is timestamped and stored. The founder can generate as many times as they want. The display always shows the most recent generation. Historical generations are accessible below.
+
+### Data Sources
+| Element | Source |
+|---|---|
+| Sprint and milestone data | sprints, initiatives, milestones tables |
+| Milestone activity | milestones table — status change timestamps |
+| Blockers | milestones where status = Blocked |
+| Generation history | momentum_syntheses table |
+| AI output | GPT synthesis — stored on generation |
+
+### Edge States
+- Sprint just launched (< 7 days): synthesis available but a note acknowledges limited data — "Your sprint is just getting started. Generate a synthesis any time, though the picture will grow clearer as the quarter progresses."
+- Sprint complete (retrospective pending): synthesis available but a banner prompts: "Your sprint is complete. Consider beginning your retrospective for a full-quarter synthesis."
+
+---
+
+## Page 4 — Sprint Wind-Down
+
+### Page Purpose
+A structured closing process for the final weeks of the sprint. Helps the founder make deliberate decisions about what to close, what to carry forward, and what to release — and begins seeding context for the next quarter's planning cycle.
+
+### Trigger & Availability
+- Not accessible until the final 21 days of the sprint (3 weeks out)
+- A contextual prompt appears on the Execution Overview and in the sidebar navigation when this threshold is reached: "Q1 ends in 21 days. Begin your wind-down review."
+- Once triggered, it remains accessible through the end of the sprint
+- After the sprint closes, this page becomes read-only — its decisions are locked into the retrospective and next sprint's context
+
+### Page Layout
+
+**Top Section**
+- Sprint goal statement — persistent banner
+- Days remaining — shown prominently with a sense of intentionality, not alarm
+- Wind-down progress: a simple checklist showing which of the three wind-down steps have been completed:
+  - [ ] Completion decisions made
+  - [ ] Rollover items reflected on
+  - [ ] Forward-seeding questions answered
+
+**Step 1 — Completion Decisions**
+A list of every incomplete initiative and milestone, grouped by 3P bucket. For each item, the founder makes a decision:
+
+Initiative level:
+- Each incomplete initiative shows: name, capability area, success definition, current milestone completion (e.g., "3 of 5 milestones complete"), owner
+- Three decision options per initiative:
+  - **Complete by end of sprint** — founder commits to finishing in remaining time. Milestone view expands to show which milestones are still open.
+  - **Roll Over** — carry into next sprint. Triggers Step 2 reflection prompt for this initiative.
+  - **Release** — no longer relevant or deprioritized. A brief confirmation: "Are you sure? This initiative will be archived and won't appear in next quarter's planning."
+
+Milestone level (shown within each initiative):
+- Individual milestones can be marked complete, rolled over, or released independently of the parent initiative's decision
+- A milestone marked Complete here updates its status in the Status Tracker in real time
+
+**Step 2 — Rollover Reflection**
+Shown only for items marked "Roll Over" in Step 1. For each rolled-over initiative:
+- Initiative name and original success definition shown as context
+- Two prompted fields:
+  - "What got in the way of completing this?" (free text, optional)
+  - "Does this still belong in Prioritize next quarter, or has it shifted?" (dropdown: Still Prioritize / Move to Plant / Reassess during planning)
+- These answers are stored and passed as context to the Quarter Map in the next sprint cycle
+
+**Step 3 — Forward-Seeding Questions**
+Three prompted reflection questions. Free text. Optional but encouraged. Shown after Steps 1 and 2 are complete.
+
+1. "What surprised you most about this quarter — what went better or harder than expected?"
+2. "Which capability area ended up needing more attention than you gave it?"
+3. "If you were starting the quarter over, what would you classify differently?"
+
+These answers feed the Retrospective synthesis and pre-populate context for next quarter's planning session.
+
+**Wind-Down Summary**
+After all three steps are addressed, the page shows a summary block:
+- Initiatives completing by end of sprint: [N]
+- Initiatives rolling over: [N]
+- Initiatives released: [N]
+- Milestones completing: [N]
+- Milestones rolling over: [N]
+
+A "Finalize Wind-Down" CTA appears when all items have a decision. Finalizing does not close the sprint — it simply locks the wind-down decisions and marks Step 4 of the wind-down checklist complete. The retrospective is a separate action.
+
+### AI Behavior on This Page
+Light. GPT is used for one output only:
+
+**Wind-Down Summary Narrative:**
+After the founder finalizes wind-down, GPT generates a single paragraph summarizing the decisions made — what is being completed, what is being carried forward, and what is being released. This paragraph is used as the opening context in the Retrospective synthesis. It is shown at the bottom of the wind-down page for founder review.
+
+### Data Sources
+| Element | Source |
+|---|---|
+| Incomplete initiatives | initiatives table — completion status |
+| Incomplete milestones | milestones table — status != Complete |
+| Completion decisions | wind_down_decisions table (new) |
+| Rollover reflections | wind_down_reflections table (new) |
+| Forward-seeding answers | sprint_reflections table (new) |
+| Wind-down summary | GPT synthesis — stored in sprint_reflections |
+
+---
+
+## Page 5 — Retrospective
+
+### Page Purpose
+The payoff moment. The complete account of what this quarter meant — what was accomplished, how capabilities developed, who drove the work, and what comes next. The most important page in the execution layer for long-term platform retention and founder motivation.
+
+### Trigger & Availability
+- Available after the sprint end date has passed AND the wind-down has been finalized
+- A CTA appears on the Execution Overview: "Q1 is complete. Begin your retrospective."
+- Once the retrospective is generated and approved, it becomes a permanent record — accessible from sprint history indefinitely
+
+### Page Layout — Four Acts
+
+**Act 1 — The Account: What We Did**
+
+Deterministic section. No AI. Just honest facts.
+
+- Sprint goal statement — displayed at the top with the founder's self-assessment directly below it:
+  - "Did we accomplish our sprint goal?" — three options: **Yes** / **Partially** / **We Learned** (reframe of "No" — intentional language choice that maintains agency)
+  - Optional free text: "In your own words, what did this sprint deliver?"
+- Sprint Stats:
+  - Initiatives launched: [N]
+  - Initiatives completed: [N]
+  - Initiatives rolled over: [N]
+  - Initiatives released: [N]
+  - Milestones completed: [N] of [N] total
+  - Days in sprint: [N]
+- Initiative completion table: every initiative, sorted by status (Complete → Rolled Over → Released). Each row shows: initiative name, capability area, 3P bucket, owner, milestone completion count, and final status.
+- Rolled-over items: listed with their rollover reflection note (from Wind-Down Step 2) — "Will appear in next quarter's planning."
+
+**Act 2 — The Development: How We Grew**
+
+Deterministic data + AI interpretation.
+
+- Capability Score Movement table:
+  - Each of the 9 selected capability areas
+  - Score at sprint start (locked at sprint launch)
+  - Score at sprint end (current maturity score)
+  - Delta — shown as +N% or -N% with directional arrow
+  - Visual: a small before/after bar showing the shift
+- Below the table — AI-generated Capability Development Summary:
+  - One to two sentences per capability area that moved. Interprets what drove the change and what it means. Grounded in the specific initiatives that addressed that capability area.
+  - Areas that did not move also get one sentence — acknowledging that not every sprint produces score movement in every area, and contextualizing why (Plant areas may not move yet; Iterate areas may move slowly by design).
+
+**Act 3 — The Team: Who Made It Happen**
+
+Deterministic section. Human-input layer.
+
+- Team contribution summary: for each team member, the milestones they owned and their completion rate
+- Founder-authored shoutouts: a free text field per team member. Prompted: "What do you want to recognize [name] for this quarter?" Optional but encouraged.
+- These shoutouts are included in the retrospective PDF export — designed to be shareable with the team
+- A "Share with Team" option generates a team-facing version of the retrospective that includes Act 1 summary stats, the AI Sprint Narrative (Act 4), and the team shoutouts — but excludes the capability score details (those are founder-facing)
+
+**Act 4 — The Story: What This Quarter Meant**
+
+AI-generated synthesis. The centerpiece of the retrospective.
+
+Four components:
+
+1. **Sprint Narrative** (three to four paragraphs):
+The complete story of the quarter — what was set out to be done, what the team actually did, how the capability scores moved and what that represents, and what the most significant development from this sprint was. Written to be read, not scanned. Specific to this founder, this agency, this quarter.
+
+2. **Capability Development Summary** (already described in Act 2):
+Pulled into Act 4 as a unified narrative following the Sprint Narrative — the two flow together.
+
+3. **Forward Guidance** (one to two paragraphs):
+A directional read on next quarter based on: rolled-over initiatives, score movements, wind-down reflections, and forward-seeding answers. Framed as a perspective, not a prescription. "Based on this quarter, here is what the data suggests deserves your attention in Q2..." This paragraph is passed to the Quarter Map as the starting recommendation for next sprint's planning.
+
+4. **Sprint Theme Close** (one to two sentences):
+Returns to the Sprint Theme set at launch. Speaks to how the theme played out across the quarter. Creates a narrative arc — the quarter had an opening line and now it has a closing one.
+
+**Act 5 — What's Next: Forward into Q2**
+
+Bridge section. Not planning — just orientation.
+
+- Rolled-over initiatives: listed as "Carrying forward into Q2" — each with a link to view the initiative detail
+- Forward Guidance excerpt: the first sentence of the Forward Guidance from Act 4, shown as a pull quote
+- CTA: "Begin Q2 Planning" — links to the Planning section with the Quarter Map pre-populated with the Forward Guidance recommendations as a starting point
+- A note: "Your Q2 Quarter Map has been pre-seeded with recommendations based on this retrospective. Review and adjust before planning your next sprint."
+
+### Retrospective Generation Flow
+
+1. Founder clicks "Generate Retrospective" CTA
+2. Loading state — GPT synthesizes all four AI components simultaneously (Sprint Narrative, Capability Development Summary, Forward Guidance, Sprint Theme Close)
+3. Full retrospective renders with all five acts
+4. Founder reviews each act — they can:
+   - Edit any AI-generated text inline
+   - Regenerate individual components
+   - Add their free-text self-assessment and shoutouts
+5. Founder clicks "Approve Retrospective" — this locks the document as the permanent record for Q1
+6. The Forward Guidance is automatically passed to the Q2 Quarter Map
+7. The sprint status updates to CLOSED across all execution pages
+8. A celebratory moment — a brief visual acknowledgment that the quarter is complete and documented. Not a confetti animation — something more considered. A full-width statement: *"Q1 2026 is complete. You built something this quarter."* with the sprint theme below it. Visible for a moment before the page settles into its final state.
+
+### AI Behavior — Retrospective Synthesis
+
+**Input context provided to GPT:**
+- Full sprint record — everything from planning through execution
+- Capability score at start and end of sprint (delta per capability area)
+- Complete initiative and milestone status at sprint close
+- All notes logged in the status tracker
+- Wind-down decisions, rollover reflections, and forward-seeding answers
+- Founder's sprint goal self-assessment and free text
+- Founder's AE Ladder stage
+- Sprint Theme from launch
+- Momentum Synthesis history (all generations from the quarter — GPT can see how the narrative evolved)
+
+**System prompt guidance for GPT:**
+- The Sprint Narrative must tell a story, not list facts. It should have a beginning (intent), middle (effort), and end (outcome).
+- Capability Development Summary must interpret, not just report. Scores are context — meaning is the output.
+- Forward Guidance must be directional and specific — not generic strategic advice. It must reference the actual rolled-over items and score movements from this sprint.
+- Sprint Theme Close must feel earned — it should only affirm the theme if the data supports affirmation. If the quarter diverged from the theme, the close should acknowledge that honestly.
+- The tone throughout is: honest, warm, sophisticated, specific. Never corporate. Never generic. Never falsely positive.
+
+### Data Sources
+| Element | Source |
+|---|---|
+| Sprint record | sprints, initiatives, milestones tables |
+| Capability scores (start) | Snapshot stored at sprint lock |
+| Capability scores (end) | Current capability_scores at retrospective generation |
+| Wind-down data | wind_down_decisions, wind_down_reflections, sprint_reflections tables |
+| Team contributions | milestones table grouped by owner |
+| AI synthesis | GPT — stored in retrospective_records table |
+| Forward guidance (for Q2) | Passed to sprint_planning_context table for next sprint |
+
+---
+
+## Cross-Page Elements
+
+### Execution Overview Page
+The landing page for the Execution section (currently shown in Image 1 of the screenshots). Needs to serve as the navigation hub and status summary for the active sprint.
+
+Should display:
+- Sprint goal statement — prominent
+- Sprint status: ACTIVE / WIND-DOWN / CLOSED
+- Quick stats: overall milestone completion %, days remaining
+- Four navigation cards (replacing or expanding the current two-card layout):
+  - Sprint Launch — "View your sprint summary and share with your team"
+  - Status Tracker — "Update milestone progress and run your weekly standup"
+  - Momentum Synthesis — "Get a strategic read on your quarter" + last generated date
+  - Sprint Wind-Down — appears only when within 21 days of sprint end
+  - Retrospective — appears only when sprint is closed and wind-down is finalized
+- No AI on this page — purely navigational and status-oriented
+
+### Sprint Goal Persistence
+The sprint goal statement appears as a persistent banner on every page in the execution section. It is never collapsible. It is always the first piece of content below the page header. This is a platform-wide design rule for the execution layer — the goal is always in view.
+
+### Sprint History
+Once a sprint is closed, all five pages become read-only historical records. A sprint history view (accessible from the execution overview) shows all past sprints with their retrospective summaries, capability score movements, and completion rates. This is the longitudinal record that compounds in value over multiple quarters.
+
+---
+
+## Open Decisions Before Spec Work Begins
+
+The following decisions need to be made before Antigravity build prompts can be written for the execution layer:
+
+1. **Sprint date logic:** How does the platform know when a sprint starts and ends? Is this set manually by the founder during sprint planning, or is it inferred from the quarter label? This affects the countdown on every page and the Wind-Down trigger.
+
+2. **Pace label ownership:** Confirmed above as founder-set, not system-calculated. Where exactly does the founder update this — on the Status Tracker page itself, or elsewhere? And what are the options (On Track / At Risk / Off Track)?
+
+3. **Team member access:** Can team members log into the platform and update milestone status themselves, or is the founder the only user who can make updates? This shapes the entire collaboration model of the Status Tracker.
+
+4. **Retrospective sharing format:** The PDF export of the retrospective — is this generated by the platform's existing PDF generation system, or does it need a new template?
+
+5. **Forward guidance pass-through:** When the retrospective's Forward Guidance is passed to the Q2 Quarter Map, how does it surface? As pre-selected capability areas, as a text recommendation, or as a ranked suggestion list the founder can accept or modify?
+
+---
+
+*Architect OS Execution Layer — Detailed Functional Spec V1.0*
+*Pre-Build — Follows Vision Document, Precedes Antigravity Build Prompts*

@@ -1,0 +1,263 @@
+# **AE Assessment Scoring Mechanics**
+
+## **Overview**
+
+The AE Ladder Assessment uses a structured scoring system that produces two levels of insight: **category-level scores** (5 separate scores showing performance across dimensions) and an **overall score** (single aggregate score determining stage placement).
+
+This document explains the technical mechanics of how responses become scores, how scores are calculated, and what each scoring level represents.
+
+---
+
+## **Assessment Structure**
+
+**Total Questions:** 19  
+ **Categories:** 5  
+ **Rating Scale:** 1-5 (integer values only)
+
+### **Question Distribution by Category**
+
+* **Category 1: Financial & Business Health** \- 4 questions  
+* **Category 2: Client Base & Market Positioning** \- 4 questions  
+* **Category 3: Operational Efficiency & Scalability** \- 4 questions  
+* **Category 4: Team Structure & Leadership** \- 4 questions  
+* **Category 5: Founder's Role & Strategic Focus** \- 3 questions
+
+Each question receives a single integer rating from 1 to 5\.
+
+---
+
+## **Rating Scale Definition**
+
+All questions use a standardized 5-point scale. The interpretation of each rating adapts based on whether the question measures establishment/maturity or agreement/truth.
+
+| Scale Value | Descriptive Label | Interpretation |
+| ----- | ----- | ----- |
+| **1** | Not Yet Established / Not True at All | This capability or condition is not yet in place, or the statement does not describe the agency at all. |
+| **2** | Somewhat Established / Somewhat True | Work has started in this area, but it is not yet reliable or repeatable. The condition exists inconsistently. |
+| **3** | Moderately Established / Moderately True | This is somewhat in place with recognizable progress, but inconsistencies or gaps remain. |
+| **4** | Well-Established / Mostly True | This is strong and repeatable, functioning reliably with only minor inefficiencies or exceptions. |
+| **5** | Fully Operationalized / Completely True | This functions predictably, efficiently, and at scale. The capability or condition is mature and consistent. |
+
+**Key Principle:** The scale measures **current operational reality**, not aspirations or recent initiatives. Ratings should reflect what is consistently true across the majority of agency operations.
+
+---
+
+## **Calculation Methodology**
+
+### **Step 1: Calculate Category Scores**
+
+For each of the 5 categories:
+
+1. Sum all question responses within that category  
+2. Divide by the number of questions in that category  
+3. Result is the **category average score** (stored as `numeric(3,2)`)
+
+**Formula:**
+
+Category Score \= (Sum of responses in category) ÷ (Number of questions in category)
+
+**Example \- Financial & Business Health:**
+
+* Question responses: 3, 4, 3, 5  
+* Calculation: (3 \+ 4 \+ 3 \+ 5\) ÷ 4 \= **3.75**  
+* Category Score: **3.75**
+
+### **Step 2: Calculate Overall Score**
+
+Once all 5 category scores are computed:
+
+1. Sum all 5 category scores  
+2. Divide by 5  
+3. Result is the **overall assessment score** (stored as `numeric(3,2)`)
+
+**Formula:**
+
+Overall Score \= (Sum of all 5 category scores) ÷ 5
+
+**Example \- Full Assessment:**
+
+* Category scores: 3.75, 4.0, 3.5, 3.0, 3.25  
+* Calculation: (3.75 \+ 4.0 \+ 3.5 \+ 3.0 \+ 3.25) ÷ 5 \= **3.50**  
+* Overall Score: **3.50**
+
+---
+
+## **Two-Level Scoring Output**
+
+The assessment produces two distinct types of scores, each serving different analytical purposes:
+
+### **Level 1: Category Scores (5 scores)**
+
+**Range:** 1.00 to 5.00  
+ **Quantity:** 5 scores (one per dimension)  
+ **Precision:** Stored as `numeric(3,2)`, rounded to 1 decimal (`numeric(3,1)`) for band lookups  
+ **Purpose:** Identify functional strengths and gaps within specific dimensions
+
+**What Category Scores Reveal:**
+
+* Which dimensions are ahead or behind relative to others  
+* Specific capability gaps that may be limiting growth  
+* Areas of strength that can be leveraged  
+* Imbalances across the business that create friction
+
+**Example Output:**
+
+Financial & Business Health: 3.75  
+Client Base & Market Positioning: 4.00  
+Operational Efficiency & Scalability: 3.50  
+Team Structure & Leadership: 3.00
+
+Founder's Role & Strategic Focus: 3.25
+
+### **Level 2: Overall Score (1 score)**
+
+**Range:** 1.00 to 5.00  
+ **Quantity:** 1 score (aggregate across all categories)  
+ **Precision:** Stored as `numeric(3,2)`, rounded to 1 decimal (`numeric(3,1)`) for stage assignment  
+ **Purpose:** Determine AE Ladder stage placement and holistic maturity level
+
+**What Overall Score Reveals:**
+
+* Where the agency is in its evolutionary journey  
+* The complexity level being managed  
+* Holistic operational maturity  
+* Stage-appropriate expectations and challenges
+
+**Example Output:**
+
+Overall Score: 3.50 → Thriving Stage
+
+---
+
+## **Score Rounding for Lookups**
+
+**For calculation:** Scores are stored with 2 decimal places (e.g., 3.27, 4.13)  
+ **For lookup:** Scores are rounded to 1 decimal place (e.g., 3.3, 4.1)
+
+### **Rounding Logic**
+
+Use standard rounding (round half up):
+
+* 3.27 → 3.3  
+* 3.24 → 3.2  
+* 3.25 → 3.3
+
+This rounded 1-decimal score is used to:
+
+* Map overall scores to stage assignments (via `ae_stage_score_lookup`)  
+* Map category scores to band assignments (via `ae_dimension_band_score_meaning`)
+
+---
+
+## **Score Usage & Hierarchy**
+
+### **Primary Insight: Overall Score**
+
+The **overall score** is the most important output because it:
+
+* Determines stage placement in the AE Ladder framework  
+* Provides the macro context for interpreting all other results  
+* Reveals the dominant pattern of complexity being navigated  
+* Drives stage-specific recommendations and insights
+
+**Use Case:** Understanding where the agency is holistically and what stage-appropriate challenges it faces.
+
+### **Secondary Insight: Category Scores**
+
+**Category scores** provide diagnostic depth by:
+
+* Revealing which dimensions are strong vs. weak relative to overall stage  
+* Identifying specific functional gaps that may be holding back progression  
+* Highlighting areas of strength that can accelerate growth  
+* Showing imbalances that create friction or risk
+
+**Use Case:** Pinpointing which capabilities need development to support stage progression or maintain current performance.
+
+### **Interpretation Principle**
+
+Category scores should always be interpreted **in context of the overall stage**:
+
+* A category score of 3.5 means something different for a Rising-stage agency vs. a Driving-stage agency  
+* Strong category scores don't guarantee stage progression if other dimensions lag significantly  
+* Weak category scores may be stage-appropriate early on but become critical gaps at higher stages
+
+---
+
+## **Data Precision Standards**
+
+**Storage Format:**
+
+* All scores stored as `numeric(3,2)` in database (e.g., 3.27, 4.13)  
+* Maintains calculation precision  
+* Enables accurate tracking over time
+
+**Lookup Format:**
+
+* Scores rounded to `numeric(3,1)` for mapping (e.g., 3.3, 4.1)  
+* Used for band and stage assignment  
+* Balances precision with interpretive clarity
+
+**Display Format:**
+
+* Present scores to users with 1-2 decimal places depending on context  
+* Overall scores typically shown as X.X (e.g., 3.5)  
+* Category scores may show X.XX for granular feedback (e.g., 3.27)
+
+---
+
+## **Calculation Example (Complete Assessment)**
+
+**Step 1: Question Responses (19 total)**
+
+Category 1 (Financial): 3, 4, 3, 5  
+ Category 2 (Client Base): 4, 4, 3, 4  
+ Category 3 (Operations): 3, 4, 3, 4  
+ Category 4 (Team): 3, 2, 3, 3  
+ Category 5 (Founder): 3, 3, 4
+
+**Step 2: Calculate Category Scores**
+
+* Financial: (3+4+3+5) ÷ 4 \= **3.75**  
+* Client Base: (4+4+3+4) ÷ 4 \= **3.75**  
+* Operations: (3+4+3+4) ÷ 4 \= **3.50**  
+* Team: (3+2+3+3) ÷ 4 \= **2.75**  
+* Founder: (3+3+4) ÷ 3 \= **3.33**
+
+**Step 3: Calculate Overall Score**
+
+(3.75 \+ 3.75 \+ 3.50 \+ 2.75 \+ 3.33) ÷ 5 \= **3.42**
+
+**Step 4: Round for Lookup**
+
+* Overall: 3.42 → **3.4**  
+* Financial: 3.75 → **3.8**  
+* Client Base: 3.75 → **3.8**  
+* Operations: 3.50 → **3.5**  
+* Team: 2.75 → **2.8**  
+* Founder: 3.33 → **3.3**
+
+**Step 5: Map to Bands/Stages**
+
+* Overall 3.4 → **Thriving Stage** (via stage lookup)  
+* Each category score → **Specific Band** (via dimension band lookup)
+
+---
+
+## **Technical Notes**
+
+**Question Weighting:** All questions within a category carry equal weight. Categories themselves carry equal weight in the overall score calculation.
+
+**Missing Responses:** Assessment requires all 19 questions to be answered. Partial assessments cannot be scored.
+
+**Retake Handling:** Each assessment submission is scored independently. Historical scores are preserved for tracking progression over time.
+
+**Score Bounds:**
+
+* Minimum possible score: 1.00 (all responses \= 1\)  
+* Maximum possible score: 5.00 (all responses \= 5\)  
+* Practical range: Most agencies score between 1.5 and 4.5
+
+---
+
+**Note:** This document covers scoring mechanics only. For how scores map to stages, see `AE_Stage_Assignment_Logic.md`. For how scores map to category bands, see `AE_Category_Band_Progressions.md`. For interpretation principles, see `AE_Interpretation_Framework.md`.
+

@@ -1,58 +1,111 @@
 import React, { useState } from 'react';
-import { ScenarioControls, ScenarioModifiers } from './ScenarioControls';
 import { RealTimeImpact } from './RealTimeImpact';
+import { ScenarioControls, ScenarioModifiers } from './ScenarioControls';
 import { ComparisonView } from './ComparisonView';
 
 export const ScenarioBuilder: React.FC = () => {
-  // Local state for the scenario modeling
-  // In a real app, this might initialize from the "Standard Calculator" result
-  const [modifiers, setModifiers] = useState<ScenarioModifiers>({
-    revenueTarget: 30, // % growth target
-    efficiency: 0,     // % efficiency gain
-    retention: 0,      // % retention improvement
-    acv: 0,            // % ACV increase
-    margin: 0          // % margin expansion
-  });
+   // Mock Baseline Data
+   const baselineData = {
+      revenue: 2500000,
+      team: 12,
+      margin: 0.20,
+      clients: 45,
+      retention: 85 // 85% retention, 15% churn
+   };
 
-  // Mock baseline data (would come from Snapshot/Tab 1)
-  const baselineData = {
-    revenue: 2000000,
-    teamSize: 10,
-    clientCount: 40,
-  };
+   // Derived Baseline ACV
+   const baselineACV = baselineData.revenue / baselineData.clients;
 
-  return (
-    <div className="space-y-6 pb-20">
-      
-      {/* Top: Heads-Up Display */}
-      <section>
-         <RealTimeImpact 
-            baselineRevenue={baselineData.revenue} 
-            baselineTeam={baselineData.teamSize} 
-            modifiers={modifiers} 
-         />
-      </section>
+   // Initial State
+   const [modifiers, setModifiers] = useState<ScenarioModifiers>({
+      revenueTarget: 30, // +30%
+      efficiency: 10,    // +10%
+      retention: 5,      // +5% (e.g. 85 -> 90)
+      acv: 5,           // +5%
+      margin: 5,         // +5% (e.g. 20 -> 25)
+      clientCount: 23,   // Derived initially based on Rev=30, ACV=5 -> (1.3/1.05)-1 = ~23%
+      timeframe: 12      // 12 months default
+   });
 
-      {/* Main Workspace */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
-         
-         {/* Left: Controls */}
-         <div className="lg:col-span-4 xl:col-span-3">
-            <ScenarioControls 
-               baselineRevenue={baselineData.revenue} 
-               modifiers={modifiers} 
-               onChange={setModifiers} 
+   const [isRun, setIsRun] = useState(false);
+   const [velocityIndex, setVelocityIndex] = useState<number | null>(null);
+
+   const handleRunScenario = () => {
+      // simple mock calculation for Velocity Index
+      // In real app, this would trigger the 32+ backend calcs.
+      // Score = 100 - Penalties.
+      // Penalty for high growth (+30% rev -> -10 pts)
+      // Penalty for hiring (+5 staff -> -10 pts)
+      const growthPenalty = Math.max(0, modifiers.revenueTarget * 0.5);
+      const hiringPenalty = Math.max(0, (modifiers.revenueTarget - modifiers.efficiency) * 0.5);
+      const score = Math.max(0, Math.min(100, 100 - (growthPenalty * 0.2) - (hiringPenalty * 0.5)));
+
+      setVelocityIndex(Math.round(score));
+      setIsRun(true);
+   };
+
+   const handleSaveScenario = () => {
+      console.log("Saving scenario:", modifiers);
+      // Todo: database call
+   };
+
+   const handleSetPrimary = () => {
+      console.log("Setting as primary:", modifiers);
+   };
+
+   const handleAddToComparison = () => {
+      console.log("Adding to comparison:", modifiers);
+   };
+
+   const handleModifierChange = (newModifiers: ScenarioModifiers) => {
+      setModifiers(newModifiers);
+      // Note: We do NOT reset isRun here, allowing "Re-Run" button to persist
+   };
+
+   return (
+      <div className="space-y-8 pb-12">
+         {/* Section 1: Scenario Configuration (Full Width) */}
+         <section className="w-full">
+            <ScenarioControls
+               baselineRevenue={baselineData.revenue}
+               baselineACV={baselineACV}
+               baselineClientCount={baselineData.clients}
+               modifiers={modifiers}
+               isRun={isRun}
+               onChange={handleModifierChange}
+               onRunScenario={handleRunScenario}
+               onSaveScenario={handleSaveScenario}
+               onSetPrimary={handleSetPrimary}
+               onAddToComparison={handleAddToComparison}
             />
-         </div>
+         </section>
 
-         {/* Right: Visualization & Deep Dive */}
-         <div className="lg:col-span-8 xl:col-span-9 space-y-6">
-            <ComparisonView 
-               baselineRevenue={baselineData.revenue} 
-               modifiers={modifiers} 
+         {/* Section 2: Real-Time Impact (Full Width) */}
+         <section className="w-full">
+            <RealTimeImpact
+               baselineRevenue={baselineData.revenue}
+               baselineTeam={baselineData.team}
+               baselineClientCount={baselineData.clients}
+               modifiers={modifiers}
+               velocityIndex={velocityIndex}
+               isRun={isRun}
             />
-         </div>
-      </section>
-    </div>
-  );
+         </section>
+
+         {/* Section 3: Deep Analysis & Comparison (Full Width) */}
+         <section className="w-full">
+            <ComparisonView
+               baselineData={{
+                  revenue: baselineData.revenue,
+                  team: baselineData.team,
+                  clients: baselineData.clients,
+                  retention: baselineData.retention / 100,
+                  margin: baselineData.margin,
+                  acv: baselineACV
+               }}
+               modifiers={modifiers}
+            />
+         </section>
+      </div>
+   );
 };

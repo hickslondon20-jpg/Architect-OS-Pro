@@ -1,0 +1,542 @@
+01-core-definitions category are now complete:
+✅ financial-kpis.md — Financial performance metrics
+✅ forecasting-kpis.md — Pipeline and forecasting metrics
+✅ retention-kpis.md — Client retention and account health
+✅ sales-marketing-kpis.md — Sales and marketing efficiency
+✅ productivity-kpis.md — Productivity and capacity metrics
+
+These core definition files are now ready to be saved to /src/knowledge/kpis/01-core-definitions/ in our project structure.
+
+
+File 1: financial-kpis.md
+
+---
+title: Financial Performance KPIs
+category: core-definitions
+subcategory: financial
+updated: 2025-01-09
+version: 1.0
+---
+
+# Financial Performance KPIs
+
+Core financial metrics that measure an agency's ability to capture value, control costs, and generate profit.
+
+## Core Metrics
+
+| KPI | Definition | Formula | Target / Benchmark | Category |
+|-----|------------|---------|-------------------|----------|
+| **AGI (Agency Gross Income)** | Total revenue minus pass-through costs (media spend, subcontractors, production costs, etc.) | Total Revenue - Pass-Through Costs | — | Revenue |
+| **AGI %** | Agency Gross Income as percentage of total revenue | (AGI ÷ Total Revenue) × 100 | **≥ 90%** | Revenue Quality |
+| **Unburdened Compensation %** | Total payroll (before taxes/benefits) as percentage of AGI | (Total Payroll ÷ AGI) × 100 | **< 45%** | Cost Control |
+| **SG&A %** | Selling, General & Administrative expenses (non-payroll overhead) as percentage of AGI | (SG&A Costs ÷ AGI) × 100 | **< 20%** | Cost Control |
+| **Total Costs %** | Combined payroll and overhead as percentage of AGI | ((Payroll + SG&A) ÷ AGI) × 100 | **< 65%** | Cost Control |
+| **Operating Profit %** | Remaining margin after all operating costs | ((AGI - Total Costs) ÷ AGI) × 100 | **> 35%** | Profitability |
+
+## Rules of Thumb
+
+### AGI Margin Structure
+Healthy agencies target the following cost distribution:
+
+- **Payroll (Labor):** ≤ 45% of AGI
+- **Overhead (SG&A):** ≤ 20% of AGI
+- **Operating Profit:** ≥ 35% of AGI
+
+### AGI Quality Considerations
+
+**High-Quality AGI:**
+- Comes from delivery you directly control and optimize
+- Internal labor, IP, systems, strategy
+- Minimal pass-through dependencies
+
+**Low-Quality AGI:**
+- Heavy reliance on media spend pass-throughs
+- High subcontractor/white-label costs
+- One-time production passthroughs
+
+### Pass-Through Cost Types
+
+| Type | Examples | Impact on AGI Quality |
+|------|----------|----------------------|
+| **Media/Ad Spend** | Facebook, Google, TikTok ads | Lowest-value pass-through; minimal margin |
+| **Subcontracted Labor** | Freelancers, white-label services | Mid-value; some markup potential |
+| **Production Costs** | Print, events, shoots, equipment | Episodic; typically neutral margin |
+| **Software/Platform Fees** | SaaS tools resold to clients | Can be profitable with strategic markup |
+
+## Revenue Hierarchy
+
+When evaluating agency financials, mature operators break down revenue into tiers:
+
+| Metric | Description | Use Case |
+|--------|-------------|----------|
+| **Gross Billings (GB)** | All invoiced client revenue including pass-throughs | Topline optics; not useful for profit analysis |
+| **Adjusted Gross Income (AGI)** | GB minus true pass-throughs | Baseline for measuring profitability |
+| **Net AGI** (aka "Net Revenue") | AGI minus contractor/white-label costs | Reveals core economic engine of internal teams |
+
+## Interpretation Notes
+
+- **Upward AGI%** indicates improved margin control and value capture
+- **Rising Compensation%** can signal team expansion or declining efficiency
+- **Increasing SG&A%** suggests overhead bloat or infrastructure investment
+- **Stable ratios** at optimized ranges indicate operational maturity
+- **Consistency matters** — sustained stability often signals systemic maturity and predictability
+
+## Related Files
+
+- `/02-benchmarks/financial-benchmarks.md` — Stage-specific target ranges
+- `/03-directional-diagnostics/financial-trend-interpretation.md` — What trends mean
+- `/04-system-dynamics/financial-kpi-interconnections.md` — How these metrics interact
+
+File 2: forecasting-kpis.md
+
+---
+title: Forecasting & Pipeline KPIs
+category: core-definitions
+subcategory: forecasting
+updated: 2025-01-09
+version: 1.0
+---
+
+# Forecasting & Pipeline KPIs
+
+Metrics that translate current financial reality into forward-looking demand, enabling capacity planning and resource allocation.
+
+## Core Metrics
+
+| KPI | Definition | Formula / Method | Target / Benchmark | Category |
+|-----|------------|------------------|-------------------|----------|
+| **Current Clients (Weighted Forecast)** | Expected recurring revenue from current clients, adjusted for churn risk | Sum of active MRR × retention probability | — | Baseline Revenue |
+| **New Business (80%+ to Close)** | Pipeline revenue with ≥80% likelihood of closing | Sum of deals with close probability ≥80% × 0.4 weighting | **4-6 months runway minimum** | Pipeline |
+| **Total Forecast** | Combined projection of current and weighted new business | Current MRR + (Weighted New Business × 0.4) | — | Revenue Projection |
+| **Clients Churned (#)** | Number of clients lost in a given month | Count of clients who cancelled/left | **< 2.5% of total clients monthly** | Retention |
+| **Clients Churned ($)** | Monthly Recurring Revenue value lost to churn | Sum of MRR from churned clients | — | Revenue Impact |
+| **New Clients (#)** | Clients added in period | Count of new client relationships | — | Acquisition Volume |
+| **New Client Value ($)** | Total contract/MRR value from new deals closed | MRR + project value from new clients | — | Acquisition Value |
+| **Net MRR Change ($)** | Net change in monthly recurring revenue | New Client Value - Churned Value | **Positive** | Growth Momentum |
+
+## Forecasting Methodology
+
+### Weighted Pipeline Logic
+
+Forecasting blends weighted probabilities to balance optimism and reality:
+
+**Example Calculation:**
+- Deal A: $10K MRR, 80% close probability → Weighted value: $10K × 0.80 = $8K
+- Then apply 0.4 multiplier for conservatism → $8K × 0.4 = $3.2K forecast contribution
+
+This dual-weighting accounts for:
+1. Individual deal probability (sales assessment)
+2. Historical fall-off rates (system-wide reality check)
+
+### Forecast Time Horizons
+
+| Horizon | Purpose | Typical Accuracy |
+|---------|---------|------------------|
+| **30-day** | Cash flow management | ±5-10% |
+| **90-day** | Capacity and hiring planning | ±15-20% |
+| **6-month** | Strategic resource allocation | ±25-30% |
+| **12-month** | Long-term strategic planning | ±40-50% |
+
+## Key Relationships
+
+### Retention → Forecast Stability
+- High churn disrupts forecasts and utilization targets
+- Stable MRR enables accurate capacity planning
+- Even small churn increases ripple through resourcing and cash flow
+
+### Pipeline → Capacity Planning
+- Combined projection drives hiring and staffing decisions
+- Inaccurate forecasting leads to resource whiplash (overstaffing or understaffing)
+- Sales pacing must match delivery readiness
+
+### Net MRR → Growth Mode
+- **Positive Net MRR:** Agency expanding recurring base organically
+- **Negative Net MRR:** Losing more to churn than adding in new business (replacement mode)
+- **Flat Net MRR:** Balance achieved but growth stagnated
+
+## Rules of Thumb
+
+### Healthy Forecasting Patterns
+- Monthly churn ≤ 2.5%
+- New business pipeline covers 4-6 months of growth
+- Net MRR consistently positive
+- Forecast variance (actual vs. predicted) ≤ 15% at 90 days
+
+### Warning Signs
+- Forecast compression (shrinking combined value)
+- Negative Net MRR for 2+ consecutive months
+- Pipeline weighted value declining
+- Forecast variance > 25% regularly
+
+## Interpretation Notes
+
+- **Rising Current Clients forecast** = strong retention and healthy renewals
+- **Declining New Business pipeline** = sales slowdown or deal stalling
+- **Positive Net MRR trend** = organic growth flywheel working
+- **Stable forecast** = operational equilibrium (positive if systems mature)
+
+## Related Files
+
+- `/02-benchmarks/retention-targets.md` — Churn and retention benchmarks
+- `/03-directional-diagnostics/forecasting-trend-interpretation.md` — Trend meanings
+- `/04-system-dynamics/forecasting-pipeline-dynamics.md` — System interactions
+- `/05-maturity-models/forecasting-maturity-ladder.md` — Evolution stages
+
+
+
+File 3: retention-kpis.md
+
+---
+title: Client Retention & Account Health KPIs
+category: core-definitions
+subcategory: retention
+updated: 2025-01-09
+version: 1.0
+---
+
+# Client Retention & Account Health KPIs
+
+Metrics that measure client satisfaction, loyalty, account growth, and the quality of delivery outcomes.
+
+## Core Metrics
+
+| KPI | Definition | Formula / Method | Target / Benchmark | Category |
+|-----|------------|------------------|-------------------|----------|
+| **Client Retention Rate (%)** | Percentage of clients retained over a given period | (Clients at End - New Clients) ÷ Clients at Start × 100 | **≥ 90% annually** or **≥ 97.5% monthly** | Retention |
+| **Client Churn Rate (%)** | Percentage of clients lost in a given period | Clients Lost ÷ Total Clients at Start × 100 | **< 2.5% monthly** | Retention |
+| **Client Tenure / Lifetime (Months)** | Average length of client relationship | Average months from start to end (or current) | — | Longevity |
+| **Upsell & Expansion Revenue ($)** | Additional revenue from existing clients (excluding churn) | Net change in MRR from existing clients | **Positive trend** | Growth |
+| **Net Revenue Retention (NRR)** | Percentage of revenue retained including expansion | ((Starting MRR + Expansion - Churn) ÷ Starting MRR) × 100 | **> 100%** (mature agencies) | Retention Quality |
+| **NPS (Net Promoter Score)** | Client satisfaction and advocacy measure | % Promoters (9-10) - % Detractors (0-6) | **> 45%** | Satisfaction |
+| **Client Results / Success Rate (%)** | Actual performance vs. target goals | (Clients Meeting/Exceeding Goals ÷ Total Clients) × 100 | **> 95%** | Delivery Quality |
+| **Referral Rate (%)** | Percentage of clients generating referrals | Clients Who Referred ÷ Total Clients × 100 | **20-30%** | Advocacy |
+
+## Client Results Measurement
+
+### The Triple-Lens Model
+
+Client results should be measured through three complementary lenses:
+
+| Lens | Definition | Example Metrics | Best For |
+|------|------------|-----------------|----------|
+| **Performance** | Quantifiable results tied to KPIs or financial goals | ROAS, CPA, conversion rate, SQL volume, MRR growth | Performance marketing, growth, SEO, advertising |
+| **Perception** | How client feels about progress and partnership | NPS, CSAT, testimonials, sentiment | Brand, creative, PR, social, communications |
+| **Progress** | Degree of movement toward strategic milestones | Roadmap completion %, milestones met, capability gains | Design, dev, consulting, strategy, ops |
+
+### Results Tracking Framework
+
+**During Onboarding:**
+- Define success in client's language
+- Co-create 3-5 measurable outcomes
+- Document in kickoff summary
+
+**During Delivery:**
+- Build results dashboard with KPIs + milestones
+- Review progress in monthly/quarterly business reviews
+- Discuss drivers and obstacles
+
+**During Renewal:**
+- Use Results Scorecard in renewal discussions
+- Quantify value delivered
+- Turn performance review into growth conversation
+
+## Key Relationships
+
+### Results → NPS → Retention
+- High delivery results drive satisfaction
+- Satisfaction increases NPS
+- Strong NPS correlates with longer retention
+
+### Retention → Upsells → LTV
+- Longer client lifespan = more upsell opportunities
+- Every retained client is compounding growth asset
+- Retention literally funds marketing through referrals
+
+### NPS → Referrals → CAC Efficiency
+- Advocates create free pipeline flow
+- Higher referral rate lowers blended CAC
+- Satisfaction compounds into cheaper acquisition
+
+## Rules of Thumb
+
+### Retention & Growth Rules
+- Monthly churn ≤ 2.5%
+- Annual retention ≥ 90%
+- NPS ≥ 45%
+- Client results ≥ 95% meeting targets
+- 20-30% of clients generating referrals
+
+### Warning Signs
+- Churn trending upward for 2+ months
+- NPS declining
+- Results % falling below 90%
+- Zero referrals for 90+ days
+- Upsell revenue flat or negative
+
+## Interpretation Notes
+
+- **Rising retention** = improved experience and delivery
+- **Longer tenure** = stronger trust and embedded value
+- **Positive expansion revenue** = successful account growth strategy
+- **High NPS** = strong referral potential
+- **Consistent results delivery** = foundational to all other retention metrics
+
+## Related Files
+
+- `/02-benchmarks/retention-targets.md` — Stage-specific retention benchmarks
+- `/03-directional-diagnostics/retention-trend-interpretation.md` — What trends mean
+- `/04-system-dynamics/retention-flywheel-dynamics.md` — How retention drives growth
+- `/06-deep-dives/client-results-measurement.md` — Deep dive on measuring outcomes
+
+
+
+File 4: sales-marketing-kpis.md
+
+---
+title: Sales & Marketing Efficiency KPIs
+category: core-definitions
+subcategory: sales-marketing
+updated: 2025-01-09
+version: 1.0
+---
+
+# Sales & Marketing Efficiency KPIs
+
+Metrics that measure the effectiveness and cost-efficiency of client acquisition processes.
+
+## Core Metrics
+
+| KPI | Definition | Formula / Method | Target / Benchmark | Category |
+|-----|------------|------------------|-------------------|----------|
+| **MQLs (Marketing Qualified Leads)** | Leads showing interest/intent based on engagement signals | Count of leads meeting MQL criteria | — | Top of Funnel |
+| **SQLs (Sales Qualified Leads)** | Prospects with fit, need, and budget verified by sales | Count of leads passing sales qualification | — | Pipeline Quality |
+| **New Proposals Sent** | Number of formal proposals issued | Count of proposals delivered | — | Sales Activity |
+| **Win Rate (%)** | Percentage of proposals that convert to deals | Deals Won ÷ Proposals Sent × 100 | **30-60%** (varies by model) | Conversion |
+| **Average Deal Size ($)** | Average value of closed deals | Total New Client Value ÷ Number of Deals | — | Deal Quality |
+| **Sales Cycle Length (Days)** | Average time from first contact to close | Average days from lead creation to deal close | — | Sales Velocity |
+| **Customer Acquisition Cost (CAC)** | Total sales + marketing cost per new client acquired | (Total Sales + Marketing Costs) ÷ New Clients | **$4K-6K typical** | Efficiency |
+| **CAC Payback Period (Months)** | Time to recover acquisition investment | CAC ÷ Monthly Gross Profit from New Client | **< 6 months** | Cash Efficiency |
+| **LTV:CAC Ratio (3-Month)** | Lifetime value relative to acquisition cost (3-month window) | (Avg Client LTV) ÷ CAC | **> 3:1** | Unit Economics |
+| **LTV:CAC Ratio (6-Month)** | Lifetime value relative to acquisition cost (6-month window) | (Avg Client LTV) ÷ CAC | **> 3:1** | Unit Economics |
+
+## Conversion Funnel Logic
+
+### MQL → SQL → Proposal → Win
+
+**Healthy conversion rates:**
+- MQL to SQL: ≥ 25%
+- SQL to Proposal: ≥ 60%
+- Proposal to Win: 30-60% (model-dependent)
+
+**Warning signs:**
+- High MQLs but flat SQLs = targeting or qualification issue
+- High SQLs but low win rate = positioning or pricing issue
+- Long sales cycles without deal size increase = friction in buying process
+
+## CAC & LTV Economics
+
+### CAC Components
+- Marketing spend (ads, content, events, tools)
+- Sales salaries and commissions
+- Sales operations and enablement costs
+
+### LTV Calculation
+- Average monthly client value × average client lifetime (months)
+- Should factor in gross margin, not gross revenue
+
+### Efficiency Benchmarks
+
+| Metric | Healthy Range | Warning Zone | Critical |
+|--------|---------------|--------------|----------|
+| **LTV:CAC** | > 3:1 | 2:1 to 3:1 | < 2:1 |
+| **CAC Payback** | < 6 months | 6-12 months | > 12 months |
+| **Win Rate** | 40-60% | 25-40% | < 25% |
+
+## Key Relationships
+
+### MQLs → SQLs → Win Rate → CAC
+- Quality of top-of-funnel leads affects conversion efficiency
+- Better targeting reduces wasted sales cycles
+- Higher win rates naturally reduce CAC per closed deal
+
+### Deal Size ↔ Sales Cycle
+- Larger deals typically extend sales cycles
+- Evaluate these metrics together — longer cycles acceptable if deal value justifies
+
+### CAC → Payback → LTV:CAC
+- These form the financial efficiency loop of acquisition
+- Rising CAC without corresponding LTV growth shrinks cash runway
+- Efficient CAC with strong LTV creates self-funding growth
+
+## Rules of Thumb
+
+### Sales & Marketing Efficiency Rules
+- LTV:CAC ≥ 3:1
+- CAC payback ≤ 6 months
+- Win rate ≥ 30% (varies by agency type)
+- SQL volume sufficient for 4-6 months pipeline
+
+### Warning Signs
+- CAC rising faster than LTV
+- Payback period extending beyond 9 months
+- Win rate declining for 2+ quarters
+- MQL volume high but SQL conversion low
+
+## Interpretation Notes
+
+- **Rising MQLs** = growing awareness and effective content
+- **Improving win rate** = better positioning or qualification
+- **Increasing deal size** = pricing power and value perception
+- **Shorter sales cycle** = reduced friction and stronger authority
+- **Declining CAC** = improved targeting or organic momentum
+
+## Related Files
+
+- `/02-benchmarks/sales-efficiency-targets.md` — Model-specific benchmarks
+- `/03-directional-diagnostics/sales-trend-interpretation.md` — What trends mean
+- `/04-system-dynamics/sales-efficiency-loops.md` — How metrics interact
+- `/06-deep-dives/acquisition-portfolio-by-agency-type.md` — Channel strategy
+
+
+
+File 5: productivity-kpis.md
+
+---
+title: Productivity & Capacity KPIs
+category: core-definitions
+subcategory: productivity
+updated: 2025-01-09
+version: 1.0
+---
+
+# Productivity & Capacity KPIs
+
+Metrics that measure how efficiently the agency converts human effort into revenue and profit.
+
+## Core Metrics
+
+| KPI | Definition | Formula / Method | Target / Benchmark | Category |
+|-----|------------|------------------|-------------------|----------|
+| **Billable Utilization Rate (%)** | Percentage of available time spent on billable client work | (Billable Hours ÷ Available Hours) × 100 | **> 70%** | Efficiency |
+| **Fully Billable Staff** | Percentage of team that is 80%+ billable | (80%+ Billable Staff ÷ Total Staff) × 100 | **≥ 80%** | Team Structure |
+| **Billable Hours Available (#)** | Total hours team could bill per month | Sum of all available work hours | — | Capacity |
+| **Hours Billed (#)** | Hours actually billed to clients | Sum of invoiced hours | — | Productivity |
+| **Unbilled Hours (#)** | Available hours not invoiced (inefficiency) | Available Hours - Billed Hours | **Keep minimal** | Leakage |
+| **Target Hourly Rate** | Agency's target billable rate per hour | Total AGI ÷ Total Billable Hours | **$200/hr benchmark** | Pricing |
+| **Billable : Non-Billable Ratio** | Ratio of revenue-generating to support staff | Billable FTEs ÷ Non-Billable FTEs | **3:1** | Leverage |
+| **AGI per FTE** | Agency Gross Income per full-time employee | Total AGI ÷ Total FTEs | **> $15,500/month** ($186K/year) | Productivity |
+| **ARPE (Average Revenue per Employee)** | Total revenue per employee (includes pass-throughs) | Total Revenue ÷ Total FTEs | **$250K-300K/year** (model dependent) | Scale |
+| **Project Profitability (%)** | Margin per project after direct costs | (Project Revenue - Direct Costs) ÷ Project Revenue × 100 | **20-30%** | Margin Control |
+| **Overtime / Overcapacity Hours (%)** | Percentage of hours worked beyond standard capacity | Overtime Hours ÷ Total Hours × 100 | **< 5-10%** | Sustainability |
+
+## AGI per FTE: The Critical Leverage Metric
+
+### Healthy Ranges by Stage
+
+| Agency Maturity | AGI per FTE Target | Monthly Equivalent |
+|-----------------|-------------------|-------------------|
+| **Early-stage (≤$1M AGI)** | $140K-$160K/year | $11.7K-$13.3K/month |
+| **Mid-stage ($2-5M AGI)** | $160K-$180K/year | $13.3K-$15K/month |
+| **Scalable ($5-10M AGI)** | $180K-$200K/year | $15K-$16.7K/month |
+| **Elite (Operationally Mature)** | $200K-$225K/year | $16.7K-$18.8K/month |
+
+### What AGI per FTE Measures
+
+**Not just:**
+- How hard people work
+- Raw output volume
+
+**But rather:**
+- How efficiently the business converts time into economic value
+- Quality of pricing, systems, and role clarity
+- True operational leverage
+
+### Revenue per FTE vs. AGI per FTE
+
+**Critical Distinction:**
+
+| Metric | Includes | Best For |
+|--------|----------|----------|
+| **Revenue per FTE** | All billing including pass-throughs | External benchmarking, topline comparison |
+| **AGI per FTE** | Only value agency keeps (minus passthroughs) | Operational efficiency, profit analysis, valuation |
+
+**Typical relationship:**
+- Media agencies: Revenue per FTE might be $350K but AGI per FTE only $150K
+- Strategic agencies: Revenue per FTE $250K and AGI per FTE $220K
+
+**Always use AGI per FTE for efficiency and profitability analysis.**
+
+## Utilization & Capacity Balance
+
+### Utilization Sweet Spots
+
+| Range | Interpretation | Action |
+|-------|----------------|--------|
+| **< 60%** | Undercapacity or overstaffing | Review forecast, consider strategic hiring pause |
+| **60-70%** | Healthy buffer for growth and innovation | Maintain; allows internal projects |
+| **70-80%** | Optimal productive range | Sustainable high performance |
+| **80-90%** | High output but monitor sustainability | Watch for early burnout signals |
+| **> 90%** | Overcapacity risk zone | High burnout risk; quality may suffer |
+
+### Billable : Non-Billable Ratio
+
+**Healthy progression:**
+- Early stage: 2:1 (building support infrastructure)
+- Mid-stage: 3:1 (balanced leverage)
+- Mature: 3:1 to 4:1 (optimized operations)
+
+**Warning:** Ratios above 5:1 often indicate under-investment in infrastructure.
+
+## Key Relationships
+
+### Utilization → AGI per FTE → Profit
+- Higher utilization increases AGI per person
+- But only sustainable if systems support the workload
+- Pushing beyond 85% usually reduces quality and increases burnout
+
+### AGI per FTE → Forecast Accuracy → Hiring Decisions
+- Stable AGI per FTE enables confident hiring predictions
+- Declining AGI per FTE signals overhiring or underforecasting
+- Use as early-warning indicator of structural inefficiency
+
+### Project Profitability → EBITDA
+- Each project's margin compounds into agency-level profit
+- Target 20-30% project margin to sustain 30-35% EBITDA
+- Margin leakage at project level is often invisible until too late
+
+## Rules of Thumb
+
+### Productivity Rules
+- Utilization ≥ 70%
+- Billable:Non-Billable ratio ≥ 3:1
+- AGI per FTE ≥ $15.5K/month
+- Project profitability ≥ 20%
+- Unbilled time < 5%
+- Overtime < 5-10%
+
+### Warning Signs
+- AGI per FTE declining for 2+ quarters
+- Utilization consistently > 90%
+- Unbilled hours increasing
+- Project profitability < 15%
+- Rising overtime trends
+
+## Interpretation Notes
+
+- **Rising AGI per FTE** = improved leverage, pricing power, or efficiency
+- **High utilization with low burnout** = healthy systems and role clarity
+- **Strong project profitability** = good scoping and delivery control
+- **Minimal unbilled hours** = strong capacity planning and accountability
+- **Consistent metrics** = operational predictability and scalability
+
+## Related Files
+
+- `/02-benchmarks/agi-per-fte-ranges.md` — Detailed stage benchmarks
+- `/03-directional-diagnostics/productivity-trend-interpretation.md` — Trend meanings
+- `/04-system-dynamics/productivity-capacity-system.md` — System interactions
+- `/06-deep-dives/agi-per-fte-leverage-curve.md` — Healthy vs unhealthy growth
+- `/06-deep-dives/revenue-vs-agi-per-fte.md` — Critical distinction explained
+
+
+
+

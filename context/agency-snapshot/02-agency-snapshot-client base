@@ -1,0 +1,791 @@
+# **Client Base & Positioning TAB — COMPLETE BUILD SPECIFICATION**
+
+## **DOCUMENT OVERVIEW**
+
+This specification defines the complete build for the **Growth & Pipeline** tab within the Agency Snapshot feature. This tab captures current-state revenue model, client profile, retention health, and acquisition efficiency to characterize the agency's business model and strategic implications.
+
+**Visual Reference:** Match layout and styling of Financial tab exactly.
+
+---
+
+## **PAGE HEADER**
+
+┌─────────────────────────────────────────────────┐  
+│ 📈 Client Base & Positioning                            │  
+│                                                 │  
+│ 💡 Ballpark figures are fine — directional     │  
+│    understanding of your model is more          │  
+│    important than precision                     │  
+│                                                 │  
+└─────────────────────────────────────────────────┘
+
+**Header Text:**
+
+* Title: "Growth & Pipeline"  
+* Subtitle: "Ballpark figures are fine — directional understanding of your model is more important than precision"
+
+---
+
+## **BASELINE FIELDS (5 Required for Meaningful Insights)**
+
+### **SECTION A: MODEL PROFILE**
+
+#### **Field 1: Revenue Mix (% MRR vs Project)**
+
+**Field Name:** `revenue_mix_mrr_percentage`  
+ **Data Type:** Decimal (percentage)  
+ **Input Type:** Percentage input  
+ **Validation:**
+
+* Minimum: 0%  
+* Maximum: 100%  
+* Optional field  
+* Auto-calculate project % as (100 \- MRR %)
+
+**Label:** "Revenue Mix (% MRR vs Project)"  
+ **Placeholder:** "% Recurring"  
+ **Helper Text:** "What % of your revenue is recurring/retainer vs. project-based?"  
+ **Info Icon/Tooltip:** "Recurring \= retainers, subscriptions, ongoing contracts. Project \= one-time engagements, fixed-scope work. If you're 70% recurring, enter 70%."
+
+**Display Format:**
+
+Revenue Mix (% MRR vs Project)  
+┌────────────────────────────────────────┐  
+│ Recurring: \[\_\_\_\_%\]                     │  
+│ Project: \[\_\_\_\_%\] (auto-calculated)     │  
+└────────────────────────────────────────┘
+
+**Auto-calculation:** Project % \= 100 \- Recurring %
+
+---
+
+### **SECTION B: CLIENT PROFILE**
+
+#### **Field 2: Active Client Count**
+
+**Field Name:** `active_client_count`  
+ **Data Type:** Integer  
+ **Input Type:** Number input  
+ **Validation:**
+
+* Minimum: 0  
+* Maximum: 1000  
+* Optional field
+
+**Label:** "Active Client Count"  
+ **Placeholder:** 0  
+ **Helper Text:** "Current number of active paying clients"  
+ **Info Icon/Tooltip:** "Count clients you're currently billing or delivering work for. Include both retainer and project clients."
+
+---
+
+#### **Field 3: Client Tier Mix**
+
+**Field Name:** `client_tier_mix`  
+ **Data Type:** String (enum)  
+ **Input Type:** Single-select dropdown  
+ **Options:**
+
+* `mostly_smb` — "Local/regional businesses (typically \<50 employees)"  
+* `mostly_midmarket` — "Mid-size organizations (typically 50-500 employees)"  
+* `mostly_enterprise` — "Enterprise clients (typically 500+ employees)"  
+* `mixed` — "Mixed across tiers"
+
+**Label:** "Client Tier Mix"  
+ **Placeholder:** "Select client tier..."  
+ **Helper Text:** "What tier do most of your clients fall into?"  
+ **Info Icon/Tooltip:** "This helps us understand delivery complexity and relationship management requirements. Think about the typical size of the organizations you serve, not what they pay you."
+
+---
+
+### **SECTION C: RETENTION PROFILE**
+
+#### **Field 4: Monthly Churn Rate**
+
+**Field Name:** `monthly_churn_rate`  
+ **Data Type:** Decimal (percentage)  
+ **Input Type:** Percentage input  
+ **Validation:**
+
+* Minimum: 0%  
+* Maximum: 100%  
+* Optional field
+
+**Label:** "Monthly Churn Rate"  
+ **Placeholder:** 0%  
+ **Helper Text:** "What % of clients do you typically lose each month?"  
+ **Info Icon/Tooltip:** "Monthly churn \= (Clients lost in a month / Active clients at start of month) × 100\. If you typically lose 1 client out of 40, that's 2.5% monthly churn. Estimate if you don't track precisely."
+
+---
+
+#### **Field 5: Average Client Lifetime**
+
+**Field Name:** `average_client_lifetime_months`  
+ **Data Type:** Integer  
+ **Input Type:** Number input  
+ **Validation:**
+
+* Minimum: 1 month  
+* Maximum: 120 months (10 years)  
+* Optional field
+
+**Label:** "Average Client Lifetime"  
+ **Placeholder:** months  
+ **Helper Text:** "How many months does a typical client stay with you?"  
+ **Info Icon/Tooltip:** "This is the average duration of your client relationships. If most clients stay 2-3 years, enter 24-36 months. This can validate your churn rate or provide an alternative if you don't track churn precisely."
+
+---
+
+## **ENHANCED FIELDS (5 Optional Depth)**
+
+### **SECTION D: ACQUISITION EFFICIENCY**
+
+#### **Field 6: Typical Win Rate**
+
+**Field Name:** `typical_win_rate`  
+ **Data Type:** Decimal (percentage)  
+ **Input Type:** Percentage input  
+ **Validation:**
+
+* Minimum: 0%  
+* Maximum: 100%  
+* Optional field
+
+**Label:** "Typical Win Rate"  
+ **Placeholder:** 0%  
+ **Helper Text:** "What % of proposals do you typically close?"  
+ **Info Icon/Tooltip:** "Win rate \= (Proposals won / Total proposals sent) × 100\. Industry average for agencies is 30-35%. Estimate based on your typical conversion rate if you don't track formally."
+
+---
+
+#### **Field 7: Average Sales Cycle Length**
+
+**Field Name:** `average_sales_cycle`  
+ **Data Type:** String (enum)  
+ **Input Type:** Single-select dropdown  
+ **Options:**
+
+* `very_short` — "Very short (\<2 weeks)"  
+* `short` — "Short (2-4 weeks)"  
+* `moderate` — "Moderate (1-2 months)"  
+* `long` — "Long (2-3 months)"  
+* `very_long` — "Very long (3+ months)"  
+* `varies` — "Varies significantly"
+
+**Label:** "Average Sales Cycle Length"  
+ **Placeholder:** "Select sales cycle..."  
+ **Helper Text:** "Typical time from first conversation to signed contract"  
+ **Info Icon/Tooltip:** "This reflects how long it typically takes to convert a prospect into a client. Shorter cycles suggest transactional sales, longer cycles suggest complex evaluations."
+
+---
+
+### **SECTION E: ACQUISITION CHANNELS**
+
+#### **Field 8: Channel Mix (Rank Order)**
+
+**Field Name:** Multiple fields for each channel:
+
+* `channel_referrals_rank`  
+* `channel_partnerships_rank`  
+* `channel_content_rank`  
+* `channel_paid_rank`  
+* `channel_outbound_rank`
+
+**Data Type:** String (enum) for each  
+ **Input Type:** Dropdown for each channel  
+ **Options (for each dropdown):**
+
+* `first` — "1st"  
+* `second` — "2nd"  
+* `third` — "3rd"  
+* `fourth` — "4th"  
+* `fifth` — "5th"  
+* `not_at_all` — "Not at all"
+
+**Label:** "Channel Mix (Rank Order)"  
+ **Helper Text:** "Rank your primary acquisition channels from most to least important"  
+ **Info Icon/Tooltip:** "Rank each channel by importance to your new client acquisition. You can mark multiple as 'Not at all' if you don't use them."
+
+**Display Format:**
+
+Channel Mix (Rank Order)
+
+Referrals and Word of Mouth         \[1st ▼\]  
+Partnerships and Alliances          \[2nd ▼\]  
+Content and Authority (organic)     \[3rd ▼\]  
+Paid Acquisition                    \[Not at all ▼\]  
+Outbound and Prospecting            \[Not at all ▼\]
+
+**Validation:**
+
+* No duplicate ranks (cannot have two channels ranked "1st")  
+* At least one channel must be ranked (cannot be all "Not at all")  
+* Multiple channels can be "Not at all"  
+* Rank option 1-5
+
+---
+
+### **SECTION F: PIPELINE & NEW BUSINESS**
+
+#### **Field 9: Concentration Index (Top 5, 10, 20 Clients)**
+
+**Field Names:**
+
+* `concentration_top5_pct`  
+* `concentration_top10_pct`  
+* `concentration_top20_pct`
+
+**Data Type:** Decimal (percentage) for each  
+ **Input Type:** Percentage input (three inline fields)  
+ **Validation:**
+
+* Minimum: 0%  
+* Maximum: 100%  
+* Optional field  
+* Logical validation: Top 5% ≤ Top 10% ≤ Top 20%
+
+**Label:** "Concentration Index"  
+ **Helper Text:** "What % of revenue comes from your top clients?"  
+ **Info Icon/Tooltip:** "This measures client concentration risk. For example, if your 5 largest clients represent 60% of revenue, enter 60% for Top 5\. Higher concentration means more vulnerability to losing large clients."
+
+**Display Format (Single Line):**
+
+Concentration Index  
+Top 5: \[\_\_\_%\]  Top 10: \[\_\_\_%\]  Top 20: \[\_\_\_%\]  
+---
+
+## **CALCULATED METRICS (7 Real-Time Calculations)**
+
+These calculate immediately as users enter data (client-side JavaScript):
+
+### **Calculation 1: Average Client Value (ACV)**
+
+**Field Name:** `calculated_acv`  
+ **Formula:**
+
+javascript  
+const monthly\_agi \= getFromFinancialTab('monthly\_agi');  
+const client\_count \= active\_client\_count;
+
+if (monthly\_agi && client\_count \> 0\) {  
+  calculated\_acv \= monthly\_agi / client\_count;  
+} else {  
+  calculated\_acv \= null;  
+}
+
+**Display Format:** $X,XXX per month per client  
+ **Conditional Display:** Only show if both AGI (from Financial tab) and client count are provided  
+ **Label:** "Average Client Value (ACV)"
+
+---
+
+### **Calculation 2: MRR (Dollars)**
+
+**Field Name:** `calculated_mrr_dollars`  
+ **Formula:**
+
+javascript  
+const monthly\_agi \= getFromFinancialTab('monthly\_agi');  
+const mrr\_pct \= revenue\_mix\_mrr\_percentage;
+
+if (monthly\_agi && mrr\_pct \!== null) {  
+  calculated\_mrr\_dollars \= monthly\_agi \* (mrr\_pct / 100);  
+} else {  
+  calculated\_mrr\_dollars \= null;  
+}
+
+**Display Format:** $XXX,XXX  
+ **Label:** "Monthly Recurring Revenue"
+
+---
+
+### **Calculation 3: Project Revenue (Dollars)**
+
+**Field Name:** `calculated_project_dollars`  
+ **Formula:**
+
+javascript  
+const monthly\_agi \= getFromFinancialTab('monthly\_agi');  
+const project\_pct \= 100 \- revenue\_mix\_mrr\_percentage;
+
+if (monthly\_agi && revenue\_mix\_mrr\_percentage \!== null) {  
+  calculated\_project\_dollars \= monthly\_agi \* (project\_pct / 100);  
+} else {  
+  calculated\_project\_dollars \= null;  
+}
+
+**Display Format:** $XXX,XXX  
+ **Label:** "Project Revenue"
+
+---
+
+### **Calculation 4: Annual Churn Rate**
+
+**Field Name:** `calculated_annual_churn_pct`  
+ **Formula:**
+
+javascript  
+if (monthly\_churn\_rate \!== null) {  
+  calculated\_annual\_churn\_pct \= monthly\_churn\_rate \* 12;  
+  // Note: This is rough approximation, actual compound \= different  
+  // But sufficient for directional insight  
+} else {  
+  calculated\_annual\_churn\_pct \= null;  
+}
+
+**Display Format:** \~XX% annual turnover  
+ **Label:** "Annual Churn Rate (Approximate)"
+
+---
+
+### **Calculation 5: Annual Churned Clients**
+
+**Field Name:** `calculated_annual_churned_clients`  
+ **Formula:**
+
+javascript  
+if (active\_client\_count && monthly\_churn\_rate \!== null) {  
+  const annual\_churn\_pct \= monthly\_churn\_rate \* 12;  
+  calculated\_annual\_churned\_clients \= Math.round(  
+    active\_client\_count \* (annual\_churn\_pct / 100\)  
+  );  
+} else {  
+  calculated\_annual\_churned\_clients \= null;  
+}
+
+**Display Format:** \~X clients per year  
+ **Label:** "Churned Clients Annually"
+
+---
+
+### **Calculation 6: Implied Replacement Rate**
+
+**Field Name:** `calculated_replacement_rate`  
+ **Formula:**
+
+javascript  
+if (monthly\_churn\_rate \!== null) {  
+  calculated\_replacement\_rate \= monthly\_churn\_rate;  
+  // The replacement rate equals the churn rate  
+  // This is the % growth needed monthly just to stay flat  
+} else {  
+  calculated\_replacement\_rate \= null;  
+}
+
+**Display Format:** Must grow X.X% monthly to maintain revenue  
+ **Label:** "Implied Replacement Rate"  
+ **Helper Text Below:** "This is the minimum monthly growth rate needed to offset churn and stay neutral (not counting upsells)"
+
+---
+
+### **Calculation 7: Concentration Risk Score**
+
+**Field Name:** `calculated_concentration_risk`  
+ **Formula:**
+
+let riskScore \= 'LOW';  
+let riskReason \= '';
+
+const top5 \= concentration\_top5\_pct;  
+const top10 \= concentration\_top10\_pct;  
+const top20 \= concentration\_top20\_pct;
+
+if (top5 \> 70 || top10 \> 85 || top20 \> 95\) {  
+  riskScore \= 'HIGH';  
+  riskReason \= 'Extremely concentrated client base';  
+} else if (top5 \> 50 || top10 \> 70 || top20 \> 85\) {  
+  riskScore \= 'MEDIUM';  
+  riskReason \= 'Notable concentration in top clients';  
+} else if (top5 \!== null || top10 \!== null || top20 \!== null) {  
+  riskScore \= 'LOW';  
+  riskReason \= 'Well-distributed client base';  
+} else {  
+  riskScore \= null;  
+  riskReason \= '';  
+}  
+\`\`\`
+
+\*\*Display Format:\*\*  
+\`\`\`  
+Concentration Risk: \[HIGH/MEDIUM/LOW\]  
+(Top 5: X%, Top 10: Y%)  
+\`\`\`
+
+\*\*Color Coding:\*\*  
+\- HIGH \= Red text  
+\- MEDIUM \= Yellow/orange text  
+\- LOW \= Green text
+
+\---
+
+\#\# \*\*RIGHT-SIDE PANEL STRUCTURE\*\*
+
+\#\#\# \*\*Section 1: Calculated Metrics (Immediate)\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ 📊 Calculated Metrics                           │  
+│                                                 │  
+│ \[Shows immediately as data is entered\]          │  
+│                                                 │  
+│ Average Client Value: $8,333/month              │  
+│ Monthly Recurring Revenue: $70,000              │  
+│ Project Revenue: $30,000                        │  
+│ Annual Churn Rate: \~30% turnover                │  
+│ Churned Clients Annually: \~12 clients           │  
+│ Implied Replacement Rate: 2.5% monthly          │  
+│ Concentration Risk: MEDIUM (Top 5: 65%)         │  
+│                                                 │  
+│ \[Gray text below\]                               │  
+│ These metrics calculate automatically based     │  
+│ on your inputs and Financial tab data.          │  
+└─────────────────────────────────────────────────┘  
+\`\`\`
+
+\#\#\# \*\*Section 2: Contextual Insights (After Save)\*\*
+
+\*\*Before Save:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ 💡 What This Tells Us                           │  
+│                                                 │  
+│ \[Empty state with icon\]                         │  
+│                                                 │  
+│ Click "Save Growth & Pipeline Data" below to    │  
+│ generate contextual insights and benchmark      │  
+│ comparisons for your client model.              │  
+└─────────────────────────────────────────────────┘  
+\`\`\`
+
+\*\*After Save:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ 💡 What This Tells Us                           │  
+│                                                 │  
+│ \[GPT-generated content appears here\]            │  
+│                                                 │  
+│ Your revenue model is 70% recurring ($70K MRR,  │  
+│ $30K project revenue), creating baseline        │  
+│ predictability...                               │  
+│                                                 │  
+│ \[Full synthesis continues\]                      │  
+└─────────────────────────────────────────────────┘  
+\`\`\`
+
+\---
+
+\#\# \*\*GPT SYNTHESIS PROMPT STRUCTURE\*\*
+
+\#\#\# \*\*System Prompt:\*\*  
+\`\`\`  
+You are a business analyst specializing in marketing agency revenue models and client dynamics. Analyze the provided growth and pipeline snapshot and generate contextual insights using observational language (not prescriptive). Focus on:
+
+1\. Revenue model implications (recurring vs. project mix)  
+2\. Client size profile and operational complexity indicators  
+3\. Retention health and churn dynamics  
+4\. Implied replacement rate and growth requirements  
+5\. Concentration risk assessment  
+6\. Acquisition efficiency (if enhanced data provided)  
+7\. Channel mix implications (if enhanced data provided)
+
+Use benchmark ranges:  
+\- MRR Mix: 80%+ (very stable), 60-80% (balanced), 40-60% (project-heavy), \<40% (transactional)  
+\- Monthly Churn: \<1.5% (excellent), 1.5-2.5% (healthy), 2.5-4% (moderate concern), 4%+ (high concern)  
+\- Concentration Risk: HIGH (top 5 \>70% OR top 10 \>85%), MEDIUM (top 5 \>50% OR top 10 \>70%), LOW (distributed)  
+\- Win Rate: 50%+ (excellent), 40-50% (strong), 30-40% (standard), \<30% (below average)
+
+Keep tone observational ("indicates," "suggests," "positions you"), not directive ("you should"). Length: 200-300 words.
+
+### **User Prompt Payload:**
+
+json  
+{  
+  "revenue\_mix\_mrr\_percentage": 70,  
+  "active\_client\_count": 12,  
+  "client\_tier\_mix": "mostly\_midmarket",  
+  "monthly\_churn\_rate": 2.5,  
+  "average\_client\_lifetime\_months": 40,  
+    
+  "enhanced\_fields\_provided": {  
+    "typical\_win\_rate": 40,  
+    "average\_sales\_cycle": "moderate",  
+    "channel\_mix": {  
+      "referrals": "1st",  
+      "partnerships": "2nd",  
+      "content": "3rd",  
+      "paid": "not\_at\_all",  
+      "outbound": "not\_at\_all"  
+    },  
+    "concentration\_top5\_pct": 65,  
+    "concentration\_top10\_pct": 80,  
+    "concentration\_top20\_pct": 92  
+  },  
+    
+  "calculated\_metrics": {  
+    "calculated\_acv": 8333,  
+    "calculated\_mrr\_dollars": 70000,  
+    "calculated\_project\_dollars": 30000,  
+    "calculated\_annual\_churn\_pct": 30,  
+    "calculated\_annual\_churned\_clients": 12,  
+    "calculated\_replacement\_rate": 2.5,  
+    "calculated\_concentration\_risk": "MEDIUM"  
+  },  
+    
+  "financial\_tab\_context": {  
+    "monthly\_agi": 100000,  
+    "cash\_runway\_months": 1.3  
+  }  
+}  
+\`\`\`
+
+\*\*Note:\*\* Only include enhanced fields if actually filled. Don't send null/empty values.
+
+\---
+
+\#\#\# \*\*Expected GPT Response Format:\*\*  
+\`\`\`  
+Your revenue model is 70% recurring ($70K MRR, $30K project revenue), creating baseline predictability while maintaining flexibility for larger project premiums. With 12 active clients averaging $8,333/month (calculated ACV), you're operating in the mid-market tier — past SMB volume requirements but not yet enterprise coordination complexity.
+
+Your 2.5% monthly churn (roughly 30% annual turnover) means you're replacing approximately a third of your client base each year. This translates to an implied replacement rate of 2.5% monthly growth just to stay neutral — before accounting for any net expansion. Your 40-month average client lifetime validates this churn rate, indicating most relationships last 3+ years.
+
+Concentration Risk: MEDIUM — your top 5 clients represent 65% of revenue (top 10 at 80%). While not critically concentrated, losing any large relationship would create meaningful impact, particularly given your 1.3-month cash runway from Financial tab. This suggests building reserves or diversifying your client base alongside retention focus.
+
+Your typical win rate of 40% exceeds industry benchmarks of 30-35%, suggesting effective qualification and proposal quality. Combined with your primarily referral-driven acquisition (ranked 1st, with partnerships 2nd and content 3rd), this indicates strong client satisfaction driving growth — though reliance on referrals limits your ability to control acquisition timing without developing more proactive systems.
+
+Overall Client Model: Mid-market, relationship-intensive operation with strong retention foundation and effective sales conversion, tempered by moderate concentration risk and referral-dependent acquisition.  
+\`\`\`
+
+\---
+
+\#\# \*\*BENCHMARKS FOR SYNTHESIS\*\*
+
+\#\#\# \*\*Revenue Mix (MRR %):\*\*  
+\- \*\*80%+\*\* → Very stable, recurring-heavy (subscription model)  
+\- \*\*60-80%\*\* → Balanced, healthy mix  
+\- \*\*40-60%\*\* → Project-heavy with some recurring  
+\- \*\*\<40%\*\* → Primarily project/transactional
+
+\#\#\# \*\*Monthly Churn Rate:\*\*  
+\- \*\*\<1.5%\*\* → Excellent retention (85%+ annual retention)  
+\- \*\*1.5-2.5%\*\* → Healthy (70-82% annual retention)  
+\- \*\*2.5-4%\*\* → Moderate concern (52-70% annual retention)  
+\- \*\*4%+\*\* → High concern (\<52% annual retention)
+
+\#\#\# \*\*Concentration Risk Thresholds:\*\*
+
+\*\*Top 5 Clients:\*\*  
+\- \*\*\>70%\*\* \= HIGH RISK (extremely concentrated)  
+\- \*\*50-70%\*\* \= MEDIUM RISK (notable concentration)  
+\- \*\*\<50%\*\* \= LOW RISK (distributed)
+
+\*\*Top 10 Clients:\*\*  
+\- \*\*\>85%\*\* \= HIGH RISK  
+\- \*\*70-85%\*\* \= MEDIUM RISK  
+\- \*\*\<70%\*\* \= LOW RISK
+
+\*\*Top 20 Clients:\*\*  
+\- \*\*\>95%\*\* \= HIGH RISK  
+\- \*\*85-95%\*\* \= MEDIUM RISK  
+\- \*\*\<85%\*\* \= LOW RISK
+
+\*\*Overall Risk Score Logic:\*\*  
+\- If ANY threshold triggers HIGH → Overall \= HIGH  
+\- If ANY threshold triggers MEDIUM (and no HIGH) → Overall \= MEDIUM  
+\- If all thresholds are LOW → Overall \= LOW
+
+\#\#\# \*\*Win Rate:\*\*  
+\- \*\*50%+\*\* → Excellent (top quartile)  
+\- \*\*40-50%\*\* → Strong (above average)  
+\- \*\*30-40%\*\* → Industry standard  
+\- \*\*20-30%\*\* → Below average  
+\- \*\*\<20%\*\* → Concerning
+
+\---
+
+\#\# \*\*UI/UX IMPLEMENTATION NOTES\*\*
+
+\#\#\# \*\*Page Layout:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────────────────┐  
+│  Growth & Pipeline Tab                                      │  
+│  \[Ballpark guidance message\]                                │  
+├────────────────────────────────┬────────────────────────────┤  
+│                                │                            │  
+│  BASELINE FIELDS               │  📊 Calculated Metrics     │  
+│  (Always visible)              │  \[Real-time calculations\]  │  
+│                                │                            │  
+│  MODEL PROFILE                 │  ACV: $X,XXX               │  
+│  \[Field 1: Revenue Mix\]        │  MRR $: $XXX,XXX           │  
+│                                │  Project $: $XXX,XXX       │  
+│  CLIENT PROFILE                │  Annual Churn: \~X%         │  
+│  \[Field 2: Client Count\]       │  Churned Clients: \~X       │  
+│  \[Field 3: Tier Mix\]           │  Replacement Rate: X.X%    │  
+│                                │  Concentration Risk: X     │  
+│  RETENTION PROFILE             │                            │  
+│  \[Field 4: Churn Rate\]         │  ─────────────────────     │  
+│  \[Field 5: Lifetime\]           │                            │  
+│                                │  💡 What This Tells Us     │  
+│  ▶ Enhanced Metrics (Optional) │  \[GPT synthesis after save\]│  
+│    \[Initially collapsed\]       │                            │  
+│                                │                            │  
+│    ACQUISITION EFFICIENCY      │                            │  
+│    \[Field 6: Win Rate\]         │                            │  
+│    \[Field 7: Sales Cycle\]      │                            │  
+│                                │                            │  
+│    ACQUISITION CHANNELS        │                            │  
+│    \[Field 8: Channel Mix\]      │                            │  
+│                                │                            │  
+│    PIPELINE & NEW BUSINESS     │                            │  
+│    \[Field 9: Concentration\]    │                            │  
+│                                │                            │  
+│  \[Save Growth & Pipeline Data\] │                            │  
+│                                │                            │  
+└────────────────────────────────┴────────────────────────────┘
+
+### **Field Behavior:**
+
+* All fields optional (no required validation)  
+* Tab order follows logical flow  
+* Percentage fields auto-format with % symbol  
+* Number fields with appropriate constraints  
+* Info icons next to field labels trigger tooltips on hover  
+* Helper text appears below each field (gray, smaller font)
+
+### **Calculated Metrics Behavior:**
+
+* Start with placeholder "---" for all metrics  
+* Update immediately as relevant fields change  
+* Show smooth transition animation when values populate  
+* If required fields empty, show "---" instead of $0 or 0%  
+* Cross-tab calculation (ACV) only works if Financial tab completed
+
+### **Save Button Behavior:**
+
+* Label: "Save Growth & Pipeline Data"  
+* Position: Bottom of left column  
+* Disabled state if no data entered (gray, not clickable)  
+* Active state once any field has data (blue, clickable)  
+* On click:  
+  * Show loading spinner  
+  * Send data to GPT synthesis endpoint  
+  * Update right panel with insights  
+  * Change button to "Update Growth & Pipeline Data"
+
+### **Enhanced Accordion:**
+
+* Label: "▶ Enhanced Metrics (Optional)"  
+* Subtext: "Provide additional context for deeper insights on acquisition and pipeline"  
+* On click: Expand to show 5 additional fields  
+* Icon changes to "▼" when expanded  
+* Smooth height transition animation
+
+---
+
+## **DATABASE SCHEMA NOTES**
+
+**Table:** `agency_snapshots`
+
+All growth fields should be stored in this table with these columns:
+
+sql  
+\-- Baseline fields  
+revenue\_mix\_mrr\_percentage DECIMAL(5,2)  
+active\_client\_count INTEGER  
+client\_tier\_mix VARCHAR(50)  
+monthly\_churn\_rate DECIMAL(5,2)  
+average\_client\_lifetime\_months INTEGER
+
+\-- Enhanced fields  
+typical\_win\_rate DECIMAL(5,2)  
+average\_sales\_cycle VARCHAR(50)  
+channel\_referrals\_rank VARCHAR(20)  
+channel\_partnerships\_rank VARCHAR(20)  
+channel\_content\_rank VARCHAR(20)  
+channel\_paid\_rank VARCHAR(20)  
+channel\_outbound\_rank VARCHAR(20)  
+concentration\_top5\_pct DECIMAL(5,2)  
+concentration\_top10\_pct DECIMAL(5,2)  
+concentration\_top20\_pct DECIMAL(5,2)
+
+\-- Calculated fields (store for historical reference)  
+calculated\_acv DECIMAL(12,2)  
+calculated\_mrr\_dollars DECIMAL(12,2)  
+calculated\_project\_dollars DECIMAL(12,2)  
+calculated\_annual\_churn\_pct DECIMAL(5,2)  
+calculated\_annual\_churned\_clients INTEGER  
+calculated\_replacement\_rate DECIMAL(5,2)  
+calculated\_concentration\_risk VARCHAR(20)
+
+\-- GPT synthesis output  
+growth\_synthesis TEXT  
+growth\_synthesis\_generated\_at TIMESTAMP
+
+\-- Metadata  
+created\_at TIMESTAMP  
+updated\_at TIMESTAMP  
+user\_id UUID (foreign key to users table)  
+---
+
+## **VISUAL DESIGN REQUIREMENTS**
+
+* **Match Financial tab exactly** in styling, spacing, typography  
+* Use card-based layout with clear spacing between sections  
+* Section headers: 14px, semi-bold, dark gray  
+* Field labels: 12px, regular weight, medium gray  
+* Helper text: 11px, light gray, below fields  
+* Info icons: Small (i) icon, triggers tooltip on hover  
+* Calculated metrics panel: Light background, clear visual separation  
+* Responsive: Calculated metrics panel on right (desktop), below (tablet/mobile)
+
+---
+
+## **SUMMARY — READY FOR IMPLEMENTATION**
+
+### **Baseline Fields: 5 fields (\~5-10 min completion)**
+
+1. Revenue Mix (% MRR vs Project)  
+2. Active Client Count  
+3. Client Tier Mix (dropdown)  
+4. Monthly Churn Rate (%)  
+5. Average Client Lifetime (months)
+
+### **Enhanced Fields: 5 fields (optional depth)**
+
+6. Typical Win Rate (%)  
+7. Average Sales Cycle Length (dropdown)  
+8. Channel Mix (rank order across 5 channels)  
+9. Concentration Index (Top 5, 10, 20 as %)
+
+### **Calculated Metrics: 7 immediate calculations**
+
+1. Average Client Value (ACV)  
+2. MRR (dollars)  
+3. Project Revenue (dollars)  
+4. Annual Churn Rate (%)  
+5. Annual Churned Clients (\#)  
+6. Implied Replacement Rate (%)  
+7. Concentration Risk Score (High/Medium/Low)
+
+### **GPT Synthesis: After save**
+
+* Contextual insights (200-300 words)  
+* Benchmark comparisons  
+* Revenue model characterization  
+* Observational language (no prescriptions)
+
+---
+
+## **HANDOFF CHECKLIST**
+
+✅ Complete field specifications with validation  
+ ✅ Calculated metrics formulas defined  
+ ✅ GPT synthesis prompt structure provided  
+ ✅ UI/UX layout matches Financial tab  
+ ✅ Benchmark definitions for synthesis  
+ ✅ Database schema notes included  
+ ✅ Visual design requirements specified  
+ ✅ Ready for Antigravity/Lovable implementation
+
+---
+
+**END OF GROWTH & PIPELINE TAB BUILD SPECIFICATION**
+

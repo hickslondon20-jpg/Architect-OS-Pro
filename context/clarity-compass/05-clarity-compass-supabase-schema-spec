@@ -1,0 +1,442 @@
+# Clarity Compass — Supabase Schema Spec
+**Version:** 1.0  
+**Status:** Ready for Migration  
+**Naming Convention:** All tables prefixed with `cc_` per platform standards  
+**User Reference:** `auth.users.id` (Supabase auth UUID)  
+**GVS Reference:** `gvs_saved_growth_scenarios`
+
+---
+
+## Overview
+
+Six tables support the full Clarity Compass feature. They are organized across three functional layers:
+
+**Draft Layer** — working state between sessions  
+`cc_drafts` `cc_horizon_tags`
+
+**Version Layer** — immutable submitted records  
+`cc_versions` `cc_version_horizon_snapshots`
+
+**Supporting Layer** — metadata and operational logging  
+`cc_meta` `cc_synthesis_log`
+
+---
+
+## Table 1 — cc_drafts
+
+Stores the working draft state for each horizon per founder. One row per founder per horizon. Upserted on every save — never duplicated. Persists between sessions until the founder submits a full version.
+
+```sql
+create table cc_drafts (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null references auth.users(id) on delete cascade,
+  horizon             text not null check (horizon in ('12_month', '24_month', '36_month', 'ultimate_vision')),
+  field_selections    jsonb not null default '{}',
+  completion_status   text not null default 'not_started' check (completion_status in ('not_started', 'in_progress', 'complete')),
+  last_saved_at       timestamptz not null default now(),
+  created_at          timestamptz not null default now(),
+
+  unique (user_id, horizon)
+);
+
+-- Indexes
+create index cc_drafts_user_id_idx on cc_drafts(user_id);
+create index cc_drafts_user_horizon_idx on cc_drafts(user_id, horizon);
+
+-- RLS
+alter table cc_drafts enable row level security;
+
+create policy "Users can manage their own drafts"
+  on cc_drafts
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+
+**field_selections JSONB structure:**
+
+Each horizon stores its field selections as a flat key-value object. Keys match the field identifiers defined in the spec. Example for 12_month:
+
+```json
+{
+  "primary_financial_objective": "Reinvest aggressively to fund growth",
+  "revenue_model_direction": "Continuing to scale a model that's already proven",
+  "financial_success_markers": [
+    "Decisions are no longer made from scarcity or cash pressure",
+    "Margin has improved to the point where the business funds its own evolution"
+  ],
+  "client_quality_direction": "I want to raise the bar — fewer, higher-value, better-fit clients",
+  "market_position_direction": "Sharpening specialization — becoming more distinctly known for a specific outcome or vertical",
+  "client_relationship_markers": [
+    "Clients treat us as a strategic partner, not a vendor or executor"
+  ],
+  "delivery_consistency_direction": "Standardizing processes so quality is repeatable regardless of who executes",
+  "operational_leverage_direction": "Building infrastructure ahead of growth to create capacity before it's needed",
+  "operational_success_markers": [
+    "The business runs consistently without requiring my direct involvement in delivery"
+  ],
+  "leadership_distribution_intent": "I want a defined leadership layer owning specific functions with meaningful autonomy",
+  "team_building_intent": "A team of specialists who own defined functions with deep expertise in their lane",
+  "founder_role_direction": "Less delivery, more strategy and vision",
+  "founder_focus_intent": "Business growth and market positioning"
+}
+```
+
+---
+
+## Table 2 — cc_horizon_tags
+
+Stores scenario tags independently from draft and version records. One row per founder per horizon per context (draft or version). Keeping this separate allows tags to be updated without rewriting the full draft or version record.
+
+```sql
+create table cc_horizon_tags (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null references auth.users(id) on delete cascade,
+  horizon             text not null check (horizon in ('12_month', '24_month', '36_month', 'ultimate_vision')),
+  context             text not null check (context in ('draft', 'version')),
+  context_id          uuid not null,
+  scenario_id         uuid references gvs_saved_growth_scenarios(id) on delete set null,
+  scenario_snapshot   jsonb,
+  tagged_at           timestamptz not null default now(),
+
+  unique (user_id, horizon, context, context_id)
+);
+
+-- Indexes
+create index cc_horizon_tags_user_id_idx on cc_horizon_tags(user_id);
+create index cc_horizon_tags_context_id_idx on cc_horizon_tags(context_id);
+create index cc_horizon_tags_scenario_id_idx on cc_horizon_tags(scenario_id);
+
+-- RLS
+alter table cc_horizon_tags enable row level security;
+
+create policy "Users can manage their own horizon tags"
+  on cc_horizon_tags
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+
+**Notes:**
+
+`context` distinguishes whether this tag belongs to a draft record or a version record. `context_id` is the UUID of the relevant `cc_drafts.id` or `cc_versions.id` record.
+
+`scenario_snapshot` stores a point-in-time copy of the relevant scenario data at the time of tagging — GVI score, band label, composition label, pressure profile summary, and GPT synthesis excerpt. This prevents the synthesis from changing retroactively if the founder later modifies or deletes the original scenario.
+
+---
+
+## Table 3 — cc_versions
+
+The immutable version record created on submit. One row per submitted Compass. Stores the complete intake payload, all synthesis content, version metadata, and completion state. The synthesis JSONB field is the only field that can be updated after creation — only when a legitimate regeneration with changed inputs occurs.
+
+```sql
+create table cc_versions (
+  id                      uuid primary key default gen_random_uuid(),
+  user_id                 uuid not null references auth.users(id) on delete cascade,
+  version_name            text not null,
+  version_number          integer not null,
+  input_hash              text not null,
+  full_intake_payload     jsonb not null default '{}',
+  synthesis               jsonb not null default '{}',
+  synthesis_status        text not null default 'pending' check (synthesis_status in ('pending', 'generating', 'complete', 'failed')),
+  horizons_complete       text[] not null default '{}',
+  scenario_tags_present   text[] not null default '{}',
+  is_current_version      boolean not null default true,
+  submitted_at            timestamptz not null default now(),
+  synthesis_generated_at  timestamptz,
+  created_at              timestamptz not null default now()
+);
+
+-- Indexes
+create index cc_versions_user_id_idx on cc_versions(user_id);
+create index cc_versions_user_current_idx on cc_versions(user_id, is_current_version);
+create index cc_versions_input_hash_idx on cc_versions(user_id, input_hash);
+
+-- RLS
+alter table cc_versions enable row level security;
+
+create policy "Users can read their own versions"
+  on cc_versions
+  for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own versions"
+  on cc_versions
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update synthesis on their own versions"
+  on cc_versions
+  for update
+  using (auth.uid() = user_id);
+```
+
+**synthesis JSONB structure:**
+
+```json
+{
+  "block_1_header": {
+    "ultimate_vision_characterization": "...",
+    "horizon_scenario_strip": [
+      {
+        "horizon": "12_month",
+        "scenario_name": "Aggressive Growth 2026",
+        "gvi_score": 84,
+        "band_label": "High Velocity",
+        "composition_label": "Ambition-Driven"
+      }
+    ]
+  },
+  "block_2_trajectory": "GPT-generated prose...",
+  "block_3_visual": {
+    "horizon_cards": [
+      {
+        "horizon": "12_month",
+        "label": "Foundational Scale",
+        "data_points": ["Aggressive team expansion", "High founder dependency"],
+        "band_badge": "High Velocity"
+      }
+    ]
+  },
+  "block_4_implications": {
+    "prose": "GPT-generated prose...",
+    "callouts": [
+      {
+        "stem": "A trajectory of this character implies...",
+        "implication": "..."
+      },
+      {
+        "stem": "The path you've described requires...",
+        "implication": "..."
+      }
+    ]
+  },
+  "block_5_insights": [
+    {
+      "headline": "GPT-generated insight headline",
+      "narrative": "GPT-generated supporting narrative..."
+    },
+    {
+      "headline": "GPT-generated insight headline",
+      "narrative": "GPT-generated supporting narrative..."
+    }
+  ],
+  "block_6_north_star": {
+    "statement": "GPT-generated north star statement...",
+    "represents": "GPT-generated supporting context line 1...",
+    "in_service_of": "GPT-generated supporting context line 2..."
+  }
+}
+```
+
+**Notes:**
+
+`input_hash` is a deterministic hash of the full intake payload. Used by the regenerate logic to determine whether inputs have changed since the last synthesis. If the hash matches the current version, overwrite synthesis. If it does not match, write a new version record.
+
+`is_current_version` is set to true on creation and set to false on all previous versions for that user when a new version is created. Enables fast retrieval of the current version without sorting.
+
+`horizons_complete` and `scenario_tags_present` are arrays of horizon identifiers — e.g. `['12_month', '24_month', '36_month', 'ultimate_vision']` — stored at version creation time for fast display in the History tab without needing to inspect the full payload.
+
+---
+
+## Table 4 — cc_version_horizon_snapshots
+
+Stores the per-horizon field state as individual queryable rows within a version. While the full intake payload is also stored in `cc_versions.full_intake_payload`, this table enables horizon-level querying, comparison between versions at the horizon level, and clean data access for the Progression Synthesis feature without parsing the full version JSONB.
+
+```sql
+create table cc_version_horizon_snapshots (
+  id                  uuid primary key default gen_random_uuid(),
+  version_id          uuid not null references cc_versions(id) on delete cascade,
+  user_id             uuid not null references auth.users(id) on delete cascade,
+  horizon             text not null check (horizon in ('12_month', '24_month', '36_month', 'ultimate_vision')),
+  field_selections    jsonb not null default '{}',
+  scenario_id         uuid references gvs_saved_growth_scenarios(id) on delete set null,
+  scenario_snapshot   jsonb,
+  created_at          timestamptz not null default now(),
+
+  unique (version_id, horizon)
+);
+
+-- Indexes
+create index cc_version_horizon_snapshots_version_id_idx on cc_version_horizon_snapshots(version_id);
+create index cc_version_horizon_snapshots_user_id_idx on cc_version_horizon_snapshots(user_id);
+create index cc_version_horizon_snapshots_user_horizon_idx on cc_version_horizon_snapshots(user_id, horizon);
+
+-- RLS
+alter table cc_version_horizon_snapshots enable row level security;
+
+create policy "Users can read their own horizon snapshots"
+  on cc_version_horizon_snapshots
+  for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own horizon snapshots"
+  on cc_version_horizon_snapshots
+  for insert
+  with check (auth.uid() = user_id);
+```
+
+**Notes:**
+
+This table is written to at the same time as `cc_versions` on submit — four rows created per submission, one per horizon. It is never updated after creation. Its primary future-state purpose is enabling the Pro tier Progression Synthesis feature, which will query across versions at the horizon level to surface how specific dimensions have shifted over time.
+
+---
+
+## Table 5 — cc_meta
+
+A single row per founder. Tracks the current navigation and draft state at a high level. Enables fast retrieval of where a founder is in their Clarity Compass journey without querying multiple tables. Updated on every meaningful state change.
+
+```sql
+create table cc_meta (
+  id                      uuid primary key default gen_random_uuid(),
+  user_id                 uuid not null references auth.users(id) on delete cascade,
+  current_version_id      uuid references cc_versions(id) on delete set null,
+  has_submitted           boolean not null default false,
+  last_active_horizon     text check (last_active_horizon in ('12_month', '24_month', '36_month', 'ultimate_vision')),
+  draft_overall_status    text not null default 'not_started' check (draft_overall_status in ('not_started', 'in_progress', 'complete')),
+  version_count           integer not null default 0,
+  last_activity_at        timestamptz not null default now(),
+  created_at              timestamptz not null default now(),
+
+  unique (user_id)
+);
+
+-- Indexes
+create index cc_meta_user_id_idx on cc_meta(user_id);
+
+-- RLS
+alter table cc_meta enable row level security;
+
+create policy "Users can manage their own meta record"
+  on cc_meta
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+```
+
+**Notes:**
+
+`current_version_id` references the most recently submitted version. Used as the primary pointer for the Dashboard — if this is populated, render the synthesis from that version record.
+
+`has_submitted` is the single boolean that determines whether the Dashboard shows the empty state or the loaded synthesis.
+
+`draft_overall_status` is a rolled-up status derived from the four horizon draft completion statuses. Updated whenever any horizon draft is saved.
+
+`version_count` increments on every new version creation. Used for display in the History tab and for determining version numbering.
+
+---
+
+## Table 6 — cc_synthesis_log
+
+Logs every GPT synthesis call. One row per call. Never updated after creation. Provides operational visibility into synthesis generation, cost tracking, error logging, and the input hash comparison logic that drives the regenerate decision.
+
+```sql
+create table cc_synthesis_log (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null references auth.users(id) on delete cascade,
+  version_id          uuid references cc_versions(id) on delete set null,
+  input_hash          text not null,
+  trigger             text not null check (trigger in ('submit', 'regenerate')),
+  status              text not null default 'pending' check (status in ('pending', 'success', 'failed')),
+  error_message       text,
+  tokens_used         integer,
+  model               text,
+  duration_ms         integer,
+  created_at          timestamptz not null default now(),
+  completed_at        timestamptz
+);
+
+-- Indexes
+create index cc_synthesis_log_user_id_idx on cc_synthesis_log(user_id);
+create index cc_synthesis_log_version_id_idx on cc_synthesis_log(version_id);
+create index cc_synthesis_log_input_hash_idx on cc_synthesis_log(user_id, input_hash);
+
+-- RLS
+alter table cc_synthesis_log enable row level security;
+
+create policy "Users can read their own synthesis log"
+  on cc_synthesis_log
+  for select
+  using (auth.uid() = user_id);
+
+create policy "Service role can insert synthesis log entries"
+  on cc_synthesis_log
+  for insert
+  with check (true);
+```
+
+**Notes:**
+
+`trigger` distinguishes between an initial submit call and a regenerate call. Useful for analytics and cost attribution.
+
+`tokens_used`, `model`, and `duration_ms` enable cost tracking per synthesis call. These are populated by the n8n workflow after the GPT call completes.
+
+The insert policy uses `with check (true)` because synthesis log entries are written by the n8n service role, not by the authenticated user directly.
+
+---
+
+## Retrieval Logic
+
+When a founder opens the Clarity Compass, the frontend runs this retrieval sequence:
+
+```
+1. Query cc_meta where user_id = auth.uid()
+
+2. If cc_meta.has_submitted = true:
+   → Load cc_versions where id = cc_meta.current_version_id
+   → Populate Dashboard with synthesis JSONB
+   → Populate Vision State form fields from cc_versions.full_intake_payload (read-only view)
+   → Load cc_horizon_tags where context = 'version' and context_id = current_version_id
+
+3. If cc_meta.has_submitted = false:
+   → Show Dashboard empty state
+   → Query cc_drafts where user_id = auth.uid() for all four horizons
+   → Populate each horizon accordion with its respective draft field_selections
+   → Load cc_horizon_tags where context = 'draft' and context_id = respective draft id
+   → Set accordion status badges from cc_drafts.completion_status
+   → Set sidebar indicators from same
+
+4. If no cc_meta record exists (first visit):
+   → Create cc_meta record for this user
+   → Show all horizons as Not Started
+   → Show Dashboard empty state
+```
+
+---
+
+## Save Logic
+
+**Auto-save trigger:** Fires 1500ms after the last field change within a horizon. Upserts the relevant `cc_drafts` row. Updates `cc_meta.last_activity_at` and `cc_meta.draft_overall_status`.
+
+**Explicit save (Save button within horizon):** Immediately upserts the relevant `cc_drafts` row and updates `cc_drafts.completion_status` based on whether all required fields in that horizon are complete.
+
+**Submit trigger:** 
+1. Collects all four `cc_drafts` records
+2. Generates `input_hash` from full intake payload
+3. Creates `cc_versions` record with `synthesis_status = 'pending'`
+4. Creates four `cc_version_horizon_snapshots` records
+5. Creates `cc_horizon_tags` records with `context = 'version'`
+6. Updates `cc_meta.has_submitted = true`, `cc_meta.current_version_id`, `cc_meta.version_count`
+7. Creates `cc_synthesis_log` entry with `trigger = 'submit'`
+8. Fires n8n webhook with full payload
+9. On n8n completion, updates `cc_versions.synthesis` and `cc_versions.synthesis_status = 'complete'`
+10. Updates `cc_synthesis_log` with status, tokens, duration
+
+**Regenerate logic:**
+1. Generate `input_hash` from current form state
+2. Compare against `cc_versions.input_hash` on current version
+3. If hash matches → update `cc_versions.synthesis` in place, log as regenerate
+4. If hash differs → create new `cc_versions` record, new snapshots, new tags, increment version count, set previous version `is_current_version = false`
+
+---
+
+## Migration Order
+
+Run migrations in this order to respect foreign key dependencies:
+
+1. `cc_meta`
+2. `cc_drafts`
+3. `cc_versions`
+4. `cc_version_horizon_snapshots`
+5. `cc_horizon_tags`
+6. `cc_synthesis_log`

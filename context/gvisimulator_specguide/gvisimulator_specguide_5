@@ -1,0 +1,1228 @@
+# **📄 DOCUMENT 5: Visual Design Specifications**
+
+## **Growth Velocity Calculator — Premium Interface Design System**
+
+---
+
+## **Brand Philosophy: Premium Intelligence Platform**
+
+**Design Mandate:** This tool should feel like enterprise-grade strategic intelligence software—the kind of system a $10K/month consultant would use to advise C-suite executives. Every visual element must communicate sophistication, credibility, and deep analytical capability.
+
+**NOT:** Playful, emoji-heavy, consumer app aesthetic  
+ **YES:** Bloomberg Terminal meets McKinsey report meets Figma analytics
+
+---
+
+## **Core Design Principles**
+
+### **1\. Intellectual Sophistication**
+
+Data should feel dense but organized. Charts should reward careful study. Typography should communicate authority.
+
+### **2\. Restrained Elegance**
+
+Use whitespace generously. Let data breathe. Avoid visual clutter or decorative elements that don't serve function.
+
+### **3\. Progressive Disclosure**
+
+Surface critical insights immediately. Deeper complexity available on interaction. Never overwhelm with all data at once.
+
+### **4\. Tactile Precision**
+
+Interactions should feel deliberate and precise. Sliders move smoothly. Transitions are purposeful. Nothing bounces or jiggles.
+
+### **5\. Confident Authority**
+
+Design should project certainty and expertise. This is professional-grade strategic analysis, not a fun calculator.
+
+---
+
+## **Color System**
+
+### **Primary Palette: Sophisticated Neutrals**
+
+Background Hierarchy:  
+├─ Surface Primary: \#FFFFFF (pure white)  
+├─ Surface Secondary: \#F8F9FA (soft gray for cards)  
+├─ Surface Tertiary: \#F1F3F5 (subtle backgrounds)  
+└─ Surface Depth: \#E9ECEF (dividers, borders)
+
+Text Hierarchy:  
+├─ Text Primary: \#1A1D1F (near-black for headers)  
+├─ Text Secondary: \#4A5568 (body text)  
+├─ Text Tertiary: \#718096 (supporting text)  
+└─ Text Disabled: \#A0AEC0 (inactive states)
+
+Border System:  
+├─ Border Strong: \#CBD5E0 (clear separations)  
+├─ Border Default: \#E2E8F0 (standard borders)
+
+└─ Border Subtle: \#EDF2F7 (minimal separation)
+
+---
+
+### **Semantic Colors: Pressure Indicators**
+
+Replace emoji-based pressure families with sophisticated color coding:
+
+Status Colors (Primary Use: Pressure Family Alerts)
+
+Critical / High Pressure:  
+├─ Primary: \#DC2626 (strong red)  
+├─ Background: \#FEE2E2 (light red wash)  
+├─ Border: \#FCA5A5 (medium red)  
+└─ Usage: RED pressure alerts, danger states
+
+Caution / Moderate Pressure:  
+├─ Primary: \#D97706 (amber)  
+├─ Background: \#FEF3C7 (light amber wash)  
+├─ Border: \#FCD34D (medium amber)  
+└─ Usage: YELLOW pressure alerts, warning states
+
+Stable / Low Pressure:  
+├─ Primary: \#059669 (forest green)  
+├─ Background: \#D1FAE5 (light green wash)  
+├─ Border: \#6EE7B7 (medium green)  
+└─ Usage: GREEN pressure alerts, healthy states
+
+Informational:  
+├─ Primary: \#2563EB (blue)  
+├─ Background: \#DBEAFE (light blue wash)  
+├─ Border: \#93C5FD (medium blue)  
+└─ Usage: Neutral information, calculation results
+
+**Usage Philosophy:**
+
+* Never use raw semantic colors for large areas  
+* Always use background washes with subtle borders  
+* Text in semantic color only for emphasis (labels, badges)  
+* Charts can use semantic primaries at 80% opacity
+
+---
+
+### **Chart Palette: Data Visualization**
+
+Primary Data Series:  
+├─ Series 1: \#1E40AF (deep blue) — Revenue, targets, primary metrics  
+├─ Series 2: \#7C3AED (violet) — Profit, secondary outcomes  
+├─ Series 3: \#0891B2 (teal) — Efficiency, operations  
+├─ Series 4: \#DC2626 (red) — Churn, costs, pressure points  
+└─ Series 5: \#059669 (green) — Growth, improvements, gains
+
+Supporting Elements:  
+├─ Grid Lines: \#E5E7EB at 40% opacity  
+├─ Axis Labels: \#6B7280  
+├─ Hover States: Series color at 120% brightness  
+└─ Selected States: Series color with \#1F2937 border
+
+**Chart Design Rules:**
+
+1. No gradients (solid fills only)  
+2. 8px border radius on bars/cards maximum  
+3. 2px stroke width for lines  
+4. 12px minimum spacing between bars  
+5. 16px padding inside chart containers
+
+---
+
+## **Typography System**
+
+### **Font Stack**
+
+\--font-primary: 'Inter', \-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;  
+\--font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;  
+\`\`\`
+
+\*\*Why Inter:\*\*  
+\- Designed for UI/screens  
+\- Professional without being cold  
+\- Excellent legibility at all sizes  
+\- Strong number forms (critical for data-heavy interface)
+
+\---
+
+\#\#\# \*\*Type Scale & Hierarchy\*\*  
+\`\`\`  
+Display (Page Titles):  
+├─ Size: 32px (2rem)  
+├─ Weight: 600 (SemiBold)  
+├─ Line Height: 1.2  
+├─ Letter Spacing: \-0.02em (tight)  
+├─ Color: Text Primary  
+└─ Usage: Main page title
+
+Heading 1 (Section Headers):  
+├─ Size: 24px (1.5rem)  
+├─ Weight: 600 (SemiBold)  
+├─ Line Height: 1.3  
+├─ Letter Spacing: \-0.01em  
+├─ Color: Text Primary  
+└─ Usage: Major section headers (e.g., "Structural Implications")
+
+Heading 2 (Subsection Headers):  
+├─ Size: 18px (1.125rem)  
+├─ Weight: 600 (SemiBold)  
+├─ Line Height: 1.4  
+├─ Letter Spacing: 0  
+├─ Color: Text Primary  
+└─ Usage: Card titles, pressure family labels
+
+Heading 3 (Component Labels):  
+├─ Size: 14px (0.875rem)  
+├─ Weight: 500 (Medium)  
+├─ Line Height: 1.4  
+├─ Letter Spacing: 0.01em (slightly loose)  
+├─ Text Transform: Uppercase  
+├─ Color: Text Tertiary  
+└─ Usage: Field labels, small headers ("BASELINE INPUTS")
+
+Body Large (Primary Content):  
+├─ Size: 16px (1rem)  
+├─ Weight: 400 (Regular)  
+├─ Line Height: 1.6  
+├─ Letter Spacing: 0  
+├─ Color: Text Secondary  
+└─ Usage: Main paragraph text, GPT synthesis
+
+Body (Default):  
+├─ Size: 14px (0.875rem)  
+├─ Weight: 400 (Regular)  
+├─ Line Height: 1.5  
+├─ Letter Spacing: 0  
+├─ Color: Text Secondary  
+└─ Usage: Form fields, table cells, most UI text
+
+Body Small (Supporting):  
+├─ Size: 12px (0.75rem)  
+├─ Weight: 400 (Regular)  
+├─ Line Height: 1.4  
+├─ Letter Spacing: 0.01em  
+├─ Color: Text Tertiary  
+└─ Usage: Helper text, captions, footnotes
+
+Mono (Data Display):  
+├─ Font: JetBrains Mono  
+├─ Size: 14px (0.875rem)  
+├─ Weight: 500 (Medium)  
+├─ Line Height: 1.4  
+├─ Letter Spacing: 0  
+├─ Color: Text Primary  
+└─ Usage: Numbers, calculations, code-like data  
+\`\`\`
+
+\*\*Typography Rules:\*\*  
+1\. Never use font weights below 400 (Regular)  
+2\. Never use more than 2 weights per component  
+3\. Line height increases with paragraph length  
+4\. All numbers use tabular figures (monospace digits)  
+5\. Percentage/currency symbols use same weight as number
+
+\---
+
+\#\# Layout System
+
+\#\#\# \*\*Grid & Spacing\*\*  
+\`\`\`  
+Base Unit: 4px (0.25rem)
+
+Spacing Scale:  
+├─ xs: 4px (0.25rem)  
+├─ sm: 8px (0.5rem)  
+├─ md: 16px (1rem)  
+├─ lg: 24px (1.5rem)  
+├─ xl: 32px (2rem)  
+├─ 2xl: 48px (3rem)  
+└─ 3xl: 64px (4rem)
+
+Component Padding:  
+├─ Tight: 12px (buttons, badges)  
+├─ Default: 20px (cards, panels)  
+├─ Comfortable: 32px (major sections)  
+└─ Spacious: 48px (page margins)
+
+Gap Between Elements:  
+├─ Inline (horizontal): 12px  
+├─ Stack (vertical): 16px  
+├─ Section: 32px  
+└─ Page: 48px  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Container Widths\*\*  
+\`\`\`  
+Page Container:  
+├─ Max Width: 1440px  
+├─ Padding: 48px horizontal  
+└─ Centered with auto margins
+
+Two-Column Layout:  
+├─ Left Panel: 45% width  
+├─ Gap: 32px  
+├─ Right Panel: 55% width \- gap  
+└─ Minimum 320px per column
+
+Card System:  
+├─ Border Radius: 8px  
+├─ Background: Surface Secondary  
+├─ Border: 1px solid Border Default  
+├─ Shadow: 0 1px 3px rgba(0,0,0,0.05)  
+└─ Padding: 24px  
+\`\`\`
+
+\*\*Layout Philosophy:\*\*  
+\- Asymmetric layouts feel more premium than 50/50  
+\- Right panel slightly larger (results more important than inputs)  
+\- Cards float on surface (subtle shadow, not heavy)  
+\- Generous padding \= confidence in content
+
+\---
+
+\#\# Component Specifications
+
+\#\#\# \*\*1. Pressure Family Status Cards\*\* (Replacing emoji indicators)
+
+\*\*Visual Design:\*\*  
+\`\`\`  
+┌────────────────────────────────────────────┐  
+│ ┌──────┐  RETENTION PRESSURE              │  
+│ │ ████ │  High Treadmill Risk             │  
+│ │ ████ │                                  │  
+│ └──────┘  Over 50% of growth replaces    │  
+│           churned revenue                 │  
+└────────────────────────────────────────────┘  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Container:  
+├─ Width: 100% (in grid)  
+├─ Min Height: 96px  
+├─ Background: Contextual (red/amber/green wash)  
+├─ Border: 2px solid contextual border color  
+├─ Border Radius: 8px  
+├─ Padding: 16px  
+└─ Cursor: pointer (clickable)
+
+Status Indicator (Left):  
+├─ Width: 48px  
+├─ Height: 48px  
+├─ Background: Contextual primary color at 20% opacity  
+├─ Border: 2px solid contextual primary color  
+├─ Border Radius: 8px  
+└─ Icon: 24px minimal line icon (see icon system below)
+
+Label (Top Right):  
+├─ Font: Heading 3 (14px uppercase)  
+├─ Color: Text Tertiary  
+├─ Letter Spacing: 0.05em  
+└─ Margin Bottom: 4px
+
+Status Text (Middle Right):  
+├─ Font: Heading 2 (18px semibold)  
+├─ Color: Contextual primary color  
+└─ Margin Bottom: 8px
+
+Description (Bottom Right):  
+├─ Font: Body Small (12px)  
+├─ Color: Text Secondary  
+├─ Line Height: 1.5  
+└─ Max Lines: 2 with ellipsis
+
+Hover State:  
+├─ Border: 2px solid contextual primary color  
+├─ Shadow: 0 4px 12px contextual color at 15% opacity  
+├─ Transform: translateY(-2px)  
+└─ Transition: all 150ms ease  
+\`\`\`
+
+\*\*Icon System for Pressure Families:\*\*
+
+Instead of emojis, use minimal line icons (24px, 2px stroke):  
+\`\`\`  
+Retention Pressure:     ↻ (circular arrow with gap)  
+Sales Capability:       ↗ (upward arrow with momentum)  
+Capacity Wall:          ⊞ (stacked squares representing team)  
+Profit Trap:            $ (dollar sign with balance scale)  
+Whale Trap:             ⚖ (balance/scale icon)  
+Comparison:             ⇄ (bidirectional arrows)  
+\`\`\`
+
+\*\*These icons should be:\*\*  
+\- Vector (SVG)  
+\- Single stroke weight (2px)  
+\- No fill (outline only)  
+\- Colored with contextual primary color  
+\- Minimal detail (recognizable at small sizes)
+
+\---
+
+\#\#\# \*\*2. Impact Cards (Real-Time Updates)\*\*
+
+\*\*Visual Design:\*\*  
+\`\`\`  
+┌─────────────────────────────────────┐  
+│ TARGET REVENUE                      │  
+│                                     │  
+│ $2,600,000                          │  
+│ \+30% from baseline                  │  
+│                                     │  
+│ ▓▓▓▓▓▓▓░░░ 65% to goal             │  
+└─────────────────────────────────────┘  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Container:  
+├─ Background: Surface Secondary  
+├─ Border: 1px solid Border Default  
+├─ Border Radius: 8px  
+├─ Padding: 20px  
+├─ Min Height: 140px  
+└─ Hover: Border becomes Border Strong
+
+Label (Top):  
+├─ Font: Heading 3 (14px uppercase medium)  
+├─ Color: Text Tertiary  
+├─ Margin Bottom: 16px  
+└─ Letter Spacing: 0.05em
+
+Value (Center):  
+├─ Font: Display (32px semibold)  
+├─ Font: Mono for numbers  
+├─ Color: Text Primary  
+├─ Margin Bottom: 8px  
+└─ Tabular figures enabled
+
+Delta/Comparison (Below Value):  
+├─ Font: Body Small (12px)  
+├─ Color: Contextual (green for positive, red for negative)  
+├─ Icon: ↑ or ↓ before text (12px)  
+└─ Format: "+30% from baseline" or "-$50K vs target"
+
+Progress Indicator (Bottom):  
+├─ Height: 6px  
+├─ Background: Border Subtle  
+├─ Fill: Contextual color (green for good, amber for caution)  
+├─ Border Radius: 3px  
+└─ Smooth animation on value change (300ms ease)
+
+Number Transition:  
+├─ Animated (not instant jump)  
+├─ Duration: 400ms  
+├─ Easing: cubic-bezier(0.4, 0, 0.2, 1\)  
+└─ Count-up effect for large changes  
+\`\`\`
+
+\---
+
+\#\#\# \*\*3. Slider Controls\*\* (Pro Tier)
+
+\*\*Visual Design:\*\*  
+\`\`\`  
+Growth Target: \+30%  
+━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━  
+\-50%           0%           \+100%
+
+Adjusted Revenue: $2,600,000  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Container:  
+├─ Padding: 24px 0  
+├─ Border Bottom: 1px solid Border Subtle  
+└─ Last child: no border
+
+Label Row:  
+├─ Display: flex, justify-between  
+├─ Margin Bottom: 12px  
+├─ Label Left: Font Heading 2 (18px semibold)  
+└─ Value Right: Font Mono (16px medium), Color: Text Primary
+
+Track:  
+├─ Height: 6px  
+├─ Background: Border Subtle  
+├─ Border Radius: 3px  
+└─ Position: relative
+
+Track Fill (0% to thumb):  
+├─ Background: Informational Primary (\#2563EB)  
+├─ Height: 6px  
+├─ Border Radius: 3px  
+└─ Transition: width 100ms ease
+
+Thumb:  
+├─ Width: 20px  
+├─ Height: 20px  
+├─ Background: \#FFFFFF  
+├─ Border: 3px solid Informational Primary  
+├─ Border Radius: 50% (circle)  
+├─ Shadow: 0 2px 8px rgba(0,0,0,0.15)  
+├─ Cursor: grab  
+└─ Active: cursor becomes grabbing, shadow increases
+
+Range Labels (Below Track):  
+├─ Display: flex, justify-between  
+├─ Font: Body Small (12px)  
+├─ Color: Text Tertiary  
+└─ Margin Top: 8px
+
+Result Display (Below Labels):  
+├─ Font: Body (14px)  
+├─ Color: Text Secondary  
+├─ Margin Top: 12px  
+└─ Format: "Adjusted Revenue: $2,600,000"
+
+Interaction:  
+├─ Debounce: 300ms after release  
+├─ Smooth drag (no snapping)  
+├─ Keyboard: Arrow keys move 1%, Shift+Arrow moves 5%  
+└─ Focus ring: 2px solid Informational Primary at 50% opacity  
+\`\`\`
+
+\*\*Preset Buttons:\*\*  
+\`\`\`  
+Container:  
+├─ Display: grid, 4 columns  
+├─ Gap: 12px  
+├─ Margin Bottom: 32px
+
+Button:  
+├─ Background: Surface Secondary  
+├─ Border: 1px solid Border Default  
+├─ Border Radius: 8px  
+├─ Padding: 12px 16px  
+├─ Font: Body (14px medium)  
+├─ Color: Text Secondary  
+├─ Cursor: pointer
+
+Hover:  
+├─ Border: Border Strong  
+├─ Background: Surface Tertiary
+
+Active/Selected:  
+├─ Background: Informational Background  
+├─ Border: Informational Border  
+├─ Color: Informational Primary  
+└─ Font Weight: 600 (semibold)  
+\`\`\`
+
+\---
+
+\#\#\# \*\*4. Comparison Scorecard Table\*\*
+
+\*\*Visual Design:\*\*  
+\`\`\`  
+┌────────────────────────────────────────────────────────────┐  
+│ METRIC           BASELINE    SCENARIO A    SCENARIO B      │  
+├────────────────────────────────────────────────────────────┤  
+│ Target Revenue   $2.0M       $3.0M         $2.5M          │  
+│ Profit Pool      $300K       $350K         $500K ✓        │  
+│ Sales Velocity   1/mo        5/mo ⚠        2/mo           │  
+│ Hires Needed     —           \+8 ⚠          \+2             │  
+│ Churn Load       $200K       $400K         $150K          │  
+└────────────────────────────────────────────────────────────┘  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Table Container:  
+├─ Background: Surface Secondary  
+├─ Border: 1px solid Border Default  
+├─ Border Radius: 8px  
+├─ Overflow: hidden  
+└─ Margin: 32px 0
+
+Header Row:  
+├─ Background: Surface Tertiary  
+├─ Border Bottom: 2px solid Border Strong  
+├─ Padding: 16px  
+├─ Font: Heading 3 (14px uppercase medium)  
+├─ Color: Text Tertiary  
+└─ Letter Spacing: 0.05em
+
+Data Rows:  
+├─ Padding: 16px  
+├─ Border Bottom: 1px solid Border Subtle  
+├─ Font: Body (14px)  
+├─ Color: Text Secondary  
+└─ Hover: Background Surface Tertiary
+
+Cells:  
+├─ Vertical Align: middle  
+├─ Text Align: left (metric), right (numbers)  
+├─ Min Width: 120px (numbers)  
+└─ Padding: 0 16px
+
+Number Formatting:  
+├─ Font: Mono  
+├─ Font Weight: 500 (medium)  
+├─ Tabular figures  
+└─ Color: Text Primary
+
+Best Value Indicator:  
+├─ Background: Success Background (very light green)  
+├─ Icon: ✓ (12px) after number  
+├─ Icon Color: Success Primary  
+└─ Font Weight: 600 (semibold)
+
+Warning Indicator:  
+├─ Background: Caution Background (very light amber)  
+├─ Icon: ⚠ (12px) after number  
+├─ Icon Color: Caution Primary  
+└─ No font weight change
+
+Baseline Column:  
+├─ Background: Surface Tertiary (slightly darker)  
+└─ Font Weight: 500 (medium) for emphasis  
+\`\`\`
+
+\---
+
+\#\# Chart Specifications
+
+\#\#\# \*\*Chart 1: Treadmill Chart (Stacked Bar)\*\*
+
+\*\*Purpose:\*\* Show net growth vs. churn replacement visually
+
+\*\*Design:\*\*  
+\`\`\`  
+Revenue Required ($)  
+│  
+│  ┌─────────────────────────┐  
+│  │ Net Growth      │       │  Scenario A  
+│  │ (Green)         │       │  
+│  ├─────────────────┤       │  
+│  │ Churn Replace   │       │  
+│  │ (Red)           │       │  
+│  └─────────────────┴───────┘  
+│  
+│  ┌───────────────────┐  
+│  │ Net Growth │      │        Scenario B  
+│  │ (Green)    │      │  
+│  ├────────────┤      │  
+│  │ Churn      │      │  
+│  │ (Red)      │      │  
+│  └────────────┴──────┘  
+│  
+└─────────────────────────────── Scenarios  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Chart Container:  
+├─ Width: 100%  
+├─ Height: 400px  
+├─ Background: \#FFFFFF  
+├─ Padding: 32px  
+├─ Border: 1px solid Border Default  
+└─ Border Radius: 8px
+
+Bars:  
+├─ Width: 80px  
+├─ Gap Between Bars: 48px  
+├─ Border Radius: 4px (top only)  
+└─ No border on bars
+
+Stack Segments:  
+├─ Net Growth: \#059669 (green) at 100% opacity  
+├─ Churn Replacement: \#DC2626 (red) at 100% opacity  
+└─ 1px divider line between segments (\#FFFFFF)
+
+Axes:  
+├─ X-Axis: Scenario names, 14px, Text Secondary  
+├─ Y-Axis: Dollar values, 12px Mono, Text Tertiary  
+├─ Axis Lines: 1px solid Border Subtle  
+└─ Grid Lines: Horizontal only, Border Subtle at 30% opacity
+
+Labels (On Bars):  
+├─ Position: Inside each segment (if space allows)  
+├─ Font: 12px medium  
+├─ Color: \#FFFFFF  
+├─ Format: "$1.2M" (abbreviated)  
+└─ Hidden if segment \< 40px height
+
+Legend:  
+├─ Position: Top right  
+├─ Font: 12px  
+├─ Color: Text Secondary  
+├─ Layout: Horizontal, 16px gap  
+└─ Color Swatch: 12px square with 2px radius
+
+Tooltip (On Hover):  
+├─ Background: \#1F2937 (dark gray)  
+├─ Color: \#FFFFFF  
+├─ Padding: 12px 16px  
+├─ Border Radius: 6px  
+├─ Shadow: 0 4px 12px rgba(0,0,0,0.15)  
+├─ Font: 12px  
+├─ Format:  
+│   "Scenario A  
+│   Net Growth: $1,000,000  
+│   Churn Replacement: $600,000  
+│   Total Required: $1,600,000"  
+└─ Transition: opacity 150ms ease  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Chart 2: Profit Efficiency (Grouped Bar)\*\*
+
+\*\*Purpose:\*\* Compare revenue vs. profit side-by-side
+
+\*\*Design:\*\*  
+\`\`\`  
+Revenue/Profit ($)  
+│  
+│  ┌──┐  ┌─┐      ┌──┐  ┌──┐    ┌──┐  ┌─┐  
+│  │  │  │ │      │  │  │  │    │  │  │ │  
+│  │  │  │ │      │  │  │  │    │  │  │ │  
+│  │R │  │P│      │R │  │P │    │R │  │P│  
+│  └──┘  └─┘      └──┘  └──┘    └──┘  └─┘  
+│ Baseline      Scenario A    Scenario B  
+│  
+└─────────────────────────────────────────  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Chart Container:  
+├─ Same as Treadmill Chart (consistency)
+
+Grouped Bars:  
+├─ Bar Width: 60px each  
+├─ Gap Within Group: 12px  
+├─ Gap Between Groups: 64px  
+├─ Border Radius: 4px (top only)  
+└─ No border
+
+Bar Colors:  
+├─ Revenue: \#1E40AF (deep blue) at 100% opacity  
+├─ Profit: \#D97706 (amber gold) at 100% opacity  
+└─ Hover: 20% brightness increase
+
+Group Labels (X-Axis):  
+├─ Centered below each group  
+├─ Font: 14px medium  
+├─ Color: Text Secondary  
+└─ 24px margin top
+
+Value Labels (Above Bars):  
+├─ Font: 12px Mono medium  
+├─ Color: Text Primary  
+├─ Format: "$3.0M" (abbreviated)  
+├─ Positioned 8px above bar  
+└─ Only shown if \> $100K (avoid clutter)
+
+Legend:  
+├─ "Revenue" and "Profit" with color swatches  
+├─ Position: Top right  
+└─ Same styling as Treadmill Chart
+
+Tooltip:  
+├─ Same styling as Treadmill Chart  
+├─ Format:  
+│   "Scenario A  
+│   Revenue: $3,000,000  
+│   Profit: $350,000  
+│   Margin: 11.7%"  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Chart 3: Machine Strain (Dot Plot)\*\*
+
+\*\*Purpose:\*\* Show operational pressure points (headcount & sales velocity)
+
+\*\*Design:\*\*  
+\`\`\`  
+           Headcount    Sales Velocity  
+Scenario A    ●              ●  
+Scenario B    ●          ●  
+Baseline      ●      ●  
+           │    │    │    │    │    │  
+           0    5   10   15   20   25  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Chart Container:  
+├─ Same container as other charts  
+├─ Height: 300px (shorter than bar charts)
+
+Y-Axis (Scenarios):  
+├─ Left-aligned labels  
+├─ Font: 14px medium  
+├─ Color: Text Secondary  
+├─ 120px width for labels  
+└─ 16px spacing between rows
+
+X-Axis (Values):  
+├─ Bottom-aligned  
+├─ Font: 12px Mono  
+├─ Color: Text Tertiary  
+├─ Gridlines: Vertical, Border Subtle at 30% opacity  
+└─ Scale auto-adjusts to data range
+
+Dots:  
+├─ Radius: 8px  
+├─ Headcount: \#7C3AED (violet)  
+├─ Sales Velocity: \#0891B2 (teal)  
+├─ Fill: Solid color at 100% opacity  
+├─ Border: 2px \#FFFFFF  
+├─ Shadow: 0 2px 4px rgba(0,0,0,0.1)  
+└─ Hover: Radius increases to 10px, shadow increases
+
+Connecting Line (Optional):  
+├─ Between dots of same scenario  
+├─ Stroke: Border Default  
+├─ Width: 1px  
+├─ Opacity: 40%  
+└─ Dashed: 4px dash, 4px gap
+
+Legend:  
+├─ "Headcount Required" (violet dot)  
+├─ "Sales Velocity (deals/mo)" (teal dot)  
+├─ Position: Top right  
+└─ Same styling as other charts
+
+Tooltip:  
+├─ Same styling as other charts  
+├─ Format:  
+│   "Scenario A  
+│   Headcount: 18 FTEs  
+│   Sales Velocity: 5 deals/month"
+
+Threshold Indicators (Optional):  
+├─ Vertical line at "healthy range" boundaries  
+├─ Stroke: Caution Primary at 30% opacity  
+├─ Width: 2px  
+├─ Dashed: 6px dash, 6px gap  
+├─ Label: Small text above chart area  
+└─ Example: "Safe hiring pace →" at 10% line  
+\`\`\`
+
+\---
+
+\#\# GPT Synthesis Display
+
+\#\#\# \*\*Section Layout\*\*  
+\`\`\`  
+┌────────────────────────────────────────────────────┐  
+│ STRATEGIC SYNTHESIS                                │  
+├────────────────────────────────────────────────────┤  
+│                                                    │  
+│ Reality Check                                      │  
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │  
+│ \[GPT-generated text in comfortable reading width\] │  
+│                                                    │  
+│ Capacity Warning                                   │  
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │  
+│ \[GPT-generated text\]                              │  
+│                                                    │  
+│ One Big Lever                                      │  
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │  
+│ \[GPT-generated text\]                              │  
+│                                                    │  
+│ Watch-Outs                                         │  
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │  
+│ • High Retention Pressure: \[detail\]               │  
+│ • Hiring Velocity Risk: \[detail\]                  │  
+│                                                    │  
+└────────────────────────────────────────────────────┘  
+\`\`\`
+
+\*\*Specifications:\*\*  
+\`\`\`  
+Container:  
+├─ Background: Surface Secondary  
+├─ Border: 1px solid Border Default  
+├─ Border Radius: 8px  
+├─ Padding: 32px  
+├─ Margin Top: 32px  
+└─ Max Width: 800px (reading comfort)
+
+Section Header:  
+├─ Font: Heading 2 (18px semibold)  
+├─ Color: Text Primary  
+├─ Margin Bottom: 12px  
+├─ Letter Spacing: \-0.01em  
+└─ No underline
+
+Section Divider:  
+├─ Border Bottom: 2px solid Border Strong  
+├─ Margin Bottom: 20px  
+├─ Width: 100%  
+└─ No gradient
+
+Body Text:  
+├─ Font: Body Large (16px)  
+├─ Color: Text Secondary  
+├─ Line Height: 1.7 (generous for reading)  
+├─ Max Width: 65ch (characters)  
+├─ Margin Bottom: 32px (between sections)  
+└─ Paragraph spacing: 16px
+
+Watch-Out Items:  
+├─ List Style: None (custom bullets)  
+├─ Padding Left: 24px  
+├─ Margin Bottom: 16px per item  
+├─ Bullet: "•" with 12px right margin  
+├─ Bullet Color: Caution Primary  
+└─ Emphasis: Bold inline for key terms
+
+Loading State:  
+├─ Background: Surface Tertiary  
+├─ Height: 600px  
+├─ Display: Animated skeleton  
+├─ Animation: Shimmer effect (subtle)  
+└─ Message: "Analyzing your growth scenario..." (centered)
+
+Empty State:  
+├─ Background: Surface Secondary  
+├─ Icon: 24px information icon (minimal)  
+├─ Text: "Complete the calculation to see strategic insights"  
+├─ Color: Text Tertiary  
+└─ Center-aligned, 80px padding vertical  
+\`\`\`
+
+\---
+
+\#\# Responsive Breakpoints  
+\`\`\`  
+Desktop Large (\>1440px):  
+├─ Container: Max 1440px, centered  
+├─ Two-column: 45% / 55%  
+├─ Charts: Full width in containers  
+└─ No layout changes
+
+Desktop (1024px \- 1440px):  
+├─ Container: 95% width  
+├─ Two-column: Maintained  
+├─ Chart heights: Same  
+└─ Font sizes: Same
+
+Tablet (768px \- 1023px):  
+├─ Container: 100% width, 32px padding  
+├─ Two-column: Stacks at 900px  
+├─ Charts: Stacked vertically  
+├─ Sliders: Full width  
+└─ Impact cards: 2-column grid
+
+Mobile (\< 768px):  
+├─ Container: 100% width, 16px padding  
+├─ All columns: 100% width (stacked)  
+├─ Pressure cards: 1 column  
+├─ Impact cards: 1 column  
+├─ Charts: Horizontal scroll if needed  
+├─ Comparison table: Horizontal scroll  
+├─ Font sizes: Reduce by 1 step  
+└─ Slider thumbs: Increase to 24px (easier touch)  
+\`\`\`
+
+\---
+
+\#\# Loading States & Animations
+
+\#\#\# \*\*Calculation Loading\*\*  
+\`\`\`  
+Loading Overlay:  
+├─ Background: rgba(255, 255, 255, 0.95)  
+├─ Backdrop Blur: 8px  
+├─ Z-index: 50  
+├─ Display: Flex, centered  
+└─ Fade in/out: 200ms ease
+
+Spinner:  
+├─ Size: 48px  
+├─ Stroke: 4px  
+├─ Color: Informational Primary  
+├─ Animation: Smooth rotation (1s linear infinite)  
+└─ Style: Circular, minimal (no dots or segments)
+
+Loading Text:  
+├─ Font: Body (14px medium)  
+├─ Color: Text Secondary  
+├─ Margin Top: 16px  
+└─ No animated dots (feels amateurish)  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Number Transitions\*\*  
+\`\`\`  
+Value Change Animation:  
+├─ Duration: 400ms  
+├─ Easing: cubic-bezier(0.4, 0, 0.2, 1\) (smooth deceleration)  
+├─ Style: Count-up (1234 → 1567, not instant jump)  
+├─ Decimal Precision: Maintained throughout  
+└─ Color Pulse: Subtle (same color, 120% brightness for 200ms)
+
+Chart Transitions:  
+├─ Bar Height: 500ms ease-out  
+├─ Dot Position: 400ms ease-out  
+├─ Color Changes: 200ms ease  
+└─ No bounce or elastic easing (feels playful)  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Skeleton Loading (GPT Synthesis)\*\*  
+\`\`\`  
+Skeleton Design:  
+├─ Background: Linear gradient (subtle shimmer)  
+├─ Colors: Surface Tertiary → Surface Secondary → Surface Tertiary  
+├─ Animation: Translate X (-100% to 100%) over 1.5s  
+├─ Width: Varied (simulate text lines)  
+│   ├─ Line 1: 100%  
+│   ├─ Line 2: 95%  
+│   ├─ Line 3: 87%  
+│   └─ Line 4: 92%  
+├─ Height: 16px per line  
+├─ Gap: 12px between lines  
+├─ Border Radius: 4px  
+└─ Fade out on content load: 300ms ease  
+\`\`\`
+
+\---
+
+\#\# Interaction Patterns
+
+\#\#\# \*\*Button States\*\*  
+\`\`\`  
+Primary Button:  
+├─ Default:  
+│   ├─ Background: Informational Primary  
+│   ├─ Color: \#FFFFFF  
+│   ├─ Border: None  
+│   ├─ Padding: 12px 24px  
+│   ├─ Border Radius: 8px  
+│   ├─ Font: 14px medium  
+│   └─ Shadow: 0 1px 2px rgba(0,0,0,0.05)  
+├─ Hover:  
+│   ├─ Background: Informational Primary at 110% brightness  
+│   ├─ Shadow: 0 4px 8px rgba(37,99,235,0.2)  
+│   └─ Transform: translateY(-1px)  
+├─ Active:  
+│   ├─ Background: Informational Primary at 90% brightness  
+│   ├─ Transform: translateY(0)  
+│   └─ Shadow: 0 1px 2px rgba(0,0,0,0.05)  
+└─ Disabled:  
+    ├─ Background: Border Subtle  
+    ├─ Color: Text Disabled  
+    ├─ Cursor: not-allowed  
+    └─ Opacity: 60%
+
+Secondary Button:  
+├─ Default:  
+│   ├─ Background: Transparent  
+│   ├─ Color: Text Secondary  
+│   ├─ Border: 1px solid Border Default  
+│   └─ Same padding/radius as Primary  
+├─ Hover:  
+│   ├─ Background: Surface Tertiary  
+│   ├─ Border: Border Strong  
+│   └─ Color: Text Primary  
+└─ Active/Disabled: Similar adjustments
+
+Ghost Button:  
+├─ Default:  
+│   ├─ Background: Transparent  
+│   ├─ Color: Text Tertiary  
+│   ├─ Border: None  
+│   └─ Padding: 8px 16px  
+├─ Hover:  
+│   ├─ Background: Surface Tertiary  
+│   └─ Color: Text Secondary  
+└─ Usage: "Clear Form", "Cancel", etc.  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Focus States\*\* (Accessibility)  
+\`\`\`  
+Focus Ring:  
+├─ Outline: 2px solid Informational Primary  
+├─ Outline Offset: 2px  
+├─ Border Radius: Matches element \+ 2px  
+└─ Never use browser default (blue ring)
+
+Input Fields:  
+├─ Focus: Border becomes Informational Primary  
+├─ Focus Ring: As above  
+└─ Label animates (if floating label pattern)
+
+Sliders:  
+├─ Focus: Thumb gets ring as above  
+├─ Keyboard Navigation: Visible indication  
+└─ No outline on track (only thumb)  
+\`\`\`
+
+\---
+
+\#\# Empty States
+
+\#\#\# \*\*No Calculations Yet\*\*  
+\`\`\`  
+┌────────────────────────────────────────────┐  
+│                                            │  
+│              \[Icon: Calculator\]            │  
+│                                            │  
+│        No calculations yet                 │  
+│                                            │  
+│    Enter your growth targets above         │  
+│    to see strategic insights               │  
+│                                            │  
+└────────────────────────────────────────────┘
+
+Icon:  
+├─ Size: 48px  
+├─ Color: Text Tertiary at 40% opacity  
+├─ Style: Minimal line icon (not emoji)
+
+Title:  
+├─ Font: Heading 2 (18px semibold)  
+├─ Color: Text Secondary  
+├─ Margin: 16px 0 8px
+
+Description:  
+├─ Font: Body (14px)  
+├─ Color: Text Tertiary  
+├─ Max Width: 300px  
+└─ Center-aligned  
+\`\`\`
+
+\---
+
+\#\#\# \*\*No Saved Scenarios\*\*  
+\`\`\`  
+┌────────────────────────────────────────────┐  
+│                                            │  
+│         \[Icon: Bookmark Plus\]              │  
+│                                            │  
+│       No saved scenarios                   │  
+│                                            │  
+│   Adjust the sliders above and save        │  
+│   scenarios to compare different paths     │  
+│                                            │  
+└────────────────────────────────────────────┘
+
+Same styling as above, different icon/text  
+\`\`\`
+
+\---
+
+\#\# Accessibility Requirements  
+\`\`\`  
+Color Contrast:  
+├─ Text Primary on Surface Primary: 16:1 (AAA)  
+├─ Text Secondary on Surface Primary: 7:1 (AA)  
+├─ Text Tertiary on Surface Secondary: 4.5:1 (AA)  
+└─ Interactive elements: Minimum 3:1 (AA)
+
+Keyboard Navigation:  
+├─ Tab order: Logical, left-to-right, top-to-bottom  
+├─ Focus visible: Always (custom ring, never hidden)  
+├─ Skip links: "Skip to results", "Skip to synthesis"  
+└─ Escape key: Close modals, reset focus
+
+Screen Reader:  
+├─ Semantic HTML: \<section\>, \<article\>, \<nav\>  
+├─ ARIA labels: For icon-only buttons  
+├─ ARIA live regions: For real-time updates (sliders)  
+├─ Alt text: For charts (describe data trends)  
+└─ Table headers: \<th\> with scope attributes
+
+Motion:  
+├─ Respect prefers-reduced-motion  
+├─ If reduced: Transitions become instant (0ms)  
+├─ Animations: Optional, not critical to understanding  
+└─ Skeleton loading: Still visible but static
+
+Design Tokens (CSS Variables)
+
+:root {  
+  /\* Colors \*/  
+  \--color-bg-primary: \#FFFFFF;  
+  \--color-bg-secondary: \#F8F9FA;  
+  \--color-bg-tertiary: \#F1F3F5;  
+    
+  \--color-text-primary: \#1A1D1F;  
+  \--color-text-secondary: \#4A5568;  
+  \--color-text-tertiary: \#718096;  
+    
+  \--color-border-strong: \#CBD5E0;  
+  \--color-border-default: \#E2E8F0;  
+  \--color-border-subtle: \#EDF2F7;  
+    
+  \--color-critical-primary: \#DC2626;  
+  \--color-critical-bg: \#FEE2E2;  
+  \--color-critical-border: \#FCA5A5;  
+    
+  \--color-caution-primary: \#D97706;  
+  \--color-caution-bg: \#FEF3C7;  
+  \--color-caution-border: \#FCD34D;  
+    
+  \--color-success-primary: \#059669;  
+  \--color-success-bg: \#D1FAE5;  
+  \--color-success-border: \#6EE7B7;  
+    
+  \--color-info-primary: \#2563EB;  
+  \--color-info-bg: \#DBEAFE;  
+  \--color-info-border: \#93C5FD;  
+    
+  /\* Typography \*/  
+  \--font-primary: 'Inter', system-ui, sans-serif;  
+  \--font-mono: 'JetBrains Mono', monospace;  
+    
+  \--text-display: 32px;  
+  \--text-h1: 24px;  
+  \--text-h2: 18px;  
+  \--text-h3: 14px;  
+  \--text-body-lg: 16px;  
+  \--text-body: 14px;  
+  \--text-body-sm: 12px;  
+    
+  /\* Spacing \*/  
+  \--space-xs: 4px;  
+  \--space-sm: 8px;  
+  \--space-md: 16px;  
+  \--space-lg: 24px;  
+  \--space-xl: 32px;  
+  \--space-2xl: 48px;  
+  \--space-3xl: 64px;  
+    
+  /\* Radius \*/  
+  \--radius-sm: 4px;  
+  \--radius-md: 8px;  
+  \--radius-lg: 12px;  
+    
+  /\* Shadow \*/  
+  \--shadow-sm: 0 1px 2px rgba(0,0,0,0.05);  
+  \--shadow-md: 0 4px 6px rgba(0,0,0,0.07);  
+  \--shadow-lg: 0 10px 15px rgba(0,0,0,0.10);  
+    
+  /\* Transitions \*/  
+  \--transition-fast: 150ms ease;  
+  \--transition-base: 200ms ease;  
+  \--transition-slow: 300ms ease;  
+  \--transition-number: 400ms cubic-bezier(0.4, 0, 0.2, 1);  
+}
+
+**END OF DOCUMENT 5**
+
+---
+
+## **Summary: Visual Design System**
+
+✅ **Premium aesthetic** (no emojis, sophisticated icons)  
+ ✅ **Sophisticated color system** (pressure indicators, semantic colors)  
+ ✅ **Professional typography** (Inter, clear hierarchy, tabular figures)  
+ ✅ **Generous spacing** (breathing room, confident layouts)  
+ ✅ **Clean chart designs** (minimal styling, data-focused)  
+ ✅ **Smooth interactions** (purposeful transitions, no bounce)  
+ ✅ **Accessible** (WCAG AA/AAA compliance, keyboard navigation)  
+ ✅ **Consistent tokens** (CSS variables for maintainability)
+
+**This design system conveys:** Enterprise-grade intelligence software, strategic advisory tool, professional credibility, intellectual sophistication.

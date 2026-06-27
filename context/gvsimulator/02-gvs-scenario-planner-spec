@@ -1,0 +1,465 @@
+# Scenario Planner — Inputs Layer UI/UX Specification
+
+**Architect OS | Growth Velocity Simulator**
+**Feature:** Scenario Planner — Inputs & Save Flow
+**Version:** 1.0
+**Status:** Ready for Implementation
+**Audience:** Antigravity — Frontend Build
+
+---
+
+## How to Use This Document
+
+This spec covers the inputs layer of the Scenario Planner only — from page load through saving a scenario. The comparison section (pressure dashboard, visual analysis, data grid) is a separate pass and is not in scope here.
+
+Read this document fully before writing any code. Section 1 covers layout and structure. Section 2 covers each component in detail. Section 3 covers interaction states and behavior. Section 4 covers the run and save flow. Section 5 covers technical wiring notes.
+
+---
+
+## Section 1 — Page Layout & Structure
+
+### 1.1 Overall Page Layout
+
+The Scenario Planner page uses a two-tab structure at the top — **Calculator** and **Scenario Planner** — consistent with the existing tab navigation already in place. The Scenario Planner tab is the focus of this spec.
+
+The inputs layer occupies the full width of the page content area. It is not a sidebar, not a panel — it is the primary content of the page. Clean, focused, no competing elements.
+
+**Vertical stack — top to bottom:**
+
+```
+┌─────────────────────────────────────────────────────┐
+│  PAGE HEADER                                        │
+│  "Scenario Planner"                                 │
+│  Subtitle: "Build and save growth scenarios         │
+│  for comparison"                                    │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  BLOCK 1 — BASELINE CONFIGURATION                   │
+│  Auto-populated from Agency Snapshot                │
+│  Editable fields                                    │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  BLOCK 2 — SCENARIO TARGET CONFIGURATION            │
+│  Preset chips (top)                                 │
+│  Timeframe selector                                 │
+│  Slider + value inputs for each target field        │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  BLOCK 3 — RUN & SAVE ACTIONS                       │
+│  Run Scenario button                                │
+│  Inline save prompt (appears after run)             │
+│  Confirmation state (appears after save)            │
+└─────────────────────────────────────────────────────┘
+```
+
+**No output content appears in this layer.** No pressure cards, no charts, no metrics table. Those belong in the comparison section below (separate pass).
+
+### 1.2 Page Width & Spacing
+
+- Content area: max-width consistent with rest of platform
+- Block padding: 24px internal padding on all blocks
+- Block gap: 16px between blocks
+- Field row gap: 16px between input rows within blocks
+
+### 1.3 Visual Hierarchy Principle
+
+The three blocks should feel like sequential steps — not three equal panels. The visual weight should guide the eye downward: configure baseline → set target → run and save. Subtle step numbering (1, 2, 3) or a light progress indicator reinforces this without being heavy-handed.
+
+---
+
+## Section 2 — Component Specifications
+
+### 2.1 Block 1 — Baseline Configuration
+
+**Purpose:** Establish the starting point for all scenario calculations. Defaults to Agency Snapshot current state. Fully editable.
+
+#### Header Row
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ① BASELINE                          [⟳ Sync Snapshot] │
+│  Your current agency state                          │
+│  ● Using Agency Snapshot data                       │
+└─────────────────────────────────────────────────────┘
+```
+
+- Block label: "BASELINE" — small caps or uppercase, muted color, step number "①" prefix
+- Subtitle: "Your current agency state" — light weight, small
+- Source indicator: Small dot + "Using Agency Snapshot data" — muted green dot, small text
+  - Changes to muted amber dot + "Custom baseline" if any field is edited
+- Sync button: "⟳ Sync Snapshot" — text button, top right of block header. Re-pulls from snapshot and resets any edits. Subtle — not a primary action.
+
+#### Field Layout
+
+Two-column grid. Seven fields total — arrange as 3 rows of 2 plus 1 full-width at bottom, or 4 rows of 2 (one row has a single field centered or left-aligned).
+
+Recommended arrangement:
+```
+[ Annual AGI ]          [ Gross Revenue ]
+[ Profit Margin % ]     [ Client Count ]
+[ ACV ]                 [ Retention Rate % ]
+[ Team FTEs ]
+```
+
+#### Individual Field Component (Baseline)
+
+Each baseline field is a standard labeled input — no slider needed here, these are the known current values.
+
+```
+┌────────────────────────────┐
+│ Annual AGI                 │
+│ $ [ 1,200,000            ] │
+└────────────────────────────┘
+```
+
+- Label: small, muted, above the field
+- Input: clean bordered input field, right-aligned numeric value
+- Currency fields show $ prefix inside field
+- Percentage fields show % suffix inside field
+- On edit: field border highlights (platform accent color), source indicator updates to "Custom baseline"
+- Validation: numeric only, no negative values
+
+---
+
+### 2.2 Block 2 — Scenario Target Configuration
+
+**Purpose:** Define the growth target for this scenario using presets, sliders, or direct value entry.
+
+#### Header Row
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ② SCENARIO TARGET                                  │
+│  Define your growth scenario                        │
+└─────────────────────────────────────────────────────┘
+```
+
+#### Sub-section A — Quick Presets
+
+Four preset chips arranged horizontally. Selecting one populates all target slider fields relative to baseline. Does not lock fields — all remain editable after selection.
+
+```
+[ Steady Climb ]  [ Active Growth ]  [ Aggressive Scale ]  [ Positioning Shift ]
+```
+
+**Preset definitions (relative to baseline):**
+
+| Preset | AGI | Clients | ACV | Margin | Retention | FTEs | Timeframe |
+|---|---|---|---|---|---|---|---|
+| Steady Climb | +20% | +15% | +5% | hold | hold | +15% | 24mo |
+| Active Growth | +40% | +25% | +10% | -2% | hold | +30% | 24mo |
+| Aggressive Scale | +75% | +40% | +5% | -5% | -3% | +60% | 18mo |
+| Positioning Shift | +30% | +5% | +25% | +3% | hold | +10% | 24mo |
+
+**Chip visual states:**
+- Default: outlined chip, muted border, light background
+- Hover: slightly elevated, border darkens
+- Selected: filled background (platform accent color), white text, checkmark prefix
+- Selecting a different chip deselects the current one
+- Editing any slider after preset selection deselects the preset chip (no preset is "active" once customized)
+
+#### Sub-section B — Timeframe Selector
+
+Sits between presets and the field inputs. Clean segmented control — not a dropdown.
+
+```
+TIMEFRAME
+[ 12 Months ]  [ 24 Months ]  [ 36 Months ]
+```
+
+- Selected segment: filled, dark background or accent
+- Default selection: 24 Months
+- Changing timeframe recalculates all resolved absolute values on the sliders in real time
+
+#### Sub-section C — Target Field Inputs
+
+Seven fields — one per metric. Each field is a full-width row consisting of three connected elements: label, slider, and value display. Arranged vertically, one row per metric.
+
+**Individual Target Field Row:**
+
+```
+Annual AGI (Target)
+─────────────────────────────────────────────────────
++30%  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━  [ $1,560,000 ]
+      ├── baseline: $1,200,000 ──────────────────────
+```
+
+**Component breakdown:**
+
+**Percentage badge** (left of slider)
+- Shows the relative change from baseline as a percentage
+- Updates in real time as slider moves
+- Color: green for positive change, amber for negative change (margin compression, retention drop)
+- Format: +30% / -5% / 0%
+
+**Slider**
+- Full-width between the percentage badge and the value display
+- Range: configurable per metric (see ranges below)
+- Snap points: none — continuous
+- Track: thin, rounded. Left of thumb: accent color. Right of thumb: muted gray.
+- Thumb: small filled circle, slightly elevated on hover
+- Baseline marker: a subtle tick mark on the slider track at the 0% position so the founder can always see where "no change" is
+
+**Value display** (right of slider)
+- Shows the resolved absolute value in real time
+- Format matches the metric: currency ($1,560,000), percentage (28%), integer (16 clients)
+- **Clickable** — clicking the value turns it into an editable input field
+- In edit mode: input field with focus ring, cursor at end of value
+- On blur or Enter: value locks, slider repositions to match, percentage badge updates
+- Small edit icon (pencil, 12px) appears on hover before click to signal editability
+
+**Baseline reference line**
+- Below the slider: small muted text showing "baseline: [value]"
+- Always visible — grounds the relative adjustment in the actual starting number
+
+**Slider Range Defaults Per Metric:**
+
+| Metric | Min | Max | Default |
+|---|---|---|---|
+| Annual AGI | -10% | +150% | +30% |
+| Gross Revenue | -10% | +150% | +30% |
+| Profit Margin | -15% | +15% | 0% |
+| Client Count | -10% | +100% | +20% |
+| ACV | -20% | +100% | +5% |
+| Retention Rate | -20% | +10% | 0% |
+| Team FTEs | -20% | +150% | +20% |
+
+Note: Gross Revenue is derived from AGI if not adjusted — it moves proportionally unless manually overridden. This follows the same implied variable logic as the Calculator.
+
+---
+
+### 2.3 Block 3 — Run & Save Actions
+
+**Purpose:** Execute the scenario calculation and save the result.
+
+#### Default State (Before Run)
+
+```
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│         [ ↗ Run Scenario Analysis ]                 │
+│                                                     │
+│  Calculation runs instantly. Results saved to       │
+│  your scenario library.                             │
+└─────────────────────────────────────────────────────┘
+```
+
+- Primary button: full-width or prominently centered, dark fill, white text
+- Supporting micro-copy below button: light, small, sets expectation
+- No reset button needed here — adjusting sliders is already non-destructive
+
+#### Running State (During Calculation)
+
+Button transitions to loading state — spinner replaces arrow icon, label changes to "Running Analysis…"
+
+Duration: calculation is near-instant client-side. Loading state exists only to confirm the action was registered. 300–500ms minimum display even if calculation is faster.
+
+#### Post-Run State (Save Prompt — Inline Expansion)
+
+Immediately after run completes, the block expands inline below the button. No modal, no page change.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ✓  Scenario calculated                             │
+│                                                     │
+│  GVI Score: 67  ·  Healthy Velocity                 │
+│  Ambition-Driven                                    │
+│                                                     │
+│  Give this scenario a name to save it:              │
+│  ┌─────────────────────────────────────────────┐    │
+│  │  Active Growth — 24mo                       │    │
+│  └─────────────────────────────────────────────┘    │
+│                                                     │
+│  [ Save Scenario ]          [ Discard ]             │
+│                                                     │
+│  Saving adds this to your comparison library.       │
+└─────────────────────────────────────────────────────┘
+```
+
+- Checkmark + "Scenario calculated" confirmation — green, small
+- GVI Score and band name displayed prominently — gives the founder immediate signal before saving
+- Composition label on second line — lighter weight
+- Name field: pre-populated with a suggested name based on dominant metric change and timeframe
+  - Suggested name logic: "[Preset name] — [Timeframe]" if preset used, or "[Primary metric] +[%] — [Timeframe]" if custom
+  - Examples: "Active Growth — 24mo", "AGI +75% — 18mo", "Conservative Climb — 36mo"
+- Save button: primary, full-width within the block
+- Discard: text link, right-aligned or secondary placement — low visual weight
+
+#### Post-Save State (Confirmation)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  ✓  "Active Growth — 24mo" saved                   │
+│                                                     │
+│  This scenario is now available in your             │
+│  comparison view.                                   │
+│                                                     │
+│  [ View in Comparison ]    [ Build Another ]        │
+└─────────────────────────────────────────────────────┘
+```
+
+- "View in Comparison" — navigates to comparison section (scrolls down or switches sub-tab)
+- "Build Another" — resets Block 2 sliders to default positions, clears the save prompt, ready for next scenario
+- Baseline Block 1 is NOT reset — the starting point stays the same
+
+---
+
+## Section 3 — Interaction States & Behavior
+
+### 3.1 Slider Interaction
+
+| State | Visual Behavior |
+|---|---|
+| Default | Track visible, thumb at position matching current value |
+| Hover | Thumb slightly enlarges, cursor changes to grab |
+| Active/Dragging | Thumb enlarges, percentage badge and value display update in real time |
+| At baseline (0%) | Baseline tick mark aligns with thumb, percentage badge shows "0%" in neutral color |
+| Positive adjustment | Left track fills with green-tinted accent |
+| Negative adjustment | Left track fills with amber-tinted color |
+
+### 3.2 Value Field Click-to-Edit
+
+| State | Visual Behavior |
+|---|---|
+| Default | Value displayed as formatted text, pencil icon appears on hover |
+| Clicked | Transitions to input field, value selected for replacement |
+| Editing | Clear input field with cursor, slider grayed out (temporarily inactive) |
+| On Enter/Blur | Value validates, slider repositions to match, percentage badge updates, field returns to display mode |
+| Invalid entry | Field border turns red, value reverts to last valid on blur |
+
+### 3.3 Baseline Source Indicator States
+
+| State | Indicator |
+|---|---|
+| Snapshot data loaded, unedited | 🟢 "Using Agency Snapshot data" |
+| Any field manually edited | 🟡 "Custom baseline — [n] fields modified" |
+| Sync button clicked | Brief loading state, then returns to 🟢 state, all fields reset |
+
+### 3.4 Preset Chip States
+
+| State | Visual |
+|---|---|
+| Default | Outlined, light background |
+| Hover | Border darkens, slight background tint |
+| Selected | Filled background (accent), white text, ✓ prefix |
+| Deselected by customization | Returns to default — no chip shown as selected |
+
+### 3.5 Empty / First Load State
+
+When the Scenario Planner tab is opened for the first time or if Agency Snapshot has no data:
+
+- Block 1 fields show empty with placeholder values in muted text
+- A banner above Block 1: "Complete your Agency Snapshot to auto-populate your baseline" with a link to the Snapshot tool
+- Sliders and presets are still usable — founder can manually enter baseline values
+- Run Scenario button is disabled until all required baseline fields have values
+
+Required baseline fields: Annual AGI, Client Count, Retention Rate, Profit Margin, Team FTEs.
+
+---
+
+## Section 4 — Run & Save Flow (Technical Behavior)
+
+### 4.1 On "Run Scenario Analysis" Click
+
+1. Resolve all input variables through the Explicit → Implied → Proxy hierarchy (same logic as Calculator — reference `lib/gviCalculations.ts`)
+2. Run `calculateGVIScore()` with resolved variables
+3. Build `inputs` payload (raw + resolved) matching Section 2.1 of `GVS_Supabase_Migration_Spec.md`
+4. Build `results` payload matching Section 2.2 of `GVS_Supabase_Migration_Spec.md`
+5. Build `implications` payload (template-driven) matching Section 2.3
+6. Write record to `gvs_growth_scenarios` with `status = 'pending'`
+7. Trigger n8n webhook with new record `id`
+8. Surface post-run UI state with GVI score, band, and composition label
+9. Hold runtime record `id` in local state for use in save action
+
+### 4.2 On "Save Scenario" Click
+
+1. Take the scenario name from the name field
+2. Copy full runtime record payload into `gvs_saved_growth_scenarios`:
+   - `scenario_name` from name field
+   - `inputs`, `results`, `implications`, `gvi_score` from runtime record
+   - `runtime_scenario_id` = runtime record `id`
+   - `synthesis_content` = null at save time (GPT may not have returned yet)
+3. Flip `is_saved = true` and `saved_at = now()` on runtime record
+4. Surface post-save confirmation state
+5. Scenario is now available in comparison section
+
+### 4.3 Realtime Synthesis Update
+
+The Realtime subscription established in the wiring pass continues to apply here. When n8n returns `synthesis_content` and flips `status = 'complete'` on the runtime record, if the scenario has already been saved, also update `synthesis_content` on the `gvs_saved_growth_scenarios` record. The founder may have already navigated to the comparison section — the synthesis content should populate there when it arrives.
+
+### 4.4 "Build Another" Reset Behavior
+
+Resets:
+- All Block 2 slider positions to default (0% or preset defaults)
+- Preset chip selection (none selected)
+- Timeframe back to 24 Months
+- Post-run and post-save prompt dismissed
+
+Does NOT reset:
+- Block 1 baseline fields
+- Baseline source indicator
+
+---
+
+## Section 5 — Reference Files
+
+All calculation logic, JSONB payload structures, and Supabase table definitions are already established. Do not redefine them here — reference the existing spec files:
+
+- Calculation engine: `lib/gviCalculations.ts`
+- Formula reference: `/context/GVI_Formula_Specification.md`
+- Supabase payload structures: `/context/GVS_Supabase_Migration_Spec.md`
+- Existing Calculator page for UI pattern reference: `pages/GVCalculatorPage.tsx`
+
+The Scenario Planner inputs layer writes to the same tables and uses the same calculation engine as the Calculator. The only difference is the input interaction model (sliders + presets vs. direct form fields) and the absence of an output dashboard in this layer.
+
+---
+
+## Section 6 — What NOT to Build in This Pass
+
+- Comparison section (pressure dashboard, visual analysis, data grid) — separate pass
+- Load previous scenario in inputs area — belongs in comparison section
+- Output dashboard rendering — this page does not show the full simulator output
+- Any changes to `lib/gviCalculations.ts` — locked
+- Any changes to Supabase schema — migration already complete
+
+---
+
+## Section 7 — Implementation Checklist
+
+### Block 1 — Baseline Configuration
+- [ ] Auto-populate all seven fields from Agency Snapshot on page load
+- [ ] Source indicator shows correct state (Snapshot vs Custom)
+- [ ] Sync button re-fetches Snapshot and resets fields
+- [ ] All fields individually editable with numeric validation
+- [ ] Empty/no-snapshot state handled with banner and link
+
+### Block 2 — Scenario Target Configuration
+- [ ] Four preset chips render with correct labels
+- [ ] Selecting a preset populates all slider positions with correct relative values
+- [ ] Editing any slider after preset selection deselects the active preset chip
+- [ ] Timeframe segmented control renders with 12/24/36 options, defaults to 24
+- [ ] All seven target field rows render with: percentage badge, slider, value display, baseline reference
+- [ ] Slider movement updates percentage badge and value display in real time
+- [ ] Value display is clickable and converts to editable input
+- [ ] Edited value repositions slider and updates percentage badge
+- [ ] Positive/negative slider states show correct track colors
+- [ ] Baseline tick mark visible at 0% position on each slider
+
+### Block 3 — Run & Save Flow
+- [ ] Run Scenario button triggers calculation and Supabase write
+- [ ] Loading state displays during calculation
+- [ ] Post-run state shows GVI score, band, composition label, and name field
+- [ ] Name field pre-populated with suggested name based on scenario configuration
+- [ ] Save button writes to `gvs_saved_growth_scenarios` with correct payload
+- [ ] Post-save confirmation state shows scenario name and two CTAs
+- [ ] "View in Comparison" scrolls to or activates comparison section
+- [ ] "Build Another" resets Block 2 only, preserves Block 1
+- [ ] Realtime subscription updates `synthesis_content` on saved record when GPT returns
+
+---
+
+*Spec Status: Ready for implementation. Build inputs layer only. Comparison section is a separate pass.*
+*Reference: GVI_Formula_Specification.md and GVS_Supabase_Migration_Spec.md for all calculation and database logic.*

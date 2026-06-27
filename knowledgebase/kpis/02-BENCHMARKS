@@ -1,0 +1,1015 @@
+All 4 files in 02-benchmarks category are now complete:
+✅ financial-benchmarks.md — Margin structures, AGI% by type, stage-based targets
+✅ agi-per-fte-ranges.md — Comprehensive productivity benchmarks with leverage curve guidance
+✅ retention-targets.md — Churn, NPS, tenure, upsell, and referral benchmarks by stage
+✅ sales-efficiency-targets.md — CAC, LTV:CAC, win rate, and payback benchmarks
+
+These benchmark files are now ready to be saved to /src/knowledge/kpis/02-benchmarks/ in our project structure.
+
+
+File 1: financial-benchmarks.md
+
+
+---
+title: Financial Performance Benchmarks
+category: benchmarks
+subcategory: financial
+updated: 2025-01-09
+version: 1.0
+---
+
+# Financial Performance Benchmarks
+
+Stage-specific and agency-type-specific benchmarks for financial health metrics.
+
+## Universal AGI Margin Rules of Thumb
+
+These ratios apply across all agency types and stages as foundational targets:
+
+| Component | Target Range | Meaning |
+|-----------|--------------|---------|
+| **Payroll (Labor)** | ≤ 45% of AGI | Labor cost control |
+| **Overhead (SG&A)** | ≤ 20% of AGI | Infrastructure efficiency |
+| **Operating Profit** | ≥ 35% of AGI | Reinvestment capacity and enterprise value |
+
+### Total Cost Structure Target
+**Total Costs (Payroll + SG&A):** ≤ 65% of AGI
+
+## AGI % by Agency Type
+
+The percentage of total revenue that becomes Agency Gross Income (after pass-throughs) varies significantly by business model:
+
+| Agency Type | AGI as % of Revenue | Typical Pass-Through Costs | Value Creation Source |
+|-------------|---------------------|---------------------------|----------------------|
+| **Media Buying / Performance** | 25-40% | High (ad spend, media placements) | Strategy, optimization, reporting |
+| **Creative / Branding / Web** | 60-75% | Moderate (some production, freelancers) | Internal creative capacity |
+| **PR / Communications** | 65-80% | Low (mostly internal team) | Relationships, narrative, execution |
+| **Strategic / Advisory / Consulting** | 85-95% | Very low (minimal external costs) | Intellectual capital, strategy |
+
+### AGI Quality Implications
+
+**For operators:**
+- Higher AGI% = more value captured internally
+- Track Net AGI (AGI minus contractor costs) for cleanest efficiency view
+
+**For investors/acquirers:**
+- Normalize all agencies to AGI for fair comparison
+- High pass-through agencies valued on AGI multiples, not revenue multiples
+
+## Financial Benchmarks by Stage
+
+### Rising Stage (≤$1.5M AGI)
+
+| Metric | Target Range | Focus |
+|--------|--------------|-------|
+| **AGI %** | 70-85% | Establish value capture patterns |
+| **Unburdened Compensation %** | 45-55% | Learning to balance team costs |
+| **SG&A %** | 20-30% | Building infrastructure |
+| **Operating Profit %** | 10-25% | Survival to stability |
+| **Cash Reserves** | 1-2 months | Emergency buffer only |
+
+**Key Challenge:** Achieving consistent profitability month-over-month
+
+---
+
+### Striving Stage ($1.5M-3M AGI)
+
+| Metric | Target Range | Focus |
+|--------|--------------|-------|
+| **AGI %** | 80-90% | Refining value capture |
+| **Unburdened Compensation %** | 40-50% | Efficiency discipline |
+| **SG&A %** | 18-25% | Infrastructure maturing |
+| **Operating Profit %** | 20-30% | Margin control |
+| **Cash Reserves** | 3 months | Reinvestment buffer |
+
+**Key Challenge:** Maintaining margins while scaling team
+
+---
+
+### Thriving Stage ($3M-7M AGI)
+
+| Metric | Target Range | Focus |
+|--------|--------------|-------|
+| **AGI %** | 85-92% | High value capture |
+| **Unburdened Compensation %** | 38-45% | Optimized efficiency |
+| **SG&A %** | 15-22% | Mature infrastructure |
+| **Operating Profit %** | 30-35% | Strong profitability |
+| **Cash Reserves** | 4-6 months | Strategic flexibility |
+
+**Key Challenge:** Scaling systems without margin compression
+
+---
+
+### Driving Stage ($7M-15M+ AGI)
+
+| Metric | Target Range | Focus |
+|--------|--------------|-------|
+| **AGI %** | 90-95% | Exceptional value capture |
+| **Unburdened Compensation %** | 35-42% | Elite efficiency |
+| **SG&A %** | 15-20% | Optimized infrastructure |
+| **Operating Profit %** | 35-45% | Enterprise-grade margins |
+| **Cash Reserves** | 6-12 months | Capitalization and optionality |
+
+**Key Challenge:** Maintaining margins at scale while building enterprise value
+
+## Cost Ratio Dynamics
+
+### The See-Saw Effect
+
+When AGI% improves (less pass-through, more retained value):
+- Compensation% and SG&A% naturally decline *as percentages* even if absolute costs stay flat
+- Profit% amplifies geometrically with each efficiency gain
+
+### Compounding Improvements
+
+**Example:**
+- 5% improvement in AGI% can ripple into +8-10% profit improvement
+- Because it amplifies both productivity and overhead efficiency simultaneously
+
+### Decline Compounds Faster
+
+When AGI% falls (more outsourcing, pricing concessions):
+- Every cost ratio instantly worsens
+- Creates profit compression spiral unless corrected quickly
+
+## Warning Thresholds
+
+### Yellow Flags (Monitor Closely)
+
+| Metric | Threshold | Indication |
+|--------|-----------|------------|
+| **Compensation %** | 45-50% | Efficiency slipping; review roles/pricing |
+| **SG&A %** | 20-25% | Overhead creeping; audit spend |
+| **Operating Profit %** | 25-30% | Margin pressure; identify levers |
+
+### Red Flags (Immediate Action)
+
+| Metric | Threshold | Indication |
+|--------|-----------|------------|
+| **Compensation %** | > 50% | Severe inefficiency or under-pricing |
+| **SG&A %** | > 25% | Overhead bloat; structural issue |
+| **Operating Profit %** | < 20% | Unsustainable; margin crisis |
+| **Total Costs %** | > 70% | Business model under stress |
+
+## Consistency as a KPI
+
+### Why Stability Matters
+
+Agencies showing stable ratios within target ranges exhibit:
+- **Predictable earnings** → investor confidence
+- **Scalable growth runway** → hiring confidence  
+- **Systemic maturity** → valuation premium
+
+### Variance Monitoring
+
+Track quarter-over-quarter variance:
+- **Healthy variance:** ≤5% movement in cost ratios
+- **Attention needed:** 5-10% movement
+- **Structural issue:** >10% movement
+
+## Interpretation Guidelines
+
+### Reading the Ratios Together
+
+Financial KPIs behave like interconnected gears:
+- **AGI%** = engine torque (leverage input)
+- **Labor% + SG&A%** = friction coefficients (drag)
+- **Profit%** = output horsepower (result)
+
+Optimizing one gear helps; synchronizing all creates momentum.
+
+### Stage Transitions
+
+Expect temporary margin compression during:
+- Major system investments
+- Leadership layer additions
+- Strategic hiring ahead of revenue
+
+These are investments, not inefficiencies—if planned and time-bounded.
+
+## Related Files
+
+- `/01-core-definitions/financial-kpis.md` — Metric definitions
+- `/03-directional-diagnostics/financial-trend-interpretation.md` — What trends mean
+- `/04-system-dynamics/financial-kpi-interconnections.md` — How metrics interact
+
+
+
+File 2: agi-per-fte-ranges.md
+
+
+---
+title: AGI per FTE Benchmark Ranges
+category: benchmarks
+subcategory: productivity
+updated: 2025-01-09
+version: 1.0
+---
+
+# AGI per FTE Benchmark Ranges
+
+Comprehensive benchmarks for Agency Gross Income per Full-Time Employee across stages and agency types.
+
+## Universal Context
+
+**AGI per FTE measures:** How much real, keepable income your agency generates per employee.
+
+**What it reveals:**
+- Economic output per person
+- Operational leverage quality
+- Pricing power and efficiency
+- Scalability readiness
+
+**Critical distinction:** AGI per FTE (retained value) ≠ Revenue per FTE (includes pass-throughs)
+
+## Core Benchmark Ranges by Stage
+
+| Agency Maturity Stage | Annual AGI per FTE | Monthly AGI per FTE | Interpretation |
+|----------------------|-------------------|-------------------|----------------|
+| **Early-Stage (Building Systems)** | $140K-$160K | $11.7K-$13.3K | Hiring ahead of growth acceptable; focus on foundations |
+| **Mid-Stage (Scaling Predictably)** | $160K-$180K | $13.3K-$15K | Healthy balance—sustainable leverage and margins |
+| **Growth-Stage (Optimized Operations)** | $180K-$200K | $15K-$16.7K | Strong efficiency—high profit without overstrain |
+| **Advanced (System-Leveraged)** | $200K-$225K | $16.7K-$18.8K | Elite level—automation and specialization leveraging output |
+
+### The Plateau Zone
+
+**$200K-$225K+ range:**
+- Efficiency curve begins to flatten
+- Most "easy" leverage captured
+- Further gains require automation, technology, leadership depth
+- Healthy to stabilize here while building next leverage layer
+
+**Beyond $225K:**
+- Possible but often signals overcapacity risk
+- Monitor burnout, quality, and sustainability metrics closely
+- May indicate short-term extraction rather than systemic efficiency
+
+## AGI per FTE by Agency Type
+
+Different business models support different productivity ranges due to service complexity and delivery models:
+
+| Agency Type | Healthy AGI per FTE Range | Revenue per FTE (Approx.) | Notes |
+|-------------|--------------------------|--------------------------|-------|
+| **Media Buying / Performance** | $150K-$180K | $250K-$350K | High revenue but significant pass-through |
+| **Creative / Branding / Web** | $170K-$200K | $250K-$280K | More value retained internally |
+| **PR / Communications** | $180K-$200K | $250K-$270K | Relationship-driven; high internal value |
+| **Strategic / Advisory / Consulting** | $200K-$230K | $220K-$250K | Nearly all intellectual capital; minimal pass-through |
+
+### Why These Differences Matter
+
+**High Pass-Through Agencies (Media, Performance):**
+- Revenue per FTE looks impressive but misleading
+- AGI per FTE reveals true productivity
+- Focus on margin per client, not topline growth
+
+**High-Value Capture Agencies (Consulting, Strategy):**
+- Revenue per FTE closer to AGI per FTE
+- Every hire adds nearly full value
+- Scalability limited by talent quality, not systems
+
+## Revenue per FTE vs. AGI per FTE
+
+### The Critical Distinction
+
+| Metric | What It Includes | Best Use Case |
+|--------|-----------------|---------------|
+| **Revenue per FTE** | All billing including pass-throughs | External benchmarking, topline comparison, market positioning |
+| **AGI per FTE** | Only value agency keeps after pass-throughs | Operational efficiency, profit analysis, valuation prep |
+
+### Typical Ranges
+
+**Revenue per FTE benchmarks often cited:**
+- $250K-$260K across industries
+- $220K-$350K for agencies (model-dependent)
+
+**Translation to AGI per FTE:**
+- Subtract 25-35% for typical pass-through exposure
+- Media-heavy: Revenue $350K → AGI $140K-$175K
+- Strategy-focused: Revenue $250K → AGI $210K-$240K
+
+### Why AGI per FTE Matters More
+
+**For operators:**
+- Reveals if you're scaling efficiency or just throughput
+- Determines hiring affordability
+- Drives profit per employee
+
+**For investors/acquirers:**
+- Normalizes comparison across different models
+- Reveals scalability potential
+- Influences valuation multiples
+
+## The Leverage Curve
+
+### Healthy Growth Pattern
+```
+AGI/FTE
+│
+│         ┌────── Plateau (Optimization phase)
+│    ┌────┘
+│  ┌─┘
+│─┘
+└─────────────────► Time / Operational Sophistication
+```
+
+**Stages of the curve:**
+
+1. **Startup Scramble (<$140K):** Finding rhythm; inefficiencies normal
+2. **Building Foundations ($140K-$160K):** First systems emerging
+3. **Scalable Efficiency ($160K-$200K):** Healthy sustainable zone
+4. **Optimization Plateau ($200K-$225K):** Efficiency curve flattening
+5. **Caution Zone (>$225K):** Monitor for unsustainable leverage
+
+### Unhealthy Leverage Signals
+
+**Rising AGI per FTE is problematic when driven by:**
+- Consistent overcapacity (>90% utilization)
+- Delayed hiring despite workload increase
+- Normalized overtime (>10% regularly)
+- Rising employee turnover
+- Quality complaints increasing
+
+**Healthy AGI per FTE growth driven by:**
+- Better pricing and positioning
+- Process automation and systems
+- Role clarity and specialization
+- Forecasting and capacity management
+- Leadership leverage (delegation depth)
+
+## Stage-Specific Guidance
+
+### Rising Stage (≤$1.5M AGI)
+
+**Target:** $140K-$160K per FTE
+
+**Focus:**
+- Establish baseline productivity
+- Learn workload balance
+- Build foundational processes
+
+**Warning signs:**
+- Below $120K = severe inefficiency
+- Above $180K = likely burnout trajectory
+
+---
+
+### Striving Stage ($1.5M-3M AGI)
+
+**Target:** $160K-$180K per FTE
+
+**Focus:**
+- Systemize efficiency gains
+- Establish capacity forecasting
+- Balance growth and sustainability
+
+**Warning signs:**
+- Stagnant at $140K-$150K = systems not scaling
+- Jumping to $200K+ = risk of overcapacity
+
+---
+
+### Thriving Stage ($3M-7M AGI)
+
+**Target:** $180K-$200K per FTE
+
+**Focus:**
+- Predictable leverage curve
+- Leadership bandwidth growing
+- Infrastructure supporting scale
+
+**Warning signs:**
+- Declining from $190K to $160K = overhiring or efficiency loss
+- Pushing above $225K = sustainability risk
+
+---
+
+### Driving Stage ($7M-15M+ AGI)
+
+**Target:** $200K-$225K per FTE
+
+**Focus:**
+- Sustainable plateau
+- Automation and tech leverage
+- Enterprise-grade operations
+
+**Warning signs:**
+- Extreme variance (±$30K quarter-to-quarter)
+- Persistent >$240K without tech/automation investment
+
+## Utilization Context
+
+AGI per FTE must be read alongside utilization:
+
+| Utilization | AGI per FTE | Interpretation |
+|-------------|-------------|----------------|
+| 70-80% | $180K-$200K | **Healthy leverage** — sustainable productivity |
+| 85-90% | $200K-$220K | **Strong but monitor** — approaching capacity limits |
+| >90% | >$225K | **Caution zone** — likely unsustainable without intervention |
+| <65% | <$160K | **Undercapacity** — underutilized resources or overstaffed |
+
+## Warning Thresholds
+
+### Monitor Closely (Yellow Flag)
+
+- AGI per FTE declining 10%+ quarter-over-quarter
+- AGI per FTE >$220K with utilization >85%
+- AGI per FTE <$140K for mature agencies (>$2M AGI)
+
+### Immediate Action (Red Flag)
+
+- AGI per FTE declining 20%+ over two quarters
+- AGI per FTE >$240K sustained for 2+ quarters
+- AGI per FTE <$120K for any agency over $1M AGI
+
+## Interpretation Guidelines
+
+**Rising AGI per FTE signals:**
+- Positive: Better systems, pricing, efficiency
+- Negative: Overcapacity, delayed hiring, burnout trajectory
+
+**Declining AGI per FTE signals:**
+- Positive: Strategic hiring ahead of growth
+- Negative: Inefficiency creep, under-pricing, overstaffing
+
+**Stable AGI per FTE signals:**
+- Positive: Predictable operations, mature systems
+- Negative: Growth plateau, complacency (context-dependent)
+
+**The key question:** *What's driving the number—systems or strain?*
+
+## Related Files
+
+- `/01-core-definitions/productivity-kpis.md` — Core metric definitions
+- `/03-directional-diagnostics/productivity-trend-interpretation.md` — Trend analysis
+- `/06-deep-dives/agi-per-fte-leverage-curve.md` — Deep dive on healthy growth
+- `/06-deep-dives/revenue-vs-agi-per-fte.md` — Revenue vs AGI distinction
+
+
+File 3: retention-targets.md
+
+---
+title: Client Retention & Account Health Targets
+category: benchmarks
+subcategory: retention
+updated: 2025-01-09
+version: 1.0
+---
+
+# Client Retention & Account Health Targets
+
+Stage-specific and universal benchmarks for client retention, satisfaction, and account growth metrics.
+
+## Universal Retention Rules of Thumb
+
+These targets apply across all agency types as foundational health indicators:
+
+| Metric | Target | Critical Threshold | Meaning |
+|--------|--------|-------------------|---------|
+| **Annual Client Retention Rate** | ≥ 90% | < 80% | Percentage of clients retained year-over-year |
+| **Monthly Churn Rate** | ≤ 2.5% | > 3.5% | Percentage of clients lost per month |
+| **NPS (Net Promoter Score)** | ≥ 45% | < 30% | Client satisfaction and advocacy |
+| **Client Results Success Rate** | ≥ 95% | < 85% | Clients meeting/exceeding goals |
+| **Referral Rate** | 20-30% | < 10% | Percentage of clients generating referrals |
+
+## Retention Metrics by Stage
+
+### Rising Stage (≤$1.5M AGI)
+
+| Metric | Target Range | Focus | Challenge |
+|--------|--------------|-------|-----------|
+| **Annual Retention** | 75-85% | Learning to deliver consistently | High volatility normal in early stage |
+| **Monthly Churn** | 2.5-4% | Stabilizing service quality | Client fit still being refined |
+| **NPS** | 35-50% | Building satisfaction systems | Inconsistent measurement |
+| **Client Tenure (Avg)** | 8-15 months | Establishing relationships | Short lifecycles acceptable early |
+| **Upsell Revenue** | Opportunistic | Identifying expansion moments | No systematic approach yet |
+
+**Key Challenge:** Achieving baseline retention consistency
+
+---
+
+### Striving Stage ($1.5M-3M AGI)
+
+| Metric | Target Range | Focus | Challenge |
+|--------|--------------|-------|-----------|
+| **Annual Retention** | 85-90% | Systematic retention practices | Reducing churn predictably |
+| **Monthly Churn** | 1.5-2.5% | Service quality control | Preventing high-value churn |
+| **NPS** | 45-60% | Formalizing feedback loops | Standardizing measurement |
+| **Client Tenure (Avg)** | 15-24 months | Relationship deepening | Moving beyond project cycles |
+| **Upsell Revenue** | Beginning to track | Introducing growth conversations | Building account management |
+
+**Key Challenge:** Maintaining retention while scaling delivery
+
+---
+
+### Thriving Stage ($3M-7M AGI)
+
+| Metric | Target Range | Focus | Challenge |
+|--------|--------------|-------|-----------|
+| **Annual Retention** | 90-95% | Predictable retention engine | Account expansion standard |
+| **Monthly Churn** | 1-2% | Proactive health monitoring | Early warning systems active |
+| **NPS** | 55-70% | Strong client advocacy | NPS-driven improvements |
+| **Client Tenure (Avg)** | 24-36+ months | Long-term partnerships | Multi-year relationships standard |
+| **Upsell Revenue** | 15-25% growth YoY | Planned expansion strategy | Systematic upsell process |
+| **NRR (Net Revenue Retention)** | 100-110% | Revenue expanding organically | Tracking expansion vs churn |
+
+**Key Challenge:** Balancing growth and service quality at scale
+
+---
+
+### Driving Stage ($7M-15M+ AGI)
+
+| Metric | Target Range | Focus | Challenge |
+|--------|--------------|-------|-----------|
+| **Annual Retention** | 92-98% | Enterprise-grade retention | Strategic account management |
+| **Monthly Churn** | 0.5-1.5% | Minimal churn as cultural norm | Proactive intervention systems |
+| **NPS** | 60-75%+ | World-class satisfaction | Industry-leading advocacy |
+| **Client Tenure (Avg)** | 36-60+ months | Multi-year strategic partnerships | Embedded client relationships |
+| **Upsell Revenue** | 20-35% growth YoY | Predictable expansion engine | Portfolio-level growth planning |
+| **NRR (Net Revenue Retention)** | 110-130% | Strong expansion economics | Cohort-based growth analysis |
+
+**Key Challenge:** Maintaining intimacy and service quality at enterprise scale
+
+## NPS Benchmarks by Context
+
+### By Agency Type
+
+| Agency Type | Target NPS | Exceptional NPS | Context |
+|-------------|-----------|----------------|---------|
+| **Performance / Media** | 40-55% | >60% | Results-driven; easier to measure satisfaction |
+| **Creative / Branding** | 50-65% | >70% | Relationship-heavy; emotional connection matters |
+| **PR / Communications** | 45-60% | >65% | Trust-based; reputation sensitive |
+| **Strategic / Consulting** | 55-70% | >75% | High-touch; personal relationships critical |
+
+### NPS Interpretation Scale
+
+| Range | Category | Meaning | Action |
+|-------|----------|---------|--------|
+| **>70%** | World-Class | Exceptional loyalty and advocacy | Systematize and scale what's working |
+| **50-70%** | Strong | Healthy satisfaction; good referral potential | Optimize and expand |
+| **30-50%** | Moderate | Acceptable but room for improvement | Investigate detractor feedback |
+| **10-30%** | At Risk | Satisfaction issues present | Urgent improvement needed |
+| **<10%** | Critical | Severe dissatisfaction | Crisis response required |
+
+## Churn Analysis Frameworks
+
+### Healthy Churn vs. Unhealthy Churn
+
+**Healthy churn indicators:**
+- Client outgrew services (graduated)
+- Budget constraints (economic, not performance)
+- Strategic shift outside agency scope
+- Evenly distributed across client base
+
+**Unhealthy churn indicators:**
+- Results-based disappointment
+- Communication or relationship breakdown
+- Concentrated among high-value clients
+- Pattern in specific service lines
+
+### Churn Value Analysis
+
+Beyond percentage, track dollar impact:
+
+| Monthly Churn $ | Interpretation | Action Level |
+|-----------------|----------------|--------------|
+| **<5% of MRR** | Normal | Monitor |
+| **5-10% of MRR** | Elevated | Investigate patterns |
+| **>10% of MRR** | Critical | Immediate intervention |
+
+**Key insight:** Losing 2 small clients (2% count) is different than losing 1 large client (2% count but 15% of revenue).
+
+## Client Tenure Benchmarks
+
+### By Sales Model
+
+| Model Type | Target Avg Tenure | Strong Tenure | Challenge |
+|------------|------------------|---------------|-----------|
+| **Project-Based** | 12-18 months | >24 months | Converting to retainer relationships |
+| **Retainer (Monthly)** | 18-30 months | >36 months | Demonstrating ongoing value |
+| **Retainer (Annual)** | 24-48 months | >48 months | Multi-year renewals |
+| **Embedded/Strategic** | 36-60+ months | >60 months | Becoming irreplaceable partner |
+
+### Tenure as Leading Indicator
+
+**Correlation patterns:**
+- Longer tenure → higher LTV
+- Longer tenure → lower service cost (relationship efficiency)
+- Longer tenure → higher referral likelihood
+- Longer tenure → greater upsell receptivity
+
+## Upsell & Expansion Benchmarks
+
+### Expansion Revenue Targets
+
+| Stage | Expansion as % of New Revenue | Net Revenue Retention | Focus |
+|-------|------------------------------|---------------------|-------|
+| **Rising** | <10% | 85-95% | Survival mode; just retain |
+| **Striving** | 10-20% | 95-105% | Beginning to expand systematically |
+| **Thriving** | 20-30% | 105-115% | Expansion engine established |
+| **Driving** | 30-40%+ | 115-130% | Growth primarily from expansion |
+
+### Healthy Expansion Indicators
+
+- Expansion conversations planned quarterly
+- Upsells tied to demonstrated results
+- Expansion distributed across client base (not concentrated)
+- Average deal size increasing year-over-year
+
+## Client Results Benchmarks
+
+### Success Rate Targets
+
+| Metric | Target | Exceptional | Critical Threshold |
+|--------|--------|-------------|-------------------|
+| **% Meeting Goals** | 90-95% | >95% | <85% |
+| **% Exceeding Goals** | 30-40% | >50% | <20% |
+| **Avg Performance vs Target** | 100-110% | >120% | <90% |
+
+### Results Tracking Maturity
+
+**By Stage:**
+
+| Stage | Results Tracking | Sophistication |
+|-------|-----------------|----------------|
+| **Rising** | Informal feedback | Anecdotal; not systematized |
+| **Striving** | Beginning QBRs | Quarterly structured reviews |
+| **Thriving** | Dashboards + QBRs | Real-time tracking with reviews |
+| **Driving** | Predictive analytics | AI-driven health scoring |
+
+## Referral Rate Benchmarks
+
+### By Growth Model
+
+| Growth Model | Target Referral Rate | Interpretation |
+|--------------|---------------------|----------------|
+| **Referral-Dominant** | 60-80% | Primary growth channel |
+| **Hybrid (Referral + Inbound)** | 30-50% | Balanced acquisition |
+| **System-Driven** | 20-30% | One of multiple channels |
+| **Low-Touch / Transactional** | 10-20% | Referrals less natural |
+
+### Referral Quality Indicators
+
+- **Conversion rate of referrals:** >60% (vs. 30-40% for cold leads)
+- **Deal size of referrals:** Often 20-30% higher than average
+- **Sales cycle of referrals:** 30-50% shorter than average
+
+## Warning Thresholds
+
+### Yellow Flags (Monitor Closely)
+
+- Annual retention falling below 85%
+- Monthly churn exceeding 2.5% for 2+ months
+- NPS declining 10+ points quarter-over-quarter
+- Zero upsells for 2 consecutive quarters
+- Referral rate below 15%
+
+### Red Flags (Immediate Action)
+
+- Annual retention below 75%
+- Monthly churn exceeding 4%
+- NPS below 30%
+- Client results success rate below 80%
+- High-value client churn pattern emerging
+- No referrals for 6+ months
+
+## Interpretation Guidelines
+
+### Retention as System Health
+
+Strong retention indicates:
+- Delivery quality consistency
+- Client communication effectiveness
+- Value perception alignment
+- Account management maturity
+
+Weak retention suggests:
+- Service quality issues
+- Expectation misalignment
+- Poor client fit/selection
+- Weak relationship management
+
+### The Retention Flywheel
+```
+Results → Satisfaction → Retention → Upsells → Referrals → Lower CAC → More Profit → Better Delivery
+```
+
+Every retention improvement compounds through multiple downstream effects.
+
+## Related Files
+
+- `/01-core-definitions/retention-kpis.md` — Core metric definitions
+- `/03-directional-diagnostics/retention-trend-interpretation.md` — Trend analysis
+- `/04-system-dynamics/retention-flywheel-dynamics.md` — System interactions
+- `/06-deep-dives/client-results-measurement.md` — How to measure outcomes
+
+
+
+File 4: sales-efficiency-targets.md
+
+---
+title: Sales & Marketing Efficiency Targets
+category: benchmarks
+subcategory: sales-marketing
+updated: 2025-01-09
+version: 1.0
+---
+
+# Sales & Marketing Efficiency Targets
+
+Stage-specific and model-specific benchmarks for customer acquisition efficiency and sales performance.
+
+## Universal Efficiency Rules of Thumb
+
+Core targets that apply across most agency models:
+
+| Metric | Target | Strong Performance | Critical Threshold |
+|--------|--------|-------------------|-------------------|
+| **LTV:CAC Ratio** | ≥ 3:1 | > 5:1 | < 2:1 |
+| **CAC Payback Period** | ≤ 6 months | ≤ 3 months | > 12 months |
+| **Win Rate** | 40-50% | > 60% | < 25% |
+| **Sales Cycle** | Model-dependent | 30-50% faster than benchmark | 2x+ benchmark |
+
+## CAC (Customer Acquisition Cost) Benchmarks
+
+### By Agency Type & Model
+
+| Agency Type | Typical CAC Range | Context |
+|-------------|------------------|---------|
+| **Performance / Media (SMB)** | $2K-$4K | Shorter sales cycle, lower deal size |
+| **Performance / Media (Mid-Market)** | $4K-$8K | Moderate complexity |
+| **Creative / Branding** | $5K-$10K | Longer sales cycle, relationship-driven |
+| **PR / Communications** | $6K-$12K | Trust-building intensive |
+| **Strategic / Consulting** | $10K-$25K+ | High-touch, long cycle, complex sale |
+| **Web / Dev / Technical** | $3K-$8K | Project-based, proposal-intensive |
+
+### By Stage
+
+| Stage | Acceptable CAC | Target CAC | Focus |
+|-------|---------------|------------|-------|
+| **Rising** | Variable | Stabilize measurement | Just starting to track |
+| **Striving** | Model benchmark | 10% below benchmark | Establishing efficiency |
+| **Thriving** | 15% below benchmark | 25% below benchmark | Optimizing acquisition |
+| **Driving** | 25% below benchmark | 35% below benchmark | Best-in-class efficiency |
+
+### CAC Components
+
+**Include in CAC calculation:**
+- Marketing spend (ads, content, events, tools, agencies)
+- Sales salaries and commissions
+- Sales operations and enablement costs
+- CRM and sales technology
+- Marketing team salaries
+
+**Do not include:**
+- Delivery costs
+- General overhead
+- Client success costs (post-sale)
+
+## LTV:CAC Ratio Benchmarks
+
+### Benchmark Ranges
+
+| Ratio | Interpretation | Action |
+|-------|----------------|--------|
+| **> 5:1** | Exceptional efficiency | Potential to invest more in growth |
+| **4:1 to 5:1** | Strong performance | Healthy, sustainable growth mode |
+| **3:1 to 4:1** | Good baseline | Standard healthy target |
+| **2:1 to 3:1** | Acceptable but tight | Monitor closely; improve efficiency |
+| **< 2:1** | Unsustainable | Urgent action required |
+
+### LTV Calculation Methods
+
+**3-Month LTV Window:**
+- Used for: Short-cycle validation, early-stage agencies
+- Calculation: Average client value over 3 months × expected lifetime (in 3-month periods)
+
+**6-Month LTV Window:**
+- Used for: More stable forecasting, established agencies
+- Calculation: Average client value over 6 months × expected lifetime (in 6-month periods)
+
+**Full Lifetime LTV:**
+- Used for: Mature agencies with long retention history
+- Calculation: Average total client value from acquisition to churn
+
+**Always use gross margin, not gross revenue** when calculating LTV for ratio purposes.
+
+## CAC Payback Period Benchmarks
+
+### Target Ranges
+
+| Payback Period | Interpretation | Business Impact |
+|----------------|----------------|-----------------|
+| **< 3 months** | Exceptional | Rapid reinvestment cycle possible |
+| **3-6 months** | Healthy target | Sustainable growth without cash stress |
+| **6-9 months** | Acceptable | Manageable but monitor cash |
+| **9-12 months** | Concerning | Cash flow pressure; limits growth speed |
+| **> 12 months** | Critical | Unsustainable; requires capital or restructuring |
+
+### By Business Model
+
+| Model Type | Target Payback | Strong Payback | Challenge |
+|------------|---------------|----------------|-----------|
+| **High-Frequency / Low-Touch** | 2-4 months | < 2 months | Volume-based model needs fast recovery |
+| **Retainer / Recurring** | 4-6 months | < 4 months | Standard recurring revenue model |
+| **Project-Heavy** | 6-9 months | < 6 months | Longer payback acceptable if project margins high |
+| **Strategic / High-Touch** | 6-12 months | < 8 months | Complex sale justifies longer payback |
+
+### Payback Calculation
+```
+CAC Payback Period = CAC ÷ (Monthly Gross Margin per Client)
+```
+
+**Example:**
+- CAC: $6,000
+- Monthly client value: $3,000
+- Gross margin: 60%
+- Monthly gross profit: $1,800
+- Payback period: $6,000 ÷ $1,800 = 3.3 months
+
+## Win Rate Benchmarks
+
+### By Sales Model
+
+| Sales Model | Target Win Rate | Strong Win Rate | Context |
+|-------------|----------------|----------------|---------|
+| **Inbound (Warm)** | 50-60% | > 70% | Pre-qualified interest |
+| **Referrals** | 60-70% | > 80% | Trust pre-established |
+| **Outbound (Cold)** | 20-30% | > 40% | Higher volume, lower conversion |
+| **Partnership Channel** | 40-50% | > 60% | Qualified by partner |
+| **RFP / Proposal Response** | 25-40% | > 50% | Competitive, longer cycle |
+
+### Win Rate by Stage
+
+| Stage | Acceptable Range | Target Range | Focus |
+|-------|-----------------|--------------|-------|
+| **Rising** | 20-30% | 30-40% | Learning to qualify and close |
+| **Striving** | 35-45% | 45-55% | Refining positioning and process |
+| **Thriving** | 45-55% | 55-65% | Strong market fit |
+| **Driving** | 50-60% | 60-70%+ | Strategic deal selection |
+
+### Win Rate as Efficiency Indicator
+
+**Rising win rates signal:**
+- Improved qualification
+- Stronger positioning
+- Better ICP alignment
+- More effective authority building
+
+**Declining win rates signal:**
+- Poor lead quality
+- Competitive pressure
+- Pricing misalignment
+- Weak differentiation
+
+## Sales Cycle Length Benchmarks
+
+### By Agency Type
+
+| Agency Type | Typical Cycle | Fast Cycle | Long Cycle |
+|-------------|--------------|------------|------------|
+| **Performance / Media (SMB)** | 14-30 days | < 14 days | > 45 days |
+| **Performance / Media (Mid-Market)** | 30-60 days | < 30 days | > 90 days |
+| **Creative / Branding** | 45-75 days | < 45 days | > 120 days |
+| **PR / Communications** | 30-60 days | < 30 days | > 90 days |
+| **Strategic / Consulting** | 60-120 days | < 60 days | > 180 days |
+| **Web / Dev / Technical** | 30-75 days | < 30 days | > 120 days |
+
+### Sales Cycle Evaluation
+
+**Must evaluate alongside:**
+- Average deal size (longer cycles acceptable for larger deals)
+- Win rate (faster isn't better if conversion suffers)
+- Customer quality (strategic clients worth longer cycles)
+
+**Red flags:**
+- Cycle lengthening without deal size increase
+- High variance (unpredictable timing)
+- Consistent delays at same stage
+
+## Conversion Funnel Benchmarks
+
+### Healthy Conversion Rates
+
+| Funnel Stage | Conversion Rate | Strong Performance | Weak Signal |
+|--------------|----------------|-------------------|-------------|
+| **MQL → SQL** | 25-35% | > 40% | < 20% |
+| **SQL → Proposal** | 60-75% | > 80% | < 50% |
+| **Proposal → Win** | 40-50% | > 60% | < 30% |
+| **Overall (MQL → Win)** | 8-15% | > 18% | < 5% |
+
+### Funnel Health Indicators
+
+**Healthy funnel:**
+- Consistent conversion at each stage
+- Predictable progression timing
+- High SQL quality (low proposal waste)
+
+**Unhealthy funnel:**
+- Wide variance stage-to-stage
+- Long stall periods between stages
+- High early-stage volume, low late-stage conversion
+
+## Pipeline Coverage Benchmarks
+
+### Pipeline-to-Target Ratio
+
+| Coverage Ratio | Interpretation | Risk Level |
+|----------------|----------------|------------|
+| **4:1 to 5:1** | Healthy coverage | Low risk |
+| **3:1 to 4:1** | Minimum acceptable | Moderate risk |
+| **2:1 to 3:1** | Undercovered | High risk |
+| **< 2:1** | Critical shortage | Immediate action needed |
+
+**Example:** If quarterly revenue target is $500K, pipeline should contain $2M-2.5M in weighted opportunity value.
+
+## Sales Efficiency by Stage
+
+### Rising Stage (≤$1.5M AGI)
+
+| Metric | Target | Focus |
+|--------|--------|-------|
+| **CAC** | Establish baseline | Begin tracking costs |
+| **LTV:CAC** | 2:1+ | Validate unit economics |
+| **Payback** | < 12 months | Prove sustainability |
+| **Win Rate** | 25-35% | Learn to qualify |
+| **Pipeline Coverage** | 3:1 | Build consistent flow |
+
+---
+
+### Striving Stage ($1.5M-3M AGI)
+
+| Metric | Target | Focus |
+|--------|--------|-------|
+| **CAC** | $4K-8K | Improve efficiency |
+| **LTV:CAC** | 3:1+ | Prove scalability |
+| **Payback** | 6-9 months | Reduce recovery time |
+| **Win Rate** | 35-45% | Refine positioning |
+| **Pipeline Coverage** | 4:1 | Predictable pipeline |
+
+---
+
+### Thriving Stage ($3M-7M AGI)
+
+| Metric | Target | Focus |
+|--------|--------|-------|
+| **CAC** | Model benchmark | Optimize channels |
+| **LTV:CAC** | 4:1+ | Strong unit economics |
+| **Payback** | 4-6 months | Efficient recovery |
+| **Win Rate** | 45-55% | Strong positioning |
+| **Pipeline Coverage** | 4:1+ | Systematic generation |
+
+---
+
+### Driving Stage ($7M-15M+ AGI)
+
+| Metric | Target | Focus |
+|--------|--------|-------|
+| **CAC** | 25% below benchmark | Best-in-class efficiency |
+| **LTV:CAC** | 5:1+ | Exceptional economics |
+| **Payback** | 3-4 months | Rapid reinvestment |
+| **Win Rate** | 55-65%+ | Strategic selectivity |
+| **Pipeline Coverage** | 5:1+ | Abundant deal flow |
+
+## Warning Thresholds
+
+### Yellow Flags (Monitor Closely)
+
+- LTV:CAC falling below 3.5:1
+- CAC increasing 15%+ quarter-over-quarter
+- Payback period extending beyond 7 months
+- Win rate declining 10+ points
+- Sales cycle lengthening 25%+ without deal size growth
+
+### Red Flags (Immediate Action)
+
+- LTV:CAC below 2:1 for 2+ quarters
+- CAC above model benchmark by 50%+
+- Payback period > 12 months
+- Win rate < 25%
+- Pipeline coverage < 2:1
+
+## Interpretation Guidelines
+
+### CAC Analysis
+
+**CAC increasing signals:**
+- Positive: Strategic move upmarket
+- Negative: Declining conversion efficiency, poor targeting
+
+**CAC decreasing signals:**
+- Positive: Better processes, stronger brand, referral momentum
+- Negative: Under-investing in growth, cherry-picking easy deals
+
+### The Efficiency Stack
+```
+Win Rate ↑ → CAC ↓ → Payback ↓ → LTV:CAC ↑ → Self-Funding Growth
+```
+
+Each improvement compounds through the system.
+
+## Related Files
+
+- `/01-core-definitions/sales-marketing-kpis.md` — Core metric definitions
+- `/03-directional-diagnostics/sales-trend-interpretation.md` — Trend analysis
+- `/04-system-dynamics/sales-efficiency-loops.md` — System interactions
+- `/06-deep-dives/acquisition-portfolio-by-agency-type.md` — Channel mix strategies

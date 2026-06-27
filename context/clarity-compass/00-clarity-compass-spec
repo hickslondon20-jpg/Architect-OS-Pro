@@ -1,0 +1,850 @@
+# Clarity Compass — Full Feature Spec
+**Version:** 1.0  
+**Status:** Ready for Build  
+**Purpose:** Complete front-end specification for the Clarity Compass feature. This document covers all tabs, components, states, interactions, and content for Antigravity to build incrementally.
+
+---
+
+## Overview
+
+The Clarity Compass is a vision intake and synthesis tool for agency founders. It captures qualitative vision across four time horizons — 12-Month, 24-Month, 36-Month, and Ultimate Vision — and combines that with quantitative scenario data from the Growth Velocity Simulator to produce an AI-generated strategic synthesis.
+
+The output is a north star document the founder can share with their team, return to over time, and use as the strategic anchor for all execution planning in the platform.
+
+---
+
+## Tab Structure
+
+The Clarity Compass has three top-level tabs:
+
+1. **Vision State** — the intake form
+2. **Dashboard** — the synthesis output
+3. **History** — version history and downloads
+
+Tab navigation is always visible. The active tab is highlighted. Founders can navigate between tabs freely at any point.
+
+---
+
+## Tab 1 — Vision State (Intake)
+
+### Layout
+
+Two-column layout matching the existing platform pattern:
+- **Left column (main):** accordion sections for each horizon, stacked vertically
+- **Right column (sidebar):** persistent "Your Declared Direction" progress panel
+
+### Your Declared Direction Sidebar
+
+Sticky sidebar panel on the right. Displays all four horizons as a vertical list with status indicators:
+- **Complete** — green indicator
+- **In Progress** — amber indicator  
+- **Not Started** — grey indicator
+
+Clicking a horizon in the sidebar scrolls the main column to that section and expands it if collapsed.
+
+---
+
+### Horizon Sections — General Behavior
+
+Each horizon is a collapsible accordion card. Default state on first visit: all collapsed, all showing Not Started.
+
+Each accordion header displays:
+- Horizon icon (existing emoji icons — keep as is)
+- Horizon title
+- One-line subtitle describing the horizon's purpose
+- Status badge (Complete / In Progress / Not Started)
+- Expand/collapse chevron
+
+When expanded, the accordion shows:
+- The scenario tagging accordion (see below)
+- All dimension sections with their fields
+- A Save button at the bottom of the section
+
+Status updates automatically:
+- **Not Started** — no fields touched
+- **In Progress** — at least one field selected but not all required fields complete
+- **Complete** — all required fields have a selection
+
+---
+
+### Scenario Tagging Accordion
+
+Sits at the top of each expanded horizon section, above the dimension fields. Collapsed by default.
+
+**Collapsed state label:** "Tag a Growth Velocity Scenario — Optional"
+
+When expanded:
+- Brief helper text: "Attaching a saved scenario adds a quantitative layer to your synthesis for this horizon. Encouraged but not required."
+- Dropdown to select from the founder's saved GVS scenarios
+- Once selected, shows the scenario name, GVI score, band label, and composition label as a compact summary strip
+- A clear/remove link to detach the scenario
+
+When collapsed after tagging, the collapsed header updates to show the tagged scenario name so it's visible without expanding.
+
+If no scenarios are saved, the dropdown shows a message: "No saved scenarios yet. Run a scenario in the Growth Velocity Simulator to tag one here." With a link to the simulator.
+
+---
+
+### 12-Month Horizon
+
+**Header:** 12-Month Future Reality  
+**Subtitle:** Describe the business you intend to build over the next 12 months — not where you are today, but where you want to be.
+
+#### Dimension 1 — Financial Reality
+
+**Dimension label:** Financial Reality  
+**Dimension helper text:** What do you want the economic shape of the business to become by this point?
+
+---
+
+**Field: Primary Financial Objective**  
+Helper text: What do you want the business to be optimizing for financially — not the target, but the intent driving your decisions.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Improve profitability at current scale
+- Reinvest aggressively to fund growth
+- Transition to a higher-value revenue model
+- Build toward a specific financial milestone
+- Stabilize and reduce financial volatility
+
+---
+
+**Field: Revenue Model Direction**  
+Helper text: Where do you want your pricing, packaging, or service structure to be by this point — regardless of who you're serving.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Continuing to scale a model that's already proven
+- Moving upmarket — higher fees, more selective engagements
+- Introducing new offer structures or revenue streams
+- Simplifying — fewer services, sharper focus
+- Shifting from project-based to retainer or recurring model
+
+---
+
+**Field: What Financial Success Looks Like at This Stage**  
+Helper text: Choose the markers that best describe what financial health feels like when this horizon is realized.  
+Type: Multi-select  
+Max selections: 2  
+Required: Yes (minimum 1 selection)  
+Options:
+- Decisions are no longer made from scarcity or cash pressure
+- Revenue is consistent enough that growth feels planned, not reactive
+- Margin has improved to the point where the business funds its own evolution
+- No single client represents an existential revenue risk
+- The financial foundation exists to build the team proactively
+
+---
+
+#### Dimension 2 — Clients & Market Reality
+
+**Dimension label:** Clients & Market Reality  
+**Dimension helper text:** Who do you want this business to be for, and what position do you want it to claim in the market?
+
+---
+
+**Field: Client Quality Direction**  
+Helper text: Where do you want the caliber, fit, and relationship dynamic of your client base to be by this point — not who you're targeting, but the quality standard you're moving toward.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- I want to raise the bar — fewer, higher-value, better-fit clients
+- I want to expand the base — more clients at a consistent quality level
+- I want to tighten criteria — being more deliberate about who we take on
+- I want to deepen existing relationships — growing with current clients rather than acquiring new
+- I want to transition out of misaligned client relationships toward a clearer ideal
+
+---
+
+**Field: Market Position Direction**  
+Helper text: Where do you want the agency's differentiation and perceived position in the market to be — how you want to be known and why clients choose you.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Sharpening specialization — becoming more distinctly known for a specific outcome or vertical
+- Broadening capability — expanding what the agency is known for delivering
+- Moving toward more sophisticated buyers — larger or more complex client relationships
+- Building category authority — becoming a recognizable voice in a defined space
+- Clarifying differentiation — making what makes us different more explicit and consistent
+- Holding and executing on an established position — the work is in consistency, not redefinition
+
+---
+
+**Field: What the Client Relationship Looks Like at This Stage**  
+Helper text: Choose the statements that best describe how your relationship with clients has evolved when this horizon is realized.  
+Type: Multi-select  
+Max selections: 2  
+Required: Yes (minimum 1 selection)  
+Options:
+- Clients treat us as a strategic partner, not a vendor or executor
+- We are selective enough that we rarely take on work outside our zone of excellence
+- Our retention is strong enough that growth comes primarily from existing relationships
+- We have a clear and consistent reason why clients choose us over alternatives
+- The clients we serve reflect the market position we are intentionally building toward
+
+---
+
+#### Dimension 3 — Operations & Systems Reality
+
+**Dimension label:** Operations & Systems Reality  
+**Dimension helper text:** How do you want the business to deliver and operate by this point — systematically and efficiently?
+
+---
+
+**Field: Delivery Consistency Direction**  
+Helper text: Where do you want the agency's ability to deliver quality outcomes — systematically, not just occasionally — to be by this point.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Moving from founder-dependent delivery toward team-led consistency
+- Standardizing processes so quality is repeatable regardless of who executes
+- Documenting and systematizing what has historically lived in people's heads
+- Evolving from team-led consistency toward systematized, scalable delivery infrastructure
+- Maintaining and deepening a delivery model that will be well established by this point
+- Scaling a proven delivery system into new service lines or client types
+
+---
+
+**Field: Operational Leverage Direction**  
+Helper text: Where do you want the relationship between your operational capacity and revenue potential to be — is growth becoming more structurally efficient.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Building infrastructure ahead of growth to create capacity before it's needed
+- Streamlining existing operations to reduce overhead relative to output
+- Introducing technology or tooling to increase team output without proportional headcount growth
+- Holding current operational structure while proving the model at this scale
+- Restructuring how work gets resourced and delivered to improve margin per engagement
+
+---
+
+**Field: What Operational Progress Looks Like at This Stage**  
+Helper text: Choose the statements that best describe what the business feels like operationally when this horizon is realized.  
+Type: Multi-select  
+Max selections: 2  
+Required: Yes (minimum 1 selection)  
+Options:
+- The business runs consistently without requiring my direct involvement in delivery
+- Growth no longer creates proportional stress on the team or operational capacity
+- We have documented systems that a new team member could follow without tribal knowledge
+- Our delivery model is efficient enough that margin improves as revenue grows
+- The operational foundation exists to take on more without rebuilding how we work
+
+---
+
+#### Dimension 4 — Team & Leadership Reality
+
+**Dimension label:** Team & Leadership Reality  
+**Dimension helper text:** How do you want the human architecture of the business to evolve over the next 12 months?
+
+---
+
+**Field: Where Do You Want Leadership to Live by This Point**  
+Helper text: Not who holds what title — how you want decision-making authority and strategic ownership to be distributed across the business.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- I want to remain the primary strategic driver with stronger execution capacity built around me
+- I want a defined leadership layer owning specific functions with meaningful autonomy
+- I want at least one other person capable of carrying the business strategically if I step back
+- I want day-to-day decisions largely handled without my involvement across most functions
+- I want a leadership team that can represent the vision externally as well as execute internally
+
+---
+
+**Field: What Kind of Team Are You Intentionally Building Toward**  
+Helper text: The nature and capability of the people you want around you by this point — not headcount or roles, but what the team becomes.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- A team of specialists who own defined functions with deep expertise in their lane
+- A team capable of client-facing leadership without my direct involvement
+- A team that executes consistently without needing my oversight on quality
+- A team with enough leadership depth that growth doesn't create a hiring crisis
+- A team whose capability reflects the market position we are building toward
+
+---
+
+#### Dimension 5 — Founder Role & Stewardship Reality
+
+**Dimension label:** Founder Role & Stewardship Reality  
+**Dimension helper text:** Where do you want to personally sit within the business by this point?
+
+---
+
+**Field: How Do You Want Your Role to Evolve by This Point**  
+Helper text: What you want to move toward — and away from — in how you show up in the business.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Less delivery, more strategy and vision
+- Less client management, more team and leadership development
+- Less operational oversight, more business development and growth
+- Stepping back from day-to-day decisions while staying close to strategy
+- Deepening focus on the areas where I create the most leverage
+
+---
+
+**Field: Where Do You Want Your Highest-Leverage Attention by This Point**  
+Helper text: The one area where you want your time and energy concentrated at this horizon.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Business growth and market positioning
+- Team building and leadership development
+- Systems, operations, and delivery infrastructure
+- Product or service evolution
+- Vision, strategy, and long-term direction
+
+---
+
+### 24-Month Horizon
+
+**Header:** 24-Month Future Reality  
+**Subtitle:** Building on your 12-month foundation — describe what this business has become at the two-year mark.
+
+Introductory context line displayed at the top of the expanded section, below the scenario tag accordion:  
+*"At this horizon the question shifts from what the business is building to what it has become. Your selections should reflect the business you want to exist as a result of your 12-month foundation being realized."*
+
+---
+
+#### Dimension 1 — Business Identity
+
+**Dimension label:** Business Identity  
+**Dimension helper text:** What has this business become in the market — and what does its commercial model reflect about the identity it has built?
+
+---
+
+**Field: What Does This Business Stand For by This Point**  
+Helper text: Not your positioning statement — what you want the agency to be genuinely known for and called upon to deliver.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- A specialist agency with a clear and defensible reputation in a defined space
+- A strategic partner that clients bring in when the stakes are high
+- A growth-oriented agency known for measurable commercial outcomes
+- A premium agency associated with sophisticated, complex engagements
+- An authority in our category — known beyond our immediate client base
+- A trusted, stable partner that clients stay with and grow with over time
+
+---
+
+**Field: What Does the Business Model Reflect About What You've Built by This Point**  
+Helper text: How the agency generates and sustains revenue as an expression of the identity it has established — not the numbers, but the nature of the model.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Revenue built on deep, long-term client relationships with high retention
+- Revenue built on a premium positioning that commands higher fees from fewer clients
+- Revenue diversified across multiple streams or offer types that reduce concentration risk
+- Revenue that is predictable and recurring enough to plan and invest with confidence
+- Revenue that reflects a clear market position — the clients we attract mirror who we've chosen to become
+
+---
+
+**Field: What Feels True About This Business at This Stage**  
+Helper text: Choose the statements that best capture what the business has become when this horizon is realized.  
+Type: Multi-select  
+Max selections: 2  
+Required: Yes (minimum 1 selection)  
+Options:
+- The agency has a reputation that precedes it — we get called because of who we are, not just what we do
+- There is a clear and consistent story about what we do, who we do it for, and why we're the right choice
+- The clients we serve and the work we do are a direct reflection of the business we set out to build
+- We have moved from being one of many options to being a preferred or differentiated choice in our space
+- The business has an identity that exists independently of my personal brand or relationships
+
+---
+
+#### Dimension 2 — Organizational Maturity
+
+**Dimension label:** Organizational Maturity  
+**Dimension helper text:** How has the organization matured as a whole — and what has that made possible for you?
+
+---
+
+**Field: What Has the Organization Become Capable of by This Point**  
+Helper text: Not who is on the team — the nature of how the organization operates and what it can handle as a whole.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- A specialist team with deep functional expertise that handles complex work without my involvement
+- A leadership-driven organization where a core team carries the vision and makes consequential decisions independently
+- A systems-driven operation where consistency and quality come from how we're built, not who's in the room
+- A culture-led organization where shared values and ways of working scale without needing more structure
+- A team that has grown in sophistication alongside the clients and complexity we now serve
+
+---
+
+**Field: Given What the Organization Can Now Handle — Where Is Your Focus by This Point**  
+Helper text: Not your role title or involvement level — what you are primarily building or driving at this stage of the business.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Building the next chapter — new markets, new capabilities, or new revenue opportunities
+- Building the brand and external presence — becoming a visible authority in our space
+- Building the leadership pipeline — developing the people who will carry the business forward
+- Building deeper client relationships — becoming more strategically embedded with the clients we serve
+- Building the long-term foundation — the infrastructure, culture, and model that makes the business durable
+
+---
+
+**Field: What Feels True About How This Business Runs at This Stage**  
+Helper text: Choose the statements that best describe the organizational reality when this horizon is realized.  
+Type: Multi-select  
+Max selections: 2  
+Required: Yes (minimum 1 selection)  
+Options:
+- The business has a leadership and operational structure that doesn't depend on me to hold it together
+- The team we've built reflects the business we've become — not the business we were two years ago
+- Growth is no longer constrained by my personal capacity or bandwidth
+- The organization handles complexity, ambiguity, and client demands without it escalating to me
+- There is a culture and way of operating that exists independently of any single person including me
+
+---
+
+### 36-Month Horizon
+
+**Header:** 36-Month Future Reality  
+**Subtitle:** Building on your 12 and 24-month foundations — what three years of intentional building has produced, unlocked, and made possible.
+
+Introductory context line displayed at the top of the expanded section:  
+*"At this horizon the question is no longer what you are building — it is what the building has produced. Your selections should reflect the trajectory, optionality, and new territory that your 36-month vision represents."*
+
+---
+
+#### Dimension 1 — What the Path Has Produced
+
+**Dimension label:** What the Path Has Produced  
+**Dimension helper text:** Not your metrics or milestones — what is fundamentally different about the business and your relationship to it.
+
+---
+
+**Field: What Has Three Years of Intentional Building Made Real**  
+Helper text: Not your metrics or milestones — what is fundamentally true about the business and your relationship to it that simply wasn't possible at the starting point.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- The business operates with a clarity of identity and direction that makes every decision easier to make
+- We have built something that stands on its own — it has momentum, reputation, and capability that exist independently of any one person
+- The gap between the business I was running and the business I always wanted to run has closed meaningfully
+- I have moved from reacting to what the business demands to choosing what the business becomes
+- The foundation we've built has made the next chapter genuinely possible in a way it never was before
+
+---
+
+#### Dimension 2 — What Optionality Now Exists
+
+**Dimension label:** What Optionality Now Exists  
+**Dimension helper text:** Not where you're going — what directions are now genuinely open to you as a result of what you've built.
+
+---
+
+**Field: What Has This Foundation Made Available to You**  
+Helper text: Not where you're going — what directions are now genuinely open to you as a result of what you've built. The range of what has become possible.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Scale — the business has the foundation, model, and team to grow significantly if we choose to push
+- Depth — we can go deeper into our niche, become more premium, more specialized, more definitive in our space
+- Transition — the business is transferable, scalable under different leadership, or positioned for a future exit
+- Reinvention — the foundation exists to evolve the model, the market, or the nature of what we do in a meaningful way
+- Sustainability — the business runs well enough and profitably enough that I can choose pace, involvement, and lifestyle intentionally
+
+---
+
+#### Dimension 3 — The New Frontier
+
+**Dimension label:** The New Frontier  
+**Dimension helper text:** The next territory that required this foundation to even become a real possibility — not your ultimate destination, but the door that's now open.
+
+---
+
+**Field: What Has Three Years of Building Put Within Reach for the First Time**  
+Helper text: The next territory that required this foundation to even become a real possibility — not your ultimate destination, but the door that's now open.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Entering a new market or serving a meaningfully different or more sophisticated client
+- Launching a new offer, capability, or revenue model that the current foundation can now support
+- Building or acquiring something adjacent that the business's reputation and infrastructure makes possible
+- Stepping into a new personal or professional role that the business's maturity now allows
+- Taking the business to a scale or level of impact that previously felt out of reach
+
+---
+
+**Field: Is There Something Specific About Your New Frontier the Options Above Don't Fully Capture**  
+Helper text: Add any context that brings your particular vision of what's now possible into sharper focus.  
+Type: Open text  
+Required: No — Optional  
+Character limit: 280  
+Display note: Label this field clearly as Optional. Show character count as the founder types.
+
+---
+
+### Ultimate Vision
+
+**Header:** Ultimate Vision  
+**Subtitle:** Beyond the three horizons — what you are ultimately building, what it is meant to mean, and who you are becoming through the act of building it.
+
+Introductory context line displayed at the top of the expanded section:  
+*"This section has no time anchor. It is not asking about a state the business will reach by a certain point. It is asking what this business is ultimately for — and what building it means beyond the metrics and the milestones."*
+
+---
+
+#### Dimension 1 — The Nature of the Endgame
+
+**Dimension label:** The Nature of the Endgame  
+**Dimension helper text:** What are you ultimately building toward — the underlying drive and the ultimate shape of what this business becomes.
+
+---
+
+**Field: What Is the Underlying Drive Behind Everything You Are Building**  
+Helper text: Not a goal or a milestone — the fundamental thing this entire journey is in service of.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- Mastery — becoming the definitive version of what this agency can be in our space
+- Impact — building something whose influence and outcomes extend beyond our revenue
+- Freedom — creating a business that funds and enables a life built entirely on my terms
+- Legacy — building something that outlasts my direct involvement and stands on its own
+- Wealth creation — building significant financial value that creates long-term security and opportunity
+- Influence — becoming a recognized voice, leader, or authority in the industry we serve
+
+---
+
+**Field: What Does This Business Ultimately Become**  
+Helper text: Not its revenue or headcount — the nature and character of what this agency is at its fullest expression.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- A highly specialized boutique — the definitive choice in a defined and valuable niche
+- A full-service growth agency with broad capability and a strong market presence
+- A premium advisory firm where we are brought in for the highest-stakes strategic work
+- A platform or brand that extends beyond client services into education, content, or community
+- A scalable agency model built for growth beyond my direct involvement
+- A lifestyle-optimized agency — highly profitable, intentionally bounded, built around how I want to work
+
+---
+
+#### Dimension 2 — What the Business Is Meant to Represent
+
+**Dimension label:** What the Business Is Meant to Represent  
+**Dimension helper text:** Not what it delivers or how it performs — what it means. What you want to be true about it in ten or fifteen years.
+
+---
+
+**Field: What Do You Want This Business to Ultimately Stand For**  
+Helper text: Not what it delivers or how it performs — what it means. What you want to be true about it in ten or fifteen years.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- It is my finest professional achievement — the clearest expression of what I am capable of building
+- It is a known and respected name in our industry — a business with a reputation that speaks for itself
+- It created meaningful careers and opportunities for the people who built it alongside me
+- It proved that there is a better way to build and run an agency — and became the example of that
+- It gave me the life I always wanted — and the business was the vehicle that made that possible
+- It became something bigger than me — an organization with its own identity, culture, and direction
+
+---
+
+#### Dimension 3 — The Founder's Long-Term Arc
+
+**Dimension label:** The Founder's Long-Term Arc  
+**Dimension helper text:** Not your role or title — who you are becoming through the act of building this, and how you want to relate to what you've created.
+
+---
+
+**Field: What Does Building This Business Ultimately Make You**  
+Helper text: Not your role or title — who you are becoming through the act of building this over the long term.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- A builder — someone who creates things, and this business is one of several chapters in that story
+- A master — someone whose life's work is concentrated in this business and what it becomes
+- A leader — someone whose primary contribution is developing people and building organizational capability
+- A visionary — someone who sets direction and creates culture while others execute and operate
+- An entrepreneur — someone for whom this business is a proving ground that opens doors to what comes next
+
+---
+
+**Field: How Do You Want to Relate to This Business at the Point of Ultimate Realization**  
+Helper text: Not the mechanics of exit or succession — the nature of your ongoing connection to what you've created.  
+Type: Single select dropdown  
+Required: Yes  
+Options:
+- I want to remain the visionary and cultural anchor while the business runs fully without my daily involvement
+- I want to hand it to someone I've developed — a leader who carries the vision forward with genuine ownership
+- I want to reach a point where I can walk away fully and let it stand entirely on its own
+- I want to be involved indefinitely — this is the work I want to do and I never want to fully step away
+- I want to transition it in a way that creates significant value — whether through sale, merger, or partnership
+- I want it to evolve into something I haven't fully defined yet — and I want the freedom to decide when I get there
+
+---
+
+### Submit Block
+
+Sits below all four horizon accordions at the bottom of the Vision State tab.
+
+**Version Name Field**  
+Label: Name This Version  
+Helper text: Give this version of your Clarity Compass a name — or use the one we've suggested.  
+Type: Text input  
+Default value: Auto-generated recommendation based on current date — format: "Clarity Compass — [Month Year]" (e.g., "Clarity Compass — February 2026")  
+Editable: Yes — founder can override with any name  
+Required: Yes
+
+**Submit Button**  
+Label: Generate My Strategic Synthesis  
+State rules:
+- Disabled and visually muted until all required fields across all four horizons are complete
+- Active and full color once all required fields are complete
+- Optional fields (open text in 36-month, all scenario tags) do not block submission
+
+**Validation behavior:**  
+If the founder attempts to submit with incomplete required fields, scroll to the first incomplete section and expand it. Show a brief inline error message at the top of that section: "Complete this section to generate your synthesis."
+
+---
+
+### Loading State
+
+Triggered immediately on submit. Full overlay or dedicated loading screen — consistent with existing platform loading patterns.
+
+Displays a progress bar and rotating contextual messages as it progresses. Suggested message sequence:
+1. "Reading your declared vision across all four horizons..."
+2. "Connecting your qualitative intent with your scenario data..."
+3. "Identifying patterns, alignments, and structural implications..."
+4. "Composing your Strategic Synthesis..."
+5. "Finalizing your North Star Statement..."
+
+On completion, auto-redirect to the Dashboard tab. The loading state dismisses and the Dashboard renders with full content.
+
+---
+
+## Tab 2 — Dashboard (Strategic Synthesis)
+
+### Empty State
+
+Displayed when a founder visits the Dashboard tab before any synthesis has been generated.
+
+Layout: Placeholder wireframe blocks representing the six content blocks — visually present but empty and muted. An overlay card sits centered on the page with:
+- Headline: "Your Strategic Synthesis will appear here"
+- Body: "Complete your Vision State to generate your Clarity Compass synthesis — a north star document that codifies your trajectory, surfaces structural implications, and articulates what you are ultimately building."
+- CTA button: "Go to Vision State" — navigates to the Vision State tab
+
+This same empty state displays on return visits before submission.
+
+---
+
+### Synthesis Dashboard — Loaded State
+
+Six content blocks rendered in sequence. All content is AI-generated via n8n and GPT except Block 1 which is deterministic. Content is read-only — no editing in this view.
+
+---
+
+#### Block 1 — Vision Header
+
+Deterministic — pulled directly from stored data, no GPT generation.
+
+Displays:
+- Agency name
+- Version name (as set in the submit block)
+- Date generated
+- A one-line characterization of the ultimate vision — derived from the combination of Field: Underlying Drive + Field: What the Business Ultimately Becomes
+- Horizon Scenario Strip — a horizontal visual strip showing all three horizons. Each horizon tile displays: horizon label, tagged scenario name (or "No scenario tagged"), GVI score (if available), and GVI band label (if available). Styled as compact tiles in a row.
+
+---
+
+#### Block 2 — Movement 1: The Declared Trajectory
+
+GPT-generated prose block.
+
+**Purpose:** Narrative spine of the synthesis. Tells the three horizons and ultimate vision as a single progressive arc — not horizon by horizon but as a continuous story of what is being built and where it is going.
+
+**Format:** Three to four paragraphs of flowing prose. No bullet points. No subheaders within this block.
+
+**Tone:** Confident and declarative. Peer-level. Observational.
+
+**Block header:** "Your Declared Trajectory"
+
+**Display note:** Full-width prose block. Subtle left border accent in brand color to visually distinguish from the structural blocks around it.
+
+---
+
+#### Block 3 — Trajectory Visual Strip
+
+Deterministic — built from stored intake data.
+
+A horizontal timeline display showing the progression across all four horizons. Each horizon is a card in the sequence showing:
+- Horizon label
+- Two to three of the most strategically significant field selections from that horizon — chosen by a deterministic rule set (not GPT): for each horizon, surface the primary endgame or identity field plus the most revealing success marker selection
+- Tagged scenario GVI band if available — displayed as a small colored band badge
+
+Cards are connected by a directional arrow or line to reinforce the arc visually.
+
+**Display note:** This is a visual summary element, not a data dump. Maximum three data points per horizon card. Design must be clean and shareable — this block travels well when the document is exported or shared.
+
+---
+
+#### Block 4 — Movement 2: The Structural Implications
+
+GPT-generated hybrid block — prose plus callout statements.
+
+**Purpose:** Surfaces what the declared trajectory structurally implies. Not prescriptive — observational characterizations of what a path of this nature requires.
+
+**Format:** Two to three paragraphs of prose followed by two or three standalone callout statements. Callout statements are visually distinct from the prose — displayed as highlighted quote-style blocks.
+
+**Callout statement format:** Each begins with a stem phrase generated by GPT — something like "A trajectory of this character implies..." or "The path you've described requires..." followed by the specific implication.
+
+**Block header:** "What This Path Implies"
+
+---
+
+#### Block 5 — Movement 3: What This Reveals
+
+GPT-generated insight block.
+
+**Purpose:** The synthesis's most distinctive contribution. Surfaces one or two observations that emerge from reading all declarations together — things the founder couldn't see from inside the form.
+
+**Format:** One or two insight blocks. Each insight block contains:
+- A specific generated headline — GPT has full latitude to name this. Should be specific and personal, not generic category labels. Guardrail: headline should be a phrase or short sentence that characterizes the insight, not a label.
+- Two to three sentences of supporting narrative unpacking the observation and why it is structurally significant.
+
+**Block header:** "What the Full Picture Reveals"
+
+**Display note:** This block should feel visually distinct from the others — slightly elevated design treatment to signal that this is the synthesis's deepest layer of insight.
+
+---
+
+#### Block 6 — Movement 4: The North Star Statement
+
+GPT-generated closing block.
+
+**Purpose:** A single synthesized statement of what the founder is ultimately building and why it matters. The document's closing artifact.
+
+**Format:**
+- The North Star Statement itself — one to three sentences maximum. Displayed in large type, visually dominant, centered or prominently styled.
+- Two lines of supporting context below the statement — what this north star represents and what the journey toward it is ultimately in service of.
+
+**Block header:** "Your North Star"
+
+**Display note:** This block needs visual weight. Large type for the statement. Clear white space around it. Designed to be screenshot-able and shareable as a standalone artifact.
+
+---
+
+### Dashboard Actions
+
+Displayed as an action bar below the synthesis content or as a sticky header element:
+
+- **Download PDF** — exports the full synthesis as a formatted PDF. Available to all tiers.
+- **Regenerate** — re-triggers the GPT synthesis call with the same intake data. Prompts a confirmation: "This will replace your current synthesis. Are you sure?" Available to all tiers.
+- **New Version** — navigates back to the Vision State tab with all fields cleared, ready for a new intake. Saves the current version to History before clearing. Available to all tiers.
+
+---
+
+## Tab 3 — History
+
+### Purpose
+
+Displays all saved versions of the founder's Clarity Compass. Allows downloading previous synthesis outputs. Pro tier gets access to progression synthesis features.
+
+---
+
+### Layout
+
+Two sections stacked vertically:
+
+**Section 1 — Version History List**
+
+A list of all saved versions in reverse chronological order. Each version row displays:
+- Version name
+- Date generated
+- Horizon completion status at time of generation (all four complete, or note any that were skipped)
+- Download PDF button — downloads that version's synthesis PDF
+- Delete option — with confirmation prompt
+
+**Section 2 — Progression Intelligence (Pro Feature)**
+
+Displayed below the version list. Separated by a clear visual divider.
+
+A pill toggle at the top of this section:
+- Left pill: "Version History" — active by default, showing the list above
+- Right pill: "Progression Synthesis" — Pro locked
+
+**Progression Synthesis locked state:**  
+Shows a placeholder card with:
+- Headline: "See How Your Vision Has Evolved"
+- Body: "As you create new versions of your Clarity Compass over time, Architect OS Pro synthesizes the progression — surfacing how your vision has shifted, what that reveals about your growth, and how your north star has evolved."
+- CTA: "Explore Architect OS Pro" — links to upgrade page or coming soon state depending on platform state
+
+This section is visible to all tiers but the Progression Synthesis feature is locked behind Pro. The version list and PDF downloads are available to all tiers.
+
+---
+
+## Component States Summary
+
+| Component | State | Behavior |
+|---|---|---|
+| Horizon accordion | Not Started | Collapsed, grey status indicator |
+| Horizon accordion | In Progress | Collapsed or expanded, amber indicator |
+| Horizon accordion | Complete | Collapsed, green indicator |
+| Scenario tag accordion | Untagged | Collapsed, label shows "Optional" |
+| Scenario tag accordion | Tagged | Collapsed, label shows scenario name |
+| Submit button | Incomplete | Disabled, muted styling |
+| Submit button | Ready | Active, full brand color |
+| Dashboard tab | Pre-submission | Empty state with overlay prompt |
+| Dashboard tab | Post-submission | Full six-block synthesis rendered |
+| Progression Synthesis | Free tier | Visible but locked with upgrade prompt |
+| Progression Synthesis | Pro tier | Accessible (placeholder / coming soon) |
+
+---
+
+## Data and Save Logic
+
+- Auto-save triggers on every field selection change — saves to draft record in Supabase
+- Save button within each horizon section performs an explicit save of that horizon's current state
+- Draft record is upserted until Submit is triggered — no duplicate records created during drafting
+- Submit fires the n8n workflow with the full intake payload — creates a new immutable version record
+- Version record stores: all field selections, all scenario tags, version name, timestamp, generated synthesis JSON
+- Each horizon's scenario tag is stored as a foreign key reference to the saved GVS scenario record
+- Synthesis JSON is stored as a structured object with named fields corresponding to each of the six blocks — Block1Header, Block2Trajectory, Block3VisualData, Block4Implications, Block4Callouts, Block5Insights, Block6NorthStar
+
+---
+
+## n8n Workflow Trigger
+
+On Submit:
+
+1. Collect full intake payload — all field selections across all four horizons
+2. Collect scenario data for any tagged horizons — GVI score, band, composition label, pressure profile, GPT synthesis from the scenario record
+3. Collect Agency Snapshot baseline data
+4. Package into structured JSON payload
+5. Send to n8n webhook
+6. n8n constructs GPT prompt using the four-movement brief and the full payload
+7. GPT returns structured JSON with all generated blocks
+8. n8n writes the synthesis JSON to the version record in Supabase
+9. Frontend receives confirmation and renders the Dashboard
+
+---
+
+## Build Sequence for Antigravity
+
+Build in this order. Do not wire real data or n8n until the skeleton is confirmed.
+
+1. Three-tab shell — Vision State, Dashboard, History — with navigation and active state
+2. Vision State layout — two-column structure with main column and sidebar
+3. Your Declared Direction sidebar with four horizon status indicators
+4. Four horizon accordion cards with expand/collapse, status badges, and Save buttons
+5. Scenario tagging accordion within each horizon — collapsed by default, dropdown and tagged state
+6. All field content within each horizon — dropdowns, multi-selects, open text — using the field specs above
+7. Submit block — version name field with auto-generated default, submit button with disabled and active states
+8. Validation behavior on incomplete submission attempt
+9. Loading state — progress bar and rotating messages
+10. Dashboard empty state — placeholder blocks and overlay prompt
+11. Dashboard loaded state — six block structure with placeholder content in each block
+12. Dashboard action bar — Download PDF, Regenerate, New Version
+13. History tab — version list structure, download buttons, Pro locked Progression Synthesis section
+14. Wire sidebar status indicators to actual field completion state
+15. Wire submit button active state to all-required-fields-complete condition
+16. Backend integration — auto-save, explicit save, submit trigger, n8n webhook, synthesis render

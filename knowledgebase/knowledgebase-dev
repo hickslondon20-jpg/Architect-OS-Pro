@@ -1,0 +1,222 @@
+# Architect OS — Knowledge Base Chunking & Taxonomy Guidelines
+
+**Version:** 1.0
+**Purpose:** Governing document for how all Architect OS intellectual property gets chunked, tagged, and prepared for vector storage. This document is fed to an agent alongside source material to produce structured chunking plans. It is also the reference for any human review of those plans.
+
+**How to use this document:**
+- When processing a new source document, provide this file as the instruction set alongside the source markdown
+- The agent should output a structured chunking plan (not the final chunks themselves) — see Output Format section at the bottom
+- If a source document doesn't fit cleanly into the existing taxonomy, flag it and propose extensions rather than forcing a bad fit
+- This document evolves. New content types, domains, or edge cases should be noted and incorporated as they arise
+
+---
+
+## Section 1 — Core Principles
+
+These principles govern every chunking and tagging decision. When in doubt, come back here.
+
+**Semantic integrity over arbitrary size.** Chunks should represent complete, self-contained units of meaning. A chunk about Treadmill Pressure should contain everything needed to understand and apply that concept — not half of it. Never split a concept across chunks because of a token or character limit. If a self-contained unit is large, keep it together. If it's small, keep it separate. Size is a consequence of meaning, not the other way around.
+
+**Retrieve what's needed, not what's related.** The purpose of chunking is to enable precise retrieval during a Virtual CSO conversation. When a founder asks about cash flow at the Thriving stage, the system should surface the Thriving Financial dimension chunk — not the entire Thriving Stage Profile. Chunks should be narrow enough that retrieval is specific, but complete enough that the retrieved chunk actually answers the question without requiring additional context.
+
+**Behavioral instructions are not retrieval targets.** Some content in your source documents tells the AI *how to behave* when using other content — tone guidelines, interpretation rules, usage instructions. These do not belong in the vector store. They belong in the system prompt layer. When you encounter this type of content during chunking, flag it separately rather than treating it as a chunk. See Section 4 for specifics.
+
+**Metadata is the filter layer, not decoration.** Tags are what let the system narrow retrieval *before* the vector search runs. Bad metadata means the wrong chunks surface. Every tag assignment should answer a specific question: "If a founder asks something in this domain, at this stage, about this type of content — will this chunk correctly appear or correctly stay hidden?"
+
+**Build for extensibility.** The initial taxonomy covers the document types seen so far. New source material will introduce new content types, new domains, or new edge cases. When that happens, propose taxonomy extensions in the chunking plan rather than forcing new content into ill-fitting categories. The guidelines evolve with the knowledge base.
+
+---
+
+## Section 2 — Metadata Taxonomy
+
+Every chunk receives all required fields. Optional fields are assigned only when they add meaningful retrieval precision. Each field definition includes its current allowed values and notes on when to extend.
+
+---
+
+### 2.1 `stage` — AE Ladder Stage Relevance
+
+**Required.** Determines which user profiles this chunk is relevant to. This is the primary filter that prevents a Rising-stage founder from receiving Driving-stage guidance mid-conversation.
+
+| Value | When to Use |
+|-------|-------------|
+| `rising` | Content specific to Rising stage ($300K–$1M AGI range, early-stage challenges) |
+| `striving` | Content specific to Striving stage ($1M–$3M AGI range) |
+| `thriving` | Content specific to Thriving stage ($3M–$5M AGI range) |
+| `driving` | Content specific to Driving stage ($5M–$10M AGI range) |
+| `arriving` | Content specific to Arriving stage ($10M–$20M+ AGI range) |
+| `all` | Universal content — applies regardless of stage (core framework definitions, philosophy, universal benchmarks) |
+| `multi` | Content that explicitly covers multiple stages with stage-specific variations within it (e.g., a benchmark table that has rows for each stage). Use sparingly — prefer splitting into per-stage chunks when possible |
+
+**Extension note:** If the platform ever adds stages or sub-stages, add values here. If a chunk covers two adjacent stages but not all five, use `multi` and note which stages in the chunk's `notes` field.
+
+---
+
+### 2.2 `domain` — Business Dimension
+
+**Required.** Maps to the five dimensions of the Maturity & Readiness framework. This is the second-level filter — after stage narrows the pool, domain narrows it further to the specific area of the business the conversation is touching.
+
+| Value | Maps To | Covers |
+|-------|---------|--------|
+| `financial` | Financial Resilience & Business Health | Revenue, margins, cash flow, forecasting, pricing, AGI, profitability |
+| `clients_market` | Market Position & Client Base | Client portfolio, ICP, positioning, retention, acquisition, ACV, market expansion |
+| `operations` | Operational Systems & Scalability | Workflows, delivery, coordination, systems, process, utilization |
+| `team_leadership` | Team Structure & Leadership | Hiring, org structure, delegation, leadership development, culture, span of control |
+| `founder_stewardship` | Strategic Stewardship | Founder role evolution, vision, strategic planning, decision-making, identity |
+| `cross_domain` | Spans multiple dimensions | Framework-level content, philosophy, scoring logic, or content that deliberately integrates multiple domains. Use this when the content is structurally about how domains interact rather than being about any single domain |
+
+**Extension note:** These five domains are stable — they map to the core M+R framework structure and are unlikely to change. If a new document introduces a topic that genuinely doesn't fit any of these (unlikely but possible), propose a new domain value rather than forcing it into `cross_domain`.
+
+---
+
+### 2.3 `content_type` — What Kind of Content This Is
+
+**Required.** This is the most important tag for controlling *how* the AI uses a retrieved chunk. A benchmark chunk and a philosophy chunk might both be relevant to the same conversation, but they serve completely different purposes — one provides hard reference data, the other provides behavioral guardrails. The AI needs to know which is which.
+
+| Value | Definition | Example |
+|-------|------------|---------|
+| `framework_definition` | Explains how a system, model, or methodology works. Structural and conceptual. | The M+R three-tier hierarchy (dimensions → capabilities → checkpoints). The 3P framework (Prioritize, Plant, Progressively Iterate) |
+| `benchmark` | Hard reference data — thresholds, ranges, targets, and what crossing them implies. Observational, not prescriptive. | AGI per FTE ranges by stage. Pressure Family trigger thresholds (green/yellow/red bands). Margin benchmarks |
+| `stage_profile` | Narrative description of what a specific stage looks and feels like across a business dimension. Rich in pattern recognition and language for founders to identify with. | Thriving Financial & Business Health dimension. Rising Operational Efficiency section |
+| `philosophy` | Behavioral principles and tone guardrails. How the AI should frame, interpret, and communicate within this knowledge base. | "Observational over judgmental." "Implications, not prescriptions." Core principles sections |
+| `symptom` | Named patterns that describe specific problems a founder might be experiencing. High value for retrieval because founders describe their situations in symptom language. | "Coordination Drag." "The Growth Squeeze." "Cohesion Cracks" |
+| `transition_indicator` | Signals that indicate readiness to move from one stage to the next. Surfaces when founders ask "am I ready to progress?" | Thriving → Driving transition indicators across systems, revenue, team, client, and founder dimensions |
+| `decision_heuristic` | Rules of thumb for specific decision scenarios. Compact, actionable guidance grounded in the frameworks. | Stage context for ACV evolution expectations. Team structure break points by headcount. Span of control guidelines |
+| `scoring_logic` | Explains how calculations, scores, or prioritization formulas work within the platform. | Urgency = Criticality × Impact. 3P distribution logic. Pressure Family flag calculations |
+| `scenario_config` | Predefined scenario configurations with specific parameter settings and their strategic intent. | Steady Climb, Rocket Ship, Profit Squeeze, Up-Market Pivot preset configurations |
+
+**Extension note:** This list will grow. When a new source document contains content that doesn't fit any existing type, define a new value here with a clear definition. The key question when defining a new content_type is: "Does this content serve a fundamentally different purpose during retrieval than anything already defined?" If yes, it's a new type. If it's just a variation of an existing type, use the existing type.
+
+---
+
+### 2.4 `kpi_family` — KPI or Metric Category
+
+**Optional.** Only assign when the chunk contains specific metrics, thresholds, or benchmarks tied to a measurable KPI. Skip this field entirely for philosophy, framework definition, or narrative content. This tag enables hyper-precise retrieval when a specific metric comes up in conversation.
+
+| Value | Covers |
+|-------|--------|
+| `agi_per_fte` | Agency Gross Income per full-time equivalent. Productivity and leverage benchmarks |
+| `retention` | Client retention rates, churn thresholds, monthly and annual churn benchmarks |
+| `margin` | Operating margins, profit margins, margin compression thresholds |
+| `utilization` | Team utilization rates, capacity benchmarks, billable vs non-billable ratios |
+| `concentration` | Client portfolio concentration — single-client and top-3 revenue thresholds |
+| `sales_velocity` | Acquisition pace, sales acceleration requirements, win rate benchmarks |
+| `acv` | Average Client Value — delta thresholds, rate of change, dependency ratios |
+| `cash_reserves` | Cash runway benchmarks, reserve months targets |
+| `hiring_velocity` | Hiring pace thresholds, quarterly team growth rates, span of control |
+| `growth_rate` | Revenue growth rate benchmarks by stage — sustainable, aggressive, overextended bands |
+| `payroll` | Payroll as percentage of AGI — healthy, maximum, critical thresholds |
+
+**Extension note:** Add new KPI families as the platform's benchmark library expands. Each new value should correspond to a specific, measurable metric that founders track or that the Growth Velocity Calculator surfaces.
+
+---
+
+### 2.5 `source_doc` — Source Document Identifier
+
+**Required.** Clean identifier for which source document this chunk came from. Used for citation, debugging, and traceability. Format: lowercase, underscores, no extensions.
+
+Examples: `mr_framework_overview`, `thriving_stage_profile`, `gv_benchmarks`, `ae_interpretation_framework`
+
+---
+
+### 2.6 `chunk_id` — Human-Readable Chunk Identifier
+
+**Required.** A unique, descriptive identifier for this chunk within its source document. This is your debugging handle — when a bad chunk surfaces during a conversation, this is how you find it.
+
+Format: `[source_doc_short]_[descriptive_label]`
+
+Examples: `mr_structural_architecture`, `thriving_financial_dimension`, `gv_treadmill_pressure`, `thriving_cohesion_cracks_symptom`
+
+---
+
+### 2.7 `notes` — Free-Form Context
+
+**Optional.** Any additional context about this chunk that doesn't fit the structured fields. Use for edge cases, tagging uncertainty, or flags that need human review. This field is for the chunking plan review process — it's not stored in the vector database long-term.
+
+---
+
+## Section 3 — Chunking Rules
+
+These rules govern how source documents get divided into chunks.
+
+**Rule 1: Split along functional boundaries, not formatting boundaries.** Section headers in the source document are a useful signal but not the final authority. Split where the *purpose* of the content changes, not where a heading happens to fall. If two consecutive sections under different headings are both answering the same type of question, consider whether they belong in one chunk. If one section contains two distinct concepts that would be retrieved in different conversations, split it regardless of how the source formats it.
+
+**Rule 2: Keep self-contained units intact.** If a concept requires a specific set of information to be useful — a threshold plus its interpretation, a symptom plus its "why it happens" explanation, a benchmark table plus the context that makes it meaningful — keep those pieces together. A chunk that's useful in isolation is a good chunk. A chunk that only makes sense alongside another chunk is a chunking failure.
+
+**Rule 3: Separate behavioral instructions from retrievable knowledge.** When source documents contain sections that tell the AI how to use or interpret other content (Usage Notes, "For AI Systems" sections, tone guidelines), do not chunk these as retrievable knowledge. Flag them in the chunking plan as `[BEHAVIORAL — DO NOT CHUNK]` and note their content. These will be handled separately as system prompt material.
+
+**Rule 4: Named patterns and symptoms are always individual chunks.** These are high-retrieval-value units. Founders describe their problems in symptom language — "we feel like we're on a treadmill," "every hire feels more expensive." If the system can match that language to a named pattern, it can provide grounded, specific guidance. Each named symptom or pattern should be its own chunk so it surfaces cleanly when the language matches.
+
+**Rule 5: Benchmark tables stay with their interpretation context.** A table of thresholds without explanation of what crossing those thresholds implies is just numbers. Keep benchmark data together with its immediate interpretation — the "what this means" and "what this implies" content that gives the numbers strategic meaning. But do not attach unrelated benchmarks to the same chunk just because they appear in the same document section.
+
+**Rule 6: Philosophy and principles chunks are always isolated.** These chunks serve as behavioral guardrails. They need to surface independently — a philosophy chunk should be retrievable on its own when the conversation needs a tone correction or a framing reminder, without being bundled with framework content that might dilute its signal.
+
+**Rule 7: When in doubt, chunk smaller.** It's easier to retrieve two small chunks that are both relevant than to retrieve one large chunk where only part is relevant. The vector search will surface both if they're both semantically close to the query. But it cannot extract half of a chunk.
+
+---
+
+## Section 4 — Handling Document Types Not Yet Seen
+
+Your knowledge base will expand beyond the three initial documents. This section provides guidance for processing source material that doesn't cleanly match existing patterns.
+
+**Step 1: Classify the document's primary purpose.** Before chunking anything, determine what role this document plays in the ecosystem. Is it teaching a concept (framework_definition)? Providing reference data (benchmark)? Describing an experience (stage_profile)? Guiding behavior (philosophy)? A document might contain multiple types — that's fine, but knowing the primary purpose helps orient the chunking.
+
+**Step 2: Check for behavioral instruction content.** Every document should be scanned for sections that tell the AI how to use the rest of the content. Common signals: "For AI Systems," "Usage Notes," "How to interpret," "Tone guidance," "When to surface this." Flag all of these as behavioral — do not chunk them.
+
+**Step 3: Identify the natural retrieval units.** Ask: "In what different conversations would different parts of this document be needed?" Each answer to that question is a chunk. If the entire document would only ever be needed as a whole — unlikely but possible for very short, focused documents — it can be a single chunk.
+
+**Step 4: Assign metadata. If existing values don't fit, propose extensions.** Fill in all required fields. If a `content_type` or `domain` value doesn't exist that accurately describes this content, note it in the chunking plan with a proposed new value and definition. Do not force content into a wrong category to avoid creating a new one.
+
+**Step 5: Flag uncertainty.** If you're genuinely unsure about a chunking boundary, a metadata assignment, or whether something is behavioral vs. retrievable, flag it in the `notes` field. The review step exists to catch these.
+
+---
+
+## Section 5 — Output Format
+
+When an agent processes a source document using these guidelines, the output should be a structured chunking plan in the following format. This is what gets reviewed before anything is embedded or inserted into Supabase.
+
+```
+CHUNKING PLAN: [source_doc_identifier]
+SOURCE FILE: [filename]
+PROCESSED BY: [agent identifier or timestamp]
+
+================================================
+BEHAVIORAL CONTENT FLAGGED (not chunked):
+================================================
+- [Section name or line range]: [Brief description of what this content instructs]
+- [Section name or line range]: [Brief description]
+
+================================================
+CHUNKS:
+================================================
+
+CHUNK 1
+  chunk_id:     [source_short]_[label]
+  stage:        [value]
+  domain:       [value]
+  content_type: [value]
+  kpi_family:   [value or NONE]
+  source_doc:   [identifier]
+  notes:        [any flags, uncertainties, or edge case notes]
+  content:      [The actual text of this chunk — exact copy from source, no paraphrasing]
+
+CHUNK 2
+  [same structure]
+
+...
+
+================================================
+TAXONOMY EXTENSIONS PROPOSED:
+================================================
+- [field]: [proposed new value] — [definition and rationale]
+
+================================================
+REVIEW FLAGS:
+================================================
+- [Any chunking decisions that need human verification]
+```
+
+Each chunk's `content` field should be the verbatim text from the source document. No summarization, no paraphrasing. The chunk is exactly what will be embedded and stored.
+
+---
+
+*This document is a living specification. When new content types, edge cases, or taxonomy gaps are discovered during chunking, update this document accordingly before processing additional source material.*

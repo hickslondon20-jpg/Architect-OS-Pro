@@ -1,0 +1,322 @@
+# PRD — Quarter Map: 3P Capability Selection & Sprint Commitment
+**Status:** Ready for Build  
+**Last Updated:** February 2026  
+**Feature Area:** Architect OS Pro Suite — Planning  
+**Route:** `/pro/planning/quarter-map`  
+**Depends On:** Strategic Roadmap (Horizon Declaration + Roadmap Review) completed and locked  
+
+---
+
+## 1. Overview
+
+The Quarter Map is the final step in the Planning section of the Pro Suite. It is where the founder translates everything the platform has surfaced — stage placement, capability gaps, 12-month synthesis, and quarterly sequencing — into nine deliberate capability commitments for the current sprint, organized using the 3P Framework: Prioritize, Plant, and Progressively Iterate.
+
+The Quarter Map is not a selection tool. It is a commitment device. The user is not browsing a list of options — they are making nine conscious decisions about where to direct their attention this quarter, informed by everything that came before. By the time they lock and proceed, they should feel settled in their choices — not because the platform told them what to pick, but because the logic of their own plan has clicked into place.
+
+The experience serves a single primary outcome: the user leaves with a locked, defensible Quarter Map that they understand well enough to explain to their team and that feeds directly into the Sprint Planning tool.
+
+---
+
+## 2. Prerequisites
+
+The Quarter Map requires the following upstream steps to be complete:
+
+| Dependency | Requirement |
+|---|---|
+| M&R Audit | Completed — capability scores and rankings available |
+| AE Ladder | Completed — stage placement confirmed |
+| Clarity Compass | Minimum 3 horizons defined |
+| Roadmap Review | Synthesis generated and reviewed |
+
+If the Roadmap Review synthesis has not been generated, the Quarter Map renders a locked state with a prompt to complete the Roadmap Review first. The capability grid is visible but not interactive.
+
+---
+
+## 3. Screen Layout — Full Structure
+
+The Quarter Map is a single scrollable page organized into four vertical sections:
+
+1. **Page Header** — title, subtitle, and quarter identifier
+2. **12-Month Reference Strip** — compact synthesis anchor
+3. **Capability Selection Grid** — full-width browsable card grid
+4. **3P Commitment Columns** — Prioritize, Plant, Progressively Iterate
+5. **Completion & Lock** — submit action and quarter posture synthesis
+
+---
+
+## 4. Section 1 — Page Header
+
+**Title:** `Quarter Map`  
+**Quarter identifier:** `Planning for: Q1 2026` — with a dropdown to switch quarters (future quarters available for parking lot use; Q1 is the active planning quarter and the default view)  
+**Subtitle:** `Select 9 capability areas for your Q1 focus. Organize them across the 3P Framework — Prioritize, Plant, and Progressively Iterate — to define how you'll direct your attention this sprint.`
+
+Right-aligned header controls:
+- `History` — secondary link, routes to past quarter maps
+- `Save Draft` — saves current selection state without locking
+- `Lock & Proceed →` — primary action, disabled until selection is complete (9/9)
+
+---
+
+## 5. Section 2 — 12-Month Reference Strip
+
+A compact, collapsible reference panel positioned between the page header and the capability grid. It is collapsed by default — the user can expand it if they want to reference the synthesis while making selections.
+
+**Collapsed state:**
+- A single line: `Q1 synthesis context — your 12-month focus areas and sequencing insight`
+- An expand chevron on the right
+
+**Expanded state:**
+Three compact callout items pulled directly from the Roadmap Review 12-month accordion:
+
+| Item | Label | Content |
+|---|---|---|
+| 1 | `LOAD-BEARING AREAS` | The 2-3 capability areas identified as highest structural leverage for this year — named, one sentence each |
+| 2 | `DEPENDENCY CHAIN` | The sequencing insight from the 12-month synthesis — what unlocks what |
+| 3 | `PRIMARY CONSTRAINT` | The single thing most likely to slow progress — framed as context, not warning |
+
+This panel is read-only. It is a reference layer, not an introduction. The user has already read this content in the Roadmap Review — it is surfaced here only to keep the strategic logic accessible while they work.
+
+Visual treatment: subtle background fill, slightly compressed type, clearly secondary to the capability grid below. Does not dominate the screen.
+
+---
+
+## 6. Section 3 — Capability Selection Grid
+
+### 6.1 Layout
+
+Full-width grid of capability area cards. Cards are arranged in rows — 4 cards per row at desktop width, 2 per row at tablet. The grid is scrollable vertically. All 25 capability areas are present in the grid.
+
+As capabilities are added to the 3P columns below, they are visually marked as selected in the grid (a selected state indicator — checkmark, highlight, or reduced opacity) but remain in the grid. They are not removed from view. This allows the user to see the full landscape of capabilities at all times and understand what they have and haven't selected.
+
+### 6.2 Filter Bar
+
+Above the grid, a filter bar with the following controls:
+
+- **Category filter tabs:** All / Financial Health / Client Portfolio / Operations / Team Structure / Strategic Stewardship — matching the five M&R dimensions
+- **Search field:** Text search by capability name
+- **Sort toggle:** Default sort is M&R ranking (highest priority first based on stage-calibrated scores). Secondary sort option: Alphabetical.
+
+The default view — unfiltered, sorted by M&R ranking — means the capabilities most relevant to their current stage float to the top naturally. This is intentional: the ranked order is the platform's implicit guidance without being prescriptive.
+
+### 6.3 Capability Card — Surface View
+
+Each card in the grid displays:
+
+| Element | Content |
+|---|---|
+| Category tag | Dimension label (e.g., `Financial Health`) in the dimension's brand color |
+| Rank number | `#1`, `#2`, `#3` etc. — M&R stage-calibrated ranking |
+| Capability name | Full capability area name (e.g., `Cash Flow Forecasting`) |
+| Maturity bar | Visual progress bar showing maturity score (0-100%) |
+| Stage status badge | `Below Stage` / `At Stage` / `Ahead of Stage` — color coded |
+| Add button | `+` icon — click to add to a 3P column (triggers column selection if not dragging) |
+
+### 6.4 Capability Card — Expanded View
+
+Clicking anywhere on a card (except the `+` button) opens an expanded view — a modal or side drawer — that provides deeper context on that capability area.
+
+**Expanded view contents:**
+
+**Header:**
+- Capability name (large)
+- Category tag and rank number
+- Maturity score and stage status badge
+
+**Section 1 — What This Capability Encompasses**
+- Label: `WHAT THIS IS`
+- 2-3 sentences in plain language describing what this capability area covers — what "having it" looks like operationally at a functioning agency
+- Content: pulled from the M&R Audit capability area descriptions (deterministic — not GPT-generated)
+
+**Section 2 — What Good Looks Like At Your Stage**
+- Label: `WHAT GOOD LOOKS LIKE AT YOUR STAGE`
+- 2-3 sentences describing what this capability area looks like when it is operating well for an agency at the user's specific AE Ladder stage
+- Content: stage-specific, pulled from the M&R checkpoint and capability area data model (deterministic)
+
+**Section 3 — Why It's Ranked Here**
+- Label: `WHY IT'S RANKED #[N] FOR YOU`
+- 1-2 sentences explaining what the user's M&R Audit results say about this capability area — their score, their stage status, and why it surfaces at this position in the ranked list
+- Content: generated from the user's capability score data — deterministic, not GPT
+
+**Section 4 — 3P Placement Reference**
+- Label: `WHERE THIS MIGHT FIT`
+- A single observational sentence suggesting which 3P bucket this capability area might naturally belong in, based on its score and stage status
+- Framed explicitly as a reference, not a directive: *"Based on your current score and stage, this capability is often a Prioritize or Plant item for agencies at your stage — though only you know your full context."*
+- Content: rule-based, derived from score + stage status. Below Stage → Prioritize or Plant suggestion. At Stage → Plant or Iterate suggestion. Ahead of Stage → Iterate suggestion.
+- This is the only instance of placement guidance in the entire Quarter Map experience. It lives here, in the expanded view, as a reference — never surfaced unsolicited.
+
+**Footer actions:**
+- `Add to Prioritize` / `Add to Plant` / `Add to Iterate` — three secondary buttons
+- `Close` — dismisses the expanded view
+
+---
+
+## 7. Section 4 — 3P Commitment Columns
+
+### 7.1 Layout
+
+Three equal-width columns sitting below the capability grid, spanning the full page width. Each column holds exactly 3 capability selections — no more, no less. The 9/9 total is enforced: the Lock & Proceed button remains disabled until all three columns have exactly 3 selections each.
+
+**Column headers:**
+
+| Column | Label | Subtitle |
+|---|---|---|
+| Prioritize | `Prioritize` | `Core focus this quarter` |
+| Plant | `Plant` | `Prepare for next horizon` |
+| Iterate | `Progressively Iterate` | `Maintain and refine` |
+
+**Column color coding:** Keep the existing color treatment — blue for Prioritize, green for Plant, orange for Iterate. This is already established in the wireframe and should not change.
+
+### 7.2 Adding Capabilities to Columns
+
+Two interaction methods — both must work:
+
+**Drag and drop:** Drag a card from the grid and drop it into a column slot.
+
+**Click to add:** Click the `+` button on a grid card — this opens a simple column picker: three buttons labeled Prioritize / Plant / Iterate. Selecting one places the card in that column. This is the primary interaction for users who find drag-and-drop cumbersome.
+
+### 7.3 Column Card — Display
+
+Once a capability is placed in a column, its column card displays:
+
+| Element | Content |
+|---|---|
+| Category tag | Dimension label in dimension color |
+| Capability name | Full name |
+| Maturity score | Percentage |
+| Stage status badge | Below Stage / At Stage / Ahead of Stage |
+| Remove control | `×` icon — returns the card to the unselected state in the grid |
+| Move control | A subtle drag handle or `Move` link — allows repositioning between columns without removing |
+
+### 7.4 Selection Counter
+
+A persistent bottom bar (or sticky footer) displays the current selection count:
+
+`Selection: 3/3 Prioritize · 2/3 Plant · 1/3 Iterate — 6 of 9 selected`
+
+This updates in real time as cards are added or removed. When 9/9 is reached: `Selection Complete (9/9) — Ready to lock your Q1 focus.` The Lock & Proceed button activates.
+
+### 7.5 Parking Lot (Future Quarters)
+
+A fourth column — visually de-emphasized, positioned to the right of the three active columns or accessible via a tab — labeled `Parked for Later`. No slot limit. Cards placed here are saved as deferred — not part of the active quarter, not forgotten. No further interaction required on this screen for parked items.
+
+---
+
+## 8. Section 5 — Completion & Lock
+
+### 8.1 Lock Action
+
+**Button label:** `Lock & Proceed to Sprint Planning →`  
+**State:** Disabled until 9/9 selections complete. Active once complete.  
+**Secondary action:** `Save Draft` — saves the current selection state without locking. Available at all times.
+
+On click — Lock & Proceed:
+1. Saves the 9 capability selections and their 3P assignments to Supabase against the user record and current quarter
+2. Triggers the Quarter Map synthesis generation (see 8.2)
+3. Transitions to a brief loading state — use existing `LoadingOverlay` component. Message: `"Synthesizing your Quarter Map..."`
+4. On synthesis completion: renders the Quarter Posture synthesis block (see 8.3) before routing to Sprint Planning
+
+### 8.2 Quarter Map Synthesis — Data Inputs
+
+On lock, the synthesis engine receives:
+
+- The 9 selected capability areas and their 3P assignments
+- The user's AE Ladder stage
+- The M&R Audit scores for the 9 selected capabilities
+- The Q1 sprint theme and key implications from the Execution Sequencer
+- The 12-month load-bearing capability areas from the Roadmap Review synthesis
+- Any content entered in the Contextual Overrides fields (constraints, priorities)
+
+### 8.3 Quarter Posture Synthesis — Completion Moment
+
+After the synthesis generates, before routing to Sprint Planning, the platform renders a full-screen or prominent synthesis block. This is the completion moment — the beat that makes the quarter feel real.
+
+**Layout:**
+
+**Header:**
+- Label (small caps, muted): `YOUR Q1 QUARTER MAP`
+- Quarter identifier: `Q1 2026`
+
+**Posture statement:**
+- 3-5 sentences of GPT-generated synthesis
+- Reflects back what the locked Quarter Map represents as a whole — not a list of the 9 capabilities, but a coherent statement of what this quarter is organizationally about
+- Observational in tone — reveals what the selections imply, not what the platform thinks of them
+- Names the Prioritize theme (what the quarter is building toward), the Plant theme (what's being seeded for the next horizon), and the Iterate theme (what's being sustained)
+- If there are any notable observations — a tension between a selection and a stated constraint, a sequencing note worth holding — they surface here as brief, neutral callouts. Not flags. Not corrections. Just mirrors.
+- For Phase 2 placeholder: a stage-aware template paragraph referencing the actual 3 Prioritize capabilities by name and the Q1 sprint theme
+
+Example of correct tone:
+*"Your Q1 focus centers on building the financial and operational infrastructure that your 12-month trajectory depends on. By Prioritizing Cash Flow Forecasting, Role Clarity, and Delivery Process, you're addressing the foundational visibility gaps that, if left unresolved, compound in complexity as the agency scales. The capabilities you've chosen to Plant signal forward thinking on positioning — work that won't pay off this quarter but that you're beginning to seed. The Iterate selections show a mature recognition of what's already working and simply needs to be maintained. This is a disciplined, sequenced quarter."*
+
+**3P Summary panel:**
+Below the posture statement, a clean visual summary of the three columns — capability names only, organized under their 3P labels. This is the artifact version of their plan — scannable, shareable.
+
+**CTA:**
+- Primary button: `Begin Sprint Planning →`
+- Routes to: `/pro/execution/sprint-planning`
+- Supporting line (small, muted): `You'll turn each capability area into initiatives and milestones in Sprint Planning.`
+
+**Secondary action:**
+- `Download Quarter Map (PDF)` — generates a one-page brief of the posture statement and 3P summary. Available here and accessible later from the dashboard.
+
+---
+
+## 9. New Components to Build
+
+| Component | Description | Used On |
+|---|---|---|
+| `CapabilityGridCard` | Full-width grid card with surface view content and expand trigger | Capability grid |
+| `CapabilityExpandedView` | Modal or drawer with four-section expanded capability detail | Triggered from grid card |
+| `ThreePColumn` | Individual 3P column with slot management, drop zone, and column card display | 3P commitment section |
+| `CapabilityColumnCard` | Card as it appears inside a 3P column — condensed, with remove and move controls | 3P columns |
+| `SelectionCounterBar` | Persistent bottom bar showing real-time selection progress | Sticky footer |
+| `ReferenceStrip` | Collapsible 12-month synthesis reference panel | Below page header |
+| `QuarterPostureBlock` | Full completion moment block with synthesis, 3P summary, and CTA | Post-lock screen |
+| `ParkingLotColumn` | De-emphasized fourth column for deferred capability areas | Adjacent to 3P columns |
+
+---
+
+## 10. Existing Components to Reuse
+
+| Component | Usage |
+|---|---|
+| `LoadingOverlay` | Synthesis generation loading state on lock action |
+| Capability card stage status badge | Already exists in current wireframe — keep visual treatment |
+| 3P column color coding | Already established — blue/green/orange — do not change |
+| `CalloutBlock` | Reuse inside the Reference Strip expanded state |
+
+---
+
+## 11. Data Requirements
+
+| Data Point | Source | Usage |
+|---|---|---|
+| 25 capability area names and descriptions | M&R Audit data model / knowledge base | Grid card surface and expanded view |
+| Stage-specific capability descriptions | M&R checkpoint data model | Expanded view — "What good looks like at your stage" |
+| User capability scores (all 25) | Supabase capability score tables | Maturity bar, stage status badge, ranking |
+| Stage-calibrated ranking (1-25) | Supabase — derived from scoring engine | Default sort order, rank number on card |
+| AE Ladder stage | `ae_assessments` table | Stage status badge calibration, expanded view content, synthesis |
+| Q1 sprint theme and implications | Roadmap Review synthesis — Supabase | Reference strip and synthesis inputs |
+| 12-month load-bearing capabilities | Roadmap Review synthesis — Supabase | Reference strip |
+| Contextual overrides content | Roadmap Review — Supabase | Synthesis input |
+| Locked 3P selections | Saved to Supabase on lock | Sprint Planning seed data |
+
+---
+
+## 12. Tone & Language Principles
+
+All platform-generated content — expanded view text, reference strip content, completion synthesis — must follow:
+
+- **Observational, not prescriptive** — the platform reveals what things imply, never tells the founder what to do
+- **Stage-calibrated** — all language references the user's specific stage by name
+- **Specific** — references real capability names and real dimension names, never generic business language
+- **Non-evaluative** — the platform does not judge selections as good or bad, right or wrong
+- **Peer-level** — strategic advisor voice, not coach or educator
+
+---
+
+## 13. Open Items / Future Considerations
+
+- **Team sharing** — the Quarter Map PDF and posture statement should eventually be shareable with team members as a one-page quarterly brief. Not in scope for this build.
+- **Quarter-over-quarter comparison** — future consideration: show how this quarter's selections compare to last quarter's to surface the evolution of focus over time.
+- **Sprint Planning seed** — the locked 3P selections must be available as seed data in Sprint Planning so capability areas pre-populate as initiative containers. This handoff should be confirmed as part of the Sprint Planning build.
+- **Observational readback — deferred** — the real-time observational layer during selection is not feasible without live GPT calls and is parked. If introduced in a future phase, it belongs only in the completion synthesis, not during active selection.

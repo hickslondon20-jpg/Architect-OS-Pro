@@ -1,0 +1,887 @@
+# GVS — Scenario Planner: Compare Mode Full Specification
+
+**Architect OS | Growth Velocity Simulator**
+**Version:** 1.0
+**Status:** Ready for Implementation
+**Audience:** Antigravity — Frontend Build + Database Migration
+
+---
+
+## How to Use This Document
+
+This spec covers three things in order:
+
+1. **Database migration** — updates to existing tables and two new comparison tables
+2. **Navigation architecture** — the pill toggle between Build and Compare modes
+3. **Compare mode UI/UX** — full component specifications, interaction states, and data flow
+
+Complete the database migration first. Do not begin frontend work until the migration is confirmed. Read all sections before writing any code.
+
+Reference files already in repo:
+```
+/context/GVI_Formula_Specification.md
+/context/GVS_Supabase_Migration_Spec.md
+/context/GVS_ScenarioPlanner_InputsLayer_Spec.md
+lib/gviCalculations.ts
+pages/GVCalculatorPage.tsx (or equivalent Scenario Planner page)
+```
+
+---
+
+## Section 1 — Database Migration
+
+### 1.1 Update `gvs_saved_growth_scenarios` — Forced Unique Save Logic
+
+Add a unique constraint that prevents a scenario from being resaved under the same name if any input metric has changed. The uniqueness is enforced at the database level on a combination of `user_id`, `scenario_name`, and a hash of the `inputs` JSONB.
+
+```sql
+-- Add input hash column for uniqueness enforcement
+ALTER TABLE public.gvs_saved_growth_scenarios
+  ADD COLUMN inputs_hash text GENERATED ALWAYS AS (
+    encode(sha256(inputs::text::bytea), 'hex')
+  ) STORED;
+
+-- Unique constraint: same user cannot save two scenarios
+-- with the same name AND the same input configuration
+CREATE UNIQUE INDEX idx_gvs_saved_unique_name_inputs
+  ON public.gvs_saved_growth_scenarios (user_id, scenario_name, inputs_hash);
+```
+
+**Behavioral implication for frontend:** Before saving, if a record exists with the same `user_id`, `scenario_name`, and `inputs_hash`, Supabase returns a unique constraint violation. The frontend must catch this and prompt: "A scenario with this name and configuration already exists. Choose a different name or modify your inputs." If the inputs have changed but the name is the same, the constraint allows the save because `inputs_hash` will differ — this is a new scenario, not an overwrite.
+
+---
+
+### 1.2 Create `gvs_comparison_runs` (Runtime Comparison Table)
+
+Every comparison execution writes a record here when the GPT call is triggered. One record per run regardless of whether it is explicitly saved.
+
+```sql
+CREATE TABLE public.gvs_comparison_runs (
+  id                    uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id               uuid NOT NULL,
+  agency_id             uuid NOT NULL,
+  scenario_ids          jsonb NOT NULL,
+  scenario_ids_hash     text GENERATED ALWAYS AS (
+                          encode(sha256(scenario_ids::text::bytea), 'hex')
+                        ) STORED,
+  scenario_snapshots    jsonb NOT NULL,
+  baseline_snapshot     jsonb NOT NULL,
+  deterministic_output  jsonb NULL,
+  synthesis_content     jsonb NULL,
+  status                text NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending', 'processing', 'complete', 'error')),
+  is_saved              boolean NOT NULL DEFAULT false,
+  saved_at              timestamp with time zone NULL,
+  created_at            timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT gvs_comparison_runs_pkey PRIMARY KEY (id),
+  CONSTRAINT gvs_comparison_runs_agency_fkey
+    FOREIGN KEY (agency_id) REFERENCES agencies (agency_id),
+  CONSTRAINT gvs_comparison_runs_user_fkey
+    FOREIGN KEY (user_id) REFERENCES auth.users (id)
+);
+
+-- Deduplication lookup: find existing run for same scenario combination
+CREATE UNIQUE INDEX idx_gvs_comparison_runs_dedup
+  ON public.gvs_comparison_runs (user_id, scenario_ids_hash)
+  WHERE status = 'complete';
+
+CREATE INDEX idx_gvs_comparison_runs_user
+  ON public.gvs_comparison_runs USING btree (user_id);
+
+CREATE INDEX idx_gvs_comparison_runs_agency
+  ON public.gvs_comparison_runs USING btree (agency_id);
+
+CREATE INDEX idx_gvs_comparison_runs_status
+  ON public.gvs_comparison_runs USING btree (status);
+
+CREATE INDEX idx_gvs_comparison_runs_is_saved
+  ON public.gvs_comparison_runs USING btree (is_saved);
+```
+
+---
+
+### 1.3 Create `gvs_saved_comparisons` (Saved Comparisons Table)
+
+Explicit saves only. One record per named comparison. Fully reloadable without recomputation.
+
+```sql
+CREATE TABLE public.gvs_saved_comparisons (
+  id                      uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id                 uuid NOT NULL,
+  agency_id               uuid NOT NULL,
+  runtime_comparison_id   uuid NULL,
+  comparison_name         text NOT NULL,
+  scenario_ids            jsonb NOT NULL,
+  scenario_snapshots      jsonb NOT NULL,
+  baseline_snapshot       jsonb NOT NULL,
+  deterministic_output    jsonb NOT NULL,
+  synthesis_content       jsonb NULL,
+  version                 integer NOT NULL DEFAULT 1,
+  created_at              timestamp with time zone NULL DEFAULT now(),
+  updated_at              timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT gvs_saved_comparisons_pkey PRIMARY KEY (id),
+  CONSTRAINT gvs_saved_comparisons_agency_fkey
+    FOREIGN KEY (agency_id) REFERENCES agencies (agency_id) ON DELETE CASCADE,
+  CONSTRAINT gvs_saved_comparisons_user_fkey
+    FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE,
+  CONSTRAINT gvs_saved_comparisons_runtime_fkey
+    FOREIGN KEY (runtime_comparison_id)
+    REFERENCES public.gvs_comparison_runs (id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_gvs_saved_comparisons_user
+  ON public.gvs_saved_comparisons USING btree (user_id);
+
+CREATE INDEX idx_gvs_saved_comparisons_agency
+  ON public.gvs_saved_comparisons USING btree (agency_id);
+
+CREATE INDEX idx_gvs_saved_comparisons_created
+  ON public.gvs_saved_comparisons USING btree (created_at DESC);
+
+CREATE INDEX idx_gvs_saved_comparisons_runtime
+  ON public.gvs_saved_comparisons USING btree (runtime_comparison_id);
+
+-- updated_at auto-update trigger
+CREATE OR REPLACE FUNCTION update_gvs_saved_comparisons_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER maintain_gvs_saved_comparisons_updated_at
+  BEFORE UPDATE ON gvs_saved_comparisons
+  FOR EACH ROW EXECUTE FUNCTION update_gvs_saved_comparisons_updated_at();
+```
+
+---
+
+### 1.4 JSONB Payload Definitions for Comparison Tables
+
+#### `scenario_ids` — Sorted Array for Deduplication
+
+```json
+["uuid-scenario-a", "uuid-scenario-b", "uuid-scenario-c"]
+```
+
+Always sort alphabetically before storing. The hash is generated from this sorted array so the same three scenarios always produce the same hash regardless of selection order.
+
+#### `scenario_snapshots` — Full Scenario Payloads at Comparison Time
+
+```json
+{
+  "slot_1": {
+    "saved_scenario_id": "uuid",
+    "scenario_name": "Active Growth — 24mo",
+    "gvi_score": 67,
+    "band": "Healthy Velocity",
+    "composition_label": "Ambition-Driven",
+    "inputs": { },
+    "results": { },
+    "implications": { },
+    "synthesis_content": { }
+  },
+  "slot_2": { },
+  "slot_3": { }
+}
+```
+
+Slot keys correspond to the column order the founder arranged via drag-and-drop. Slot 1 is always leftmost scenario column (Baseline column is separate — see `baseline_snapshot`).
+
+#### `baseline_snapshot` — Agency Snapshot Current State at Run Time
+
+```json
+{
+  "currentAGI": 1080000,
+  "currentGrossRevenue": 1440000,
+  "currentProfitMargin": 0.28,
+  "currentClientCount": 32,
+  "currentACV": 33750,
+  "currentRetentionRate": 0.76,
+  "currentFTEs": 0,
+  "snapshotDate": "2026-02-23T00:00:00Z"
+}
+```
+
+#### `deterministic_output` — Instantly Computed Comparison Data
+
+```json
+{
+  "pressureTable": {
+    "retention":     { "baseline": null, "slot_1": "GREEN",  "slot_2": "YELLOW", "slot_3": "YELLOW" },
+    "sales":         { "baseline": null, "slot_1": "GREEN",  "slot_2": "GREEN",  "slot_3": "GREEN"  },
+    "capacity":      { "baseline": null, "slot_1": "RED",    "slot_2": "RED",    "slot_3": "GREEN"  },
+    "margin":        { "baseline": null, "slot_1": "GREEN",  "slot_2": "GREEN",  "slot_3": "RED"    },
+    "concentration": { "baseline": null, "slot_1": "GREEN",  "slot_2": "GREEN",  "slot_3": "GREEN"  },
+    "positioning":   { "baseline": null, "slot_1": "GREEN",  "slot_2": "GREEN",  "slot_3": "GREEN"  }
+  },
+  "pressureImplications": {
+    "retention":     { "slot_1": "Healthy — retention stable", "slot_2": "Moderate treadmill — 30-50% sales replacing churn", "slot_3": "Moderate treadmill — 30-50% sales replacing churn" },
+    "sales":         { "slot_1": "Achievable — 1.3x pace", "slot_2": "Achievable — 0.9x pace", "slot_3": "Achievable — 1.7x pace" },
+    "capacity":      { "slot_1": "Culture/burnout risk — hiring too fast", "slot_2": "Culture/burnout risk", "slot_3": "Healthy — hiring pace sustainable" },
+    "margin":        { "slot_1": "Economics sound", "slot_2": "Economics sound", "slot_3": "Funding gap — payroll exceeds profit" },
+    "concentration": { "slot_1": "Portfolio balanced", "slot_2": "Portfolio balanced", "slot_3": "Portfolio balanced" },
+    "positioning":   { "slot_1": "Latent — no repositioning required", "slot_2": "Latent", "slot_3": "Latent" }
+  },
+  "chartData": {
+    "revenueTrajectory": {
+      "baseline": [1080000, 1080000, 1080000],
+      "slot_1":   [1080000, 1440000, 1890000],
+      "slot_2":   [1080000, 1350000, 1600000],
+      "slot_3":   [1080000, 1600000, 2400000],
+      "timeLabels": ["0", "12mo", "24mo"]
+    },
+    "efficiencyMap": {
+      "slot_1": { "revenueGrowthPct": 0.75, "profitMarginPct": 0.23, "label": "Active Growth" },
+      "slot_2": { "revenueGrowthPct": 0.48, "profitMarginPct": 0.25, "label": "Steady Climb" },
+      "slot_3": { "revenueGrowthPct": 1.22, "profitMarginPct": 0.15, "label": "Rocket Ship" }
+    },
+    "growthBridge": {
+      "slot_1": { "retainedRevenue": 820800, "churnReplacement": 259200, "netNew": 810000 },
+      "slot_2": { "retainedRevenue": 820800, "churnReplacement": 259200, "netNew": 520000 },
+      "slot_3": { "retainedRevenue": 793800, "churnReplacement": 286200, "netNew": 1320000 }
+    },
+    "operationalPulse": {
+      "slot_1": { "avgNewHiresPerQtr": 0.75 },
+      "slot_2": { "avgNewHiresPerQtr": 0.38 },
+      "slot_3": { "avgNewHiresPerQtr": 1.13 }
+    }
+  },
+  "gviScores": {
+    "slot_1": { "score": 67, "band": "Healthy Velocity", "compositionLabel": "Ambition-Driven" },
+    "slot_2": { "score": 74, "band": "Healthy Velocity", "compositionLabel": "Structure-Driven" },
+    "slot_3": { "score": 44, "band": "Active Pressure",  "compositionLabel": "Mixed Pressure" }
+  }
+}
+```
+
+#### `synthesis_content` — GPT Comparison Synthesis (Written by n8n)
+
+```json
+{
+  "headlineTension": "The central trade-off across these scenarios is between growth velocity and structural capacity — each path achieves the revenue target through a fundamentally different operational profile.",
+  "comparativeNarrative": "Full GPT-generated paragraph comparing all three scenarios...",
+  "scenarioImplications": {
+    "slot_1": "Active Growth demands a 3x sales motion shift but preserves structural stability — the constraint is execution, not foundation.",
+    "slot_2": "Steady Climb is structurally the safest path but requires the longest runway — appropriate if retention holds and no competitive urgency exists.",
+    "slot_3": "Rocket Ship delivers maximum revenue but creates a capacity constraint that exceeds current team absorption capacity — a structural investment decision precedes this path."
+  },
+  "tradeoffInsights": [
+    "Slot 1 vs Slot 2: Active Growth adds 18% more revenue in same timeframe at the cost of higher sales intensity. Neither creates structural risk.",
+    "Slot 1 vs Slot 3: Rocket Ship doubles revenue ambition but introduces a Capacity RED that Active Growth avoids — requires a hiring and culture decision before committing.",
+    "Slot 2 vs Slot 3: The conservative path preserves margin; the aggressive path sacrifices it. Neither is wrong — they represent different theories of growth."
+  ]
+}
+```
+
+---
+
+## Section 2 — Navigation Architecture: Pill Toggle
+
+### 2.1 Toggle Placement and Structure
+
+The pill toggle sits at the top of the Scenario Planner tab content area, directly below the page header. It is always visible regardless of which mode is active. It is not a full tab bar — it is a lightweight mode switcher.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Scenario Planner                                   │
+│  Advanced growth modeling and scenario comparison   │
+│                                                     │
+│        [ Build Scenario ]  [ Compare ]              │
+└─────────────────────────────────────────────────────┘
+```
+
+**Visual spec:**
+- Pill container: rounded rectangle, light gray background or subtle border
+- Active mode: filled pill segment, dark background, white text
+- Inactive mode: transparent, medium-weight text, hover state darkens slightly
+- Width: auto-sized to label length, not full-width
+- Centered or left-aligned below the page header — consistent with platform conventions
+- No icons required — labels are self-explanatory
+
+**Toggle state is managed as:** `mode: 'build' | 'compare'`
+
+Default on page load: `'build'`
+
+Exception: if the founder arrives via "View in Comparison" CTA from the post-save confirmation, `mode` initializes as `'compare'`.
+
+### 2.2 Toggle Behavior
+
+Switching modes is instant — no loading state, no animation delay. The content below the toggle swaps completely. Build mode content and Compare mode content do not coexist on the same scroll — one replaces the other.
+
+No confirmation required to switch modes. Any unsaved in-progress scenario in Build mode is preserved in local state — switching to Compare and back does not reset the Build form.
+
+### 2.3 Compare Mode Entry — No Scenario Required
+
+Compare mode is always accessible regardless of whether a scenario was just created. A founder can land on the Scenario Planner page and click directly into Compare. The Compare mode handles its own empty state if no scenarios exist in their library.
+
+---
+
+## Section 3 — Compare Mode: Full UI Specification
+
+### 3.1 Overall Layout
+
+Compare mode is a single scrollable view with four sequential sections:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  SECTION A — SCENARIO SELECTOR                      │
+│  Dropdown selection → active comparison cards       │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  SECTION B — SNAPSHOT STRIP                         │
+│  Baseline card + 3 scenario cards (expandable)      │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  SECTION C — COMPARISON PRESSURE TABLE              │
+│  Side-by-side RAG status across all scenarios       │
+│  Expandable rows with pressure implications         │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│  SECTION D — VISUAL ANALYSIS                        │
+│  4 charts rendered from deterministic data          │
+└─────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [ Generate Strategic Comparison ]   ← GPT trigger
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────────────────────────────────────────┐
+│  SECTION E — STRATEGIC COMPARISON SYNTHESIS         │
+│  GPT-generated on demand. Hidden until triggered.   │
+└─────────────────────────────────────────────────────┘
+```
+
+Sections A through D render instantly from stored scenario data as soon as scenarios are selected. Section E is hidden until the GPT trigger button is clicked.
+
+---
+
+### 3.2 Section A — Scenario Selector
+
+**Purpose:** Let the founder select which saved scenarios to bring into the active comparison. Handles large scenario libraries gracefully via dropdown rather than card grid.
+
+#### Empty State (No Scenarios Selected)
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Select scenarios to compare                        │
+│                                                     │
+│  [ + Add Scenario ▾ ]                               │
+│                                                     │
+│  Select up to 3 scenarios. Your current agency      │
+│  baseline is always included as the reference.      │
+│                                                     │
+│  No scenarios yet?                                  │
+│  → Build your first scenario in the Build tab       │
+└─────────────────────────────────────────────────────┘
+```
+
+#### Add Scenario Dropdown
+
+Clicking "Add Scenario" opens a searchable dropdown list of all the founder's saved scenarios. Each item in the list shows:
+
+```
+[ Scenario Name ]          GVI: 67  ·  Healthy Velocity  ·  24mo
+[ Active Growth — 24mo ]   GVI: 67  ·  Healthy Velocity  ·  24mo
+[ Steady Climb — 18mo  ]   GVI: 74  ·  Healthy Velocity  ·  18mo
+[ Rocket Ship — 24mo   ]   GVI: 44  ·  Active Pressure   ·  24mo
+```
+
+- Scenarios already selected in the active comparison are shown with a checkmark and are not re-selectable
+- Dropdown is searchable — text input at top filters the list
+- Maximum 3 selections enforced — once 3 are selected the dropdown disables with a tooltip: "Maximum 3 scenarios. Remove one to add another."
+
+#### Active Selection State
+
+Once scenarios are selected, the selector section shows a compact row of selected scenario chips with an "Add" button if slots remain:
+
+```
+[ ✕ Active Growth — 24mo ]  [ ✕ Steady Climb — 18mo ]  [ ✕ Rocket Ship — 24mo ]  [ All 3 selected ]
+```
+
+- Each chip has an ✕ to remove it from the comparison
+- Removing a scenario immediately updates all downstream sections
+
+---
+
+### 3.3 Section B — Snapshot Strip
+
+**Purpose:** Give each scenario a quick individual identity. Orient the founder to each path before the comparison begins. Supports drag-to-reorder and click-to-expand for full individual detail.
+
+#### Layout
+
+Four cards in a horizontal row — Baseline always leftmost, then three scenario cards in the order the founder has arranged them.
+
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  BASELINE    │  │  SLOT 1      │  │  SLOT 2      │  │  SLOT 3      │
+│  Current     │  │  Active      │  │  Steady      │  │  Rocket      │
+│  State       │  │  Growth      │  │  Climb       │  │  Ship        │
+│              │  │              │  │              │  │              │
+│  —           │  │  GVI: 67     │  │  GVI: 74     │  │  GVI: 44     │
+│  Reference   │  │  Healthy     │  │  Healthy     │  │  Active      │
+│              │  │  Velocity    │  │  Velocity    │  │  Pressure    │
+│              │  │  Ambition    │  │  Structure   │  │  Mixed       │
+│              │  │              │  │              │  │              │
+│  [ View ]    │  │  [ Expand ]  │  │  [ Expand ]  │  │  [ Expand ]  │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+                  ← drag to reorder →
+```
+
+#### Baseline Card
+
+- Always locked in leftmost position — not draggable
+- Label: "BASELINE" — small caps, muted
+- Subtitle: "Current Agency State"
+- No GVI score (baseline is not a scenario run)
+- Key metrics shown: current AGI, clients, ACV, margin, retention
+- "View" button expands to show full Agency Snapshot data inline
+
+#### Scenario Cards
+
+- Draggable — drag handle visible on hover (or on mobile: long press)
+- Card header: scenario name, truncated if long
+- GVI score prominent — large number, band color applied to score
+- Band name and composition label below score
+- Top pressure signal — single highest-severity pressure family flagged
+  - Example: "⚠ Capacity Pressure" in amber if that family is RED
+  - "✓ No critical pressures" in muted green if all GREEN
+- "Expand" button — expands card inline to full individual scenario detail
+
+#### Expanded Scenario Card
+
+When expanded, the card grows to show the complete individual scenario read — equivalent to the Calculator output for that scenario. Content pulled from stored `synthesis_content` and `implications`:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Active Growth — 24mo                              [ Collapse ↑ ]    │
+│  GVI: 67  ·  Healthy Velocity  ·  Ambition-Driven                   │
+│                                                                      │
+│  [Synthesis Headline from stored synthesis_content]                  │
+│                                                                      │
+│  PRESSURE PROFILE                                                    │
+│  Retention     ● GREEN   Healthy — retention stable                  │
+│  Sales         ● GREEN   Achievable — 1.3x pace required             │
+│  Capacity      ● RED     Culture/burnout risk — hiring too fast       │
+│  Margin        ● GREEN   Economics sound                             │
+│  Concentration ● GREEN   Portfolio balanced                          │
+│  Positioning   ● GREEN   Latent — no repositioning required          │
+│                                                                      │
+│  [Synthesis narrative paragraph from stored synthesis_content]       │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Only one card can be expanded at a time. Expanding a second card collapses the first.
+
+#### Drag-to-Reorder Behavior
+
+- Scenario cards (slots 1–3) are draggable horizontally
+- Baseline card is fixed and non-draggable
+- On drag: card lifts slightly (shadow increases), other cards shift to show drop position
+- On drop: cards reorder, slot assignments update, all downstream sections (pressure table columns, chart labels) update to match new order
+- Reordering is a visual-only operation — it does not trigger a new Supabase write until the GPT call fires or an explicit save occurs
+
+---
+
+### 3.4 Section C — Comparison Pressure Table
+
+**Purpose:** Show the structural pressure profile of all scenarios simultaneously. Surface where scenarios differ and where they align. The primary comparative output.
+
+#### Table Structure
+
+Four columns — Baseline (always leftmost, always shown as reference) plus one column per scenario slot.
+
+```
+PRESSURE TYPE          BASELINE    ACTIVE GROWTH   STEADY CLIMB    ROCKET SHIP
+─────────────────────────────────────────────────────────────────────────────
+Retention Pressure      —          ● GREEN         ● YELLOW        ● YELLOW
+Sales Pressure          —          ● GREEN         ● GREEN         ● GREEN
+Capacity Pressure       —          ● RED           ● RED           ● GREEN
+Margin Pressure         —          ● GREEN         ● GREEN         ● RED
+Concentration Risk      —          ● GREEN         ● GREEN         ● GREEN
+Positioning Pressure    —          ● GREEN         ● GREEN         ● GREEN
+```
+
+#### Column Headers
+
+- "BASELINE" — muted, labeled as "(Reference)"
+- Scenario column headers show scenario name, GVI score, and band label
+  ```
+  ACTIVE GROWTH — 24MO
+  GVI 67 · Healthy Velocity
+  ```
+- Column widths equal — each scenario gets the same visual weight
+
+#### Row Structure — Two States
+
+**Collapsed row:**
+```
+Retention Pressure      —    ● GREEN          ● YELLOW         ● YELLOW
+The Treadmill               [Show Details]   [Show Details]   [Show Details]
+```
+
+- Pressure family name on left
+- Archetype label below name (e.g., "The Treadmill", "New Capability") — muted, small
+- RAG badge per scenario column
+- "Show Details" link per cell — expands that cell's implication
+
+**Expanded row (Show Details clicked for one cell):**
+```
+Retention Pressure      —    ● GREEN          ● YELLOW         ● YELLOW
+                             Healthy          Moderate         Moderate
+                             Retention is     Treadmill —      Treadmill —
+                             well-managed     30-50% sales     30-50% sales
+                             (<30%            effort is        effort is
+                             replacement).    replacing        replacing
+                                              churn.           churn.
+                        [Hide Details]  [Hide Details]  [Hide Details]
+```
+
+- All cells in the row expand simultaneously when any "Show Details" is clicked
+- Content pulled from `deterministic_output.pressureImplications`
+- "Hide Details" collapses back to compact state
+
+#### RAG Badge Visual Spec
+
+| Status | Color | Badge |
+|---|---|---|
+| GREEN | Green background | ✓ GREEN |
+| YELLOW | Amber background | ⚠ YELLOW |
+| RED | Red background | ✕ RED |
+| Baseline | Muted | — |
+
+---
+
+### 3.5 Section D — Visual Analysis
+
+**Purpose:** Ground the comparison spatially. Charts render from `deterministic_output.chartData` — no additional computation required.
+
+#### Layout
+
+Two-column grid, two rows — four charts total.
+
+```
+┌─────────────────────────────┐  ┌─────────────────────────────┐
+│  Revenue Trajectory         │  │  Efficiency Map             │
+│  (The Climb)                │  │  (Growth vs. Margin)        │
+└─────────────────────────────┘  └─────────────────────────────┘
+
+┌─────────────────────────────┐  ┌─────────────────────────────┐
+│  Growth Bridge              │  │  Operational Pulse          │
+│  (The Treadmill)            │  │  (Hiring Intensity)         │
+└─────────────────────────────┘  └─────────────────────────────┘
+```
+
+#### Chart 1 — Revenue Trajectory (The Climb)
+
+- Line chart
+- X axis: time in months (0 to max timeframe across selected scenarios)
+- Y axis: revenue in dollars
+- Lines: one per scenario + baseline as flat reference line
+- Each line color-coded and labeled
+- Subtitle: "Steeper slopes require higher velocity"
+- Data source: `deterministic_output.chartData.revenueTrajectory`
+
+#### Chart 2 — Efficiency Map (Growth vs. Margin)
+
+- Scatter plot
+- X axis: Revenue Growth % (0% to max across scenarios)
+- Y axis: Profit Margin % (0% to max)
+- One dot per scenario, labeled
+- Quadrant annotations: Upper right = "Unicorn Zone", Lower right = "Burn to Grow", Upper left = "Steady State", Lower left = "Struggling"
+- Baseline shown as a reference point
+- Subtitle: "Upper right is ideal. Right-down is 'Burn to Grow'."
+- Data source: `deterministic_output.chartData.efficiencyMap`
+
+#### Chart 3 — Growth Bridge (The Treadmill)
+
+- Stacked bar chart
+- One bar per scenario
+- Three stack segments: Retained Revenue (blue), Churn Replacement (red), Net New Growth (green)
+- Baseline reference line at current revenue level
+- Subtitle: "Red is replacing churn. Green is true net new growth."
+- Data source: `deterministic_output.chartData.growthBridge`
+
+#### Chart 4 — Operational Pulse (Hiring Intensity)
+
+- Bar chart
+- One bar per scenario
+- Y axis: average net new hires required per quarter
+- Subtitle: "Average net new hires required per quarter to sustain growth"
+- Data source: `deterministic_output.chartData.operationalPulse`
+
+---
+
+### 3.6 GPT Trigger — Generate Strategic Comparison
+
+A visually distinct divider section between the deterministic content (Sections B–D) and the synthesis section (Section E). This communicates the transition from instant outputs to a deeper on-demand analytical layer.
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Ready to go deeper?
+  Generate a strategic analysis comparing these
+  scenarios — trade-offs, implications, and the
+  central tension across all three paths.
+
+  [ ↗ Generate Strategic Comparison ]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Button states:**
+
+| State | Label | Visual |
+|---|---|---|
+| Default | "↗ Generate Strategic Comparison" | Dark filled, primary |
+| Loading | "Generating Analysis…" | Spinner, muted |
+| Complete (synthesis loaded) | "Analysis Complete" | Muted, disabled |
+| Error | "Generation Failed — Retry" | Error color, retry action |
+
+**On click:**
+1. Check deduplication — query `gvs_comparison_runs` for existing complete record with matching `scenario_ids_hash` for this user
+2. If found: load existing synthesis, skip GPT call
+3. If not found: write runtime record to `gvs_comparison_runs`, trigger n8n webhook with record ID
+4. Subscribe to Realtime on runtime record — when `status = 'complete'`, pull `synthesis_content` and render Section E
+5. Section E appears below the trigger with a smooth expand
+
+---
+
+### 3.7 Section E — Strategic Comparison Synthesis
+
+Hidden until GPT returns. Renders as a full-width panel below the trigger.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  STRATEGIC ANALYSIS                                 │
+│                                                     │
+│  [Headline Tension — one declarative sentence]      │
+│                                                     │
+│  [Comparative narrative paragraph]                  │
+│                                                     │
+│  SCENARIO IMPLICATIONS                              │
+│  ─────────────────────────────────────────────────  │
+│  Active Growth — 24mo                               │
+│  [One to two sentence implication]                  │
+│                                                     │
+│  Steady Climb — 18mo                                │
+│  [One to two sentence implication]                  │
+│                                                     │
+│  Rocket Ship — 24mo                                 │
+│  [One to two sentence implication]                  │
+│                                                     │
+│  KEY TRADE-OFFS                                     │
+│  ─────────────────────────────────────────────────  │
+│  [Trade-off insight 1]                              │
+│  [Trade-off insight 2]                              │
+│  [Trade-off insight 3]                              │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+Content pulled directly from `synthesis_content` JSONB:
+- Headline: `synthesis_content.headlineTension`
+- Narrative: `synthesis_content.comparativeNarrative`
+- Scenario implications: `synthesis_content.scenarioImplications.slot_1/2/3`
+- Trade-off insights: `synthesis_content.tradeoffInsights` array
+
+**Save Comparison — appears after synthesis loads:**
+
+```
+  [ 💾 Save This Comparison ]
+```
+
+Clicking opens inline name field with suggested name (e.g., "Growth Path Analysis — Feb 2026"). Saving writes to `gvs_saved_comparisons`, sets `runtime_comparison_id`, flips `is_saved = true` on runtime record.
+
+---
+
+## Section 4 — Data Flow: Compare Mode
+
+### 4.1 On Scenario Selection (Instant — No API Call)
+
+1. Founder selects up to 3 scenarios from dropdown
+2. Frontend reads full scenario records from `gvs_saved_growth_scenarios` for each selected ID
+3. Compute deterministic output client-side:
+   - RAG status per pressure family: derive from `results.components` deduction values per scenario
+   - Chart data: compute from `results` JSONB for each scenario
+4. Render Sections B, C, D immediately from computed data
+5. No Supabase write at this stage
+
+### 4.2 Deduplication Check Before GPT Call
+
+Before writing to `gvs_comparison_runs`:
+
+```
+Sort selected scenario IDs alphabetically
+→ Compute hash of sorted array
+→ Query gvs_comparison_runs WHERE user_id = x AND scenario_ids_hash = hash AND status = 'complete'
+→ If record found: load synthesis_content directly, render Section E, skip GPT
+→ If not found: proceed to write and trigger
+```
+
+### 4.3 On GPT Trigger
+
+1. Sort scenario IDs and compute hash
+2. Build `scenario_snapshots` object with full payload for each scenario (inputs, results, implications, synthesis_content)
+3. Build `baseline_snapshot` from current Agency Snapshot
+4. Write record to `gvs_comparison_runs` with `status = 'pending'`
+5. Trigger n8n webhook with runtime record ID
+6. Subscribe to Realtime on runtime record
+7. When `status = 'complete'`: pull `synthesis_content`, render Section E
+
+### 4.4 On Save Comparison
+
+1. Founder clicks "Save This Comparison" and names it
+2. Copy full runtime record payload into `gvs_saved_comparisons`:
+   - `comparison_name` from name field
+   - `scenario_ids`, `scenario_snapshots`, `baseline_snapshot`, `deterministic_output`, `synthesis_content` from runtime record
+   - `runtime_comparison_id` = runtime record ID
+3. Flip `is_saved = true` and `saved_at = now()` on runtime record
+4. Show confirmation: "Comparison saved."
+
+### 4.5 On Load Saved Comparison (Future)
+
+When a founder returns and loads a previously saved comparison:
+- Read from `gvs_saved_comparisons`
+- Populate all state from stored JSONB
+- Sections B, C, D, E all render from stored data
+- No recomputation, no GPT call
+- Scenario selector shows the saved scenario names as pre-selected
+
+---
+
+## Section 5 — GPT Payload for Comparison Synthesis
+
+n8n packages the following from the runtime record for the GPT call. This is what the model receives as context.
+
+```json
+{
+  "comparisonContext": {
+    "scenarioCount": 3,
+    "baselineAGI": 1080000,
+    "baselineClients": 32,
+    "baselineRetention": 0.76,
+    "baselineMargin": 0.28
+  },
+  "scenarios": {
+    "slot_1": {
+      "name": "Active Growth — 24mo",
+      "gviScore": 67,
+      "band": "Healthy Velocity",
+      "compositionLabel": "Ambition-Driven",
+      "frictionShare": 0.45,
+      "timeframeMonths": 24,
+      "targetAGI": 1890000,
+      "components": { },
+      "watchSignals": { },
+      "existingSynthesis": {
+        "synthesisHeadline": "...",
+        "compositionNote": "...",
+        "synthesisNarrative": "..."
+      }
+    },
+    "slot_2": { },
+    "slot_3": { }
+  },
+  "comparativeSignals": {
+    "pressureDifferences": [
+      { "family": "retention", "slot_1": "GREEN", "slot_2": "YELLOW", "slot_3": "YELLOW" },
+      { "family": "capacity",  "slot_1": "RED",   "slot_2": "RED",    "slot_3": "GREEN"  }
+    ],
+    "gviRange": { "min": 44, "max": 74, "spread": 30 },
+    "revenueRange": { "min": 1600000, "max": 2400000 },
+    "marginRange": { "min": 0.15, "max": 0.25 }
+  }
+}
+```
+
+**GPT is instructed to return:**
+- One headline tension statement
+- One comparative narrative paragraph (max 150 words)
+- One scenario implication per slot (1–2 sentences each)
+- Two to three trade-off insights (one sentence each)
+- Observational tone only — no recommendations, no prescriptions
+
+---
+
+## Section 6 — Implementation Checklist
+
+### Database Migration
+- [ ] Add `inputs_hash` generated column to `gvs_saved_growth_scenarios`
+- [ ] Add unique constraint on `(user_id, scenario_name, inputs_hash)`
+- [ ] Create `gvs_comparison_runs` table with all fields and indexes
+- [ ] Create `gvs_saved_comparisons` table with all fields and indexes
+- [ ] Add `updated_at` auto-update trigger to `gvs_saved_comparisons`
+- [ ] Verify unique constraint behavior: same name + same inputs → rejected; same name + different inputs → allowed
+
+### Pill Toggle
+- [ ] Mode state `'build' | 'compare'` controlled at Scenario Planner page level
+- [ ] Toggle renders correctly in both active and inactive states
+- [ ] "View in Comparison" CTA from Build post-save sets mode to `'compare'`
+- [ ] Switching modes does not reset Build form state
+
+### Section A — Scenario Selector
+- [ ] Dropdown renders all saved scenarios with name, GVI score, band, timeframe
+- [ ] Search/filter within dropdown functional
+- [ ] Maximum 3 scenarios enforced in dropdown
+- [ ] Chip row shows selected scenarios with remove (✕) functionality
+- [ ] Removing a scenario updates all downstream sections
+- [ ] Empty state renders with CTA to Build mode
+
+### Section B — Snapshot Strip
+- [ ] Baseline card renders with current Agency Snapshot data, locked position
+- [ ] Scenario cards render with name, GVI score, band, composition label, top pressure signal
+- [ ] Expand/collapse individual scenario cards functioning
+- [ ] Expanded state shows full pressure profile and synthesis content from stored data
+- [ ] Only one card expanded at a time
+- [ ] Drag-to-reorder functional for scenario cards (not baseline)
+- [ ] Reordering updates column order in pressure table and chart labels
+
+### Section C — Pressure Table
+- [ ] Table renders with correct column headers (baseline + 3 scenario columns)
+- [ ] RAG badges render correctly per cell from deterministic output
+- [ ] Show/Hide Details expands all cells in a row simultaneously
+- [ ] Implication text renders from `deterministic_output.pressureImplications`
+
+### Section D — Visual Analysis
+- [ ] All four charts render from `deterministic_output.chartData`
+- [ ] Revenue Trajectory: correct lines per scenario, baseline as flat reference
+- [ ] Efficiency Map: dots positioned correctly, quadrant annotations visible
+- [ ] Growth Bridge: stacked bars with correct three-segment color coding
+- [ ] Operational Pulse: bars per scenario with correct values
+- [ ] Charts update when scenarios are reordered or changed
+
+### GPT Trigger + Section E
+- [ ] Deduplication check fires before any GPT call
+- [ ] If duplicate found: synthesis loads from existing record, no new call
+- [ ] Runtime record written to `gvs_comparison_runs` on trigger click
+- [ ] n8n webhook triggered with runtime record ID
+- [ ] Realtime subscription active on runtime record
+- [ ] Section E renders when `status = 'complete'` and `synthesis_content` arrives
+- [ ] All synthesis fields render from correct `synthesis_content` keys
+- [ ] Save Comparison writes to `gvs_saved_comparisons` with correct payload
+- [ ] `is_saved` and `saved_at` flip on runtime record after save
+
+### Forced Unique Save (Scenarios)
+- [ ] Frontend catches unique constraint violation on scenario save
+- [ ] Error message prompts rename or input change — does not crash
+- [ ] New scenario with same name but different inputs saves successfully
+
+---
+
+## Section 7 — What NOT to Build in This Pass
+
+- Loading saved comparisons from library (future pass)
+- Comparison history or comparison list view (future pass)
+- Any changes to `lib/gviCalculations.ts`
+- Any changes to the Calculator tab
+- Any changes to Build mode (inputs layer already complete)
+- n8n workflow internals — frontend triggers the webhook only
+
+---
+
+*Spec Status: Ready for implementation. Complete database migration before beginning frontend build.*
+*Reference: GVS_Supabase_Migration_Spec.md and GVS_ScenarioPlanner_Spec.md for existing patterns.*

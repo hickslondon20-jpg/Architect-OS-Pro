@@ -1,0 +1,1507 @@
+# **ARCHITECT OS PLATFORM — HIGH-LEVEL SUMMARY**
+
+## **Platform Purpose**
+
+Architect OS is a **strategic operating system for 7-8 figure marketing agency founders** that guides them through their transformation journey from diagnosis → clarity → execution → momentum. It serves as an intelligent strategic partner that helps founders understand where they are, where they're going, and what needs to develop to get there.
+
+---
+
+## **Platform Architecture (7 Major Sections)**
+
+---
+
+### **1\. HOME (DASHBOARD)**
+
+**Purpose:** Central command center and orientation hub
+
+**What it does:**
+
+* Displays current state snapshot (stage, scores, progress)  
+* Provides quick navigation to all platform areas  
+* Shows what's active and what's next in their journey  
+* Hero stats and key metrics at a glance
+
+**Subcomponents:**
+
+* None (single dashboard view)
+
+**Tier Access:** All tiers
+
+---
+
+### **2\. AGENCY SNAPSHOT**
+
+**Purpose:** Foundational data layer that establishes current reality
+
+**What it does:**
+
+* Captures "who we are today" baseline without judgment or diagnosis  
+* Provides context for all downstream tools and AI reasoning  
+* Stores business fundamentals that don't change frequently  
+* Serves as the "don't hallucinate" layer for the platform
+
+**Subcomponents:**
+
+1. **Current State Dashboard** — Visual summary of agency fundamentals  
+2. **Current State Intake** (4 sub-tabs):  
+   * **Business Identity & Positioning:** Name, website, industry, services, delivery model, ICP  
+   * **Financial Snapshot:** Revenue band, profit margin, client count, ACV, growth trend  
+   * **Team & Delivery Structure:** Team size, contractors, delivery model, founder involvement  
+   * **Operating Context:** Geographic footprint, growth channels, tooling, sales motion
+
+**Tier Access:** Tier 0 (Free) with optional fields for Pro
+
+**Key Principle:** Descriptive, not prescriptive. This is the "from" in the transformation journey.
+
+---
+
+### **3\. CLARITY COMPASS**
+
+**Purpose:** Strategic vision and destination clarity layer
+
+**What it does:**
+
+* Defines where the agency is intentionally headed (the "to")  
+* Structures future state across multiple time horizons  
+* Makes optimization priorities explicit (Time, Money, Optionality, Freedom)  
+* Clarifies founder evolution goals and non-negotiables
+
+**Subcomponents:**
+
+1. **Vision State Synthesis/Roadmap \+ Gap Awareness Summary** — AI-generated synthesis showing current → future gap  
+2. **12/18/36-Month Vision State Clarity** — Structured future reality across 5 dimensions (Financial, Clients & Market, Operations, Team, Founder Role)  
+3. **Evolution Clarity** (2 sub-tabs):  
+   * **Founder Evolution (Tool/Quiz):** Interactive assessment of founder stage (Practitioner → Architect → Investor)  
+   * **Trade-off Optimizer:** Forces rank-ordering of the 4 optimization variables to clarify decision-making priorities
+
+**Tier Access:**
+
+* Basic vision: Tier 0 (Free)  
+* Evolution Clarity & deep synthesis: Tier 1+
+
+**Key Principle:** Not motivational vision work — architectural vision work that creates strategic alignment.
+
+---
+
+### **4\. TOOLS & ASSESSMENTS**
+
+**Purpose:** Diagnostic and planning tools that analyze feasibility and identify gaps
+
+**What it does:**
+
+* Provides interactive tools for testing growth scenarios  
+* Administers core assessments that power the entire platform  
+* Generates diagnostic insights and reports
+
+**Subcomponents:**
+
+#### **4A. GVI Simulator (Growth Velocity Intelligence) — 2 sub-tabs:**
+
+* **GV Calculator:** Tests feasibility of growth targets, reveals constraint profiles (retention pressure, hiring needs, cash requirements, capacity walls)  
+* **Scenario Planner:** Multi-scenario comparison showing trade-offs between different growth paths (Pro tier)
+
+#### **4B. AE Ladder Assessment — 3 sub-tabs:**
+
+* **Results Dashboard:** Stage badge, dimension scores, strengths/gaps, focus priorities  
+* **Assessment:** 19-question stage diagnostic across 5 dimensions  
+* **Stage Deep Dive:** Narrative explainer of what their stage means, band nuance, stage journey context
+
+#### **4C. M\&R Audit (Maturity & Readiness Audit) — 3 sub-tabs:**
+
+* **Results Dashboard:** Overall scores, dimension analysis, capability insights (3 dashboard tabs: Global Insights, Dimension Analysis, Capability Priorities)  
+* **Assessment:** 125 checkpoint questions (5 dimensions × 5 capabilities × 5 checkpoints)  
+* **M\&R Deep Dive & Next Steps:** Detailed capability breakdowns, weighted priorities, stage-calibrated recommendations
+
+**Tier Access:**
+
+* GV Calculator (basic): Tier 0 (Free)  
+* GV Scenario Planner: Tier 1+  
+* AE Ladder: Tier 1 ($97 one-time, 12-month access)  
+* M\&R Audit: Tier 2 ($297 one-time, 12-month access)
+
+**Key Principle:** Diagnostics create the intelligence layer that makes execution strategic rather than reactive.
+
+---
+
+### **5\. ARCHITECT OS PRO SUITE**
+
+**Purpose:** Strategic execution workspace and operating system
+
+**What it does:**
+
+* Transforms diagnostics into executable plans  
+* Provides AI-powered strategic advisory  
+* Tracks financial/operational intelligence  
+* Monitors progress and auto-updates maturity scores
+
+**Subcomponents:**
+
+#### **5A. Dashboard**
+
+* Suite overview and navigation  
+* Quarter snapshot and progress  
+* Integration status
+
+#### **5B. Sprint Planning Tool — 5 sub-tabs:**
+
+* **Current Quarter Setup:** Define quarterly vision, AI-generated 3P priorities  
+* **Sprint Board:** Kanban-style interface (3 columns: Prioritize/Plant/Progressively Iterate), initiative cards, milestone creation  
+* **Roadmap View:** Timeline visualization showing milestone sequencing, dependencies, workload analysis, pacing intelligence  
+* **Progress Tracker:** Real-time status updates, velocity tracking, completion metrics, blocker identification  
+* **Historical Archive:** Past quarter snapshots, completion stats, checkpoint improvements
+
+#### **5C. Virtual CSO \- BI Tool \+ Insight Engine**
+
+* **Data Upload Hub:** P\&Ls, balance sheets, utilization reports (PDF/CSV/Excel)  
+* **AI Extraction & Synthesis:** Converts uploads into time-stamped metrics  
+* **Trend Visualization:** Charts, comparisons, benchmark analysis  
+* **Insight Memos:** AI-generated narrative synthesis with strategic implications  
+* **Progress Tracking:** KPI monitoring tied to sprint goals
+
+#### **5D. Virtual CSO \- Strategy Session**
+
+* **Context-aware chat interface:** Session-based AI advisor  
+* **Persona selection:** Strategic/Creative/Analytical modes  
+* **Tiered context retrieval:** Core agency data \+ dynamic business data \+ platform knowledge \+ conversation history  
+* **Strategic guidance:** Problem-solving, prioritization advice, pattern recognition  
+* **Integration:** References sprint plans, trend data, diagnostic results
+
+**Tier Access:** Tier 3 (Pro) — $197/month subscription
+
+**Key Principle:** Not task management — strategic planning, intelligence gathering, and advisory rolled into one operating system.
+
+---
+
+### **6\. RESOURCES**
+
+**Purpose:** Learning library and knowledge base
+
+**What it does:**
+
+* Houses frameworks, templates, and educational content  
+* Links to external learning environments (e.g., GoHighLevel courses)  
+* Provides reference materials and best practices  
+* Lightweight in v1 (primarily navigation/links)
+
+**Subcomponents:**
+
+* Framework library  
+* Template downloads  
+* External learning links  
+* Stage-specific resources
+
+**Tier Access:** Varies by content type
+
+---
+
+### **7\. PROFILE SETTINGS & STORAGE/DATA MANAGER**
+
+**Purpose:** Account management and data control
+
+**What it does:**
+
+* User profile and preferences  
+* Subscription and billing management  
+* Data privacy controls  
+* Document storage and management  
+* Export/delete capabilities
+
+**Subcomponents:**
+
+* Account settings  
+* Subscription management  
+* Data manager (view/download/delete uploads)  
+* Privacy controls
+
+**Tier Access:** All users
+
+---
+
+## **Platform Flow & Integration Architecture**
+
+INTAKE & VISION  
+Agency Snapshot \+ Clarity Compass  
+    ↓ (Provides context)  
+      
+DIAGNOSIS  
+Tools & Assessments (GVI, AE Ladder, M\&R Audit)  
+    ↓ (Identifies gaps and priorities)  
+      
+EXECUTION  
+Architect OS Pro Suite (Sprint Planning, Trend Analysis, Virtual CSO)  
+    ↓ (Plans, tracks, advises)  
+      
+MOMENTUM
+
+Quarterly cycle repeats with improved scores and refined strategy
+
+**Key Integration Points:**
+
+* Agency Snapshot → Feeds GV Calculator \+ AI context  
+* Clarity Compass → Sets targets for Sprint Planning  
+* M\&R Audit → Generates 3P priorities for Sprint Planning  
+* Sprint Planning → Auto-updates checkpoint scores when milestones complete  
+* Trend Analysis → Shows financial impact of completed initiatives  
+* Virtual CSO → Has access to all user context (diagnostics \+ plans \+ data)
+
+---
+
+## **Tier Structure Summary**
+
+**Tier 0 (Free):**
+
+* Home Dashboard  
+* Agency Snapshot (basic)  
+* Clarity Compass (basic vision)  
+* GV Calculator (single scenario)
+
+**Tier 1 ($97 one-time, 12 months):**
+
+* Everything in Tier 0  
+* AE Ladder Assessment \+ Results Dashboard \+ PDF  
+* Founder Evolution tools  
+* Strategic Gaps Synthesis
+
+**Tier 2 ($297 one-time, 12 months):**
+
+* Everything in Tier 1  
+* Maturity & Readiness Audit (125 checkpoints)  
+* Full diagnostic dashboards  
+* Weighted recommendations
+
+**Tier 3 ($197/month subscription):**
+
+* Everything in Tier 2  
+* Architect OS Pro Suite (Sprint Planning \+ Virtual CSO \+ Trend Analysis)  
+* Unlimited AI sessions  
+* Quarterly planning & tracking  
+* Live maturity score updates
+
+---
+
+## **Design Philosophy**
+
+**What the platform IS:**
+
+* Strategic operating system for agency transformation  
+* Intelligence layer that makes diagnostics actionable  
+* Context-aware AI advisor grounded in proprietary frameworks  
+* Closed-loop system (assess → plan → execute → measure → refine)
+
+**What the platform is NOT:**
+
+* Task manager or project management tool  
+* Generic business coaching platform  
+* Static assessment with no follow-through  
+* Replacement for Asana/ClickUp/Monday
+
+---
+
+**This summary provides the structural overview needed to understand the entire platform architecture without diving into implementation details.**
+
+# **ARCHITECT OS — MVP FEATURE SPECIFICATION**
+
+## **User Acquisition, Transformation Enablement & Team Alignment**
+
+---
+
+## **Elevator Pitch**
+
+**"From Vision in Your Head to Strategy in Your Team's Hands"**
+
+Architect OS transforms how agency founders execute their transformation journey. Instead of strategic plans collecting dust in binders and vision living only in the founder's mind, we create a **living, interactive system** that codifies your strategy, makes it shareable across your team, and provides stage-calibrated guidance that keeps you focused on the right work at the right time.
+
+These new features ensure that from the moment a founder discovers Architect OS, they can quickly capture their strategic clarity, generate beautiful synthesis documents that bring their team along, and build momentum through an execution system that turns static plans into collective progress.
+
+---
+
+## **Problem Statement**
+
+### **The Four Core Transformation Problems**
+
+**Problem 1: Strategic Plans Become Shelf-ware**
+
+Agency founders invest time creating strategic plans, transformation roadmaps, and vision documents. These plans get printed, bound, and filed away—becoming **static artifacts instead of living systems**. Without an interactive, trackable way to engage with their plan, founders lose momentum. The plan becomes a reference document that nobody references.
+
+**Impact**: Good intentions, zero execution. Strategy remains theoretical while the agency drifts.
+
+---
+
+**Problem 2: Vision Isn't Codified or Shared**
+
+Founders have clear vision of where their agency is headed—the trade-offs they're willing to make, the optimization priorities (time vs. money vs. freedom vs. optionality), and the strategic direction. But this clarity **lives implicitly in their head**, not codified in a way the team can access.
+
+Maybe 1-2 C-suite members share some of this understanding, but the broader team operates without context. They don't understand the "why" behind decisions, which initiatives matter most, or what success actually looks like.
+
+**Impact**: Misalignment. Team members row in different directions because they don't share a common strategic picture.
+
+---
+
+**Problem 3: No Stage-Calibrated Roadmap — Generic Advice Leads to Drift**
+
+Founders are bombarded with advice: "Hire faster," "Build systems," "Niche down," "Scale your offers." But most advice is **generic and doesn't account for their specific stage, constraints, or context**.
+
+This causes founders to either:
+
+* **React to fires** as they appear (perpetual reactive mode)  
+* **Follow mainstream advice** that's wrong for their stage (e.g., over-hiring before revenue justifies it, building infrastructure too early)
+
+The problem isn't lack of capability or focus—it's that **it's easy to drift** toward what seems urgent or trendy rather than what's actually strategic for their stage. Without stage-specific calibration, they waste energy on the wrong work.
+
+**Impact**: Founders work hard but make slow progress because they're optimizing for the wrong things at the wrong time.
+
+---
+
+**Problem 4: Gap Between Planning and Execution**
+
+Founders complete assessments, generate insights, and identify capability gaps. But then what? There's a chasm between **knowing what needs to improve** and **actually mobilizing the team to do the work**.
+
+Diagnostics produce reports. Reports sit in inboxes. Execution never materializes because there's no system to translate insights into initiatives, track progress, or create accountability.
+
+**Impact**: Awareness without action. Founders see the problems but can't generate momentum to solve them.
+
+---
+
+## **Target Audience**
+
+**Primary**: 7-8 figure marketing agency founders at transformation inflection points
+
+* Feeling plateau pressure (revenue stagnant, capability ceiling, founder bottleneck)  
+* Seeking strategic clarity and execution momentum (not just motivational advice)  
+* Leading teams of 10-50+ people who need alignment on direction  
+* Willing to invest in systems that make strategy actionable
+
+**Secondary**: Agency leadership teams (COO, VP Operations, Strategic Advisors)
+
+* Receive shared strategy documents from founders  
+* Need context on agency vision and transformation roadmap  
+* Responsible for translating founder vision into team execution  
+* Potential future platform users themselves
+
+**Behavioral Profile**:
+
+* Time-constrained (need tools that create clarity quickly, not lengthy processes)  
+* Skeptical of generic business advice (need stage-calibrated, context-aware guidance)  
+* Value systems thinking over tactical hacks  
+* Want to bring their team along (not operate as lone visionary)  
+* Prefer self-service exploration with intelligent guidance
+
+---
+
+## **USP (Unique Selling Proposition)**
+
+**"The Operating System That Makes Strategy Executable"**
+
+Unlike static planning tools that produce documents nobody uses, or generic coaching that ignores your stage and context, Architect OS:
+
+1. **Codifies implicit founder knowledge** into explicit, shareable strategic clarity  
+2. **Creates stage-calibrated roadmaps** that show the right work for your specific context  
+3. **Transforms static plans into living systems** with trackable progress and team alignment  
+4. **Generates beautiful synthesis documents** that bring your team along on the transformation journey  
+5. **Closes the execution gap** between diagnostic insights and mobilized action
+
+**Key Differentiator**: Every tool serves the transformation journey—from initial clarity capture to ongoing execution momentum. This isn't a task manager or generic assessment platform; it's an **intelligent strategic partner** that keeps you and your team aligned, focused, and moving forward together.
+
+---
+
+## **Target Platforms**
+
+* **Primary**: Web application (desktop-first, responsive)  
+* **Secondary**: Mobile web (tablet/phone optimized)  
+* **Future consideration**: Native mobile apps (iOS/Android) for on-the-go access to reports and team sharing
+
+**Technical Context**:
+
+* Frontend: Built in Lovable AI (React-based)  
+* Backend: Supabase (already complete)  
+* Authentication: Supabase Auth  
+* Payments: Stripe (to be integrated post-MVP)
+
+---
+
+## **Features List**
+
+### **1\. STRATEGIC ONBOARDING & CLARITY CAPTURE**
+
+#### **1.1 Welcome Modal (Transformation Gateway)**
+
+**Purpose**: Immediately orient founders to the transformation journey and capture their entry into the system
+
+**User Stories**:
+
+* \[\] As a founder visiting Architect OS for the first time, I want to quickly understand how this platform helps me execute my transformation, so I can decide if it's worth exploring  
+* \[\] As a founder with strategic clarity stuck in my head, I want a system that promises to help me codify and share it, so my team can finally align around our vision  
+* \[\] As a returning visitor who hasn't signed up yet, I want frictionless access to start capturing my strategic context
+
+**Acceptance Criteria**:
+
+* \[\] Modal displays on first load for any unauthenticated user  
+* \[\] Modal reappears for returning visitors who haven't created an account  
+* \[\] Headline communicates transformation value (not just product features)  
+* \[\] Form captures: First Name, Email  
+* \[\] Submit button creates account and logs user in automatically  
+* \[\] Modal dismisses and shows personalized greeting with user's first name  
+* \[\] Welcome modal does NOT appear once user has an account (even if logged out)
+
+**Sub-Requirements**:
+
+* \[\] Email validation (proper format, no duplicates)  
+* \[\] Error handling for failed signups (email already exists, network errors)  
+* \[\] Loading state during account creation  
+* \[\] Success animation/transition when account is created
+
+**Transformation Value Messaging**:
+
+* \[\] Headline: "Turn Strategy Into Momentum"  
+* \[\] Subheadline: "Codify your vision, align your team, execute your transformation—all in one intelligent system."  
+* \[\] CTA: "Start Building Your Roadmap"
+
+---
+
+#### **1.2 Post-Signup Orientation Experience**
+
+**Purpose**: Immediately guide new users toward their first strategic action
+
+**User Stories**:
+
+* \[\] As a new user, I want clear guidance on what to do first, so I don't feel overwhelmed or lost  
+* \[\] As a founder ready to capture strategic clarity, I want to know which tool will give me the most immediate value
+
+**Acceptance Criteria**:
+
+* \[\] Greeting displays immediately after welcome modal submission  
+* \[\] Uses user's first name from signup form  
+* \[\] Provides clear next-step guidance (2-3 sentences max)  
+* \[\] Presents three entry paths based on transformation need:  
+  * \[\] "Capture Your Current Reality" → Agency Snapshot  
+  * \[\] "Define Your Vision" → Clarity Compass  
+  * \[\] "Test Growth Feasibility" → GV Calculator  
+* \[\] Auto-dismisses after user clicks one of the paths OR after 10 seconds  
+* \[\] User can revisit orientation from Home Dashboard anytime
+
+**Design Consideration**:
+
+* \[\] Clean, non-overwhelming layout  
+* \[\] Visual icons for each path  
+* \[\] Brief (1 sentence) description of what each tool does  
+* \[\] "Not sure? Start here →" recommendation (default: Agency Snapshot)
+
+---
+
+#### **1.3 Sticky Header Navigation (Command Center)**
+
+**Purpose**: Provide persistent access to all platform areas and maintain context awareness
+
+**User Stories**:
+
+* \[\] As a logged-in user, I want persistent navigation so I can move between tools without losing my place  
+* \[\] As a user building strategic context across multiple sessions, I want to see my progress and tier status at a glance
+
+**Acceptance Criteria**:
+
+* \[\] Header appears on all pages once user is authenticated  
+* \[\] Displays: Logo, Main Nav Links, Tier Badge, Account Menu (Profile, Settings, Logout)  
+* \[\] Tier badge shows current access level (Free/Tier 1/Tier 2/Pro)  
+* \[\] For Pro users: Shows current quarter and quick link to Sprint Board  
+* \[\] Sticky positioning (remains visible on scroll)  
+* \[\] Responsive: Collapses to hamburger menu on mobile
+
+**Navigation Links**:
+
+* \[\] Home  
+* \[\] Agency Snapshot (with completion indicator if in progress)  
+* \[\] Clarity Compass (with completion indicator if in progress)  
+* \[\] Tools & Assessments (dropdown: GV Calculator, AE Ladder, M\&R Audit)  
+* \[\] Architect OS Pro (with lock icon for non-Pro users)  
+* \[\] Resources  
+* \[\] Profile & Settings
+
+---
+
+### **2\. STRATEGIC SYNTHESIS & DISTRIBUTION**
+
+#### **2.1 AI Processing Indicators (Intelligence Visibility)**
+
+**Purpose**: Make the strategic analysis work visible, building confidence in the platform's intelligence
+
+**User Stories**:
+
+* \[\] As a user waiting for synthesis generation, I want to see what analysis is happening, so I trust the platform is doing sophisticated strategic work  
+* \[\] As a founder used to generic business tools, I want to feel this platform is actually thinking about my specific context
+
+**Acceptance Criteria**:
+
+* \[\] Loading states trigger whenever AI is generating synthesis (Snapshot, Clarity Compass, GV Calculator, Assessments)  
+* \[\] Multi-stage progress indicators show specific analytical tasks  
+* \[\] Estimated time remaining displayed when possible  
+* \[\] Visual design conveys strategic intelligence (premium, professional—not playful)  
+* \[\] Progress states aligned with transformation work:  
+  * \[\] "Analyzing your agency context..."  
+  * \[\] "Identifying strategic patterns..."  
+  * \[\] "Calibrating stage-specific insights..."  
+  * \[\] "Generating your transformation synthesis..."
+
+**Sub-Requirements**:
+
+* \[\] Animated progress bar (0-100%)  
+* \[\] Stage-specific micro-animations (checkmarks, transitions)  
+* \[\] Subtle background effects (maintain sophistication—no cartoonish elements)  
+* \[\] Processing completes within 10 seconds for any synthesis  
+* \[\] Error state with helpful message if processing fails
+
+**Design Philosophy**:
+
+* \[\] This isn't a spinner—it's a window into strategic intelligence at work  
+* \[\] Conveys: "We're analyzing YOUR specific situation, not applying generic templates"
+
+---
+
+#### **2.2 Synthesis Visualization (Strategic Clarity Display)**
+
+**Purpose**: Transform implicit founder knowledge and diagnostic data into explicit, actionable strategic clarity
+
+**User Stories**:
+
+* \[\] As a founder who just completed a tool, I want a clear visual summary that crystallizes my strategic position, so I can quickly grasp key insights  
+* \[\] As a founder preparing to share strategy with my team, I want a professional synthesis I can present, so they understand where we are and where we're going
+
+**Acceptance Criteria**:
+
+* \[\] Synthesis displays after AI processing completes  
+* \[\] Visual hierarchy: Hero insight at top, supporting analysis below  
+* \[\] Uses cards, visual elements, and data visualization (not text walls)  
+* \[\] Scannable layout—user grasps key points in 10 seconds  
+* \[\] Consistent design language across all synthesis types (Snapshot, Clarity Compass, GV Calculator, Assessments)
+
+**Synthesis Components** (varies by tool):
+
+* \[\] **Agency Snapshot Synthesis**:  
+  * \[\] Current state overview card (revenue, team, delivery model)  
+  * \[\] Constraint profile (what's limiting growth right now)  
+  * \[\] Foundation strength indicators  
+  * \[\] "What This Means" strategic interpretation  
+* \[\] **Clarity Compass Synthesis**:  
+  * \[\] Vision clarity score  
+  * \[\] 12/18/36-month destination summary  
+  * \[\] Trade-off priorities visualization (Time/Money/Freedom/Optionality)  
+  * \[\] Gap awareness (current → future distance)  
+* \[\] **GV Calculator Synthesis**:  
+  * \[\] Growth feasibility rating  
+  * \[\] Constraint alerts (cash, capacity, retention pressure)  
+  * \[\] Hiring timeline requirements  
+  * \[\] Strategic implications of growth path
+
+**Visual Design Principles**:
+
+* \[\] Clean, executive-level presentation  
+* \[\] Color coding for insight types (green \= strength, yellow \= watch, red \= constraint)  
+* \[\] Charts/graphs where data visualization adds clarity  
+* \[\] White space for readability (not cramped)
+
+---
+
+#### **2.3 Download/Print Report Generation (Team Distribution)**
+
+**Purpose**: Enable founders to distribute strategic clarity to their teams, making vision and plans tangible and shareable
+
+**User Stories**:
+
+* \[\] As a founder who just gained strategic clarity, I want to download a professional report I can share with my leadership team, so we all operate from the same strategic picture  
+* \[\] As a founder preparing for a team meeting, I want a printable synthesis I can walk through, so my team understands our transformation roadmap  
+* \[\] As a team member receiving a report, I want to know this came from a legitimate strategic tool (not just the founder's personal notes), so I take it seriously
+
+**Acceptance Criteria**:
+
+* \[\] "Download Report" button appears prominently on all synthesis screens  
+* \[\] Button triggers PDF generation with professional Architect OS branding  
+* \[\] PDF includes:  
+  * \[\] User/agency name  
+  * \[\] Report title and type (e.g., "Agency Snapshot Synthesis," "Clarity Compass Vision Report")  
+  * \[\] Generation date  
+  * \[\] All synthesis content (insights, charts, strategic interpretation)  
+  * \[\] Footer: "Powered by Architect OS | architectos.com"  
+* \[\] Print-optimized layout (clean margins, proper page breaks, no nav elements)  
+* \[\] Download initiates within 3 seconds
+
+**Downloadable Content (All Tools)**:
+
+* \[\] Agency Snapshot synthesis  
+* \[\] Clarity Compass vision report  
+* \[\] GV Calculator results & scenario analysis  
+* \[\] AE Ladder Assessment report (Tier 1\)  
+* \[\] M\&R Audit diagnostic report (Tier 2\)  
+* \[\] Scenario Plans (Tier 1+)
+
+**Branding Requirements**:
+
+* \[\] Professional presentation (looks like strategic consulting deliverable)  
+* \[\] Architect OS logo in header  
+* \[\] Footer: "Powered by Architect OS" \+ URL  
+* \[\] Optional: Subtle watermark with agency/user name
+
+**Design Philosophy**:
+
+* \[\] These aren't "lead magnets"—they're **strategic artifacts** the founder can use to align their team  
+* \[\] Quality conveys: "This is legitimate strategic intelligence, not generic advice"
+
+---
+
+#### **2.4 Strategic Upgrade Pathways (Depth Unlocking)**
+
+**Purpose**: Show founders how deeper assessments and execution tools extend their transformation journey (positioned as capability expansion, not sales)
+
+**User Stories**:
+
+* \[\] As a free user who just completed Snapshot/Clarity Compass, I want to understand what stage-calibrated diagnostic depth looks like, so I can decide if it's valuable for my transformation  
+* \[\] As a founder with diagnostic clarity, I want to see how execution tools close the gap between insight and action, so I can evaluate if Pro tier serves my needs  
+* \[\] As a user exploring the platform, I want upgrade prompts to feel like strategic guidance (not pushy sales), so I maintain trust in the platform
+
+**Acceptance Criteria**:
+
+* \[\] Upgrade modal triggers AFTER synthesis is displayed (never before user sees free value)  
+* \[\] Modal displays benefits framed as **transformation capabilities**, not feature lists  
+* \[\] Shows three upgrade paths with clear value propositions:  
+  * \[\] **Tier 1 ($97 OTP, 12 months)**: "Get stage-calibrated clarity with the AE Ladder Assessment"  
+  * \[\] **Tier 2 ($297 OTP, 12 months)**: "Unlock full capability diagnostics with the M\&R Audit"  
+  * \[\] **Tier 3 ($197/month)**: "Turn insights into execution with the Pro Suite"  
+* \[\] Each tier shows: Price, access duration, transformation value (3-5 bullets), visual preview  
+* \[\] Dismissible (X button)—user can continue with free tier indefinitely
+
+**Trigger Points**:
+
+* \[\] After completing Agency Snapshot synthesis  
+* \[\] After completing Clarity Compass synthesis  
+* \[\] After viewing GV Calculator results  
+* \[\] When free user attempts to access locked content (AE Ladder, M\&R Audit, Pro Suite)
+
+**Modal Messaging Framework**:
+
+* \[\] Headline: "Ready for Stage-Calibrated Guidance?"  
+* \[\] Subheadline: Brief explanation of what paid tiers add to the transformation journey  
+* \[\] Three-column tier comparison (desktop) / stacked cards (mobile)  
+* \[\] Each tier card emphasizes **transformation capability** unlocked:  
+  * \[\] Tier 1: "Understand exactly which stage you're in and what capabilities need development"  
+  * \[\] Tier 2: "Get a complete diagnostic roadmap across all 125 capability checkpoints"  
+  * \[\] Tier 3: "Build and track your transformation initiatives with AI-powered strategic guidance"  
+* \[\] "Continue with Free Tools" dismiss option (no guilt, no pressure)
+
+**Design Philosophy**:
+
+* \[\] Feels like strategic counsel, not a sales pitch  
+* \[\] Aspirational but respectful (not manipulative)  
+* \[\] Acknowledges free tier is valuable; paid tiers extend capability
+
+---
+
+#### **2.5 Upgrade Signup Flow (Access Expansion)**
+
+**Purpose**: Provide frictionless path to deeper transformation capabilities
+
+**User Stories**:
+
+* \[\] As a founder ready to unlock stage-calibrated diagnostics, I want a simple signup process, so I can access my assessment immediately  
+* \[\] As a new paying user, I want immediate access to what I purchased, so I can maintain momentum
+
+**Acceptance Criteria**:
+
+* \[\] Clicking "Upgrade Now" opens signup form (modal or dedicated page)  
+* \[\] Form collects: Name (pre-filled if available), Email (pre-filled), Password (if needed)  
+* \[\] Displays selected tier, price, and transformation value clearly  
+* \[\] "Complete Upgrade" CTA button  
+* \[\] On submission: Account upgraded to selected tier, user logged in, redirected to appropriate next step  
+* \[\] Success message confirms upgrade and orients to next action
+
+**Simplified Flow (No Stripe Integration Yet)**:
+
+* \[\] User clicks upgrade → Form submission → Backend updates user tier in Supabase → Access granted immediately  
+* \[\] Include note: "You'll receive a payment link via email within 24 hours"  
+* \[\] No payment processing in MVP (manual invoicing handled separately)
+
+**Post-Upgrade Experience**:
+
+* \[\] Tier 1: Redirect to AE Ladder Assessment intro  
+* \[\] Tier 2: Redirect to M\&R Audit intro  
+* \[\] Tier 3: Redirect to Architect OS Pro Suite Dashboard with orientation
+
+---
+
+#### **2.6 Tier-Based Access Gating (Capability Progression)**
+
+**Purpose**: Make tier structure clear and maintain aspirational positioning of locked features
+
+**User Stories**:
+
+* \[\] As a free user, I want to understand which transformation capabilities are available at each tier, so I can plan my progression  
+* \[\] As a free user clicking on locked content, I want clear context on why it's locked and what I'd gain by unlocking it
+
+**Acceptance Criteria**:
+
+* \[\] All locked features display lock icon and tier badge in navigation  
+* \[\] Clicking locked feature shows modal with:  
+  * \[\] Headline: "This transformation capability is available in \[Tier Name\]"  
+  * \[\] Brief description of what's unlocked (strategic value, not just features)  
+  * \[\] "Unlock \[Tier Name\]" CTA  
+  * \[\] "Learn More About Tiers" link  
+* \[\] Navigation clearly distinguishes free vs. paid sections  
+* \[\] After upgrading, locked content immediately becomes accessible (no logout/login required)
+
+**Visual Indicators**:
+
+* \[\] Lock icon overlays on locked navigation items  
+* \[\] Tier badge next to feature name (e.g., "Pro" for Sprint Planning)  
+* \[\] Subtle visual treatment (grayed out but not hidden—maintains awareness)
+
+**Design Philosophy**:
+
+* \[\] Locked features feel **aspirational**, not restrictive  
+* \[\] Messaging emphasizes capability gain, not feature deprivation  
+* \[\] Free tier users don't feel "less than"—they feel like they have a clear path forward
+
+---
+
+### **3\. TEAM ALIGNMENT & VIRAL DISTRIBUTION**
+
+#### **3.1 Social Sharing Module (Strategic Advocacy)**
+
+**Purpose**: Enable founders to share their transformation journey and invite peers into the system
+
+**User Stories**:
+
+* \[\] As a founder who just gained strategic clarity, I want to share my experience with my network, so other founders know this tool exists  
+* \[\] As a user proud of my transformation progress, I want an easy way to let my peers know what I'm working on
+
+**Acceptance Criteria**:
+
+* \[\] Sharing module displays below sticky header on first login (after orientation)  
+* \[\] Appears prominently but doesn't block content  
+* \[\] Two sharing options: X (Twitter) and Email  
+* \[\] Pre-populated share text emphasizes transformation value:  
+  * \[\] X: "Just mapped out my agency's transformation roadmap with @ArchitectOS. Finally have a stage-calibrated plan that my whole team can rally around 🚀 \[referral link\]"  
+  * \[\] Email: Subject: "Strategic tool for agency founders", Body: Brief value prop \+ referral link  
+* \[\] Includes referral link automatically
+
+**Placement**:
+
+* \[\] Banner below sticky header (first login only)  
+* \[\] Permanent access in Profile/Settings under "Invite Others" or "Share Architect OS" section
+
+**Share Functionality**:
+
+* \[\] X button opens Twitter share dialog with pre-filled text \+ referral link  
+* \[\] Email button opens user's email client with pre-filled subject/body \+ referral link  
+* \[\] Copy Link button copies referral URL to clipboard with "Copied\!" confirmation
+
+**Design Considerations**:
+
+* \[\] Messaging emphasizes peer value (not self-promotion)  
+* \[\] Tone: "I found something useful" not "Check out this cool app"  
+* \[\] Dismissible without guilt
+
+---
+
+#### **3.2 Referral System (Growth Through Strategic Advocacy)**
+
+**Purpose**: Reward founders who bring other strategic thinkers into the platform
+
+**User Stories**:
+
+* \[\] As any user, I want a unique referral link I can share with founder peers, so they can experience the platform  
+* \[\] As a free user who refers a Pro subscriber, I want to experience Pro capabilities for a month, so I can evaluate if it's right for my transformation journey  
+* \[\] As a Pro user who refers others, I want extended access as a thank you for bringing strategic peers into the community
+
+**Acceptance Criteria**:
+
+* \[\] Every user receives a unique referral link on account creation  
+* \[\] Referral link format: `https://architectos.com/signup?ref=[unique_code]`  
+* \[\] When new user signs up via referral link, system records referrer ID  
+* \[\] **Reward trigger**: When referred user upgrades to $197/month Pro tier, referrer receives 1 month of Pro access  
+* \[\] **Reward logic**:  
+  * \[\] Free user refers Pro subscriber → Free user gets 1 month Pro access immediately  
+  * \[\] Pro user refers Pro subscriber → Pro user's billing cycle extends by 1 month  
+  * \[\] Tier 1/2 user refers Pro subscriber → User gets 1 month Pro credit (applied when/if they upgrade to Pro)  
+* \[\] Referrer receives notification when reward is earned (email \+ in-app)
+
+**Referral Display**:
+
+* \[\] Referral link visible in Profile/Settings page  
+* \[\] One-click "Copy Link" button with confirmation ("Copied\!")  
+* \[\] Link also embedded in social sharing module  
+* \[\] Users can share manually via any channel
+
+**Design Philosophy**:
+
+* \[\] Referrals are about **strategic peer advocacy**, not gamification  
+* \[\] Reward is access expansion, aligned with transformation value  
+* \[\] No hard selling—founders share because the tool genuinely helps
+
+---
+
+#### **3.3 Print-Optimized Reports (Physical Distribution)**
+
+**Purpose**: Enable founders to distribute strategic clarity in physical form for team meetings, offsites, and strategic planning sessions
+
+**User Stories**:
+
+* \[\] As a founder preparing for a leadership offsite, I want to print strategic synthesis reports, so my team has physical reference materials  
+* \[\] As a founder sharing reports with team members, I want professional branding that reflects the quality of the strategic work  
+* \[\] As a team member receiving a printed report, I want to know where it came from so I can explore the tool myself
+
+**Acceptance Criteria**:
+
+* \[\] "Print" button available on all synthesis/report screens  
+* \[\] Clicking "Print" opens browser print dialog OR generates print-optimized PDF  
+* \[\] Print layout removes: Navigation, sticky header, CTAs, upgrade prompts, social sharing, interactive elements  
+* \[\] Print layout includes: Report content, headings, charts, insights, synthesis text  
+* \[\] Print layout adds: Professional header/footer with Architect OS branding
+
+**Printable Content**:
+
+* \[\] Agency Snapshot synthesis  
+* \[\] Clarity Compass vision report  
+* \[\] GV Calculator results & scenario analysis  
+* \[\] AE Ladder Assessment report (Tier 1\)  
+* \[\] M\&R Audit diagnostic report (Tier 2\)  
+* \[\] Sprint plans and roadmaps (Pro tier)
+
+**Branding Requirements**:
+
+* \[\] Header: Architect OS logo (left) \+ Report title (right)  
+* \[\] Footer: "Powered by Architect OS | architectos.com" (center) \+ Page numbers (right)  
+* \[\] Optional: Subtle watermark with agency/user name  
+* \[\] Print CSS ensures: Clean formatting, proper page breaks, readable fonts
+
+**Design Philosophy**:
+
+* \[\] Printed reports should look like **strategic consulting deliverables**  
+* \[\] Quality reinforces: "This is serious strategic work, not a free online tool"  
+* \[\] Branding is subtle but clear (not intrusive)
+
+---
+
+#### **3.4 In-App Referral Link Access (Persistent Sharing)**
+
+**Purpose**: Provide ongoing access to referral functionality
+
+**User Stories**:
+
+* \[\] As a user who wants to invite a peer later, I want easy access to my referral link anytime  
+* \[\] As a user who doesn't use social media, I want to copy my referral link and share it manually
+
+**Acceptance Criteria**:
+
+* \[\] Referral link displayed in Profile/Settings page under "Invite Others" section  
+* \[\] One-click "Copy Link" button with instant confirmation ("Copied to clipboard\!")  
+* \[\] Link also embedded in social sharing banner (if visible)  
+* \[\] Users can share via any method: Slack, LinkedIn, text, WhatsApp, etc.
+
+**Optional Enhancement** (Future):
+
+* \[\] Show referral activity: "X people have signed up using your link"  
+* \[\] Show earned rewards: "You've earned X months of Pro access"
+
+---
+
+## **UX/UI Considerations**
+
+### **Welcome Modal (Transformation Gateway)**
+
+**Screen States**:
+
+* \[\] **Initial Load**: Modal centered, overlay darkens background, focus trapped in modal  
+* \[\] **Form Empty**: First Name and Email fields, disabled submit button  
+* \[\] **Form Filled**: Submit button enabled (validates on submit)  
+* \[\] **Submitting**: Loading spinner on button, "Creating your account..." text  
+* \[\] **Success**: Checkmark animation, "Welcome, \[Name\]\!" message, modal fades out after 1 second  
+* \[\] **Error**: Red error message below form, shake animation on modal
+
+**Design Principles**:
+
+* \[\] Clean, executive presentation (not playful or casual)  
+* \[\] Large, readable typography  
+* \[\] Single-column form (mobile-friendly)  
+* \[\] High-contrast CTA button  
+* \[\] Subtle professional background (gradient or texture)
+
+**Messaging Framework**:
+
+* \[\] Headline: "Turn Strategy Into Momentum"  
+* \[\] Subheadline: "Codify your vision. Align your team. Execute your transformation."  
+* \[\] Value bullets (3 max):  
+  * \[\] "Make your strategic plan a living system, not shelf-ware"  
+  * \[\] "Get stage-calibrated guidance for where you are right now"  
+  * \[\] "Generate shareable reports that bring your team along"  
+* \[\] CTA button: "Start Building Your Roadmap" (not "Sign Up")
+
+**Animations**:
+
+* \[\] Modal fade-in (300ms ease-out)  
+* \[\] Form submission: Button state change with spinner  
+* \[\] Success: Checkmark scale-in \+ modal fade-out  
+* \[\] Dismiss: Modal fade-out, overlay fades
+
+---
+
+### **Post-Signup Orientation Experience**
+
+**Layout Structure**:
+
+* \[\] Personalized greeting: "Welcome, \[First Name\]\!"  
+* \[\] Brief orientation (2-3 sentences):  
+  * \[\] "Architect OS helps you codify your strategic vision, diagnose capability gaps, and execute your transformation journey."  
+  * \[\] "Let's start by capturing where you are today. Choose your entry point:"  
+* \[\] Three path cards (horizontally arranged, desktop; stacked, mobile):  
+  * \[\] **Card 1**: Agency Snapshot  
+    * \[\] Icon: Foundation/building blocks  
+    * \[\] Label: "Capture Your Current Reality"  
+    * \[\] Description: "Document where your agency stands today"  
+    * \[\] CTA: "Start Snapshot"  
+  * \[\] **Card 2**: Clarity Compass  
+    * \[\] Icon: Compass/navigation  
+    * \[\] Label: "Define Your Vision"  
+    * \[\] Description: "Clarify where you're heading and why"  
+    * \[\] CTA: "Start Compass"  
+  * \[\] **Card 3**: GV Calculator  
+    * \[\] Icon: Growth chart  
+    * \[\] Label: "Test Growth Feasibility"  
+    * \[\] Description: "See if your growth goals are realistic"  
+    * \[\] CTA: "Run Calculator"  
+* \[\] Recommendation: "Not sure? Start with Agency Snapshot →"
+
+**Interaction States**:
+
+* \[\] Cards have hover state (subtle lift/shadow)  
+* \[\] Clicking any card dismisses orientation and navigates to that tool  
+* \[\] Orientation auto-dismisses after 10 seconds if user doesn't click  
+* \[\] User can revisit from Home Dashboard ("Getting Started" section)
+
+---
+
+### **AI Processing Indicators (Intelligence Visibility)**
+
+**Visual Design**:
+
+* \[\] Full-screen overlay with semi-transparent backdrop (maintains context)  
+* \[\] Centered processing card:  
+  * \[\] Architect OS logo or animated icon (sophisticated, not playful)  
+  * \[\] Progress bar (animated horizontal fill, smooth transitions)  
+  * \[\] Stage text below progress bar ("Analyzing your agency context...")  
+  * \[\] Estimated time remaining (if \>5 seconds)  
+* \[\] Premium aesthetic: Soft shadows, smooth animations, professional color palette
+
+**Stage Progression** (varies slightly by tool):
+
+* \[\] **Stage 1**: "Analyzing your agency context..." (0-25%)  
+* \[\] **Stage 2**: "Identifying strategic patterns..." (25-50%)  
+* \[\] **Stage 3**: "Calibrating stage-specific insights..." (50-75%)  
+* \[\] **Stage 4**: "Generating your transformation synthesis..." (75-100%)
+
+**Animation Details**:
+
+* \[\] Progress bar: Linear fill with cubic-bezier easing  
+* \[\] Stage text: Fade-out old text (200ms), fade-in new text (200ms)  
+* \[\] Background: Subtle animated gradient (very subtle—not distracting)  
+* \[\] Completion: Progress bar reaches 100%, brief pause, checkmark appears, overlay fades revealing synthesis
+
+**Design Philosophy**:
+
+* \[\] This is a **strategic intelligence reveal**, not a loading screen  
+* \[\] Conveys: "We're doing deep analytical work on YOUR specific context"  
+* \[\] Professional, executive-level presentation
+
+---
+
+### **Synthesis Visualization (Strategic Clarity Display)**
+
+**Layout Structure**:
+
+**Agency Snapshot Synthesis**:
+
+* \[\] **Hero Section**: Current state badge (e.g., "$2-3M revenue, 15-person team, project-based delivery")  
+* \[\] **Constraint Profile Card**: Visual indicators for primary constraints (cash, capacity, client dependence)  
+* \[\] **Foundation Strength Indicators**: 3-5 strengths highlighted with iconography  
+* \[\] **Strategic Interpretation Section**: "What This Means" narrative (2-3 paragraphs)  
+* \[\] **Action Zone**: "Download Report" button \+ "Unlock Stage-Calibrated Diagnostics" upgrade CTA (if free user)
+
+**Clarity Compass Synthesis**:
+
+* \[\] **Hero Section**: Vision clarity score (e.g., "Vision Clarity: 72%")  
+* \[\] **Destination Summary**: 12/18/36-month vision at a glance  
+* \[\] **Trade-off Priorities Chart**: Visual representation of Time vs. Money vs. Freedom vs. Optionality rankings  
+* \[\] **Gap Awareness Map**: Current state → Future state distance visualization  
+* \[\] **Strategic Interpretation Section**: What this vision means for decision-making  
+* \[\] **Action Zone**: Download \+ Upgrade CTA
+
+**GV Calculator Synthesis**:
+
+* \[\] **Hero Section**: Growth feasibility rating (e.g., "Feasibility: Moderate—Watch Cash Flow")  
+* \[\] **Constraint Alerts**: Visual warnings for cash needs, hiring timeline, retention pressure  
+* \[\] **Hiring Timeline**: "You'll need to hire X people by Y date"  
+* \[\] **Strategic Implications**: What this growth path requires organizationally  
+* \[\] **Action Zone**: Download \+ "Compare Scenarios" upgrade CTA (if free user)
+
+**Visual Hierarchy**:
+
+* \[\] Large headings for sections  
+* \[\] Ample white space (executive presentation, not cramped)  
+* \[\] Color coding: Green (strength), Yellow (watch), Red (constraint/alert)  
+* \[\] Scannable: User grasps key insights in 10-15 seconds
+
+**Responsive Behavior**:
+
+* \[\] Desktop: Two-column layout where appropriate (insights left, visualization right)  
+* \[\] Mobile: Single-column, stacked sections, maintained readability
+
+---
+
+### **Strategic Upgrade Pathways (Depth Unlocking)**
+
+**Modal Structure**:
+
+* \[\] **Hero Section**:  
+  * \[\] Headline: "Ready for Stage-Calibrated Guidance?"  
+  * \[\] Subheadline: "Unlock deeper diagnostics and execution tools tailored to your transformation journey."  
+* \[\] **Three-Column Tier Comparison** (desktop) / Stacked Cards (mobile)
+
+**Tier 1 Card**:
+
+* \[\] Badge: "Stage Clarity"  
+* \[\] Price: "$97 one-time (12 months)"  
+* \[\] Transformation Value:  
+  * \[\] "Discover exactly which growth stage you're in"  
+  * \[\] "Identify which capabilities need development first"  
+  * \[\] "Get stage-calibrated priorities that align with your reality"  
+  * \[\] "Download your complete AE Ladder report to share with leadership"  
+* \[\] Visual Preview: Screenshot of AE Ladder Dashboard or stage badge  
+* \[\] CTA: "Unlock Stage Clarity"
+
+**Tier 2 Card**:
+
+* \[\] Badge: "Full Diagnostic"  
+* \[\] Price: "$297 one-time (12 months)"  
+* \[\] Transformation Value:  
+  * \[\] "Complete 125-checkpoint maturity audit across all 5 dimensions"  
+  * \[\] "Get weighted capability priorities based on your stage"  
+  * \[\] "Identify exact capability gaps blocking your transformation"  
+  * \[\] "Download comprehensive diagnostic roadmap"  
+* \[\] Visual Preview: Screenshot of M\&R Dashboard or capability matrix  
+* \[\] CTA: "Unlock Full Diagnostics"
+
+**Tier 3 Card**:
+
+* \[\] Badge: "Execution System"  
+* \[\] Price: "$197/month"  
+* \[\] Transformation Value:  
+  * \[\] "Turn diagnostic insights into trackable quarterly initiatives"  
+  * \[\] "Build transformation roadmaps with AI-powered guidance"  
+  * \[\] "Track progress and auto-update your capability scores"  
+  * \[\] "Access Virtual CSO for strategic advisory"  
+* \[\] Visual Preview: Screenshot of Sprint Board or Virtual CSO interface  
+* \[\] CTA: "Unlock Pro Suite"
+
+**Modal Footer**:
+
+* \[\] "Continue with Free Tools" dismiss link (no guilt, neutral tone)
+
+**State Management**:
+
+* \[\] Modal appears after synthesis display (3-second delay)  
+* \[\] Once dismissed, doesn't reappear in same session  
+* \[\] Reappears on next tool completion (not every page load—contextual)  
+* \[\] Can be permanently disabled from Profile/Settings
+
+**Design Philosophy**:
+
+* \[\] Feels like **strategic counsel**, not sales pressure  
+* \[\] Emphasizes transformation capability unlocked, not feature lists  
+* \[\] Aspirational but respectful—free tier is legitimately valuable
+
+---
+
+### **Social Sharing Module (Strategic Advocacy)**
+
+**Banner Design** (First Login):
+
+* \[\] Horizontal layout across full width below sticky header  
+* \[\] Left: Icon (megaphone or share symbol)  
+* \[\] Center: Headline ("Found this helpful? Invite other strategic founders\!") \+ CTAs  
+* \[\] Right: Dismiss button (X icon)
+
+**CTAs**:
+
+* \[\] "Share on X" button (with X/Twitter icon)  
+* \[\] "Share via Email" button (with envelope icon)  
+* \[\] "Copy Referral Link" button (with link icon)
+
+**Banner Auto-Dismiss**:
+
+* \[\] Appears on first login (after orientation)  
+* \[\] Auto-dismisses after 10 seconds OR user dismisses manually  
+* \[\] Doesn't reappear after dismissal
+
+**Permanent Access** (Profile/Settings):
+
+* \[\] Section titled "Invite Strategic Founders"  
+* \[\] Brief explainer: "Share Architect OS with peers and earn 1 month of Pro access for each Pro subscriber you refer."  
+* \[\] Referral link displayed with "Copy Link" button  
+* \[\] Social sharing buttons (X, Email)  
+* \[\] Optional: Referral stats ("X signups from your link")
+
+**Pre-Filled Share Text**:
+
+* \[\] **X/Twitter**: "Just mapped out my agency's transformation roadmap with @ArchitectOS. Finally have a stage-calibrated plan that my whole team can rally around 🚀 \[referral link\]"  
+* \[\] **Email**:  
+  * \[\] Subject: "Strategic tool for agency founders"  
+  * \[\] Body: "I've been using Architect OS to codify my agency's strategic vision and build a transformation roadmap. It's been incredibly helpful for bringing my team along. Thought you might find it useful: \[referral link\]"
+
+**Interaction States**:
+
+* \[\] "Share on X" → Opens Twitter intent URL with pre-filled text  
+* \[\] "Share via Email" → Opens mailto: link with pre-filled subject/body  
+* \[\] "Copy Link" → Copies referral URL to clipboard, shows "Copied\!" tooltip (2 seconds)
+
+---
+
+### **Print-Optimized Reports (Physical Distribution)**
+
+**Print Button Placement**:
+
+* \[\] Top-right of synthesis container (paired with "Download PDF" button)  
+* \[\] Icon: Printer icon \+ "Print" label
+
+**Print Layout** (CSS `@media print` rules):
+
+* \[\] **Remove**: Navigation, sticky header, CTAs, upgrade prompts, social sharing, interactive elements, background colors  
+* \[\] **Keep**: Report content, headings, charts (converted to static images if needed), insights, synthesis text  
+* \[\] **Add**:  
+  * \[\] Header: Architect OS logo (left) \+ Report title \+ Report type (center) \+ Generation date (right)  
+  * \[\] Footer: "Powered by Architect OS | architectos.com" (center) \+ Page number (right)  
+  * \[\] Optional watermark: "Confidential \- \[Agency Name\]" (diagonal, subtle 10% opacity)
+
+**Page Layout**:
+
+* \[\] Standard 8.5x11" (Letter) or A4 orientation  
+* \[\] 1-inch (2.5cm) margins on all sides  
+* \[\] Page breaks: Between major sections (avoid mid-paragraph breaks)  
+* \[\] Font: Professional sans-serif (e.g., Inter, Helvetica) at readable print size (11-12pt body, 18-24pt headings)
+
+**Branding Aesthetic**:
+
+* \[\] Clean, executive-level presentation  
+* \[\] Architect OS logo subtle but visible  
+* \[\] Footer branding doesn't dominate—supports content  
+* \[\] Professional enough for leadership offsite or board presentation
+
+---
+
+### **Tier-Based Access Gating (Capability Progression)**
+
+**Visual Indicators** (Locked Content):
+
+* \[\] Lock icon overlay on navigation items  
+* \[\] Tier badge next to feature name (e.g., "AE Ladder" with "Tier 1" badge)  
+* \[\] Subtle visual treatment: Slightly grayed but not hidden
+
+**Lock Modal** (Triggered by Clicking Locked Feature):
+
+* \[\] Headline: "This transformation capability is available in \[Tier Name\]"  
+* \[\] Brief description (2-3 sentences) of strategic value:  
+  * \[\] Example (AE Ladder): "The AE Ladder Assessment reveals exactly which growth stage you're in and which capabilities need development first. This stage-calibrated diagnostic gives you clarity on where to focus next."  
+* \[\] Features included in tier (3-5 bullets, transformation-focused)  
+* \[\] "Unlock \[Tier Name\]" CTA button  
+* \[\] "Learn More About Tiers" link (opens tier comparison page)
+
+**Hover States**:
+
+* \[\] Hovering on locked item shows tooltip: "Requires \[Tier Name\]"
+
+**Post-Upgrade Experience**:
+
+* \[\] Locked icons disappear immediately (no page refresh)  
+* \[\] User can access newly unlocked content right away  
+* \[\] Brief success message: "You now have access to \[Feature Name\]\!"
+
+**Design Philosophy**:
+
+* \[\] Locked features feel **aspirational**, not restrictive  
+* \[\] Messaging emphasizes what they'd gain, not what they're missing  
+* \[\] Visual treatment maintains awareness without frustration
+
+---
+
+## **Non-Functional Requirements**
+
+### **Performance**
+
+* \[\] **Page Load Times**: All pages load within 2 seconds on standard broadband (3G+)  
+* \[\] **AI Processing**: Synthesis generation completes within 10 seconds (user never waits \>15 seconds)  
+* \[\] **PDF Generation**: Downloads initiate within 3 seconds of button click  
+* \[\] **Real-Time Updates**: Tier upgrades reflect immediately in UI (no manual refresh required)  
+* \[\] **Mobile Performance**: Touch interactions respond within 100ms, scrolling is smooth (60fps)
+
+### **Scalability**
+
+* \[\] **User Concurrency**: System handles 1,000+ simultaneous users without performance degradation  
+* \[\] **Referral Tracking**: Database efficiently handles referral relationships for 100,000+ users (indexed queries)  
+* \[\] **File Storage**: PDF reports stored efficiently (cache identical reports, avoid duplicate generation)  
+* \[\] **API Rate Limiting**: AI synthesis endpoints rate-limited to prevent abuse (e.g., max 10 generations per user per hour)
+
+### **Security**
+
+* \[\] **Authentication**: Secure session management via Supabase Auth (JWT tokens, httpOnly cookies)  
+* \[\] **Data Privacy**: User data encrypted at rest (Supabase default) and in transit (HTTPS)  
+* \[\] **Access Control**: Tier-based permissions enforced at backend (not just UI hiding)  
+* \[\] **Referral Link Security**: Unique codes generated with sufficient entropy (UUID or similar, no predictable patterns)  
+* \[\] **PDF Security**: Reports only accessible to authenticated users who own the data (signed URLs or access-controlled storage)
+
+### **Accessibility**
+
+* \[\] **WCAG 2.1 AA Compliance**: Color contrast ratios meet standards (4.5:1 for body text, 3:1 for large text)  
+* \[\] **Keyboard Navigation**: All interactive elements accessible via keyboard (Tab, Enter, Esc)  
+* \[\] **Screen Reader Support**: All modals, forms, buttons properly labeled with ARIA attributes  
+* \[\] **Focus Management**: Focus trapped in modals, clear focus indicators (visible outlines)  
+* \[\] **Error Messaging**: Clear, descriptive error messages for form validation (not just "error occurred")  
+* \[\] **Responsive Design**: Usable on devices from 320px (mobile) to 1920px+ (desktop)
+
+---
+
+## **Monetization**
+
+### **Revenue Model Context**
+
+Architect OS uses a **tiered value ladder** aligned with transformation depth:
+
+1. **Tier 0: Free** — Foundational strategic clarity (Snapshot, Clarity Compass, GV Calculator)  
+2. **Tier 1: Stage Clarity** — $97 OTP (12 months) — AE Ladder Assessment  
+3. **Tier 2: Full Diagnostic** — $297 OTP (12 months) — M\&R Audit  
+4. **Tier 3: Execution System** — $197/month — Pro Suite
+
+These features **support the monetization model** but are not built **for** monetization. They're built to **solve transformation problems**, and the tier structure reflects increasing depth of strategic capability.
+
+### **How Features Support Transformation (and Revenue)**
+
+**Welcome Modal \+ Onboarding**:
+
+* Captures founders at moment of curiosity  
+* Gets them into the system quickly so they can start codifying strategy  
+* **Revenue impact**: Increases top-of-funnel conversions (more users enter the platform)
+
+**Synthesis Display \+ Download**:
+
+* Delivers genuine free value (builds trust)  
+* Creates shareable artifacts that founders can use with their teams  
+* **Revenue impact**: Demonstrates platform intelligence, creates natural desire for deeper diagnostics
+
+**Strategic Upgrade Pathways**:
+
+* Shows what's possible with stage-calibrated guidance  
+* Helps founders self-select into appropriate tier based on transformation need  
+* **Revenue impact**: Converts curiosity into commitment when timing is right
+
+**Referral System**:
+
+* Rewards strategic advocacy (not just viral growth hacking)  
+* Brings like-minded founders into the ecosystem  
+* **Revenue impact**: Compounds growth through peer recommendations (lowest CAC channel)
+
+**Print/Download Reports**:
+
+* Extends platform value beyond the digital interface  
+* Positions founders as strategic thinkers within their organizations  
+* **Revenue impact**: Increases perceived value, creates secondary distribution (team members see reports and want access)
+
+### **Conversion Funnel (Transformation-Aligned)**
+
+**Stage 1: Orientation** (Free Tier)
+
+* Welcome modal → Quick signup  
+* Free tools provide real value (Snapshot, Clarity Compass, GV Calculator)  
+* Founders experience platform intelligence firsthand  
+* **Goal**: Build trust and demonstrate stage-calibrated thinking
+
+**Stage 2: Diagnostic Depth** (Tier 1/2)
+
+* After free tools, founders see value of structured assessments  
+* AE Ladder offers stage clarity; M\&R Audit offers capability roadmap  
+* **Goal**: Convert 10-15% of engaged free users to diagnostic tiers within 30 days
+
+**Stage 3: Execution** (Tier 3/Pro)
+
+* Founders with diagnostic clarity need execution tools  
+* Sprint Planning, Virtual CSO, and progress tracking close the gap between insight and action  
+* **Goal**: Convert 20-30% of diagnostic users to Pro within 90 days
+
+**Stage 4: Advocacy** (Referrals)
+
+* Founders who successfully use the platform share with peers  
+* Referral rewards align with value delivered (Pro access for bringing Pro subscribers)  
+* **Goal**: 20% of Pro users refer at least 1 new user annually
+
+### **Viral Coefficient Target**
+
+* **Referral incentive**: 1 month free Pro per successful Pro referral  
+* **Target viral coefficient**: 0.2-0.3 (each Pro user brings 0.2-0.3 new users on average)  
+* **Compounding effect**: With 1,000 active Pro users, 200-300 referrals/year  
+* **Qualified referrals**: Only Pro subscribers count (ensures quality over quantity)
+
+---
+
+## **Critical Questions & Clarifications**
+
+### **Strategic & Product Questions**
+
+1. **Synthesis Personalization Depth**  
+   * How personalized should synthesis feel? Should it reference specific agency details (e.g., "Your project-based delivery model creates..." vs. generic "Project-based models typically...")?  
+   * Should we include founder's name in synthesis narratives ("London, based on your agency profile...")?  
+2. **Team Sharing Functionality**  
+   * Do we want founders to be able to **invite team members** to view reports inside the platform (read-only access)?  
+   * Or is print/download sufficient for v1?  
+3. **Upgrade Prompt Frequency**  
+   * After user dismisses upgrade modal once, should it reappear on next tool completion? Next session? Only when they click locked content?  
+   * Risk balance: Too frequent \= annoying; Too rare \= missed conversion opportunities  
+4. **Referral Attribution Window**  
+   * How long is referral link valid? (Forever? 30 days? 90 days?)  
+   * If someone clicks referral link but signs up later (different session), do we still attribute?
+
+### **Technical Implementation Questions**
+
+5. **PDF Generation Method**  
+   * Are we using existing n8n PDF workflow, or building frontend-based PDF generation (e.g., jsPDF, Puppeteer)?  
+   * Where are PDFs stored? Supabase Storage? Do we cache/reuse identical reports?  
+6. **Referral Code Generation**  
+   * What format for referral codes? (UUID? Alphanumeric? Readable slugs?)  
+   * How do we prevent abuse (self-referrals, fake accounts for rewards)?  
+7. **AI Processing Realism**  
+   * Are the 4 processing stages **actual backend steps** or **simulated for UX** (frontend delay while backend completes)?  
+   * If simulated, should we add artificial minimum time (e.g., 5 seconds) even if backend is faster?  
+8. **Tier Upgrade Backend Logic**  
+   * Without Stripe, how do we handle payment verification?  
+   * Manual email with payment link? Placeholder "payment pending" state?  
+   * What's the timeline for payment confirmation (affects user expectations)?
+
+### **UX & Design Questions**
+
+9. **Welcome Modal Variations**  
+   * Should welcome modal content vary by traffic source? (e.g., LinkedIn ad focuses on team alignment, organic search focuses on stage calibration)  
+   * A/B test different headlines/value props?  
+10. **Synthesis Visual Design**  
+    * Do we have mockups/examples for each synthesis type (Snapshot, Clarity Compass, GV)?  
+    * Are charts/graphs generated by backend (data only) or do we need frontend chart components?  
+11. **Social Share Personalization**  
+    * Should pre-filled share text personalize based on user results?  
+    * Example: "I'm at Stage 3 (Thriving) according to @ArchitectOS..." vs. generic message?  
+    * More compelling but harder to implement  
+12. **Print Report QR Codes**  
+    * Should printed reports include QR code linking to Architect OS signup?  
+    * Could increase secondary distribution (team members scan QR to learn more)
+
+### **Business Logic Questions**
+
+13. **Referral Reward Edge Cases**  
+    * User on Tier 1 refers Pro subscriber → Does Tier 1 user get Pro access immediately (1 month preview)?  
+    * Or credit applied when they upgrade to Pro later?  
+    * User on Free tier gets 1 month Pro, uses it, then reverts to Free after 30 days → What's that experience like?  
+14. **Referral Credit Stacking**  
+    * Can users stack multiple referral credits? (Refer 3 people \= 3 months free?)  
+    * Or cap at 1 month credit at a time?  
+15. **Download Rate Limiting**  
+    * Can free users download unlimited synthesis reports?  
+    * Should we rate-limit to prevent abuse (e.g., max 10 downloads/day)?
+
+---
+
+## **Next Steps & Implementation Strategy**
+
+### **Phase 1: Foundation (Weeks 1-2)**
+
+**Priority 1: Welcome Modal \+ Onboarding Flow**
+
+* Design welcome modal content and messaging  
+* Build signup form with Supabase Auth integration  
+* Create post-signup orientation experience  
+* Implement sticky header navigation with tier awareness
+
+**Priority 2: AI Processing \+ Synthesis Display**
+
+* Design synthesis layouts for Snapshot, Clarity Compass, GV Calculator  
+* Build AI processing indicator component (reusable across tools)  
+* Implement synthesis visualization with proper visual hierarchy  
+* Add download/print affordance
+
+### **Phase 2: Conversion Infrastructure (Weeks 3-4)**
+
+**Priority 3: Strategic Upgrade System**
+
+* Design upgrade modal with tier comparison  
+* Build upgrade signup flow (simplified, no Stripe)  
+* Implement tier-based access gating (lock icons, modal triggers)  
+* Add tier upgrade logic to backend (Supabase user metadata update)
+
+**Priority 4: Print/Download Functionality**
+
+* Create print CSS for all synthesis types  
+* Build PDF generation system (or integrate with existing n8n workflow)  
+* Implement download button functionality  
+* Add professional branding to printed reports
+
+### **Phase 3: Viral Distribution (Weeks 5-6)**
+
+**Priority 5: Referral System**
+
+* Generate unique referral codes on signup  
+* Create referral tracking table in Supabase  
+* Build referral attribution logic (track signups via ref codes)  
+* Implement referral reward system (Pro access grants)
+
+**Priority 6: Social Sharing Module**
+
+* Design social sharing banner/section  
+* Build share functionality (X, Email, Copy Link)  
+* Write pre-filled share text  
+* Add referral link to Profile/Settings
+
+### **Phase 4: Refinement (Week 7+)**
+
+**Priority 7: Testing & Optimization**
+
+* User testing of welcome modal and onboarding flow  
+* A/B test upgrade modal messaging  
+* Refine synthesis visual design based on feedback  
+* Monitor referral conversion rates
+
+---
+
+## **Lovable Implementation Readiness**
+
+This specification is now structured for **systematic Lovable build-out**. We can break this into discrete implementation packages:
+
+### **Package 1: Welcome Modal \+ Sticky Header**
+
+* Component specs for modal, form, success states  
+* Supabase Auth integration points  
+* Sticky header with tier-aware navigation
+
+### **Package 2: AI Processing \+ Synthesis Display**
+
+* Processing indicator component (reusable)  
+* Synthesis layout templates (Snapshot, Compass, GV)  
+* Visual hierarchy and responsive design specs
+
+### **Package 3: Strategic Upgrade System**
+
+* Upgrade modal component with tier comparison  
+* Signup flow (simplified, no Stripe)  
+* Tier gating logic and locked content modals
+
+### **Package 4: Referral System \+ Social Sharing**
+
+* Referral code generation on signup  
+* Referral tracking and attribution  
+* Social sharing module (banner \+ permanent section)  
+* Reward logic (Pro access grants)
+
+### **Package 5: Print/Download Functionality**
+
+* Print CSS for all synthesis types  
+* PDF generation integration  
+* Download button functionality  
+* Branding and professional formatting

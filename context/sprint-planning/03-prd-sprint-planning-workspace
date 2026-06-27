@@ -1,0 +1,472 @@
+# Architect OS — Product Requirements Document
+## Sprint Planning: Initiative & Milestone Entry Experience
+
+| Field | Value |
+|---|---|
+| Feature Area | Architect OS Pro Suite — Planning Module |
+| Document Version | V1.0 |
+| Status | Ready for Development — First Iterative Pass |
+| Owner | London Hicks |
+| Dev Target | Antigravity (via Lovable + Supabase) |
+| Last Updated | March 2026 |
+
+---
+
+## 1. Purpose & Context
+
+This PRD defines the front-end architecture, component behavior, interaction logic, and UX philosophy for the Sprint Planning feature within the Architect OS Pro Suite. It is intended to serve as the authoritative reference for Antigravity during all incremental build prompts for this feature.
+
+### What This Feature Is
+
+Sprint Planning is the execution translation layer of Architect OS. It is where a founder moves from strategic clarity — knowing their stage, their gaps, their 12-month vision — into a structured, actionable 12-week execution plan. By the time a founder completes this section, they should have a first-draft sprint plan: capability areas classified, initiatives defined, milestones outlined, and success criteria established.
+
+### What This Feature Is Not
+
+Sprint Planning is not a task management system, a project management tool, or an operational tracker. It operates at the strategic initiative and milestone level — not at the task or subtask level. The execution section (separate) is where plans are launched and tracked. Sprint Planning is where the plan is created.
+
+### Design Philosophy
+
+The platform operates as an observational, coaching-oriented tool — not a prescriptive system that tells founders what to do. Every interaction should feel like working with a sophisticated peer advisor, not filling out a form. The AI elements support and suggest; they never auto-generate without founder initiation. Friction is minimized at entry and concentrated at the right moments: when it creates clarity, not when it creates busywork.
+
+---
+
+## 2. The 3P Framework — Core Planning Logic
+
+All sprint planning logic is organized around the 3P Framework. Every developer building this feature must understand this framework as it governs the entire information architecture, classification logic, and UX behavior of the sprint board.
+
+### PRIORITIZE
+
+The three capability areas receiving full strategic attention this quarter. These are major lifts requiring real resources, dedicated owner assignment, and multiple coordinated initiatives. This is where the quarter's momentum is built.
+
+**Initiative guidance:**
+- Recommended: 2–3 initiatives per capability area
+- Maximum: 3 initiatives per capability area
+- Each initiative should represent a meaningful strategic workstream
+- Requires at least 2 milestones per initiative before sprint lock
+
+### PLANT
+
+Three capability areas being seeded for future quarters. These are intentionally small lifts — tracking a new metric, having a key conversation, building a data foundation. Plant work enables future Prioritize work. It should feel lightweight to define.
+
+**Initiative guidance:**
+- Recommended: 1 initiative per capability area
+- Maximum: 2 initiatives per capability area
+- If it needs more than 2 initiatives, it may belong in Prioritize
+
+### PROGRESSIVELY ITERATE
+
+Three capability areas in ongoing refinement mode. Work has already been done in these areas; they require continued attention as the agency evolves. Examples: refining ICP as the agency matures, tweaking pricing structures, optimizing a delivery process already in place.
+
+**Initiative guidance:**
+- Maximum: 1 initiative per capability area
+- If more than 1 initiative is needed, the area may actually be a Prioritize
+- These get attention when capacity allows — not at the expense of Prioritize work
+
+> **Important:** Any of the 25 capability areas can fall into any 3P bucket depending on the agency's stage and quarter. The 3P classification is contextual, not fixed. The three buckets are not equal in weight — Prioritize carries the primary strategic load of the quarter.
+
+### Total Initiative Cap Reference
+
+| Tier | Cap | Notes |
+|---|---|---|
+| Prioritize | Up to 9 total (3 capability areas × 3 max each) | Soft guidance targets 6–7 in practice |
+| Plant | Up to 6 total (3 capability areas × 2 max each) | Platform nudges toward 1 per area |
+| Progressively Iterate | Up to 3 total (3 capability areas × 1 max each) | Hard cap — 1 per area, no exceptions |
+| Total Ceiling | 18 initiatives maximum | Platform coaching anchors toward 10–13 as realistic target |
+
+---
+
+## 3. Overall Founder Workflow
+
+The following describes the complete intended journey a founder takes through Sprint Planning. Antigravity should use this as the behavioral reference for how all components connect and sequence. This is not a UI sitemap — it is the lived experience the platform must enable.
+
+### Phase 1 — Pre-Sprint Context (Already Completed Upstream)
+
+Before reaching Sprint Planning, the founder has already completed:
+
+- AE Ladder Assessment — stage placement confirmed
+- Maturity & Readiness Audit — 125-checkpoint diagnostic with capability scores
+- Horizon Declaration — 36/24/12-month vision defined (qualitative + quantitative)
+- Roadmap Review — 12-month vision broken into 4 directional sprints
+- Sprint Goal Definition — the specific outcome statement for this 12-week block
+- Quarter Map — 3P capability selection completed (9 of 25 capability areas classified)
+
+> By the time a founder reaches the Sprint Board, they have a sprint goal and 9 classified capability areas. Sprint Planning translates that structure into executable initiatives and milestones.
+
+### Phase 2 — Initiative Creation (Sprint Board)
+
+The founder lands on the Sprint Board in Capability View. They see three columns (Prioritize, Plant, Progressively Iterate) with their 9 classified capability cards distributed across them. From here they:
+
+- Click into any capability area to open the Capability Card Modal
+- Review capability context: description, stage-calibrated "what good looks like," maturity score
+- Add initiatives via inline quick-add (name only) or the full initiative entry form
+- Work across capability areas in any order — no forced sequence
+- Toggle to Initiative View to see all initiatives across 3P columns simultaneously
+- Use the Strategic Advisor panel at any point for coaching support
+
+### Phase 3 — Milestone Definition
+
+Once the initiative set feels complete enough, the founder adds milestones to each initiative. This can happen immediately after creating an initiative or in a separate session. They:
+
+- Click into any initiative to open the Initiative Card Modal
+- Add milestones via inline quick-add or by clicking into the milestone for full detail
+- Define outcome, measure, owner, timeline, and dependencies per milestone
+- Navigate between initiatives using breadcrumb without closing the modal
+
+### Phase 4 — Sprint Lock
+
+When the founder is ready to commit the plan:
+
+- They click "Review & Lock Sprint" from the Sprint Board
+- System surfaces a completion review: which initiatives are incomplete, which capability areas have no initiatives
+- Founder resolves any gaps or consciously proceeds with incomplete items
+- On confirmation, the system generates a Sprint Executive Summary via GPT synthesis
+- The locked sprint creates a snapshot that feeds the Execution module
+- The executive summary becomes a persistent element accessible from the top bar
+
+---
+
+## 4. Navigation Architecture — The Unified Modal System
+
+### Core Principle
+
+All three levels of sprint planning content — Capability Areas, Initiatives, and Milestones — use the same popup modal window pattern. The layout, split structure, and interaction logic are identical across all three levels. The founder learns the interface once and applies it everywhere.
+
+### Single Modal, Drills In Place
+
+There are no stacking modals. When a founder drills from a capability card into an initiative, and from an initiative into a milestone, it is the same modal container transitioning its content. One active modal at a time, always.
+
+### Breadcrumb Navigation
+
+The upper-left corner of the modal always displays the full cascade of where the founder is:
+
+```
+Prioritize  >  Cash Flow Forecasting  >  Build Financial Dashboard  >  Audit Data Sources
+```
+
+- Each breadcrumb node is clickable and navigates back up to that level
+- The breadcrumb always starts from the 3P classification (Prioritize / Plant / Iterate)
+- It is persistent on first entry, fifth entry, and every entry — it never disappears
+- If an initiative is reclassified (e.g., moved from Prioritize to Plant), the breadcrumb updates automatically because it reads from backend metadata
+- A back arrow accompanies the breadcrumb for quick single-level navigation
+
+### Modal Layout — Split Panel Structure
+
+All three modal levels use the same split layout:
+
+| Panel | Content |
+|---|---|
+| Left Panel | Primary content — the list of children at this level (initiatives inside capability, milestones inside initiative) plus inline quick-add at bottom |
+| Right Panel | Contextual metadata — level-specific fields, status, comments/activity, change history |
+| Bottom Corner | Strategic Advisor trigger — accessible from all modal levels |
+
+### Inline Expand Pattern
+
+Within each modal's content list, clicking an item expands it inline to show a compact editable summary. This is the quick-edit state. A pencil icon within the expanded row opens the full modal for that item. Two interaction depths always available: inline quick-edit for small changes, full modal for complete review.
+
+---
+
+## 5. Capability Card Modal
+
+Opened when a founder clicks any capability area card on the Sprint Board. This is the coaching and orientation layer — it provides context that helps founders write better initiatives.
+
+### Left Panel Content
+
+| Element | Description | Notes |
+|---|---|---|
+| Capability Name | Large heading at top of panel | |
+| Capability Description | What this capability area is designed to address and enable | 2–3 sentences |
+| What Good Looks Like | Stage-calibrated statement of what "at stage" performance looks like for this founder's AE Ladder placement | Pulled from platform knowledge base, stage-specific |
+| Initiative List | All initiatives associated with this capability area, shown as expandable rows | Inline quick-edit on click; pencil icon opens full initiative modal |
+| Inline Quick-Add | Plus button or empty row at bottom of initiative list. Type a name, press enter to save. Creates an incomplete initiative immediately. | No form, no fields beyond name at this stage |
+| Add Initiative Button | Above the quick-add row. Opens the full Initiative Entry Form modal. | Always visible, not competing with quick-add |
+
+### Right Panel Content
+
+| Element | Description | Notes |
+|---|---|---|
+| Maturity Score | Current capability-level maturity score from the Maturity & Readiness Audit | Shown as percentage + visual progress indicator |
+| Stage Tag | Below Stage / At Stage / Ahead of Stage relative to current AE Ladder placement | Color-coded tag |
+| Checkpoint Context | Directional summary of which checkpoints within this capability are flagged — not individual scores, but thematic context about where the gaps live | |
+| Comments & Activity | Founder-level notes and activity log for this capability area | Not initiative-level — this is capability-level commentary |
+| 3P Classification Tag | Prioritize / Plant / Progressively Iterate badge showing which bucket this capability is in | Read from metadata; not editable here |
+
+### Empty State (First Time, Zero Initiatives)
+
+When a capability card is opened with no initiatives yet created:
+
+- Full capability context is shown (description, what good looks like, maturity score)
+- Initiative list area shows a single empty state message: "No initiatives yet — add one below"
+- The inline quick-add row is present and ready for input
+- The Add Initiative button is present above it
+- No auto-generated suggestions appear — the Strategic Advisor panel is available in the bottom corner if the founder wants coaching support
+
+---
+
+## 6. Initiative Entry Form
+
+### Design Principles
+
+- All fields visible simultaneously — no progressive disclosure, no "next" buttons
+- Identical form structure across all 3P types (Prioritize, Plant, Progressively Iterate)
+- P-type differentiation lives in placeholder text and coaching language — not in form structure
+- Form is accessible two ways: full "Add Initiative" button, or inline quick-add (name only)
+- Bulk-upload compatible field structure — same 5 fields, same order, always
+
+### The Five Core Fields
+
+| # | Field | Description | Placeholder / Notes |
+|---|---|---|---|
+| 1 | Initiative Name | Short, action-oriented label for the initiative | e.g., "Build Financial Dashboard" / "Define ICP v2" / "Implement Weekly Utilization Tracking" |
+| 2 | What We Are Addressing | The current-state problem or gap this initiative responds to. Grounded in their audit results. | Prioritize: "What critical gap is this initiative closing?" / Plant: "What foundation are we laying for the future?" / Iterate: "What existing area needs ongoing refinement?" |
+| 3 | What Success Looks Like | The definition of done at the initiative level — the finish line for the whole initiative, not individual milestones. Outcome-focused, not activity-focused. | e.g., "Live dashboard showing profitability by client and project type, reviewed monthly" |
+| 4 | Sprint Goal Connection | One sentence connecting this initiative to the sprint goal already defined. The accountability thread. | e.g., "This enables our goal of margin visibility before Q2 pricing decisions." Can be a prompted sentence completion or free text. |
+| 5 | Known Constraints or Risks | Optional free text. Anything that might slow this down or require outside resources. | Optional — placeholder: "Anything that might slow this down or require outside resources?" |
+
+### Completion Logic
+
+An initiative is considered "complete" when all five fields have content. The system evaluates completion the same way regardless of 3P type — no variation in V1.
+
+- Incomplete initiatives display a subtle visual tag (muted color treatment + small warning indicator)
+- Incomplete status never blocks saving or forward progress
+- Founders can save with any number of fields filled
+- The incomplete tag persists until all five fields have content
+- Sprint Lock is the only moment completion becomes a meaningful gate — the system surfaces a review of all incomplete initiatives before the snapshot is created
+
+### Inline Quick-Add vs. Full Entry Form
+
+| Path | Behavior | Use Case |
+|---|---|---|
+| Quick-Add (Inline) | Plus button or empty typed row at bottom of initiative list within capability card. Type a name (and optional brief description), press enter. Initiative is created immediately and appears in list as incomplete. | Lowest friction entry path |
+| Full Entry Form (Modal) | Opened via "Add Initiative" button. Shows all five fields at once. Founder fills what they know, leaves the rest, saves. Initiative created with whatever fields are populated. | Primary path for thoughtful first-pass creation |
+| Result | Both pathways create the same initiative record in the same table. The only difference is how many fields are populated on creation. | |
+
+---
+
+## 7. Initiative Card Modal
+
+The full initiative workspace. Opened by clicking the pencil icon within an expanded initiative row, or by clicking "Add Initiative" from the Sprint Board's initiative view.
+
+### Left Panel Content
+
+| Element | Description | Notes |
+|---|---|---|
+| Initiative Name | Editable heading at top | |
+| Initiative Description | Editable field combining "What We Are Addressing" — the context and intent of the initiative in 2–4 sentences | This is the narrative field visible in the card view |
+| Checkpoint Labels | Tags showing which maturity audit checkpoints this initiative addresses | Pulled from capability classification; user can add/remove |
+| Milestone List | All milestones for this initiative as expandable rows with: name, owner avatar, month target visible in collapsed state | Inline quick-edit on click; full milestone modal on pencil icon |
+| Inline Milestone Quick-Add | Plus button or empty row at bottom of milestone list | Same pattern as initiative quick-add in capability card |
+| Add Milestone Button | Opens full milestone entry form | |
+
+### Right Panel Content
+
+| Element | Description | Notes |
+|---|---|---|
+| Owner | Assigned team member or role accountable for this initiative | Dropdown or name entry |
+| 3P Classification | Prioritize / Plant / Progressively Iterate tag | Editable — changing this updates backend metadata and breadcrumb |
+| Target Completion | End-of-month target (month-level, not specific dates) | Dropdown: Month 1 / Month 2 / Month 3 |
+| Status | Not Started / In Progress / At Risk / Blocked / Complete | Toggle selection; execution phase primary use |
+| Sprint Goal Connection | The fourth field from the entry form, editable here | Visible reminder of why this initiative matters this quarter |
+| Labels | Checkpoint tags and any custom labels | Add / remove |
+| Change History | Log of edits made to this initiative with timestamps | Expandable; shows what changed and when |
+| Comments & Activity | Founder and team member comments at initiative level | Timestamped; supports async team communication |
+
+### Post-Milestone Edit Behavior
+
+Once milestones exist under an initiative, all core initiative fields remain fully editable. If the "What Success Looks Like" field is updated after milestones have been created, the system prompts: "You've updated this initiative's outcome. Please review your milestones to ensure they still reflect this goal." This is a prompt, not a block. The founder decides what to do.
+
+---
+
+## 8. Milestone Layer
+
+Milestones are the evidence of progress for each initiative. They are strategic progress markers — not tasks. Each milestone represents a meaningful phase of completion that can be independently observed and verified.
+
+> **Key distinction:** Milestones are NOT tasks ("Update the spreadsheet"). Milestones ARE strategic progress markers ("Dashboard live with accurate data"). Outcome describes the end state. Measure proves it happened.
+
+### Milestone Fields
+
+| Field | Description | Notes |
+|---|---|---|
+| Milestone Name | Short action-oriented label | e.g., "Audit current data sources" |
+| Outcome | What the end state looks like when this milestone is complete | e.g., "Complete inventory of all data systems" |
+| Measure | How we verify it is actually done | e.g., "All systems documented in shared sheet" |
+| Owner | Who is accountable for this milestone | Dropdown — team member or role |
+| Timeline | Which month this milestone targets | Dropdown: Month 1 / Month 2 / Month 3 |
+| Dependencies | Which other milestones must be complete before this one can begin | Optional multi-select from other milestones in same initiative |
+| Status | Not Started / In Progress / Complete / Blocked | Completing a milestone triggers maturity score update for associated checkpoints |
+| Notes / Blocker Flag | Optional free text for context, blockers, or updates | Inline on milestone card |
+
+### Milestone Card Modal
+
+Mirrors the initiative card pattern. Left panel shows the milestone detail fields (outcome, measure, notes, blocker flag). Right panel shows owner, timeline, dependencies, status, change history, and comments.
+
+### Milestone Completion & Score Updates
+
+When a founder marks a milestone complete, the system detects which maturity audit checkpoints that milestone's parent initiative addresses and updates those checkpoint scores accordingly. This is the closed-loop feedback mechanism that keeps the Maturity Dashboard current as execution progresses.
+
+---
+
+## 9. Sprint Board Views
+
+### By Capability View (Default)
+
+Three columns (Prioritize / Plant / Progressively Iterate). Each column contains capability area cards. Each capability card shows:
+
+- Capability name
+- Stage tag (Below Stage / At Stage / Ahead of Stage)
+- Initiative count ("2 Initiatives")
+- Completion indicator if any initiatives are incomplete
+- "Add Initiative" inline button below each card
+
+Clicking a capability card opens the Capability Card Modal.
+
+### By Initiative View (Toggle)
+
+Same three columns. Each column now shows initiative cards directly. Each initiative card shows:
+
+- Initiative name
+- Progress bar (% of milestones complete)
+- Owner avatar
+- Milestone count ("3 of 5 milestones")
+- Parent capability tag
+- Completion indicator if initiative fields are incomplete
+
+Clicking an initiative card opens the inline expand. Clicking the pencil icon opens the full Initiative Card Modal.
+
+### Sprint Goal Banner
+
+Persistent across both views. Displays the sprint goal statement in a visually distinct banner below the Sprint Board header. Always visible as founders work — the accountability anchor for everything being built below it.
+
+### Sprint Synthesis Banner
+
+When the sprint plan has been edited after a synthesis was last generated, a banner appears: "Your sprint synthesis may no longer reflect your current plan after recent edits." with Regenerate and Dismiss actions. Regenerate triggers a new GPT synthesis of the full plan at its current state.
+
+### Parking Lot
+
+A fourth column, not advertised prominently, that appears when a capability area has been placed outside the primary 9 selected. Labeled "Parking Lot" with the description "Not doing this right now. Safe to ignore." Used sparingly for edge cases where a founder identifies something relevant that falls outside their 9 classified areas. This column does not count against any 3P caps.
+
+---
+
+## 10. Strategic Advisor Panel
+
+### Purpose
+
+A contextual AI chat window available throughout the sprint planning workflow. It provides coaching support, suggestions, and sense-checks on demand — without auto-generating content or consuming API credits unless the founder initiates.
+
+### Behavior Principles
+
+- Never auto-opens — founder must initiate
+- Never auto-generates content — waits for founder prompt
+- Context is always current: the advisor knows which capability, initiative, or milestone the founder is currently viewing
+- Context updates as the founder drills deeper or navigates back in the modal hierarchy
+- Suggested prompt chips appear at the bottom to lower activation energy
+
+### Placement
+
+| Location | Behavior |
+|---|---|
+| Sprint Board (main view) | Accessible via trigger icon in top-right of the board. Opens as right-side panel, compresses board layout. |
+| Capability Card Modal | Accessible via icon anchored to bottom-right corner of the modal. Opens as embedded chat panel within the modal without closing it. |
+| Initiative Card Modal | Same bottom-right corner anchor pattern as capability card. |
+| Milestone Card Modal | Same pattern. |
+
+### Contextual Awareness by Level
+
+| Level | Context Available |
+|---|---|
+| Sprint Board | Sprint goal, 3P classification, all capability areas selected, overall initiative count and completion status |
+| Capability Card | All Sprint Board context + which capability is open, its maturity score, its checkpoint context, existing initiatives |
+| Initiative Card | All above + initiative name, fields populated, milestone count and status |
+| Milestone Card | All above + milestone name, outcome, measure, owner, dependencies |
+
+### Example Suggested Prompts by Level
+
+**Sprint Board level:**
+- "Help me translate my Prioritize capabilities into initiatives"
+- "What does focusing on these three areas imply for my quarter?"
+
+**Capability Card level:**
+- "Suggest initiatives for this capability area at my stage"
+- "What does good look like here for an agency like mine?"
+
+**Initiative Card level:**
+- "Does this initiative connect clearly to my sprint goal?"
+- "Suggest milestones for this initiative"
+- "Are there any risks I should flag here?"
+
+---
+
+## 11. Sprint Lock & Executive Summary
+
+### Review & Lock Sprint Flow
+
+Triggered by the "Review & Lock Sprint" button on the Sprint Board. Before locking, the system runs a completion check and surfaces a review screen showing:
+
+- Which initiatives are missing fields (incomplete indicator)
+- Which capability areas have zero initiatives
+- Total initiative count by 3P tier vs. recommended ranges
+- A summary count of milestones across the plan
+
+The founder can resolve gaps from this review screen or proceed to lock with acknowledged incompleteness. The lock is a deliberate choice, not a system validation gate.
+
+### Sprint Executive Summary
+
+Generated via GPT synthesis after sprint lock is confirmed. This is distinct from the in-progress Strategic Advisor coaching. The Executive Summary:
+
+- Synthesizes the full plan: sprint goal, 3P classifications, all initiatives and their outcomes, milestone overview
+- Provides coaching-level perspective on the plan's overall coherence, balance, and risks
+- Highlights high-impact initiatives and any potential sequencing concerns
+- Becomes a persistent document accessible from the top navigation bar
+- Is regenerated if the founder unlocks, edits, and re-locks the sprint
+
+---
+
+## 12. Component Inventory for Antigravity
+
+| Component | Description | Status |
+|---|---|---|
+| SprintBoard | Main board view with 3P columns, toggle, sprint goal banner, synthesis banner | Exists — refine |
+| CapabilityCard | Card on sprint board showing capability name, stage tag, initiative count, add button | Exists — refine |
+| CapabilityCardModal | Full modal for capability area with split panel layout | Build new |
+| InitiativeEntryForm | Unified 5-field form, all visible at once, same across 3P types | Replace current multi-step form |
+| InitiativeCardModal | Full initiative workspace with milestones left, metadata right | Exists — reformat with new field structure |
+| InitiativeCard | Initiative card in By Initiative view and in capability modal list | Exists — refine completion indicator |
+| InlineQuickAdd | Reusable plus-button / empty-row inline add component | Build new — used in capability modal (initiatives) and initiative modal (milestones) |
+| InlineExpandRow | Expandable row within modal lists — collapsed and expanded states | Exists — extend for capability level |
+| BreadcrumbNav | Cascading breadcrumb in upper-left of all modals, reading from backend metadata | Build new |
+| MilestoneCardModal | Full milestone workspace matching split panel pattern | Exists partially — align to full spec |
+| IncompleteIndicator | Subtle tag/visual shown on any initiative or capability card missing fields | Build new |
+| StrategicAdvisorPanel | Contextual AI chat panel, context-aware by modal level | Exists on board — extend to all modal levels |
+| SprintLockReview | Pre-lock completion review screen | Build new |
+| SprintExecutiveSummary | Post-lock GPT synthesis document, accessible from top bar | Build new |
+| ParkingLot | Fourth column on sprint board for overflow capability areas | Exists — add clear labeling and description |
+
+---
+
+## 13. Data & Backend Notes
+
+> **IMPORTANT:** The Architect OS backend (Supabase schema, scoring engine, n8n automations) is complete and must not be modified. All front-end components read from and write to existing backend structures. This section notes only the data relationships the front-end must respect.
+
+- 3P classification is stored as metadata on each capability selection record — the front-end reads this to populate columns and breadcrumbs
+- Initiative records link to capability area records via foreign key — breadcrumb cascade reads this relationship
+- Milestone completion events trigger checkpoint score updates — front-end fires this event; backend handles score recalculation
+- Incomplete status is a front-end computed state based on field population — not a stored database field
+- Sprint lock creates a point-in-time snapshot record — the executive summary is stored against this snapshot
+- Strategic Advisor panel calls are user-initiated GPT calls — not automated or triggered by platform events
+- All five initiative fields map to columns in the existing initiatives table — no new schema required
+
+---
+
+## 14. Open Items for Future Iterations
+
+The following items were identified during PRD development but deferred to post-V1:
+
+- P-type differentiated completion rules (e.g., Prioritize requiring more fields than Plant before sprint lock)
+- Bulk upload template for offline initiative creation with CSV/spreadsheet import
+- GPT-powered initiative sense-check button on post-milestone edits ("does this milestone still match the initiative outcome?")
+- Team member collaboration view within initiative and milestone cards (V1 is founder-only)
+- Calendar or capacity integration for milestone timeline validation
+- AI auto-suggest mode (opt-in) where the system pre-populates a suggested initiative set for founder review before they begin
+
+---
+
+*END OF DOCUMENT — Architect OS Sprint Planning PRD V1.0*

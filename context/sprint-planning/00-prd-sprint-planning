@@ -1,0 +1,717 @@
+# PRD — Sprint Planning: Goal Definition, Sprint Board & Initiative Creation
+**Status:** Ready for Build  
+**Last Updated:** March 2026  
+**Feature Area:** Architect OS Pro Suite — Planning  
+**Routes:** `/pro/planning/sprint-goal` · `/pro/planning/sprint-board`  
+**Depends On:** Quarter Map locked (9/9 capability selections saved)  
+**Reference:** FLOW-sprint-planning-end-to-end.md  
+
+---
+
+## 1. Overview
+
+Sprint Planning is the final section of the Planning layer before a founder enters Execution. It translates the nine capability commitments from the Quarter Map into a coherent, bounded, executable sprint plan organized around a single locked sprint goal.
+
+The experience has two primary routes:
+
+- `/pro/planning/sprint-goal` — A standalone five-screen flow where the founder authors and locks their sprint goal
+- `/pro/planning/sprint-board` — The primary planning workspace where capability cards are pre-loaded and the founder creates tiered initiatives and milestones
+
+By the time a founder completes Sprint Planning, they have:
+- A single locked sprint goal that defines what success looks like in 12 weeks
+- At least one initiative per capability area (nine total across Prioritize, Plant, and Iterate)
+- Milestone-level evidence defined for Prioritize initiatives
+- A locked sprint plan saved to Supabase, seeded as the foundation for Execution
+- A synthesized sprint posture statement that reflects back what the plan represents as a whole
+
+---
+
+## 2. What Currently Exists — Assess Before Building
+
+The following Sprint Planning components exist in the current wireframe. Audit each before building.
+
+### Keep As-Is (Minor Refinements Only)
+- **By Initiative view** (Images 9-10) — The collapsed and expanded initiative list view is well designed. Collapsed cards showing name, progress bar, owner avatar, milestone count, and capability tag are correct. Keep this structure entirely.
+- **Initiative Detail modal** (Images 12-13) — The full modal structure is strong. Title, description, milestone list with owners and dates, target completion, status selector (At Risk / On Track / Blocked), labels, and Comments & Activity thread. Milestone expansion with Outcome, Measure, Owner, Timeline, Dependencies fields, and status tags. Keep all of this — it becomes the Prioritize initiative detail view with minor field additions.
+- **3P column color coding** — Blue (Prioritize), green (Plant), orange (Iterate). Do not change.
+- **Stage status badge** — Keep existing visual treatment (Below Stage / At Stage / Ahead of Stage).
+- **View toggle** — "By Capability" / "By Initiative" toggle. Keep. Capability is now the default (previously it may have defaulted to Initiative view — confirm and update default if needed).
+
+### Refine or Extend
+- **Sprint Board — By Capability view** (Image 7) — The three-column layout with capability cards is correct structurally. Refinements needed: (1) capability cards should be pre-loaded from Quarter Map data, not manually added; (2) the AI insight banner at top is being removed from this location — contextual intelligence moves to the Reference Strip (see Section 6); (3) add initiative count, status indicator, and "Build Initiatives →" CTA to each capability card.
+- **Create Initiative modal** (Image 8) — The current modal is too simple — it only captures a name. This is being replaced by three distinct tiered creation forms (see Section 8). The concept of a lightweight modal is correct; the content inside it changes significantly based on which 3P column the capability lives in.
+
+### Remove / Retire
+- **Milestone Builder tab** (Image 11) — Currently a placeholder marked "under construction." This is being retired as a standalone tab. Milestone creation is embedded inside the initiative creation forms and the initiative detail modal. Do not build the standalone Milestone Builder tab.
+- **AI insight banner** (the top-of-board intelligence strip in Image 7) — Remove from the Sprint Board header. The contextual intelligence this was attempting to provide moves to the collapsible Reference Strip (Section 6), which is a more appropriate home for it.
+- **"1 Initiative currently hidden from Progress Tracking" notice** — Remove this system notice from the Sprint Board view. If progress tracking visibility is a feature, it belongs in the Execution section, not the planning board.
+
+### Net New
+- Sprint Goal definition flow (five screens at `/pro/planning/sprint-goal`)
+- Tiered initiative creation forms (Prioritize / Plant / Iterate — distinct form structures)
+- Reference Strip (collapsible 12-month context panel)
+- Capability context panel (auto-loads when clicking into a capability)
+- SelectionCounterBar pattern adapted for sprint completion tracking
+- Sprint posture synthesis (completion moment after lock)
+- Team members dropdown on owner fields
+- Pre-lock review screen (three reflection questions — static, not form inputs)
+
+---
+
+## 3. Prerequisites & Dependency Gating
+
+| Dependency | Requirement | Gate Behavior |
+|---|---|---|
+| Quarter Map | Locked with 9/9 selections | Hard gate — Sprint Goal and Sprint Board inaccessible without this. Show dependency notice with CTA to Quarter Map. |
+| M&R Audit | Completed | Required for capability context panel content and Reference Strip data |
+| AE Ladder | Stage confirmed | Required for stage-calibrated content in initiative forms |
+| Roadmap Review synthesis | Generated | Required for Reference Strip Q1 sprint theme content |
+
+If Quarter Map is not locked, Sprint Planning renders a locked state — the route is accessible but non-interactive. Show a clear dependency notice: *"Your Sprint Plan requires a locked Quarter Map. Complete your Quarter Map to begin planning."* with a direct CTA to `/pro/planning/quarter-map`.
+
+---
+
+## 4. Route Structure
+
+| Route | Screen | Description |
+|---|---|---|
+| `/pro/planning/sprint-goal` | 1.1 | Context Re-Anchor |
+| `/pro/planning/sprint-goal` | 1.2 | Four-Sprint Arc |
+| `/pro/planning/sprint-goal` | 1.3 | Directional Focus Prompt |
+| `/pro/planning/sprint-goal` | 1.4 | Sprint Goal Drafting |
+| `/pro/planning/sprint-goal` | 1.5 | Reality Check + Lock |
+| `/pro/planning/sprint-board` | 2.1 | Sprint Board — Capability View |
+| `/pro/planning/sprint-board/[capability-id]` | 3.0 | Capability Context |
+| `/pro/planning/sprint-board/[capability-id]` | 3.1A/B/C | Initiative Creation (tiered) |
+| `/pro/planning/sprint-board` | 4.1 | Sprint Board — Full Review |
+| `/pro/planning/sprint-board` | 4.2 | Pre-Lock Review |
+| `/pro/planning/sprint-board` | 5.1 | Loading State |
+| `/pro/planning/sprint-board` | 5.2 | Sprint Posture Synthesis |
+
+The sprint goal route is a standalone flow — it does not share the Sprint Board layout. It uses a clean, single-column centered layout with no persistent navigation sidebar during the flow.
+
+---
+
+## 5. Sprint Goal Definition Flow (`/pro/planning/sprint-goal`)
+
+### Screen 1.1 — Context Re-Anchor
+
+**Purpose:** Reset the frame before asking anything. Reorientation, not work.
+
+**Layout:** Single-column, centered, max-width 640px. Three compact panels stacked vertically.
+
+**Panel A — Where You Are Today**
+- AE Ladder stage name and one-line descriptor — pulled from `ae_assessments`
+- Two to three capability callouts as current strengths — pulled from M&R top-scored capabilities
+- Two to three capability callouts as current pressure areas — pulled from M&R lowest-scored / highest-priority capabilities
+- All content deterministic — no GPT required
+
+**Panel B — Where You're Headed This Year**
+- User's 12-month vision statement from Clarity Compass — read-only
+- User's 12-month quantitative target — read-only
+
+**Panel C — What This Sprint Represents**
+- Platform copy (static, not GPT-generated):
+  *"This sprint is the next 12 weeks of that journey. You are not solving everything. You are deciding what must change first."*
+- Quarter identifier: Q1 2026 — 12 weeks
+
+**Actions:** Single "Continue →" button. No input fields.
+
+---
+
+### Screen 1.2 — Four-Sprint Arc
+
+**Purpose:** Show where Q1 sits in the annual narrative. Orientation without obligation.
+
+**Layout:** Four cards in horizontal sequence (or vertical stack on mobile).
+
+Each card shows:
+- Quarter label (Q1 2026, Q2 2026, Q3 2026, Q4 2026)
+- Descriptive theme label — pulled from Execution Sequencer quarterly breakdown stored in Supabase from Roadmap Review
+- Two to three theme descriptors
+- Small italic label: *"Hypothesis, not a plan"*
+
+Q1 card is visually foregrounded — higher elevation, border accent, label: *"This is the sprint you are about to plan."* Q2-Q4 are present but visually de-emphasized (reduced opacity or muted treatment).
+
+**Actions:** Single "Continue →" button. No input fields.
+
+**Data source:** Quarterly theme labels and descriptors pulled from Roadmap Review Execution Sequencer synthesis saved in Supabase. If not yet generated, render the cards with stage-aware placeholder theme labels.
+
+---
+
+### Screen 1.3 — Directional Focus Prompt
+
+**Purpose:** Narrow the aperture before drafting. A directional choice, not a commitment.
+
+**Layout:** Single focused prompt with three to four framing options below.
+
+**Prompt text:** *"For the next 12 weeks, what kind of work does this sprint need to be primarily about?"*
+
+**Framing options:** Three to four mutually exclusive options. Each option has:
+- A short label (e.g., "Stabilize and create visibility")
+- Two-sentence explanation of what this means in practice
+- One line: *"What this sprint is NOT about: [brief exclusion]"*
+
+Options are generated based on the Q1 sprint theme from the Roadmap Review and the founder's M&R pressure profile. For Phase 2: use three to four stage-calibrated template options that reflect the most common sprint orientations at the user's AE Ladder stage.
+
+**Note below options (static platform copy):**
+*"This isn't your sprint goal yet. It's the frame that will shape it."*
+
+**Actions:** Select one option (required). "Continue →" becomes active after selection. Selection is saved to state for use in Screen 1.4 prompt shaping.
+
+---
+
+### Screen 1.4 — Sprint Goal Drafting
+
+**Purpose:** The founder authors their sprint goal in their own words.
+
+**Layout:** Single-column. Selected framing from 1.3 shown at top in a compact muted strip — persistent reference, not dominant.
+
+**Prompt:**
+Label: `Sprint Goal (Draft)`
+*"At the end of the next 12 weeks, it will be true that…"*
+
+Open text field below the prompt. No enforced word limit. Visible guideline below the field:
+*"One to two sentences. Describe a change in how your business operates — not a list of tasks."*
+
+**Guardrails (visible alongside the text field, always present — not a modal or tooltip):**
+- Outcome-focused, not activity-focused
+- Describes a changed operating reality
+- Specific enough that you'd know at the end of the sprint whether it's true or not
+
+**AI reflection:** For Phase 2 — no live AI response during drafting. The guardrails do the work. For GPT phase: an on-demand "Reflect on this →" button (founder-initiated only, never automatic) surfaces observations about the draft. This is deferred to the GPT wiring phase.
+
+**Actions:** "Continue →" available once text field has content. No minimum length enforced.
+
+---
+
+### Screen 1.5 — Reality Check + Lock
+
+**Purpose:** A static self-check before commitment. Not a form. Not checkboxes. Four statements the founder reads before deciding to lock or refine.
+
+**Layout:** Locked sprint goal displayed prominently at top in a styled block. Below it, four static statements (no interaction required):
+
+1. If this were the only thing we accomplished, would it be a meaningful win?
+2. Does this address a real pressure we identified in our diagnostic?
+3. Is this achievable in 12 weeks without heroic effort?
+4. Does this create momentum for the sprint that follows?
+
+These are read as a prompt for honest self-reflection. No checkboxes. No required responses. The founder reads them and decides.
+
+**Actions:**
+- Secondary link: `← Refine My Goal` — returns to Screen 1.4
+- Primary button: `Lock My Sprint Goal →` — saves goal and advances
+
+**On lock:**
+- Sprint goal saved to Supabase: user_id, quarter identifier, goal text, directional framing selected, timestamp, status: locked
+- Transition to Sprint Board (`/pro/planning/sprint-board`)
+
+**Note:** The locked sprint goal is now a persistent element throughout the Sprint Board experience — it appears in a compact strip at the top of the Sprint Board, always visible.
+
+---
+
+## 6. Sprint Board Entry (`/pro/planning/sprint-board`)
+
+### Screen 2.1 — Sprint Board — Capability View
+
+**This is the primary planning workspace.** The founder spends most of their Sprint Planning time here.
+
+### Persistent Header (always visible throughout Sprint Planning)
+
+A slim, sticky header strip at the top of the Sprint Board — always visible, never dismissable:
+
+- Sprint identifier: Q1 2026
+- Locked Sprint Goal — displayed in a compact styled strip
+- Label (small, muted): `SPRINT GOAL`
+
+This is the north star. Every initiative the founder creates should be oriented toward making this statement true.
+
+---
+
+### Reference Strip
+
+A collapsible panel positioned below the persistent header and above the board columns. Collapsed by default.
+
+**Collapsed state:**
+Single line: `Q1 synthesis context — your 12-month focus areas and sequencing insight` + expand chevron
+
+**Expanded state:**
+Three `CalloutBlock` instances (reuse existing CalloutBlock component):
+- `LOAD-BEARING AREAS` — 2-3 capability areas from the 12-month synthesis
+- `DEPENDENCY CHAIN` — the sequencing insight from the Roadmap Review
+- `PRIMARY CONSTRAINT` — the single thing most likely to slow this sprint
+
+Read-only. Visual treatment: subtle background fill, compressed type, clearly secondary.
+
+Data source: Roadmap Review 12-month synthesis fields stored in Supabase.
+
+---
+
+### Sprint Board — Column Layout
+
+Three equal-width columns. Same color coding as Quarter Map (blue / green / orange). Each column contains exactly three capability cards — pre-loaded from the locked Quarter Map selections.
+
+**Column headers:**
+- `Prioritize` — subtitle: `Core focus — 0/3 capabilities planned`
+- `Plant` — subtitle: `Groundwork — 0/3 capabilities planned`
+- `Progressively Iterate` — subtitle: `Refinement — 0/3 capabilities planned`
+
+Subtitle counters update in real time as initiatives are added.
+
+---
+
+### Capability Cards in the Board
+
+Each capability card in the Sprint Board shows:
+
+| Element | Content |
+|---|---|
+| Column color indicator | Left border in column color (blue/green/orange) |
+| Capability name | Full name |
+| Dimension tag | e.g., `Financial Health` in dimension color |
+| Maturity score | Percentage — from M&R Audit |
+| Stage status badge | Below Stage / At Stage / Ahead of Stage |
+| Initiative count | `0 initiatives` — updates as initiatives are added |
+| Status indicator | `Not started` → `In progress` → `Complete` |
+| CTA | `Build Initiatives →` |
+
+Clicking `Build Initiatives →` opens the Capability Context screen (Section 7).
+
+---
+
+### Progress Indicator
+
+Above the columns, a persistent progress counter:
+`0 of 9 capabilities have initiatives defined`
+
+Updates in real time. When all nine are complete: `9 of 9 capabilities planned — ready to lock.`
+
+---
+
+### View Toggle
+
+Top-right of the board: `By Capability | By Initiative`
+
+- **By Capability** — default view (as described above)
+- **By Initiative** — flat list of all initiatives across all tiers. Available once at least one initiative exists. Sortable by tier, capability, or owner. Keep existing implementation from Image 9-10 — the collapsed and expanded initiative list is correct.
+
+User preference saved to profile after first manual toggle. Default for new sessions: By Capability until the user has toggled at least once.
+
+---
+
+### Header Controls
+
+Top-right of the Sprint Board (separate from view toggle):
+- `Save Draft` — saves current state without locking. Always active.
+- `Lock Sprint →` — primary action. Disabled until all nine capabilities have at least one initiative. Active when complete.
+
+---
+
+## 7. Capability Context Screen
+
+**Triggered by:** Clicking `Build Initiatives →` on any capability card.  
+**Route:** `/pro/planning/sprint-board/[capability-id]`
+
+This screen loads before the initiative creation form. It orients the founder to this specific capability before they start creating.
+
+### Layout
+
+Sprint Goal persistent strip remains visible at top.
+
+**Capability header:**
+- Capability name (large)
+- Dimension tag
+- Maturity score and stage status badge
+- 3P assignment: `This capability is in your Prioritize / Plant / Progressively Iterate column`
+- One-sentence behavioral definition of what that P means in practice
+
+**Context panel (auto-generated on page load):**
+Two to three sentences synthesizing:
+- Why this capability matters given the sprint goal
+- What the user's current score and stage tell us about where it stands
+- What moving it forward this sprint would mean structurally
+
+For Phase 2: stage-aware template content generated from the capability's M&R data, user stage, and sprint goal language. For GPT phase: generated on demand using the established synthesis pattern.
+
+**Framing question (static, not an input):**
+*"What would it take to move this capability meaningfully forward this sprint?"*
+
+**Action:** `Add Initiative +` button below the framing question.
+
+**Back navigation:** `← Back to Sprint Board` — returns without losing any draft state.
+
+---
+
+## 8. Initiative Creation — Tiered Forms
+
+Clicking `Add Initiative +` opens the initiative creation form. The form is determined by which 3P column this capability belongs to. Three distinct forms.
+
+All forms share a common structural pattern: a clean modal or inline expanded panel. Progressive disclosure — later fields appear after earlier fields have content. No scrollable forms with all fields visible simultaneously.
+
+---
+
+### 8A — Prioritize Initiative Creation
+
+**This form should feel deliberate and slightly weighty.** High leverage, high structure.
+
+**Step 1 — Name the Initiative**
+- Label: `What is this initiative?`
+- Short text field — working title
+- Placeholder example: *"Implement rolling 90-day revenue forecast"*
+
+**Step 2 — Define the Outcome**
+- Label: `If this initiative succeeds, what will be true that is not true today?`
+- One to two sentence text field
+- Guardrail visible below field: *"Describe a changed operating reality — not a completed task"*
+- Reveals after Step 1 has content
+
+**Step 3 — Confirm Sprint Connection**
+- Label: `Why does this need to happen this sprint — not next sprint?`
+- Short text field
+- Ensures the initiative is genuinely sprint-bound
+- Reveals after Step 2 has content
+
+**Step 4 — Assign Ownership**
+- Label: `Who is accountable for this initiative?`
+- Dropdown pulling from `team_members` table — see Section 10
+- If no team members exist yet: text field fallback with a subtle prompt to add team members in settings
+- Reveals after Step 3 has content
+
+**Step 5 — Known Constraints**
+- Label: `What could slow or block this? (Optional)`
+- Short text field
+- Optional — surfaced because Prioritize initiatives carry real execution risk
+- Reveals after Step 4 is filled
+
+**Step 6 — Define Milestones**
+- Label: `What observable evidence would tell you this initiative is moving forward?`
+- Milestone builder — add two to four milestones inline
+- Each milestone: a short statement written as "exists / does not exist" or "has happened / has not happened"
+- Two visible example milestones shown as placeholder text before the user starts:
+  - *"e.g., Revenue categories standardized and applied to last 6 months"*
+  - *"e.g., Weekly forecast review completed four consecutive times"*
+- Minimum: two milestones required before saving. Maximum: four.
+- Each milestone field has an owner assignment (same team members dropdown)
+- Reveals after Step 5
+
+**Volume guardrail:**
+After two initiatives are saved for a Prioritize capability, a soft notice appears:
+*"You have 2 initiatives for this capability. Adding more may stretch your sprint capacity — make sure each is truly necessary."*
+Not a hard block. No override required — the founder can continue. Hard cap: 6 total Prioritize initiatives across all three Prioritize capabilities.
+
+**Save action:** `Save Initiative` — saves to Supabase, returns to capability context screen, updates initiative count on the capability card.
+
+---
+
+### 8B — Plant Initiative Creation
+
+**This form should feel fast and lightweight.** Enabling move, not execution commitment.
+
+**Step 1 — Name the Initiative**
+- Same as Prioritize — short working title
+
+**Step 2 — What This Unlocks**
+- Label: `What future work does this groundwork make possible?`
+- One sentence text field
+- This is the defining question for a Plant initiative
+- Placeholder: *"e.g., Enables data-driven capacity decisions in Q2"*
+
+**Step 3 — Binary Done Definition**
+- Label: `At the end of the sprint, how will you know this exists?`
+- One sentence — must be answerable yes or no
+- Guardrail visible: *"This should be binary — either it exists or it doesn't."*
+- Visible examples:
+  - *"Utilization is tracked weekly."*
+  - *"Client profitability can be reviewed by account."*
+
+**Step 4 — Assign Ownership**
+- Same team members dropdown as Prioritize
+
+No milestones required for Plant. The binary done definition is the evidence marker.
+
+**Volume guardrail:** One initiative per Plant capability. Soft block if trying to add a second:
+*"Plant capabilities are designed for a single enabling action. If this requires more, consider whether it belongs in Prioritize."*
+Override available — not a hard block.
+
+**Save action:** `Save Initiative`
+
+---
+
+### 8C — Progressively Iterate Creation
+
+**Note on naming:** In the UI, this is called a `Refinement`, not an `Initiative`. This distinction is intentional and communicates appropriate weight. The form label is `Add Refinement`, the save button reads `Save Refinement`.
+
+**Step 1 — Name the Refinement**
+- Label: `What are you refining?`
+- Short text field
+- Placeholder: *"e.g., ICP criteria review and update"*
+
+**Step 2 — Declare What Already Exists**
+- Label: `What decision, system, or approach is already in place that you're refining?`
+- One to two sentence text field
+- This is a guardrail — if the founder can't answer it, the capability may not be ready for iteration
+- If they leave this blank after focusing the field: a soft inline note: *"Iteration requires something already in place. If nothing exists yet, this may belong in Prioritize or Plant."*
+
+**Step 3 — Define the Adjustment**
+- Label: `What specifically is being adjusted — not rebuilt?`
+- Short text field
+- Visible examples below: `Language / Criteria / Cadence / Scope / Decision threshold`
+
+**Step 4 — Set the Time Box**
+- Label: `How much time will you intentionally spend on this?`
+- Selector — three options only:
+  - `One working session`
+  - `Two weeks`
+  - `One sprint review cycle`
+- No open-ended option — iteration must be time-bounded
+
+**Step 5 — Signal to Watch**
+- Label: `What would tell you this refinement helped?`
+- One sentence — e.g., *"Fewer escalations around client fit decisions"*
+- This is the lightweight equivalent of a milestone — one signal, not a milestone chain
+
+**Volume guardrail:** One refinement per Iterate capability. Same soft block pattern as Plant.
+
+**Save action:** `Save Refinement`
+
+---
+
+## 9. Sprint Board Full Review & Lock
+
+### Screen 4.1 — Sprint Board (Initiatives Populated)
+
+Same Sprint Board layout from Screen 2.1 with capability cards now showing their initiative and refinement content.
+
+Each capability card expanded to show:
+- Initiative count and names (up to two lines before truncating with "show more")
+- Milestone count where applicable
+- Status: `Complete` (all required fields filled) or `Incomplete` (missing required fields)
+- Incomplete indicator: a subtle flag on the card
+
+Progress indicator updated: `9 of 9 capabilities have initiatives defined` or current count.
+
+---
+
+### Screen 4.2 — Pre-Lock Review
+
+**Accessed via:** `Review & Lock Sprint →` button (appears when all nine capabilities have at least one initiative)
+
+**Layout:** Clean full-width screen. Not a modal.
+
+**Top section — Sprint Goal (prominent, styled):**
+The locked sprint goal displayed as a committed statement. Visual weight here is intentional.
+
+**Middle section — Three reflection questions (static display — no inputs, no checkboxes):**
+
+These are displayed as a structured block of statements the founder reads:
+
+1. *"Do the Prioritize initiatives, if successful, make the sprint goal meaningfully true?"*
+2. *"Do the Plant initiatives lay real groundwork for future sprints — or are they actually priorities in disguise?"*
+3. *"Are the Iterate refinements genuinely light-touch — or are they competing for the same attention as your Prioritize work?"*
+
+No interaction required. These are reflection prompts. The founder reads them and decides to proceed or go back.
+
+**Bottom section — Conscious deprioritization (read-only):**
+Label (muted): `CONSCIOUSLY DEPRIORITIZED THIS SPRINT`
+A clean list of the sixteen capability areas NOT engaged this sprint — pulled from the full 25 minus the nine Quarter Map selections.
+Supporting line: *"These 16 capability areas are intentionally out of scope this sprint. This is a choice, not an oversight."*
+
+**Actions:**
+- Secondary: `← Back to Board` — returns to Sprint Board
+- Primary: `Lock My Sprint →` — triggers lock sequence
+
+---
+
+### Screen 5.1 — Loading State
+
+Standard `LoadingOverlay` component. Message: *"Building your sprint synthesis..."*
+
+On lock:
+1. Validate all nine capabilities have at least one initiative
+2. Save all initiatives, refinements, and milestones to Supabase with status: `locked`
+3. Save parked items if any with status: `parked`
+4. Trigger GPT synthesis via n8n webhook — payload: sprint goal, nine capabilities + 3P assignments, all initiative outcome statements, all milestone statements, user stage, Q1 sprint theme, Contextual Overrides from Roadmap Review
+5. Listen for synthesis completion via Supabase Realtime (same pattern as Roadmap Review)
+
+---
+
+### Screen 5.2 — Sprint Posture Synthesis (Completion Moment)
+
+A full-screen completion moment. The sprint becomes real here.
+
+**Header:**
+- Label (small caps, muted): `YOUR SPRINT PLAN — Q1 2026`
+- Sprint goal displayed in full as a committed statement, framed
+
+**Sprint Posture Statement:**
+Three to five sentences of GPT-generated synthesis reflecting back what the locked plan represents as a whole.
+
+Addresses:
+- What the Prioritize initiatives are building toward
+- What the Plant initiatives are seeding for future sprints
+- What the Iterate refinements are keeping aligned
+- One neutral observation if relevant (a tension, a sequencing note, a capacity consideration) — framed as an observation, never a judgment
+
+Tone: peer-level strategic advisor, observational, not congratulatory.
+
+For Phase 2: stage-aware template paragraph referencing actual initiative names and sprint goal language. Must reference real data — no lorem ipsum.
+
+**Sprint Plan Summary (below synthesis):**
+Three labeled sections:
+
+*Prioritize — Building Toward:*
+Three capabilities, each with initiative name(s) and milestone count
+
+*Plant — Seeding for Future Sprints:*
+Three capabilities, each with initiative name and binary done definition
+
+*Progressively Iterate — Keeping Aligned:*
+Three capabilities, each with refinement name and time box
+
+This is the clean artifact version — scannable, presentable to a team or coach.
+
+**Actions:**
+- `Download Sprint Plan (PDF)` — deferred to PDF build phase. Button present, shows "Coming soon" state or disabled state.
+- `Launch My Sprint →` — primary CTA. Routes to `/pro/execution`. Supporting line (small, muted): *"You'll track progress, manage milestones, and run your sprint review in the Execution section."*
+
+---
+
+## 10. Team Members Table
+
+A lightweight supporting feature required for initiative and milestone owner assignment.
+
+### Table Structure (`team_members`)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `user_id` | UUID | Foreign key — scoped to account |
+| `first_name` | Text | Required |
+| `last_name` | Text | Required |
+| `position` | Text | Optional — role or title |
+| `created_at` | Timestamp | |
+| `updated_at` | Timestamp | |
+
+Account-scoped — each founder's team is their own. No cross-account sharing.
+
+### Owner Assignment Field Behavior
+
+Any `owner` field on an initiative or milestone uses a dropdown or typeahead pulling from this table. Never a free-text field. Owner field stores the team member `id`, not their name — ensures all references remain linked to one clean record.
+
+If no team members exist when the owner field is first encountered: a subtle inline prompt: `+ Add a team member` — opens a lightweight add modal (first name, last name, position). The new record is saved and immediately available in the dropdown.
+
+### Team Members Management
+
+A team members management view — accessible from user settings or a settings link within the Sprint Board. Allows:
+- Add team member
+- Edit team member
+- Delete team member (soft delete — does not break existing initiative assignments)
+
+This is a simple list view. No advanced permissions, roles, or multi-user access in v1.
+
+---
+
+## 11. Sprint History & Version Management
+
+*Flagged for future build — data architecture must support it now.*
+
+Every sprint is its own Supabase record with:
+- Sprint version stamp
+- Quarter identifier
+- Status: `draft` / `locked` / `completed`
+- All associated initiatives, milestones, and refinements linked by sprint ID
+
+Edits to locked sprints in the Execution section create new versions rather than overwriting. Original locked version is preserved.
+
+A sprint history view — accessible from the Pro Suite navigation — will allow founders to browse, review, and manage past sprints. Soft delete only. Not in scope for this build — but the schema must support it from day one.
+
+---
+
+## 12. Data Architecture Notes
+
+### New Tables Required
+
+**`sprint_goals`**
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `user_id` | UUID | |
+| `quarter` | Text | e.g., `Q1-2026` |
+| `goal_text` | Text | The authored sprint goal |
+| `directional_framing` | Text | The option selected in Screen 1.3 |
+| `status` | Enum | `draft` / `locked` |
+| `version` | Integer | For versioning support |
+| `created_at` | Timestamp | |
+| `updated_at` | Timestamp | |
+
+**`sprint_initiatives`**
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `user_id` | UUID | |
+| `sprint_goal_id` | UUID | Foreign key |
+| `quarter` | Text | e.g., `Q1-2026` |
+| `capability_id` | Text | Links to capability area |
+| `capability_name` | Text | Denormalized for performance |
+| `three_p_tier` | Enum | `prioritize` / `plant` / `iterate` |
+| `name` | Text | Initiative or refinement name |
+| `outcome_statement` | Text | Prioritize only |
+| `sprint_connection` | Text | Prioritize only |
+| `owner_id` | UUID | FK to `team_members` |
+| `known_constraints` | Text | Prioritize only, optional |
+| `unlocks_future` | Text | Plant only |
+| `binary_done_definition` | Text | Plant only |
+| `what_already_exists` | Text | Iterate only |
+| `adjustment_definition` | Text | Iterate only |
+| `time_box` | Text | Iterate only |
+| `signal_to_watch` | Text | Iterate only |
+| `status` | Enum | `draft` / `locked` / `parked` |
+| `version` | Integer | |
+| `created_at` | Timestamp | |
+| `updated_at` | Timestamp | |
+
+**`sprint_milestones`**
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `initiative_id` | UUID | FK to `sprint_initiatives` |
+| `user_id` | UUID | |
+| `description` | Text | Observable condition statement |
+| `owner_id` | UUID | FK to `team_members` |
+| `status` | Enum | `not_started` / `in_progress` / `complete` |
+| `version` | Integer | |
+| `created_at` | Timestamp | |
+| `updated_at` | Timestamp | |
+
+**`team_members`** — see Section 10.
+
+### Seed to Execution
+
+The `sprint_initiatives` and `sprint_milestones` tables are the direct data source for the Execution section's Sprint Board. Confirm this handoff structure is compatible with the Execution spec before finalizing the initiative save logic.
+
+---
+
+## 13. Tone & Language Principles
+
+All platform-generated content in Sprint Planning follows the same principles established across the platform:
+
+- **Observational not prescriptive** — reveals implications, never directs
+- **Stage-calibrated** — every piece of generated content references the user's actual AE Ladder stage by name
+- **Non-evaluative** — the platform does not judge initiative quality as good or bad
+- **Specific** — references real capability names, real initiative names, real sprint goal language
+- **Peer-level voice** — strategic advisor, not coach or educator
+- **Tiered weight** — the tone of form fields and prompts reflects the effort level of each 3P tier. Prioritize feels deliberate. Plant feels tactical. Iterate feels light.
+
+---
+
+## 14. Open Items for Execution Section Spec
+
+The following questions should be answered before the Execution section is specced:
+
+1. **Initiative editing after lock** — confirmed: editable in Execution with versioning. Execution spec must define the version increment logic and what triggers a new version (any field change? only structural changes?).
+
+2. **Progress tracking** — how does milestone completion in Execution feed back to maturity scores? This is the live maturity tracking feature. Confirm the update logic before building Execution.
+
+3. **Sprint review** — at the end of 12 weeks, what does the sprint review experience look like? This determines what data needs to be captured and stored during execution.
+
+4. **Multi-sprint flow** — when the founder completes Q1 and begins Q2, does the Sprint Goal flow run again from Screen 1.1? Confirmed: yes, same flow, but the Context Re-Anchor should surface Q1 retrospective signals.

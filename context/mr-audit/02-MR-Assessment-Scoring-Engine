@@ -1,0 +1,371 @@
+Architect OS – GM Assessment Scoring Engine
+Project Handoff Guide (Scoring → Reporting Phase)
+Purpose of This Handoff
+This document brings a new assistant up to speed on the current state of the GM (Growth Maturity & Readiness) Assessment Scoring Engine inside Architect OS.
+Scoring is now functionally complete and validated at the database level. The next phase is to sense-check outputs, finalize report fields, and build automation + dashboards (n8n / Make + GPT).
+This guide explains:
+What we built
+
+
+Why it’s structured this way
+
+
+What is confirmed working
+
+
+What needs to happen next
+
+
+
+1. High-Level Goal
+We are building a single-pass scoring system for a 125-checkpoint diagnostic that:
+Accepts raw assessment responses (0 / 1 / 2)
+
+
+Computes:
+
+
+Maturity
+
+
+Readiness
+
+
+Urgency-weighted variance
+
+
+Stage-fit (Below / At / Ahead)
+
+
+Produces stable, queryable score tables for:
+
+
+Dashboards
+
+
+PDF reports
+
+
+GPT insight generation
+
+
+Runs once on final submission, not continuously.
+
+
+Scoring happens entirely in SQL for determinism and performance.
+
+2. Assessment Lifecycle (Canonical Flow)
+Status model (conceptual):
+draft → submitted → scored → reported → archived
+
+What actually triggers scoring:
+Final submit button in UI
+
+
+Webhook → automation
+
+
+Automation sets assessment status = submitted
+
+
+Automation calls scoring function:
+
+
+select public.gm_score_assessment(<assessment_uuid>);
+
+Manual runs during QA are expected and supported.
+
+3. The Core Scoring Function
+Function
+public.gm_score_assessment(p_assessment_id uuid)
+
+What it does (in order)
+Checkpoint scoring
+
+
+Reads from gm_assessment_responses
+
+
+Joins gm_checkpoint_scoring
+
+
+Calculates:
+
+
+maturity_score_raw / max
+
+
+readiness_score_raw / max
+
+
+maturity_pct, readiness_pct (0–1)
+
+
+urgency_normalized
+
+
+variance_pct = maturity_pct – urgency_normalized
+
+
+stage_fit_id (Below / At / Ahead)
+
+
+Band assignment
+
+
+Uses gm_band_thresholds
+
+
+Maturity bands: 11
+
+
+Readiness bands: 4
+
+
+Handles edge case: pct = 1.00 via max_pct = 1.01
+
+
+Rollups
+
+
+Capability scores
+
+
+Dimension scores
+
+
+Pillar scores
+
+
+Overall assessment scores
+
+
+Ranking
+
+
+Dimension-priority ranking using:
+
+
+response tier
+
+
+urgency
+
+
+fallback ordering (gm_checkpoint_stage_dimension_order)
+
+
+Final output
+
+
+Writes a single JSON row to gm_assessment_overall_scores
+
+
+
+4. Confirmed Working Tables (QA-Validated)
+These tables are now populated correctly after running the scoring function:
+Core Score Tables
+gm_assessment_checkpoint_scores
+
+
+gm_assessment_capability_scores
+
+
+gm_assessment_dimension_scores
+
+
+gm_assessment_pillar_scores
+
+
+gm_assessment_overall_scores
+
+
+Ranking Tables
+gm_checkpoint_rankings
+
+
+gm_capability_rankings (if enabled)
+
+
+Reference / Support Tables
+gm_band_thresholds
+
+
+gm_stage_fit_factors
+
+
+gm_checkpoint_stage_dimension_order
+
+
+All band labels, band indices, and stage-fit assignments are now resolving correctly.
+
+5. Key Scoring Rules (Do Not Reinterpret)
+Response Encoding
+Response
+Value
+No
+0
+Somewhat
+1
+Yes
+2
+
+Percentages
+Stored as decimals (0.00 – 1.00)
+
+
+Never as 0–100
+
+
+Stage Fit Logic
+variance = maturity_pct – urgency_normalized
+
+< -0.15  → Below
+-0.15 to +0.15 → At
+> +0.15 → Ahead
+
+Band Assignment Rule
+pct >= min_pct AND pct <= max_pct
+
+Max maturity band uses max_pct = 1.01 to capture perfect scores.
+
+6. Known Design Decisions (Intentional)
+Scoring is NOT reactive
+ It runs once per submission to avoid partial or inconsistent states.
+
+
+SQL over views
+ Ensures deterministic scoring and prevents “live recalculation drift.”
+
+
+Ordering table exists on purpose
+ gm_checkpoint_stage_dimension_order provides a fallback ranking when urgency and response tiers tie.
+
+
+IDs vs labels
+
+
+Tables store IDs
+
+
+Labels are joined later for reporting / GPT
+
+
+Do not bake labels into logic
+
+
+
+7. QA Queries the Next Assistant Should Use
+Confirm scoring ran
+select *
+from gm_assessment_overall_scores
+where assessment_id = <uuid>;
+
+Check missing bands (should return 0)
+select count(*)
+from gm_assessment_capability_scores
+where readiness_band_index is null;
+
+select count(*)
+from gm_assessment_dimension_scores
+where maturity_band_index is null;
+
+Spot-check stage fit
+select stage_fit_id, count(*)
+from gm_assessment_checkpoint_scores
+group by stage_fit_id;
+
+
+8. What Is NOT Built Yet (Next Phase)
+1. Meaning Tables → GPT
+Capability band meanings
+
+
+Dimension band meanings
+
+
+Stage-fit interpretation text
+
+
+“So what?” summaries
+
+
+2. Report Assembly
+PDF field mapping
+
+
+Narrative blocks
+
+
+Visual-ready aggregates
+
+
+3. Dashboards
+Dimension comparison
+
+
+Priority queues
+
+
+Stage-fit distribution
+
+
+Top / bottom capability views
+
+
+4. Automations
+Submit → score
+
+
+Score → persist
+
+
+Persist → report
+
+
+Report → notify / update status
+
+
+
+9. What the Next Assistant Should Do First
+DO NOT TOUCH SCORING LOGIC.
+Instead:
+Inventory output fields needed for:
+
+
+Report
+
+
+Dashboard
+
+
+GPT prompts
+
+
+Confirm each field exists and is populated
+
+
+Identify any derived fields that should be:
+
+
+Materialized
+
+
+Computed in automation
+
+
+Generated via GPT
+
+
+Design the report payload schema
+
+
+Begin automation workflows
+
+
+
+10. Mental Model to Keep
+Scoring is the engine.
+ Reporting is the vehicle.
+ GPT is the narrator—not the calculator.
+

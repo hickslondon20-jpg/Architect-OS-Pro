@@ -1,0 +1,297 @@
+# Maturity + Readiness Audit — Capability Areas
+
+## What Capability Areas Represent
+
+Capability areas are the **primary measurement units** of the M+R Audit. They represent distinct functional competencies within each dimension that can be independently assessed, scored, and developed. Think of them as the "building blocks" of organizational maturity—specific systems or practices that evolve from foundational awareness to institutionalized excellence.
+
+Each of the 5 dimensions contains exactly 5 capability areas, creating **25 total measurement units** across the framework. These capabilities are what get scored during assessment, prioritized in roadmaps, and tracked over time as the agency matures.
+
+**Key characteristics of capability areas:**
+- **Independently measurable** — Each can be assessed without requiring full mastery of others
+- **Stage-calibrated** — "What good looks like" shifts based on the agency's AE Ladder stage
+- **Progression-oriented** — They evolve from reactive management to proactive systems to autonomous operations
+- **Strategically weighted** — Some capabilities matter more at certain stages (driving urgency scores)
+
+The detailed "what good looks like" descriptions for each capability are **stage-specific and stored in Supabase**, dynamically filtered based on the user's profile. What follows is the conceptual framework—the *intent* of each capability and *how it progresses* across maturity stages.
+
+---
+
+## D1: Financial Resilience & Business Health
+
+### 1.1 Forecasting & Visibility
+
+**Purpose:**  
+Measures the agency's ability to see and plan financial performance with clarity—enabling confident forecasting and proactive decisions.
+
+**Progression Summary:**  
+Begins with establishing foundational awareness through consistent income and expense tracking. Evolves into building reliable reporting rhythm with structured, current financial data. Matures into integrating systems that deliver real-time intelligence across revenue, margins, and cash flow. Culminates in embedding predictive foresight where financial systems surface trends, forecast scenarios, and identify risks or opportunities autonomously.
+
+---
+
+### 1.2 Margin Discipline
+
+**Purpose:**  
+Evaluates how consistently the agency generates predictable revenue and maintains dependable financial performance across cycles.
+
+**Progression Summary:**  
+Starts with establishing margin awareness by connecting effort to outcome and recognizing profitable patterns. Advances to creating reliable margin rhythm through consistent project-level tracking and scope control. Deepens into embedding profit control directly in operations, with live margin dashboards and efficiency benchmarks guiding decisions. Reaches optimization when profitability becomes predictable and scalable through process-driven margin protection and forecasting.
+
+---
+
+### 1.3 Cash Flow Management
+
+**Purpose:**  
+Assesses how effectively the business manages cash rhythm, reserves, and liquidity stability to stay operationally confident and agile.
+
+**Progression Summary:**  
+Begins with developing cash awareness—noticing timing gaps and building habits around inflow and outflow visibility. Evolves into creating a cash flow rhythm with structured forecasting, budgeting, and early reserve formation. Matures into managing liquidity with precision through proactive monitoring, expense alignment, and maintained reserves. Culminates in mastering predictive liquidity where forecasting models and dashboards simulate scenarios and optimize cash deployment strategically.
+
+---
+
+### 1.4 Financial Resilience
+
+**Purpose:**  
+Gauges the agency's ability to anticipate, absorb, and adapt to financial shocks through diversification, contingency systems, and foresight.
+
+**Progression Summary:**  
+Starts with building awareness of stability risks—recognizing dependencies and vulnerabilities without formal plans. Advances to establishing stability rhythms through monthly risk reviews, contingency buffers, and conservative decision-making. Deepens into embedding adaptive systems with diversification strategies, scenario planning, and contingency playbooks. Reaches institutionalization when stability becomes self-sustaining through diversified portfolios, liquidity strategies, and disciplined governance that absorbs pressure with agility.
+
+---
+
+### 1.5 Reinvestment & Growth Readiness
+
+**Purpose:**  
+Examines how intentionally the agency reinvests profits and resources into high-leverage opportunities that expand capability and scalability.
+
+**Progression Summary:**  
+Begins with recognizing reinvestment potential—connecting profitability to opportunity and viewing reinvestment as a growth lever. Evolves into building reinvestment discipline with structured allocation guidelines that balance expansion and confidence. Matures into systematizing growth allocation where data informs which initiatives deliver highest leverage and funding follows clear review cycles. Culminates in mastering strategic capital deployment where profit fuels purposeful expansion, capital is allocated with foresight, and reinvestments compound enterprise value.
+
+---
+
+## D2: Market Position & Client Base
+
+### 2.1 Positioning Clarity & Differentiation
+
+**Purpose:**  
+Assesses how clearly the agency defines, articulates, and demonstrates its unique value in a competitive market landscape.
+
+**Progression Summary:**  
+Begins with deepening the core focus—using performance data to identify most profitable subsegments and strongest value drivers. Evolves into codifying and amplifying authority through documented frameworks, refined messaging, and consistent proof across touchpoints. Matures into shaping the market narrative where thought leadership and proprietary insights establish the agency as a category benchmark. Culminates in anchored expansion where clarity scales with ambition, enabling confident diversification while reinforcing core positioning principles.
+
+---
+
+### 2.2 Offer & Service Alignment
+
+**Purpose:**  
+Measures how well the agency's service model and pricing structure align with client value, profitability, and strategic positioning.
+
+**Progression Summary:**  
+Starts with refining around proven strengths—analyzing outcomes and profitability to concentrate offers around excellence. Advances to structuring for fit and value with coherent service tiers, defined delivery methods, and aligned pricing. Matures into systematizing offer architecture through modular design, playbooks, and strategic fulfillment choices that ensure scalability. Reaches orchestration when offers function as a strategic portfolio—each service and delivery method amplifying positioning, margin leverage, and market leadership.
+
+---
+
+### 2.3 Pipeline Health
+
+**Purpose:**  
+Assesses how effectively the agency generates, qualifies, and nurtures opportunities to sustain forward revenue momentum.
+
+**Progression Summary:**  
+Begins with creating predictable growth rhythm—formalizing acquisition activity, tracking pipeline stages, and building visibility into conversion. Evolves into building a structured, measurable system where marketing, referrals, and outbound efforts coordinate to maintain steady deal flow. Matures into institutionalizing the growth engine with dedicated owners, integrated dashboards, and cross-functional alignment that makes opportunity generation scalable. Reaches strategic asset status when multi-channel campaigns, partnerships, and automation deliver consistent, high-quality opportunities aligned with capacity.
+
+---
+
+### 2.4 Portfolio Optimization
+
+**Purpose:**  
+Evaluates whether the agency attracts and maintains a strategically balanced mix of ideal clients and revenue streams.
+
+**Progression Summary:**  
+Starts with recognizing portfolio patterns—understanding where revenue and margin originate and identifying concentration risks. Advances to managing for balance and stability through active concentration tracking and portfolio adjustments. Matures into governing the portfolio strategically with structured review cycles that evaluate mix health, retention, and strategic fit. Reaches engineering when the portfolio becomes deliberately designed to maximize scalability and enterprise value through intentional diversification and scenario modeling.
+
+---
+
+### 2.5 Retention & Relationship Maturity
+
+**Purpose:**  
+Gauges the agency's ability to maintain durable client relationships that drive lifetime value and predictable renewals.
+
+**Progression Summary:**  
+Begins with retention through reliability and relationship depth—sustained by consistent delivery and personal trust. Advances to establishing relationship rhythms with regular reviews, feedback loops, and proactive renewal discussions. Matures into systematizing client success through dedicated account leadership, documented playbooks, and tracked satisfaction metrics. Reaches engineering when retention systems become a scalable growth engine—renewals, referrals, and expansions integrate seamlessly through predictive insights and long-term partnership design.
+
+---
+
+## D3: Operational Systems & Scalability
+
+### 3.1 SOPs & Knowledge Transfer
+
+**Purpose:**  
+Evaluates how well the agency codifies key processes and institutional knowledge to support consistency, delegation, and scaling.
+
+**Progression Summary:**  
+Starts with capturing what's repeatable without over-structuring—documenting core routines that drive efficiency while preserving agility. Advances to building fit-for-stage structure with selective formalization of critical workflows that balance clarity and adaptability. Matures into codifying institutional knowledge through comprehensive SOPs, playbooks, and training materials that accelerate onboarding and delegation. Reaches governance when documentation becomes a living, adaptive ecosystem—version-controlled, continuously refined, and serving as an institutional intelligence layer.
+
+---
+
+### 3.2 Workflow Efficiency
+
+**Purpose:**  
+Gauges how effectively core workflows are streamlined to reduce waste, improve quality, and increase throughput capacity.
+
+**Progression Summary:**  
+Begins with mapping flow and reducing friction—visualizing how work moves and making incremental improvements to handoffs and feedback loops. Advances to standardizing for predictable delivery through defined sequences, templates, and communication checkpoints. Matures into optimizing throughput and capacity balance with tracked cycle times, workload distribution, and continuous refinement. Reaches engineering when workflows become self-improving systems—retrospectives and performance data drive real-time optimization that sustains quality and efficiency at scale.
+
+---
+
+### 3.3 Automation & Intelligence Systems
+
+**Purpose:**  
+Evaluates how effectively technology and automation enhance efficiency, accuracy, and scalability without sacrificing flexibility or control.
+
+**Progression Summary:**  
+Starts with creating digital consistency by organizing foundational tools and reducing friction between manual tasks. Advances to integrating systems for efficiency—connecting key platforms to automate recurring tasks while maintaining control. Matures into scaling through unified, governed systems where data flows across CRM, finance, and delivery tools with system governance ensuring adoption and ROI. Reaches leverage when automation becomes intelligence—predictive dashboards, AI-driven workflows, and synchronized data enable faster, smarter decisions that multiply capacity.
+
+---
+
+### 3.4 Data & Performance Visibility
+
+**Purpose:**  
+Assesses how well operational data translates into actionable insight that drives alignment, decision confidence, and foresight.
+
+**Progression Summary:**  
+Begins with building awareness through consistent visibility—tracking KPIs with discipline to spot trends and inform reflection. Advances to creating a decision rhythm around metrics with regular dashboards and reviews that enable timely adjustments. Matures into integrating data for real-time clarity where unified dashboards connect operational, financial, and delivery data across teams. Reaches leverage when data becomes a strategic intelligence layer—predictive analytics highlight risks and opportunities before they surface, enabling proactive direction.
+
+---
+
+### 3.5 Role Clarity & Ownership Design
+
+**Purpose:**  
+Measures whether responsibilities and decision authority are clearly defined, enabling accountability and operational flow.
+
+**Progression Summary:**  
+Begins with defining ownership through proximity and trust—accountability exists through reliability and initiative rather than formal structure. Advances to establishing functional roles and accountability lanes as growth introduces distinct delivery, operations, and client management functions. Matures into distributing authority across clear decision layers where teams understand ownership, influence, and escalation paths. Reaches institutionalization when ownership becomes cultural—accountability is transparent, distributed, and governance adapts seamlessly as strategy evolves.
+
+---
+
+## D4: Team Structure & Leadership
+
+### 4.1 Org Structure & Team Scalability
+
+**Purpose:**  
+Examines how well the agency's structure supports growth—ensuring alignment between roles, hierarchy, and operating rhythm.
+
+**Progression Summary:**  
+Starts with shared effort and emerging alignment—roles form organically around strengths with awareness building around ownership and flow. Advances to defining structure that reduces friction through distinct functional lanes and clear reporting lines. Matures into building scalable leadership layers with established tiers, performance rhythms, and decision-making distributed across functions. Reaches institutionalization when structure becomes adaptive—roles, spans, and rhythms evolve fluidly with growth through governance frameworks that maintain clarity and autonomy.
+
+---
+
+### 4.2 Talent Development
+
+**Purpose:**  
+Evaluates how strategically the agency attracts, develops, and retains talent aligned with its growth objectives and cultural values.
+
+**Progression Summary:**  
+Begins with founder-led leadership where the founder models standards and identifies emerging talent through proximity and collaboration. Advances to guided delegation with intentional authority transfer, coaching, and early management formation. Matures into building leadership systems with defined growth pathways, performance frameworks, and development plans that create consistency. Reaches institutionalization when leadership becomes embedded in DNA—succession plans, capability frameworks, and strategic hiring pipelines ensure continuous talent development that future-proofs growth.
+
+---
+
+### 4.3 Leadership Effectiveness & Leverage
+
+**Purpose:**  
+Gauges how well leaders delegate, make timely decisions, and lead through influence rather than dependency.
+
+**Progression Summary:**  
+Begins with leading through presence and proximity—founder drives performance through active guidance and personal example. Advances to delegating with intent, transferring authority purposefully while empowering emerging leaders with context and judgment. Matures into leading through systems, rhythm, and influence where functional leaders make independent decisions within clear frameworks. Reaches leverage when leadership creates freedom—each leader operates as strategic extension, and the founder directs through vision and foresight rather than proximity or approval.
+
+---
+
+### 4.4 Performance Management & Accountability Systems
+
+**Purpose:**  
+Assesses how consistently goals, feedback, and performance metrics are used to drive accountability and progress.
+
+**Progression Summary:**  
+Begins with accountability through trust and visibility—expectations are clear through founder modeling and dialogue. Advances to establishing rhythms for goals and feedback with structured check-ins, transparent expectations, and regular recognition. Matures into integrating performance and cultural systems where individual and team goals link to business priorities with transparent metrics and continuous feedback. Reaches self-sustaining accountability when it becomes cultural—teams set, track, and review goals autonomously within performance rhythms guided by shared purpose.
+
+---
+
+### 4.5 Culture, Communication & Team Cohesion
+
+**Purpose:**  
+Evaluates how the organization cultivates trust, clarity, and collaboration—ensuring alignment between people, purpose, and performance.
+
+**Progression Summary:**  
+Begins with relational trust and founder-led connection—culture thrives on closeness, transparency, and the founder's direct example. Advances to structured communication and shared understanding through defined rhythms, meetings, and decision channels. Matures into transparent culture and cross-functional cohesion where feedback flows freely through regular cadences and cultural rituals reinforce values. Reaches self-sustaining trust when culture becomes a living system—teams communicate with autonomy, decisions are shared transparently, and trust reinforces alignment through growth.
+
+---
+
+## D5: Strategic Stewardship
+
+### 5.1 Vision & Strategic Clarity
+
+**Purpose:**  
+Measures the leadership's ability to define a clear, inspiring vision and align the organization toward that future.
+
+**Progression Summary:**  
+Begins with defining direction amid the doing—founder distinguishes activity from progress and makes choices reflecting destination. Advances to prioritizing strategy and protecting focus through disciplined boundary-setting and structured planning time. Matures into leading from altitude with intentional design—founder operates primarily in strategic layer, steering through vision and data rather than oversight. Reaches stewardship when vision expands beyond growth to enduring impact—founder serves as custodian of mission, ensuring positioning, capital strategy, and leadership continuity sustain long-term legacy.
+
+---
+
+### 5.2 Strategic Planning & Decision Governance
+
+**Purpose:**  
+Evaluates how consistently the organization plans, aligns, and governs strategic decisions to ensure unified direction and disciplined execution.
+
+**Progression Summary:**  
+Begins with intuitive planning and founder-led decisions—strategy lives in founder's mind with quick, flexible choices guided by opportunity. Advances to establishing a planning rhythm with quarterly goals, leadership check-ins, and simple progress tracking. Matures into formal governance with defined strategic cadence—annual planning, quarterly reviews, and structured decision rights enable fast, confident choices. Reaches adaptive enterprise when governance becomes dynamic—leadership operates through foresight cycles that combine long-term planning with agile, data-informed decision-making.
+
+---
+
+### 5.3 Financial & Capital Stewardship
+
+**Purpose:**  
+Assesses how leadership manages financial resources and capital allocation to balance growth, risk, and sustainability.
+
+**Progression Summary:**  
+Begins with building visibility and foundational discipline—founder focuses on financial rhythm, tracking, and gaining control. Advances to intentional budgeting with purposeful allocation where funds follow strategy and balance reinvestment with reserves. Matures into structured governance where budgets are owned by leaders, forecasts are data-driven, and capital decisions weigh ROI and timing. Reaches stewardship when leadership adopts investor mindset—capital is treated as strategic instrument for growth, freedom, and legacy with multi-year planning optimizing value and optionality.
+
+---
+
+### 5.4 Performance Governance & Org Intelligence
+
+**Purpose:**  
+Gauges how the leadership team reviews performance, learns from outcomes, and adapts organizational strategy based on insight.
+
+**Progression Summary:**  
+Begins with founder-led coordination through constant communication and proximity that maintains alignment. Advances to establishing leadership rhythm with predictable review cadences, KPI tracking, and documented commitments. Matures into insight-driven leadership where cross-functional metrics, retrospectives, and data surface insights that guide adaptation. Reaches adaptive governance when the system becomes institutional—strategy, performance, and learning operate in synchronized cycles with candid, data-driven debates that enable unified intelligence and rapid adaptation.
+
+---
+
+### 5.5 Transferability & Continuity Design
+
+**Purpose:**  
+Measures how well the agency is built for independence, adaptability, and continuity—sustaining success beyond its founder.
+
+**Progression Summary:**  
+Begins with reducing dependency and creating breathing room—early structures allow momentum to continue briefly without founder oversight. Advances to operational reliability with leadership coverage where day-to-day work executes predictably through process and trust. Matures into institutional continuity with documented knowledge, succession plans, and distributed decision rights that enable navigation through transitions. Reaches strategic sovereignty when the organization becomes self-sustaining—designed for adaptability, longevity, and optionality with systems, leadership, and capital enabling full independence from founder's daily presence.
+
+---
+
+## Key Patterns Across Capability Progression
+
+All 25 capability areas follow similar meta-patterns as they mature:
+
+- **Reactive → Proactive:** From responding to issues toward anticipating and designing solutions
+- **Individual → Institutional:** From founder-led execution toward team-led operation with systems
+- **Complexity → Clarity:** From chaotic coordination toward predictable rhythm and alignment
+- **Manual → Automated:** From hands-on effort toward leveraged, intelligence-driven systems
+- **Short-term → Long-term:** From immediate control toward strategic orchestration and legacy
+
+These patterns create the underlying logic for how stage-specific "what good looks like" descriptions are calibrated in the database—ensuring consistency across the entire M+R framework.
+
+---
+
+**Related Documentation:**
+- `MR_Framework_Overview.md` — How capabilities fit in the diagnostic system
+- `MR_Dimensions.md` — The 5 disciplines that contain these capabilities
+- `MR_Checkpoints_Concept.md` — How capabilities are validated through observable markers
+- `MR_Stage_Progression_Philosophy.md` — How capability priorities shift across maturity stages

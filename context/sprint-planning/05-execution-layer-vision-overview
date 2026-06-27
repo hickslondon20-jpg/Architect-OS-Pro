@@ -1,0 +1,285 @@
+# Architect OS — Execution Layer
+## Conceptual Vision: The Five Moments of the Sprint Experience
+
+**Document Type:** Vision & Intent — Pre-Spec Narrative
+**Phase:** Conceptual — No build instructions contained here
+**Purpose:** Define what each execution page needs to do, what story it tells, what insights it surfaces, and how AI vs. deterministic data is used to tell that story. This document precedes and informs all spec work for the execution layer.
+
+---
+
+## The Overarching Narrative
+
+The execution layer is where the platform proves its value.
+
+Everything before this — the assessment, the diagnostic, the planning — has been about building strategic clarity. The execution layer is where that clarity meets reality. And reality, in a founder-led agency, is messy, fast, and constantly competing for attention.
+
+The job of this layer is not to add more structure to an already overwhelmed founder. It is to hold the plan steady while the quarter unfolds around it — surfacing the right information at the right moment, celebrating real progress, and making the act of staying on plan feel less like discipline and more like momentum.
+
+Each of the five pages serves a distinct moment in the sprint lifecycle. Together they tell a complete story: from launch to rhythm to reflection to closure and renewal. A founder who moves through all five moments at the end of a quarter should feel something specific — they should feel like they ran a real quarter, not just survived one.
+
+---
+
+## Page 1 — Sprint Launch
+### *"Here is what we are about to do together."*
+
+**The Moment**
+Sprint launch happens the moment the founder locks the sprint plan. It is the transition from thinking to doing — the point where strategy becomes commitment. This page needs to honor that transition. It should feel like the opening of something intentional, not the output of a form.
+
+This is also the first page the founder shares with their team. The sprint executive summary lives here. It is the artifact that aligns everyone — leadership, team leads, key collaborators — around what this quarter is for and what it will take.
+
+**What the Page Needs to Do**
+Create a clear, shareable record of the sprint at the moment it launches. Give the founder something they are proud to send to their team. Make the plan feel real and committed, not provisional and editable.
+
+**The Story It Tells**
+This is where we are. This is where we are going. This is what we agreed to do to get there. These are the people responsible.
+
+The narrative arc moves from context (what stage are we at, what has the diagnostic told us) to intent (what is the sprint goal, why this quarter) to plan (the three Prioritize areas, the Plant seeds, the Iterate refinements) to commitment (who owns what, what done looks like).
+
+It does not tell the founder what to do. It reflects back what they decided, in a form that is clear enough to inspire and specific enough to hold them accountable.
+
+**What Information Is on the Page**
+
+*Deterministic — pulled directly from the sprint record:*
+- Sprint goal statement (verbatim)
+- Quarter identifier (Q1 2026, etc.)
+- 3P capability classification (all nine areas, sorted by bucket)
+- Initiative names, owners, and target completion months by capability
+- Milestone count per initiative
+- Total team members involved
+
+*AI-generated — synthesized by GPT from the sprint record:*
+- Executive Summary narrative: a two to three paragraph synthesis of what this sprint is trying to accomplish, why these capability areas were prioritized, and what the quarter will look like if the plan is executed well. Written in second person, addressed to the founder, in the platform's tone — observational, sophisticated, not prescriptive.
+- Sprint Theme: a one-line distillation of the quarter's strategic intent — not a tagline, but a clarifying phrase that captures what this sprint is really about. Example: "This is a quarter about building the infrastructure for growth you can sustain." This gives the team a memorable anchor.
+- One paragraph on what success looks like at the quarter level — what will be meaningfully different about the agency if the Prioritize areas are advanced as planned.
+
+**How AI Is Used**
+GPT synthesizes the executive summary and sprint theme at the moment of sprint lock, drawing from: the sprint goal, the 9 capability areas and their classifications, all initiative names and success definitions, the founder's AE Ladder stage, and the maturity scores of the selected capability areas.
+
+The output is presented for founder review before it is shared — the founder can edit, regenerate, or approve. Once approved, it becomes the locked artifact for that sprint.
+
+**The Emotional Target**
+The founder should feel a sense of clarity and readiness. Not anxiety about whether the plan is right — that work is done. A sense of: we know what we're doing this quarter and we're ready to go.
+
+---
+
+## Page 2 — Status Tracker
+### *"Here is where we are right now."*
+
+**The Moment**
+This is the recurring operational surface. It lives in the weekly team meeting, the Monday morning check-in, the founder's Friday review. It is designed to be opened, reviewed, updated, and closed — probably in fifteen minutes or less. It is not a page to linger on. It is a page to move through.
+
+It is also the primary input mechanism for the rest of the execution layer. Every status update made here feeds the momentum synthesis, the wind-down, and the retrospective. The more honest and current the data in this view, the more meaningful everything downstream becomes.
+
+**What the Page Needs to Do**
+Give a clear, filterable view of every milestone in the sprint — who owns it, what status it is in, when it is targeted. Make updating a status fast enough to do live in a meeting. Surface blockers and dependencies clearly so the team can address them in real time.
+
+**The Story It Tells**
+Here is the full plan, in motion. Here is who is doing what. Here is what is complete, what is in flight, and what has not started yet. Here is what is at risk.
+
+The story on this page is not about analysis — it is about ground truth. At any moment in the quarter, this page should be an accurate reflection of where the sprint actually stands.
+
+**What Information Is on the Page**
+
+*Deterministic — pulled from the sprint record and milestone status:*
+- Every milestone across all initiatives, grouped by initiative with the parent initiative and capability area shown
+- Status per milestone: Not Started, In Progress, Complete, Blocked
+- Owner per milestone
+- Target month
+- Notes field per milestone — free text, updated by anyone with access
+- Summary bar: overall milestone completion percentage, count of milestones by status, days remaining in sprint
+- Sprint goal banner — persistent at the top, always visible
+- Filter controls: by 3P column, by initiative, by owner, by status, by timeframe
+
+*No AI on this page.*
+This is a deterministic surface entirely. The goal is speed and accuracy. AI synthesis belongs on other pages. Here, the founder needs facts, not interpretation.
+
+**How AI Is Used**
+Not used on this page. This is an intentional design decision — the status tracker is a human-driven tool. Founders and team members update it. The data they enter here feeds AI synthesis elsewhere. Introducing AI interpretation on this surface would slow it down and reduce trust in the underlying data.
+
+**The Emotional Target**
+The founder should feel in control. Not overwhelmed by the volume of work, but grounded — they can see the full picture and make quick, informed decisions about where to direct attention. The team should feel seen — their work is visible, their progress is acknowledged, their blockers have a place to live.
+
+---
+
+## Page 3 — Momentum Synthesis
+### *"Here is what your progress means."*
+
+**The Moment**
+This is the page the founder opens when they want to step back from the operational detail and ask a strategic question: *how is this quarter actually going?* It might be week three, week six, or week nine. It might be triggered by a good week or a hard one. It is always founder-initiated — the platform does not push this page. The founder comes to it when they are ready for a real conversation about where they stand.
+
+This is the Virtual CSO in execution mode — not the planning advisor, but the strategic thinking partner who has been watching the quarter unfold and has something meaningful to say about it.
+
+**What the Page Needs to Do**
+Generate a synthesized, narrative read of sprint progress that goes beyond the status numbers. Celebrate real completions. Acknowledge what's still ahead. Surface one or two things worth the founder's deliberate attention. And do all of this in a way that feels like a thoughtful peer giving honest feedback — not an AI reciting statistics.
+
+**The Story It Tells**
+Here is what you have accomplished. Here is what that has taken. Here is where your attention may be needed. Here is what the quarter still has in it.
+
+This page tells a story of momentum — not pace, not velocity, not predicted completion rates. Momentum. The sense that things are moving, that effort is translating into progress, and that the quarter is going somewhere real.
+
+**What Information Is on the Page**
+
+*Deterministic — pulled from current sprint state:*
+- Initiatives completed vs. in progress vs. not started, by 3P bucket
+- Milestones completed, by initiative and owner
+- Blockers currently flagged
+- Days elapsed vs. days remaining in sprint
+- Any capability areas with zero milestone activity since sprint launch
+
+*AI-generated — GPT synthesis on demand:*
+- Progress Narrative: two to three paragraphs that translate the current sprint data into a readable account of how the quarter is going. Written specifically for this founder, at this stage, given what they set out to accomplish. Acknowledges completions, names the work done by the team, and speaks honestly about what is still ahead.
+- Attention Signal: one or two specific observations worth the founder's notice. Not alarms or warnings — observations. "Your Prioritize area with the most milestones has had no activity logged this month — it may be worth checking in with the owner." Or: "Two of your three Plant initiatives have already been seeded — you're ahead of where most founders are at this point in the quarter."
+- Encouragement Layer: a brief qualitative acknowledgment of what the work so far represents — not generic praise, but specific recognition tied to what the founder actually accomplished and what it takes to do this kind of work while running an agency.
+
+**How AI Is Used**
+This is the most AI-intensive page in the execution layer. GPT receives: the full sprint record (goal, initiatives, milestones, classifications), current status of every milestone, days elapsed, the founder's AE Ladder stage and maturity scores, and any notes captured in the status tracker.
+
+From that context, GPT generates the Progress Narrative, the Attention Signal, and the Encouragement Layer. The founder can regenerate if the synthesis feels off. Each regeneration is timestamped — the founder can see how the narrative has evolved across different points in the quarter.
+
+The synthesis is generated fresh each time the founder requests it — not cached from a previous run. This ensures it always reflects the current state of the sprint.
+
+**The Emotional Target**
+The founder should feel seen and understood — not managed or evaluated. They should feel the momentum of the quarter even on the days when it is hard to feel it from inside the work. And they should feel equipped to direct their attention to where it matters most in the weeks ahead.
+
+---
+
+## Page 4 — Sprint Wind-Down
+### *"Here is how we close this chapter and prepare for the next one."*
+
+**The Moment**
+This page becomes relevant in the final two to three weeks of the quarter. It is not triggered automatically — it surfaces contextually, either as a prompt in the navigation or as a suggestion on the execution overview page: *"You have 18 days remaining in Q1. It may be time to begin your wind-down review."*
+
+Wind-down is a distinct and important moment. It is the bridge between execution and the next planning cycle. It helps the founder make intentional decisions about what to close, what to carry forward, and what to release — rather than letting the quarter simply expire and rolling everything over by default.
+
+This page also begins seeding the retrospective. The honest reflection that happens during wind-down feeds the retrospective synthesis and the forward guidance for next quarter's planning.
+
+**What the Page Needs to Do**
+Help the founder make three types of intentional decisions before the sprint closes:
+
+One — completion decisions: which incomplete initiatives and milestones are realistically completable in the remaining time, and which are not. The founder marks each one: Complete by end of sprint / Roll over to next sprint / Release — no longer relevant.
+
+Two — rollover preparation: for items being rolled over, prompt a brief reflection. Was this deprioritized intentionally or did something get in the way? Does it belong in Prioritize next quarter or can it move to Plant? This reflection feeds the Quarter Map for the next sprint cycle.
+
+Three — forward seeding: two or three prompted questions that help the founder begin thinking about next quarter before they close this one. Not a planning session — just an orientation. "What surprised you most about this quarter?" "What capability area needs more attention than you gave it?" "What would you classify differently if you were starting over?"
+
+**The Story It Tells**
+Here is what this quarter actually contained. Here is what we are choosing to carry forward intentionally. Here is what we are releasing. And here is the very beginning of a thought about what comes next.
+
+The story on this page is about agency and intentionality — the founder is not letting the quarter happen to them. They are choosing how it ends.
+
+**What Information Is on the Page**
+
+*Deterministic — pulled from sprint record and current status:*
+- All incomplete initiatives and milestones, grouped by 3P bucket
+- Days remaining in sprint
+- Owner of each incomplete item
+- Original success definition for each incomplete initiative (so the founder can make an informed keep/release decision)
+
+*Human-generated — founder input:*
+- Completion decision per incomplete item (Complete / Roll Over / Release)
+- Reflection note per rolled-over item (optional but prompted)
+- Answers to the three forward-seeding questions
+
+*AI-generated — light synthesis:*
+- A brief summary of the wind-down decisions made, formatted for the founder's review before the sprint formally closes. Not interpretive — just a clean reflection of the choices made: "You are carrying forward X initiatives into next quarter, releasing Y, and targeting Z for completion in the remaining time."
+- The forward-seeding answers are stored and passed forward as context into the next quarter's planning flow — so when the founder opens the Quarter Map for Q2, the platform already has a sense of what they learned from Q1.
+
+**How AI Is Used**
+Lightly on this page. The heavy AI work happens in the retrospective. Here, AI is used primarily to summarize and organize the founder's decisions, and to pass the forward-seeding answers forward into the next planning cycle's context. The founder's voice dominates this page — AI is the scribe, not the narrator.
+
+**The Emotional Target**
+The founder should feel the satisfaction of deliberate closure — not the anxiety of an unfinished sprint. They are not failing at what remains incomplete. They are making intentional choices about what matters enough to carry forward and what has served its purpose. The quarter ends with agency, not with a list of things that didn't get done.
+
+---
+
+## Page 5 — Retrospective
+### *"Here is what this quarter meant."*
+
+**The Moment**
+The retrospective is the payoff. It is the moment everything the platform has been tracking — the assessment scores, the diagnostic results, the sprint plan, the execution data — comes together into a single, coherent account of what this agency accomplished in twelve weeks and what that means for where they go next.
+
+It should feel like the end of something real. A founder who reads their retrospective at the end of a quarter should feel something — pride in what was built, clarity about what comes next, and a genuine sense that the platform has been paying attention all along.
+
+This is also the moment that makes the platform worth renewing. If the retrospective lands well, the founder immediately wants to do it again. If it falls flat, the platform has failed to deliver on its core promise.
+
+**What the Page Needs to Do**
+Close the loop across four dimensions — accomplishment, capability development, team recognition, and forward guidance — in a way that is both data-grounded and genuinely human.
+
+**The Story It Tells**
+This is what you set out to do. This is what you actually did. This is what changed in your agency as a result. And this is what that means for what comes next.
+
+That four-part arc is the complete narrative of a quarter well-run. Each dimension adds something the others cannot:
+
+Accomplishment gives the founder a clear-eyed account of what was completed. Not filtered for positivity, not softened. Honest.
+
+Capability development shows how the maturity scores moved — which areas improved, which ones didn't move as expected, and why. This is the quantitative evidence that the work mattered.
+
+Team recognition names the people who drove the work. In a founder-led agency, the team rarely gets formal acknowledgment. This page gives the founder a natural moment to celebrate the people who made the quarter happen.
+
+Forward guidance uses everything the platform knows — what was completed, what was rolled over, how scores moved, what the founder said in the wind-down reflection — to offer a directional perspective on next quarter. Not a mandate. Not a prescription. A well-reasoned suggestion from a platform that has been watching closely.
+
+**What Information Is on the Page**
+
+*Deterministic — pulled from sprint record, execution data, and maturity scores:*
+- Complete list of initiatives and milestones, sorted by status (Completed / Rolled Over / Released)
+- Maturity score change per capability area: score at sprint start vs. score at sprint end, with direction indicator
+- Milestone completion rates by owner — who drove what
+- Sprint goal: shown in full, with a simple honest answer to "did we accomplish this?" (Yes / Partially / No — founder-selected, not system-calculated)
+- Rollover items being carried into next quarter
+- Days in sprint, initiatives launched, milestones completed — simple honest counts
+
+*Human-generated — founder input:*
+- Sprint goal self-assessment (Yes / Partially / No, with optional free text)
+- One or two qualitative reflection fields: "What are you most proud of from this quarter?" and "What would you do differently?" — short free text, not required but prompted
+- Optional team shoutouts — names and brief recognition notes, shareable
+
+*AI-generated — the retrospective synthesis:*
+- Sprint Narrative: three to four paragraphs that tell the complete story of the quarter. What the agency set out to do, what the team accomplished, how the capability scores moved and what that means, and what the platform sees as the most significant development from this sprint. This is the most important piece of writing the platform generates. It must feel genuine, specific, and earned — not generic.
+- Capability Development Summary: a human-readable interpretation of the score movements. Not just numbers — meaning. "Your Cash Flow Forecasting score moved from 62% to 71% this quarter. That nine-point gain reflects real structural progress — the financial dashboard initiative directly addressed the data visibility gaps that were holding this score down." Each moved capability gets a sentence or two of interpretation.
+- Forward Guidance: based on rolled-over items, score movements, and the wind-down reflections, the platform offers a directional read on next quarter. Which capability areas are positioned for continued prioritization, which ones have been seeded and may be ready to promote to Prioritize, which areas the data suggests have been underattended. This feeds directly into the Quarter Map for the next sprint as a starting recommendation — the founder can accept, modify, or ignore it.
+- Sprint Theme Close: a closing line that mirrors the Sprint Theme from the launch page. If the launch theme was "This is a quarter about building the infrastructure for growth you can sustain" — the retrospective close speaks to how that theme played out. Did the quarter deliver on its theme? What does the agency look like now compared to where it started?
+
+**How AI Is Used**
+This is the platform's most sophisticated AI moment. GPT receives the complete sprint record — everything from planning through execution — plus the maturity score deltas, the founder's qualitative inputs, and the wind-down reflections. It generates the Sprint Narrative, Capability Development Summary, Forward Guidance, and Sprint Theme Close as a unified synthesis.
+
+The founder reviews the full retrospective before it is finalized. They can edit any section, regenerate individual components, or add personal notes. Once approved, the retrospective becomes a permanent record — accessible from the founder's sprint history, shareable as a PDF, and feeding context into all future quarters.
+
+The Forward Guidance component is specifically passed into the next sprint's Quarter Map as a pre-populated starting point — so the next planning cycle begins with the platform already holding the context of what just happened, not starting cold.
+
+**The Emotional Target**
+This is the most important emotional moment in the entire platform. The founder should feel:
+
+*Proud* — their work is acknowledged specifically and meaningfully, not with generic praise but with genuine recognition of what it takes to build a business while also trying to develop it strategically.
+
+*Clear* — they know exactly where they stand, what their capability scores mean, and what the data is pointing toward for next quarter.
+
+*Motivated* — not pressured or evaluated, but genuinely energized to do it again. The retrospective should end a quarter in a way that makes the next one feel like an opportunity, not a burden.
+
+*Connected* — to the larger arc of their agency's development. One quarter's retrospective is a chapter, not the whole story. The platform should help the founder feel that they are building something over time — that each quarter compounds on the last, and that the work they are doing is adding up to something meaningful.
+
+If the retrospective delivers on all four of those emotional targets, the platform has earned its place.
+
+---
+
+## How the Five Pages Connect
+
+The five moments form a closed loop that feeds itself:
+
+**Sprint Launch** establishes the intent and creates the team alignment artifact. Its executive summary and sprint theme become the opening frame of the entire quarter.
+
+**Status Tracker** collects the operational ground truth throughout the quarter. Every status update, every blocked flag, every note is raw input for everything that follows.
+
+**Momentum Synthesis** translates that ground truth into strategic meaning on demand. It keeps the founder oriented without requiring them to analyze data themselves.
+
+**Sprint Wind-Down** creates intentional closure and begins seeding the next cycle. The decisions made here feed the retrospective and pre-populate the next Quarter Map.
+
+**Retrospective** closes the loop and opens the next one. Its Forward Guidance becomes the starting context for the next sprint's planning — so the platform learns with the founder quarter over quarter.
+
+A founder who completes all five moments at the end of a year has not just run four quarters. They have built a documented record of their agency's strategic development — a year-over-year account of what they prioritized, what they built, and how their capabilities evolved. That record is uniquely valuable and not replicable outside this platform.
+
+That is what earns Architect OS its place.
+
+---
+
+*Architect OS Execution Layer — Conceptual Vision Document V1.0*
+*Pre-Spec — No build instructions contained*

@@ -1,0 +1,191 @@
+# **AE Category Band Progressions**
+
+## **Overview**
+
+Each of the 5 assessment categories uses an **11-band progression system** that maps category scores to maturity levels within that dimension. These bands provide detailed insight into how capabilities evolve from early-stage to fully mature operations.
+
+**Key Principles:**
+
+* **Category scores** (1.00 to 5.00) are rounded to 1 decimal place and mapped to bands 1-11  
+* **Bands are stage-agnostic** \- the same band definitions apply regardless of overall stage assignment  
+* **Bands show maturity progression** \- each band represents increasing capability, sophistication, and operational maturity within that dimension  
+* **Context matters** \- Band 5 in Financial Health means something different for a Rising-stage agency vs. a Driving-stage agency (stage-specific interpretations are stored in database tables, not documented here)
+
+### **How Category Bands Work**
+
+When a category score is calculated (see `AE_Assessment_Scoring_Mechanics.md`):
+
+1. Score is rounded to 1 decimal place (e.g., 3.27 → 3.3)  
+2. Rounded score maps to a specific band (1-11)  
+3. Band provides the maturity narrative for that dimension  
+4. When combined with overall stage, band \+ stage generates nuanced, contextualized insights
+
+**Example:**
+
+* Agency scores 3.3 in Financial Health → Maps to Band 7  
+* Band 7 description provides stage-agnostic maturity context  
+* Stage-specific meaning (e.g., "Band 7 Financial for a Thriving-stage agency") lives in database tables and is accessed programmatically
+
+---
+
+## **Category 1: Financial & Business Health (Bands 1-11)**
+
+**Band 1:** Revenue is project-based or referral-driven, and cash flow tends to follow delivery cycles. Financial planning is minimal, and decisions are made in the moment. It's working for now—but not yet built for predictability or growth.
+
+**Band 2:** Revenue is growing, but still driven by short-term wins. Cash flow can be tight or uneven, and reinvestment is reactive. There's some tracking in place, but visibility is limited. Things are starting to take shape.
+
+**Band 3:** Revenue is becoming steadier, with early retainer work or client concentration helping stabilize income. The agency reinvests occasionally but lacks a clear plan for reserves or margins. There's forward motion, but still month-to-month sensitivity.
+
+**Band 4:** Revenue is mostly stable and backed by a clearer client mix. Some reinvestment strategy is in motion, and cash flow is manageable—but decisions still lean on gut over forecasting. Early financial systems are emerging, but refinement is needed.
+
+**Band 5:** Revenue streams are more consistent, with a growing mix of MRR or ongoing client work. Cash flow is steady most months. There's basic financial visibility and an awareness of when and how to reinvest. Some buffers exist, but margins may still be thin.
+
+**Band 6:** Financial systems are maturing. Cash flow is planned, reinvestment is more intentional, and the agency is building reserves. Revenue isn't just stable—it's supporting smarter decisions. Forecasting still has room to grow, but progress is clear.
+
+**Band 7:** Financial health is strong. Revenue is reliable, reserves are in place, and decisions are supported by real data. Strategic reinvestment happens with intention, and the agency has options—grow, hold, or optimize.
+
+**Band 8:** Profitability is consistent, and financial operations are running smoothly. The agency can reinvest with confidence and manage longer planning cycles. There's flexibility to weather dips, fund growth, or increase owner compensation.
+
+**Band 9:** Financial performance is fully integrated into leadership decisions. Reserves are strong, profitability is monitored, and capital is allocated across teams and initiatives with purpose. The agency is financially resilient and growth-ready.
+
+**Band 10:** The agency operates with strategic control over money, margin, and momentum. Forecasts, reserves, and reinvestment cycles are all aligned with business goals. Financial confidence supports every decision.
+
+**Band 11:** This is financial mastery. Revenue is scalable, reserves are strong, and leadership operates with long-term clarity. The agency is ready to grow, exit, or reinvest—on its own terms—with full financial confidence.
+
+---
+
+## **Category 2: Client Base & Market Positioning (Bands 1-11)**
+
+**Band 1:** The agency has carved out a niche, but ideal client subsegments are still broad. Acquisition tends to be referral-based or opportunistic, and revenue may be overly concentrated in a few key accounts. Offers are serviceable, but not yet tailored to the best-fit clients.
+
+**Band 2:** You've gained traction in your niche, and early signals are pointing to higher-fit client types. Acquisition is still largely manual, and the portfolio is shaped more by opportunity than intention. Revenue is growing, but service fit and retention vary.
+
+**Band 3:** Your ideal subsegment is becoming clearer, and client quality is improving. Early retention or retainer work is showing up more consistently. Acquisition is still hands-on, but better aligned to your positioning. Revenue mix is stabilizing as low-fit projects are phased out.
+
+**Band 4:** Your positioning is stronger, and you're attracting more of the right clients. Retainers or repeat work are increasing, but acquisition is still founder-dependent. The portfolio is more focused, though you may still carry a few legacy clients or outliers.
+
+**Band 5:** Your agency is serving a well-defined client subsegment with growing consistency. Acquisition channels are starting to mature, and the portfolio is more balanced across services and revenue streams. Expansion opportunities are emerging, but still secondary.
+
+**Band 6:** You've mastered your core client subsegment and are consistently winning work through reliable, systemized channels. The agency is exploring adjacent verticals or service opportunities with strategic intent. Portfolio health and offer alignment are strong.
+
+**Band 7:** Your agency attracts ideal-fit clients through intentional positioning and leveraged acquisition systems. Expansion is underway, but focused. The portfolio is healthy, diversified, and built around margin, value, and service fit.
+
+**Band 8:** Client generation is consistent across multiple segments, and positioning is driving scalable growth. Acquisition is predictable, and the portfolio is actively shaped to optimize margin, capacity, and growth.
+
+**Band 9:** You're winning in multiple client subsegments with precision. Client acquisition, qualification, and onboarding are structured and efficient. Revenue is distributed across balanced, high-fit segments and services.
+
+**Band 10:** Your client portfolio is fully optimized. Subsegments are mapped and managed with intention. Acquisition and retention are powered by systems, and expansion into new verticals is deliberate and profitable.
+
+**Band 11:** Positioning is a competitive advantage. The agency is known for solving high-value problems for specific client types across multiple segments. Acquisition is effortless, retention is high, and your client base is built for scale, margin, and strategic growth.
+
+---
+
+## **Category 3: Operational Efficiency & Scalability (Bands 1-11)**
+
+**Band 1:** Ops are lean and mostly founder-driven—designed for speed and flexibility. Delivery flows through intuition, not process. It works for now, but as client volume and team members grow, friction and breakdowns begin to appear. There's little documentation or operational visibility.
+
+**Band 2:** You've likely started defining key workflows or delivery steps, but systems are still ad hoc. Some parts are consistent, but others rely heavily on memory or individual effort. The approach works at your current size, but foundational systems will need to mature to handle added complexity.
+
+**Band 3:** Core processes are emerging, and documentation exists in some areas. You're becoming more aware of where things break—handoffs, QA, or team capacity. Ops are still uneven across the agency, but there's increasing recognition of the need to streamline for scale.
+
+**Band 4:** Key delivery workflows are partially standardized, and team members have shared reference points. Some automation may be in place, and client delivery feels more stable. You're still relying on people to catch issues, but systems are slowly shifting from reactive to proactive.
+
+**Band 5:** You've built systems around your most critical workflows, and they're supporting growth without constant intervention. There's more consistency in client delivery, and the team can operate with more independence. Operational gaps still exist, but they no longer define the day-to-day.
+
+**Band 6:** Ops are aligned with your current delivery model and team size. Workflows are documented, automation reduces friction, and leaders are using real-time visibility to manage performance. Systems are enabling—not slowing—your growth.
+
+**Band 7:** The agency is scaling with operational control. Most delivery runs without micromanagement, and ops flex to support more volume without compromising quality. Tracking, documentation, and ownership are embedded across functions. You're managing by system, not supervision.
+
+**Band 8:** Ops are optimized for efficiency, speed, and predictability. Complexity is handled with agility, and bottlenecks are rare. Your delivery engine is lean and repeatable, and improvements are baked into the workflow—not added on top of it.
+
+**Band 9:** Operations are strategically tuned. Teams are cross-trained, systems evolve with the agency, and leaders use ops data to plan ahead. You're able to shift capacity, spot risks early, and continuously refine how work gets done.
+
+**Band 10:** Ops support growth across service lines, teams, and client segments. Internal systems are proactive, flexible, and margin-aware. Operational decisions are tied to strategy—not just process optimization.
+
+**Band 11:** Ops are a competitive advantage. You scale efficiently without friction, manage complexity with clarity, and execute across services and clients with precision. Operational performance fuels growth, margin, and long-term sustainability.
+
+---
+
+## **Category 4: Team Structure & Leadership (Bands 1-11)**
+
+**Band 1:** The founder still holds most of the responsibility. Roles are blended, informal, and shaped more by what's needed than by strategic intent. Delegation is limited, and hiring happens reactively—usually when someone's bandwidth breaks. The current structure works for now, but growth will demand more clarity and forward planning.
+
+**Band 2:** You've started assigning roles more intentionally, but boundaries and ownership may still blur. Delegation is happening, but often requires founder input to stick. Hiring is gaining structure, though still primarily driven by immediate needs. The team works, but future capacity depends on making smarter talent moves sooner.
+
+**Band 3:** Roles are becoming clearer, and you're beginning to build more independence into your team. Some team members are stepping into informal leadership or ownership of functions. Delegation is improving, but decisions still flow through the founder. Hiring shows signs of strategy, but long-term planning is still developing.
+
+**Band 4:** A more stable team foundation is taking shape. Roles are mostly defined, and early functional leads or managers may be emerging. Decisions are shared more frequently, and hiring is starting to unlock growth instead of just relieving pressure. The team structure is beginning to reflect where the business is going—not just where it's been.
+
+**Band 5:** Your team is gaining real momentum. Most roles are clearly defined and tied to outcomes, not just tasks. Delegation is stronger, and decisions are no longer stuck at the top. Hiring is increasingly tied to growth plans, and early leadership development is starting to show up. The org is shifting from founder-reliant to functionally led.
+
+**Band 6:** You've built a capable, cross-functional team. Roles are well-defined, and ownership is distributed across key functions. Decision-making is shared, and hiring aligns with capacity forecasts. Early layers of management or reporting structure may be emerging as the team scales—and internal collaboration is starting to matter more.
+
+**Band 7:** Leadership is distributed and performance is owned across departments or functions. Reporting lines are clearer, and teams are increasingly operating with autonomy. Hiring is strategic, and internal talent is being developed—not just added. Collaboration across functions is coordinated, and org structure supports—not slows—execution.
+
+**Band 8:** The team is structured for scale. Leaders are in place, and teams operate with rhythm, clarity, and accountability. Roles flex as needed, but the agency's internal ways of working—across people, pods, and functions—are designed for speed and performance. Culture is becoming a critical asset that reinforces execution.
+
+**Band 9:** The agency operates with mature structure and leadership depth. Talent is aligned with strategic needs, teams execute efficiently across services and functions, and internal communication flows intentionally. Culture, team design, and leadership development are embedded in how the business operates.
+
+**Band 10:** The organization is built to adapt. Roles evolve alongside the agency, and your leadership bench is deep and dependable. Teams are well-aligned across layers, communication is fluid, and hiring strengthens culture as much as capability. Structure supports velocity—not bureaucracy.
+
+**Band 11:** Leadership, talent, and structure are a core growth engine. The agency develops and retains top talent, and the team operates with clarity, confidence, and cohesion. Culture scales with the business, and your org structure adapts quickly—without compromising performance or focus.
+
+---
+
+## **Category 5: Founder's Role & Strategic Focus (Bands 1-11)**
+
+**Band 1:** The founder is the engine of the business—leading sales, delivery, client relationships, and ops. It works because they're talented and driven, but nearly all momentum depends on their time and energy. There's little space for strategy or rest.
+
+**Band 2:** Some delegation is happening, but the founder is still heavily involved in daily execution. Focus is split across client work, team management, and growth tasks. Progress is happening—but it still runs through them. Long-term planning takes a back seat to daily demands.
+
+**Band 3:** The founder has pulled back slightly from the day-to-day, but still plays a hands-on role in most areas. Strategic thinking is beginning, but often gets squeezed by delivery or ops needs. Some space is being created—but systems still rely on founder input to work.
+
+**Band 4:** The founder is shifting into a more intentional leadership role. Time is being redirected toward strategy, systems, and growth. The business can function in short bursts without them, and some core functions are starting to operate independently.
+
+**Band 5:** The founder is acting more like a CEO. Key responsibilities are owned by others, and the founder is focused on growth, positioning, and big-picture direction. Their presence still matters—but it's no longer required for every decision or outcome.
+
+**Band 6:** The founder is focused primarily on CEO-level functions: vision, capital, relationships, team building, and strategy. Daily ops and delivery are handled by others. The business runs smoothly with or without them in the weeds.
+
+**Band 7:** The founder is creating leverage—not just making decisions. They invest time in people, systems, and partnerships that multiply output. Their calendar reflects strategic work, and the agency is no longer dependent on their real-time input to maintain momentum.
+
+**Band 8:** The founder's focus is narrow and high-impact. Their role is designed around strengths and scaled influence. Leadership team(s) execute independently, and strategy is shaped through insight—not firefighting. The founder is working smarter, not harder.
+
+**Band 9:** The founder is a true strategic operator. They guide direction and momentum without driving the engine themselves. Their focus is long-term and external—aligned with growth opportunities, capital, and positioning. Day-to-day decisions and execution are handled confidently by the team.
+
+**Band 10:** The founder's presence is additive—not essential. They lead from the front, but the business doesn't pause when they step back. They're shaping future bets, mentoring top talent, and reinforcing culture from the top down.
+
+**Band 11:** The founder is now a visionary steward of the business. Their time is spent creating future leverage—through capital, strategy, relationships, or impact. The business grows because of their leadership—not their labor. They're free to focus on what moves the agency forward, not what keeps it afloat.
+
+---
+
+## **How to Use Category Band Progressions**
+
+### **For Understanding Maturity**
+
+Category bands provide a clear maturity narrative for each dimension:
+
+* **Lower bands (1-3):** Early-stage, foundational capabilities forming  
+* **Middle bands (4-7):** Growing maturity, systems emerging, operational control increasing  
+* **Upper bands (8-11):** Advanced maturity, strategic leverage, competitive advantage
+
+### **For Identifying Gaps**
+
+Compare category bands across dimensions to identify:
+
+* Which capabilities are ahead or behind relative to others  
+* Whether gaps are stage-appropriate or critical constraints  
+* Which dimensions need development to support overall progression
+
+### **For Stage-Aware Interpretation**
+
+Remember that bands are stage-agnostic—**context comes from combining band \+ stage:**
+
+* Band 5 Financial for a Rising agency \= strong performance, ahead of stage  
+* Band 5 Financial for a Driving agency \= concerning gap, behind stage expectations
+
+Stage-specific interpretations (the \~300 band-stage-category combinations) are stored in database tables and accessed programmatically by AI systems and report generators.
+
+---
+
+**Note:** This document provides stage-agnostic band descriptions. For how bands combine with stage assignments to create contextual insights, see `AE_Interpretation_Framework.md`. For stage assignment logic, see `AE_Stage_Assignment_Logic.md`.
+

@@ -1,0 +1,910 @@
+DOCUMENT 3: Component Architecture & Data Flow V2  
+Growth Velocity Calculator — Frontend Structure & Integration
+
+Context: Existing Architecture  
+The Growth Velocity Calculator already exists with:  
+✅ Two-tab system at /vision-identity/growth-velocity  
+Tab 1: Standard Calculator (Free \+ Pro)  
+Tab 2: Scenario Builder (Pro only)  
+✅ Tier gating logic (3 free calculations/day, unlimited for Pro)  
+✅ Two Supabase tables: growth\_calculations and growth\_scenarios  
+✅ Basic calculation engine and results display  
+What V2 Updates:  
+🔄 Enhanced input form (7 fields instead of 4\)  
+🔄 New calculation engine (32 formulas, 6 pressure families)  
+🔄 Enhanced results display (organized by pressure families)  
+🆕 Real-time impact cards in Tab 2  
+🆕 Visual comparison charts in Tab 2  
+🆕 GPT synthesis with Agency Snapshot context
+
+Page Architecture: Two Tabs, Distinct Purposes  
+Tab 1: Standard Calculator (All Users)  
+Purpose: Single scenario analysis with implications  
+User Flow:  
+Enter baseline (or auto-populate from Agency Snapshot)  
+Set target revenue \+ timeframe  
+Click "Calculate"  
+See results \+ pressure family alerts  
+Read GPT synthesis  
+(Optional) Run again with different inputs (limited to 3/day for free users)  
+Key Features:  
+Single calculation run per interaction  
+Results stored in growth\_calculations table  
+GPT synthesis generated on each run  
+No comparison functionality  
+No sliders or presets
+
+Tab 2: Scenario Builder (Pro Only)  
+Purpose: Interactive scenario modeling with comparison  
+User Flow:  
+Baseline pre-populated from Agency Snapshot  
+Select preset or adjust sliders manually  
+See real-time impact cards update as sliders move  
+Name and save scenario  
+Build 2-3 different scenarios  
+Compare scenarios side-by-side with visual charts  
+Read GPT synthesis comparing scenarios  
+Key Features:  
+Real-time calculation (no "Calculate" button needed)  
+Multiple saved scenarios per user  
+Visual comparison charts (3 charts \+ scorecard)  
+Scenario-specific GPT synthesis  
+Unlimited runs for Pro users
+
+Component Tree Structure  
+GrowthVelocityCalculator (Page Container)  
+├── PageHeader  
+│   ├── Title: "Growth Velocity Calculator"  
+│   ├── Subtitle: "Understand the structural pressure your vision creates"  
+│   └── Tabs: \[Standard Calculator | Scenario Builder 🔒\]  
+│  
+├── Tab1: StandardCalculator (Free \+ Pro)  
+│   ├── VisionReferenceBox (conditional \- if Clarity Compass data exists)  
+│   ├── TwoColumnLayout  
+│   │   ├── LeftPanel: InputCard  
+│   │   │   ├── SectionHeader: "Current State"  
+│   │   │   ├── BaselineInputForm (7 fields)  
+│   │   │   │   ├── AutoPopulateIndicator ("From Agency Snapshot")  
+│   │   │   │   └── ManualOverrideAllowed  
+│   │   │   ├── SectionHeader: "Target State"  
+│   │   │   ├── TargetInputForm (2 fields)  
+│   │   │   └── CalculateButton  
+│   │   │       └── CreditsRemaining (Free tier only)  
+│   │   │  
+│   │   └── RightPanel: ResultsCard  
+│   │       ├── LoadingState (during calculation)  
+│   │       ├── EmptyState (before calculation)  
+│   │       └── ResultsDisplay (after calculation)  
+│   │           ├── PressureDashboard (6 family cards)  
+│   │           ├── KeyMetricsGrid  
+│   │           └── GPTSynthesisSection  
+│   │  
+│   └── UpgradePrompt (Free tier, after 3 calculations)  
+│  
+└── Tab2: ScenarioBuilder (Pro only)  
+    ├── LockedState (if not Pro)  
+    │   └── UpgradeMessage  
+    │  
+    └── UnlockedState (if Pro)  
+        ├── TwoColumnLayout  
+        │   ├── LeftPanel: ScenarioInputCard  
+        │   │   ├── BaselineSection (auto-populated, display only)  
+        │   │   ├── PresetButtons (4 presets)  
+        │   │   ├── SliderControls (5 sliders)  
+        │   │   │   ├── GrowthTargetSlider  
+        │   │   │   ├── ACVAdjustmentSlider  
+        │   │   │   ├── EfficiencySlider  
+        │   │   │   ├── RetentionSlider  
+        │   │   │   └── MarginSlider  
+        │   │   └── ScenarioActions  
+        │   │       ├── SaveScenarioButton  
+        │   │       ├── ResetSlidersButton  
+        │   │       └── ScenarioNameInput  
+        │   │  
+        │   └── RightPanel: ImpactCardsPanel  
+        │       ├── ImpactCard: Target Revenue  
+        │       ├── ImpactCard: Implied Team Size  
+        │       ├── ImpactCard: Implied Profit Pool  
+        │       ├── ImpactCard: Client Operational Volume  
+        │       └── ImpactCard: Sales Velocity Required  
+        │  
+        ├── SavedScenariosSection  
+        │   ├── ScenarioList (user's saved scenarios)  
+        │   ├── ScenarioCard (for each scenario)  
+        │   │   ├── ScenarioName  
+        │   │   ├── CreatedDate  
+        │   │   ├── QuickMetrics  
+        │   │   ├── EditButton  
+        │   │   ├── DeleteButton  
+        │   │   └── CompareCheckbox  
+        │   └── CompareButton (active when 2-3 scenarios selected)  
+        │  
+        └── ComparisonView (when Compare clicked)  
+            ├── VisualChartsSection  
+            │   ├── TreadmillChart (stacked bar)  
+            │   ├── ProfitEfficiencyChart (grouped bar)  
+            │   └── MachineStrainChart (dot plot)  
+            ├── ComparisonScorecard (table)  
+            └── GPTComparativeSynthesis
+
+Component Specifications  
+Tab 1 Components  
+1\. BaselineInputForm  
+Props:  
+typescript  
+interface BaselineInputFormProps {  
+  initialValues?: BaselineInputs;  
+  onCalculate: (inputs: CalculationInputs) \=\> void;  
+  isCalculating: boolean;  
+  creditsRemaining?: number; // Only for free tier  
+}
+
+interface BaselineInputs {  
+  baseline\_revenue: number;  
+  baseline\_team\_size: number;  
+  baseline\_client\_count: number;  
+  baseline\_retention\_rate: number;  
+  baseline\_profit\_margin: number;  
+  baseline\_acv?: number; // Calculated or manual  
+  baseline\_agi\_per\_fte?: number; // From Snapshot  
+}  
+Behavior:  
+On mount: Fetch Agency Snapshot data  
+If Snapshot exists: Pre-fill all 7 baseline fields  
+Show indicator: "📊 Auto-populated from Agency Snapshot"  
+Allow manual override of any field  
+Validate inputs on change (min/max values)  
+On "Calculate" click:  
+Validate all required fields  
+Check credits (if free tier)  
+Trigger calculation  
+Store result in growth\_calculations table
+
+2\. PressureDashboard  
+Props:  
+typescript  
+interface PressureDashboardProps {  
+  pressureAlerts: PressureFamilyAlerts;  
+}
+
+interface PressureFamilyAlerts {  
+  treadmill: Alert;  
+  sales\_capability: Alert;  
+  capacity\_wall: Alert;  
+  profit\_trap: Alert;  
+  whale\_trap: Alert;  
+}
+
+interface Alert {  
+  severity: 'GREEN' | 'YELLOW' | 'RED';  
+  label: string;  
+  message: string;  
+}  
+\`\`\`
+
+\*\*Layout:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ PRESSURE FAMILY ALERTS                          │  
+├─────────────────────────────────────────────────┤  
+│                                                 │  
+│ ┌─────────┐  ┌─────────┐  ┌─────────┐         │  
+│ │ 🏃 TREAD │  │ 🚀 SALES │  │ 👥 CAPAC│         │  
+│ │ MILL    │  │ PRESSURE│  │ ITY WALL│         │  
+│ │ \[YELLOW\]│  │ \[GREEN\] │  │ \[RED\]   │         │  
+│ └─────────┘  └─────────┘  └─────────┘         │  
+│                                                 │  
+│ ┌─────────┐  ┌─────────┐  ┌─────────┐         │  
+│ │ 💰 PROFIT│  │ 🐋 WHALE │  │ Positioning      │  
+│ │ TRAP    │  │ TRAP    │  │                │  
+│ │ \[GREEN\] │  │ \[YELLOW\]│  │           \[YELLOW\]      │  
+│ └─────────┘  └─────────┘  └─────────┘         │  
+│                                                 │  
+└─────────────────────────────────────────────────┘  
+Card States:  
+GREEN: Light green background, checkmark icon  
+YELLOW: Amber background, warning icon  
+RED: Light red background, alert icon  
+Interaction:  
+Click card → Scroll to detailed insight in GPT synthesis  
+Hover → Tooltip with full message
+
+3\. GPTSynthesisSection  
+Props:  
+typescript  
+interface GPTSynthesisSectionProps {  
+  calculationId: string;  
+  synthesisText?: string; // Cached result  
+  isGenerating: boolean;  
+  snapshotContext: AgencySnapshotContext;  
+  calculationResults: CalculationOutputs;  
+}  
+\`\`\`
+
+\*\*Layout:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ STRATEGIC SYNTHESIS                             │  
+├─────────────────────────────────────────────────┤  
+│                                                 │  
+│ \[Loading animation\] (if generating)             │  
+│                                                 │  
+│ ━━━ Reality Check ━━━                           │  
+│ \[GPT-generated diagnosis text\]                  │  
+│                                                 │  
+│ ━━━ Capacity Warning ━━━                        │  
+│ \[GPT-generated implications text\]               │  
+│                                                 │  
+│ ━━━ One Big Lever ━━━                           │  
+│ \[GPT-generated prescription text\]               │  
+│                                                 │  
+│ ━━━ Watch-Outs ━━━                              │  
+│ • ⚠️ Pressure Family Alert 1                    │  
+│ • ⚠️ Pressure Family Alert 2                    │  
+│                                                 │  
+└─────────────────────────────────────────────────┘  
+Behavior:  
+On calculation complete: Check if synthesis exists in DB  
+If cached: Display immediately  
+If not cached:  
+Show loading state  
+Call GPT API with calculation results \+ Snapshot context  
+Stream response or display when complete  
+Store in growth\_calculations.gpt\_synthesis\_text
+
+Tab 2 Components (Pro Only)  
+4\. SliderControls  
+Props:  
+typescript  
+interface SliderControlsProps {  
+  baselineValues: BaselineInputs;  
+  adjustments: ScenarioAdjustments;  
+  onAdjustmentChange: (adjustments: ScenarioAdjustments) \=\> void;  
+}
+
+interface ScenarioAdjustments {  
+  growth\_adjustment\_pct: number; // \-0.5 to 1.0  
+  acv\_adjustment\_pct: number; // \-0.5 to 1.0  
+  efficiency\_adjustment\_pct: number; // \-0.3 to 0.5  
+  retention\_adjustment\_pct: number; // \-0.2 to 0.2  
+  margin\_adjustment\_pct: number; // \-0.2 to 0.2  
+}  
+\`\`\`
+
+\*\*Individual Slider Component:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ Growth Target: \+30%                             │  
+│ ━━━━━━━━●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │  
+│ \-50%                 0%                  \+100%  │  
+│                                                 │  
+│ Adjusted Target: $2.6M (from $2M baseline)     │  
+└─────────────────────────────────────────────────┘  
+Behavior:  
+On slider move (debounced 300ms):  
+Update local state  
+Trigger real-time recalculation  
+Update impact cards  
+NO database write (only on Save)  
+Preset Buttons:  
+typescript  
+const PRESETS \= {  
+  'Steady Climb': {  
+    growth\_adjustment\_pct: 0.15,  
+    acv\_adjustment\_pct: 0,  
+    efficiency\_adjustment\_pct: 0,  
+    retention\_adjustment\_pct: 0,  
+    margin\_adjustment\_pct: 0  
+  },  
+  'Rocket Ship': {  
+    growth\_adjustment\_pct: 0.50,  
+    acv\_adjustment\_pct: 0,  
+    efficiency\_adjustment\_pct: \-0.10,  
+    retention\_adjustment\_pct: 0,  
+    margin\_adjustment\_pct: \-0.05  
+  },  
+  'Profit Squeeze': {  
+    growth\_adjustment\_pct: 0.05,  
+    acv\_adjustment\_pct: 0.10,  
+    efficiency\_adjustment\_pct: 0.15,  
+    retention\_adjustment\_pct: 0,  
+    margin\_adjustment\_pct: 0.05  
+  },  
+  'Up-Market Pivot': {  
+    growth\_adjustment\_pct: 0.25,  
+    acv\_adjustment\_pct: 0.50,  
+    efficiency\_adjustment\_pct: 0,  
+    retention\_adjustment\_pct: \-0.05, // Better retention  
+    margin\_adjustment\_pct: 0  
+  }  
+};  
+On preset click:  
+Snap all sliders to preset positions  
+Trigger immediate recalculation  
+Update impact cards
+
+5\. ImpactCard (Real-Time)  
+Props:  
+typescript  
+interface ImpactCardProps {  
+  title: string;  
+  value: number | string;  
+  unit?: string;  
+  trend?: 'up' | 'down' | 'neutral';  
+  comparisonText?: string; // "vs. $2M baseline"  
+  icon?: string;  
+  severity?: 'normal' | 'warning' | 'danger';  
+}  
+\`\`\`
+
+\*\*Layout:\*\*  
+\`\`\`  
+┌─────────────────────────────┐  
+│ 💰 TARGET REVENUE           │  
+├─────────────────────────────┤  
+│                             │  
+│      $2.6M                  │  
+│   (+30% from baseline)      │  
+│                             │  
+└─────────────────────────────┘  
+Behavior:  
+Updates in real-time as sliders move  
+Smooth number transitions (animated)  
+Color coding based on severity:  
+Normal: Default styling  
+Warning: Amber border  
+Danger: Red border  
+5 Required Impact Cards:  
+Target Revenue  
+Shows: adjusted\_target\_revenue  
+Comparison: vs. baseline\_revenue  
+Implied Team Size  
+Shows: target\_team\_size (rounded to 1 decimal)  
+Comparison: vs. baseline\_team\_size  
+Severity: Danger if hiring pace \> 10% per quarter  
+Implied Profit Pool  
+Shows: target\_profit  
+Comparison: vs. baseline\_profit  
+Severity: Warning if profit delta \< revenue delta proportion  
+Client Operational Volume  
+Shows: target\_client\_count (rounded to integer)  
+Comparison: vs. baseline\_client\_count  
+Severity: Warning if \> 3x baseline  
+Sales Velocity Required  
+Shows: monthly\_sales\_velocity\_required (e.g., "3.2 deals/month")  
+Comparison: sales\_velocity\_multiplier (e.g., "2.5x current pace")  
+Severity: Danger if \> 3x multiplier
+
+6\. SavedScenariosSection  
+Props:  
+typescript  
+interface SavedScenariosSectionProps {  
+  scenarios: SavedScenario\[\];  
+  selectedForComparison: string\[\]; // Array of scenario IDs  
+  onSelectForComparison: (scenarioId: string) \=\> void;  
+  onEditScenario: (scenarioId: string) \=\> void;  
+  onDeleteScenario: (scenarioId: string) \=\> void;  
+  onCompare: () \=\> void;  
+}
+
+interface SavedScenario {  
+  scenario\_id: string;  
+  scenario\_name: string;  
+  created\_at: string;  
+  quick\_metrics: {  
+    target\_revenue: number;  
+    headcount\_delta: number;  
+    monthly\_velocity: number;  
+    profit\_delta: number;  
+  };  
+  calculation\_id: string; // Link to full calculation  
+}  
+\`\`\`
+
+\*\*Layout:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ SAVED SCENARIOS                                 │  
+├─────────────────────────────────────────────────┤  
+│                                                 │  
+│ ☐ Rocket Ship                    \[Edit\] \[Del\]  │  
+│    Target: $3M | \+8 FTEs | 5 deals/mo          │  
+│    Created: Jan 5, 2026                         │  
+│                                                 │  
+│ ☑ Efficiency Play                \[Edit\] \[Del\]  │  
+│    Target: $2.5M | \+2 FTEs | 2 deals/mo        │  
+│    Created: Jan 5, 2026                         │  
+│                                                 │  
+│ ☑ Conservative Path              \[Edit\] \[Del\]  │  
+│    Target: $2.2M | \+3 FTEs | 2 deals/mo        │  
+│    Created: Jan 4, 2026                         │  
+│                                                 │  
+│ \[Compare Selected Scenarios\] (2 selected)       │  
+│                                                 │  
+└─────────────────────────────────────────────────┘  
+Behavior:  
+Check scenario → Add to comparison selection  
+Max 3 scenarios can be selected  
+"Compare" button disabled until 2+ selected  
+Edit → Load scenario into sliders  
+Delete → Confirm, then remove from DB
+
+7\. ComparisonView  
+Props:  
+typescript  
+interface ComparisonViewProps {  
+  selectedScenarios: SavedScenario\[\];  
+  onClose: () \=\> void;  
+}  
+\`\`\`
+
+\*\*This is a full-screen or modal overlay showing:\*\*
+
+1\. \*\*TreadmillChart\*\* (Stacked Bar)  
+   \- X-axis: Scenario names  
+   \- Y-axis: Revenue ($)  
+   \- Bars: Stacked with Net Growth (green) \+ Churn Replacement (red)
+
+2\. \*\*ProfitEfficiencyChart\*\* (Grouped Bar)  
+   \- X-axis: Scenario names  
+   \- Y-axis: Dollars ($)  
+   \- Bar groups: Revenue (blue) | Profit (gold)
+
+3\. \*\*MachineStrainChart\*\* (Dot Plot / Scatter)  
+   \- Y-axis: Scenarios  
+   \- X-axis: Value  
+   \- Two dot series: Headcount | Monthly Sales Velocity  
+   \- Color coded by severity
+
+4\. \*\*ComparisonScorecard\*\* (Table)  
+\`\`\`  
+┌─────────────────────────────────────────────────┐  
+│ Metric          | Baseline | Scenario A | Scenario B │  
+├─────────────────────────────────────────────────┤  
+│ Target Revenue  | $2M      | $3M ↑      | $2.5M ↑    │  
+│ Profit Pool     | $300K    | $350K      | $500K ✅   │  
+│ Sales Velocity  | 1/mo     | 5/mo ⚠️    | 2/mo       │  
+│ Hires Needed    | —        | \+8 ⚠️      | \+2         │  
+│ Churn Load      | $200K    | $400K      | $150K      │  
+└─────────────────────────────────────────────────┘  
+\`\`\`
+
+5\. \*\*GPTComparativeSynthesis\*\*  
+   \- Similar structure to Tab 1 synthesis  
+   \- But explicitly compares scenarios  
+   \- Highlights trade-offs between paths
+
+\---
+
+\#\# Data Flow Architecture
+
+\#\#\# \*\*Flow 1: Tab 1 Standard Calculation\*\*  
+\`\`\`  
+User arrives at page  
+    ↓  
+Component mounts → useEffect triggers  
+    ↓  
+Fetch Agency Snapshot data (via Supabase query)  
+    ↓  
+If Snapshot exists:  
+    ├→ Pre-fill baseline fields  
+    └→ Show indicator "Auto-populated from Agency Snapshot"  
+    ↓  
+User reviews/adjusts baseline  
+User sets target revenue \+ timeframe  
+User clicks "Calculate"  
+    ↓  
+Frontend validation  
+Check tier limits (if free: decrement credits)  
+    ↓  
+Call calculation engine (Layer 1 → 2 → 3\)  
+    ↓  
+Store result in growth\_calculations table  
+Return calculation\_id  
+    ↓  
+Display results:  
+    ├→ Pressure Dashboard (6 cards)  
+    ├→ Key Metrics Grid  
+    └→ Trigger GPT synthesis  
+        ↓  
+        Check if synthesis exists for this calculation\_id  
+        If yes: Display cached synthesis  
+        If no:  
+            ├→ Gather inputs: calculation results \+ Snapshot context  
+            ├→ Call GPT API (via Edge Function)  
+            ├→ Stream/display response  
+            └→ Store in growth\_calculations.gpt\_synthesis\_text  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Flow 2: Tab 2 Scenario Builder (Real-Time)\*\*  
+\`\`\`  
+User switches to Tab 2  
+    ↓  
+Check tier: Is Pro?  
+    ├→ No: Display locked state with upgrade prompt  
+    └→ Yes: Continue  
+        ↓  
+Component mounts  
+    ↓  
+Fetch Agency Snapshot (for baseline)  
+Fetch user's saved scenarios  
+    ↓  
+Display baseline (read-only)  
+Display sliders (all at 0% default)  
+Display impact cards (showing baseline values)  
+    ↓  
+User clicks preset OR adjusts slider  
+    ↓  
+Update local state (React state)  
+    ↓  
+Debounced recalculation (300ms delay)  
+    ↓  
+Run calculation engine with adjustments  
+    ↓  
+Update impact cards (animated transition)  
+    ↓  
+User clicks "Save Scenario"  
+    ↓  
+Prompt for scenario name  
+    ↓  
+Run full calculation (if not already done)  
+    ↓  
+Insert into growth\_calculations (full results)  
+    ↓  
+Insert into growth\_scenarios (links to calculation \+ stores adjustments)  
+    ↓  
+Refresh saved scenarios list  
+\`\`\`
+
+\---
+
+\#\#\# \*\*Flow 3: Scenario Comparison\*\*  
+\`\`\`  
+User selects 2-3 scenarios (checkboxes)  
+    ↓  
+User clicks "Compare Selected Scenarios"  
+    ↓  
+Fetch full calculation results for each scenario  
+    ↓  
+Render comparison view:  
+    ├→ Generate 3 charts (using Recharts)  
+    ├→ Build comparison scorecard (table)  
+    └→ Trigger comparative GPT synthesis  
+        ↓  
+        Gather: All scenario calculation results  
+        Send to GPT with prompt: "Compare these scenarios"  
+        Display synthesis
+
+State Management Strategy  
+Tab 1: Simple Component State  
+typescript  
+// Tab1StandardCalculator.tsx
+
+const \[baselineInputs, setBaselineInputs\] \= useState\<BaselineInputs | null\>(null);  
+const \[targetInputs, setTargetInputs\] \= useState({ revenue: '', timeframe: 12 });  
+const \[calculationResult, setCalculationResult\] \= useState\<CalculationResult | null\>(null);  
+const \[isCalculating, setIsCalculating\] \= useState(false);  
+const \[synthesisText, setSynthesisText\] \= useState\<string | null\>(null);  
+const \[isGeneratingSynthesis, setIsGeneratingSynthesis\] \= useState(false);
+
+// Fetch Agency Snapshot on mount  
+useEffect(() \=\> {  
+  fetchAgencySnapshot().then(snapshot \=\> {  
+    if (snapshot) {  
+      setBaselineInputs({  
+        baseline\_revenue: snapshot.monthly\_revenue \* 12,  
+        baseline\_team\_size: snapshot.team\_size\_fte,  
+        baseline\_client\_count: snapshot.active\_client\_count,  
+        baseline\_retention\_rate: snapshot.retention\_rate,  
+        baseline\_profit\_margin: snapshot.operating\_profit\_pct / 100,  
+        baseline\_acv: snapshot.monthly\_revenue \* 12 / snapshot.active\_client\_count,  
+        baseline\_agi\_per\_fte: snapshot.agi\_per\_fte  
+      });  
+    }  
+  });  
+}, \[\]);
+
+Tab 2: Real-Time Calculation State  
+typescript  
+// Tab2ScenarioBuilder.tsx
+
+const \[baselineInputs, setBaselineInputs\] \= useState\<BaselineInputs | null\>(null);  
+const \[scenarioAdjustments, setScenarioAdjustments\] \= useState\<ScenarioAdjustments\>({  
+  growth\_adjustment\_pct: 0,  
+  acv\_adjustment\_pct: 0,  
+  efficiency\_adjustment\_pct: 0,  
+  retention\_adjustment\_pct: 0,  
+  margin\_adjustment\_pct: 0  
+});  
+const \[impactMetrics, setImpactMetrics\] \= useState\<ImpactMetrics | null\>(null);  
+const \[savedScenarios, setSavedScenarios\] \= useState\<SavedScenario\[\]\>(\[\]);  
+const \[selectedForComparison, setSelectedForComparison\] \= useState\<string\[\]\>(\[\]);
+
+// Real-time calculation on adjustment change  
+const debouncedCalculate \= useMemo(  
+  () \=\> debounce((adjustments: ScenarioAdjustments) \=\> {  
+    if (\!baselineInputs) return;  
+      
+    const results \= runCalculationEngine({  
+      baseline: baselineInputs,  
+      target: {  
+        revenue: baselineInputs.baseline\_revenue \* (1 \+ adjustments.growth\_adjustment\_pct),  
+        timeframe\_months: 12 // Default  
+      },  
+      adjustments  
+    });  
+      
+    setImpactMetrics({  
+      target\_revenue: results.output\_target\_revenue,  
+      target\_team\_size: results.output\_target\_team\_size,  
+      target\_profit: results.output\_target\_profit,  
+      target\_client\_count: results.output\_target\_client\_count,  
+      monthly\_sales\_velocity: results.output\_monthly\_velocity  
+    });  
+  }, 300),  
+  \[baselineInputs\]  
+);
+
+// Trigger recalculation on adjustment change  
+useEffect(() \=\> {  
+  debouncedCalculate(scenarioAdjustments);  
+}, \[scenarioAdjustments, debouncedCalculate\]);
+
+API Integration Points  
+1\. Fetch Agency Snapshot  
+typescript  
+async function fetchAgencySnapshot(userId: string, agencyId: string) {  
+  const { data, error } \= await supabase  
+    .from('vi\_monthly\_kpis\_current')  
+    .select('\*')  
+    .eq('user\_id', userId)  
+    .eq('agency\_id', agencyId)  
+    .single();  
+      
+  if (error || \!data) return null;  
+    
+  return data;  
+}
+
+2\. Store Calculation  
+typescript  
+async function storeCalculation(inputs: CalculationInputs, results: CalculationOutputs) {  
+  const { data, error } \= await supabase  
+    .from('growth\_calculations')  
+    .insert({  
+      user\_id: getCurrentUserId(),  
+      agency\_id: getCurrentAgencyId(),  
+        
+      // Baseline inputs  
+      baseline\_revenue: inputs.baseline.revenue,  
+      baseline\_team\_size: inputs.baseline.teamSize,  
+      baseline\_client\_count: inputs.baseline.clientCount,  
+      baseline\_retention\_rate: inputs.baseline.retentionRate,  
+      baseline\_profit\_margin: inputs.baseline.profitMargin,  
+      baseline\_acv: inputs.baseline.acv,  
+      baseline\_agi\_per\_fte: inputs.baseline.agiPerFTE,  
+        
+      // Target  
+      target\_revenue: inputs.target.revenue,  
+      target\_timeframe\_months: inputs.target.timeframeMonths,  
+        
+      // Calculated outputs  
+      ...results.outputDeltas,  
+        
+      // Pressure family alerts (JSONB)  
+      pressure\_family\_alerts: results.pressureAlerts  
+    })  
+    .select()  
+    .single();  
+      
+  return data?.calculation\_id;  
+}
+
+3\. Generate GPT Synthesis  
+typescript  
+async function generateGPTSynthesis(  
+  calculationId: string,  
+  calculationResults: CalculationOutputs,  
+  snapshotContext: AgencySnapshotContext  
+) {  
+  // Call Edge Function  
+  const response \= await fetch('/api/growth-velocity-synthesis', {  
+    method: 'POST',  
+    headers: { 'Content-Type': 'application/json' },  
+    body: JSON.stringify({  
+      calculation\_id: calculationId,  
+      calculation\_results: calculationResults,  
+      snapshot\_context: snapshotContext,  
+      project\_knowledge\_context: true // Use project docs for coaching frameworks  
+    })  
+  });  
+    
+  const { synthesis } \= await response.json();  
+    
+  // Store in DB  
+  await supabase  
+    .from('growth\_calculations')  
+    .update({ gpt\_synthesis\_text: synthesis })  
+    .eq('calculation\_id', calculationId);  
+      
+  return synthesis;  
+}
+
+4\. Save Scenario (Pro Tier)  
+typescript  
+async function saveScenario(  
+  scenarioName: string,  
+  baselineInputs: BaselineInputs,  
+  targetInputs: TargetInputs,  
+  adjustments: ScenarioAdjustments,  
+  calculationId: string  
+) {  
+  const { data, error } \= await supabase  
+    .from('growth\_scenarios')  
+    .insert({  
+      user\_id: getCurrentUserId(),  
+      agency\_id: getCurrentAgencyId(),  
+      scenario\_name: scenarioName,  
+        
+      // Store baseline snapshot  
+      baseline\_revenue: baselineInputs.baseline\_revenue,  
+      baseline\_team\_size: baselineInputs.baseline\_team\_size,  
+      baseline\_client\_count: baselineInputs.baseline\_client\_count,  
+      baseline\_retention\_rate: baselineInputs.baseline\_retention\_rate,  
+      baseline\_profit\_margin: baselineInputs.baseline\_profit\_margin,  
+      baseline\_acv: baselineInputs.baseline\_acv,  
+        
+      // Store target  
+      target\_revenue: targetInputs.revenue,  
+      target\_timeframe\_months: targetInputs.timeframe\_months,  
+        
+      // Store adjustments  
+      growth\_adjustment\_pct: adjustments.growth\_adjustment\_pct,  
+      acv\_adjustment\_pct: adjustments.acv\_adjustment\_pct,  
+      efficiency\_adjustment\_pct: adjustments.efficiency\_adjustment\_pct,  
+      retention\_adjustment\_pct: adjustments.retention\_adjustment\_pct,  
+      margin\_adjustment\_pct: adjustments.margin\_adjustment\_pct,  
+        
+      // Link to full calculation  
+      calculation\_id: calculationId  
+    })  
+    .select()  
+    .single();  
+      
+  return data?.scenario\_id;  
+}
+
+Tier Gating Implementation  
+Free Tier Limits (Tab 1\)  
+typescript  
+// Check remaining credits before calculation  
+async function checkCalculationCredits(userId: string) {  
+  const today \= new Date().toISOString().split('T')\[0\];  
+    
+  const { count } \= await supabase  
+    .from('growth\_calculations')  
+    .select('\*', { count: 'exact', head: true })  
+    .eq('user\_id', userId)  
+    .gte('created\_at', \`${today}T00:00:00Z\`)  
+    .lte('created\_at', \`${today}T23:59:59Z\`);  
+      
+  const creditsUsed \= count || 0;  
+  const creditsRemaining \= Math.max(0, 3 \- creditsUsed);  
+    
+  return {  
+    hasCredits: creditsRemaining \> 0,  
+    creditsRemaining  
+  };  
+}
+
+// In component  
+const handleCalculate \= async () \=\> {  
+  const userTier \= getUserTier(); // From context  
+    
+  if (userTier \=== 'free') {  
+    const { hasCredits, creditsRemaining } \= await checkCalculationCredits(userId);  
+      
+    if (\!hasCredits) {  
+      showUpgradeModal('You've used all 3 calculations today. Upgrade to Pro for unlimited access.');  
+      return;  
+    }  
+      
+    // Show remaining credits after calculation  
+    setCreditsRemaining(creditsRemaining \- 1);  
+  }  
+    
+  // Proceed with calculation  
+  await runCalculation();  
+};
+
+Pro Tier Gate (Tab 2\)  
+typescript  
+// In Tab component  
+const ScenarioBuilderTab \= () \=\> {  
+  const userTier \= getUserTier();  
+    
+  if (userTier \!== 'pro') {  
+    return (  
+      \<LockedTabState  
+        title="Scenario Builder"  
+        description="Build and compare multiple growth scenarios with interactive modeling tools"  
+        features={\[  
+          'Unlimited calculations',  
+          'Interactive slider controls',  
+          'Save unlimited scenarios',  
+          'Visual comparison charts',  
+          'Comparative AI synthesis'  
+        \]}  
+        ctaText="Upgrade to Pro"  
+        ctaLink="/pricing"  
+      /\>  
+    );  
+  }  
+    
+  return \<ScenarioBuilderContent /\>;  
+};
+
+Responsive Design Notes  
+Desktop (\>1024px)  
+Two-column layout (50/50 or 45/55 split)  
+Results panel sticky on scroll  
+Charts displayed side-by-side in comparison view  
+Tablet (768-1024px)  
+Maintain two columns but narrower  
+Stack comparison charts vertically  
+Mobile (\<768px)  
+Full stack: Inputs → Calculate → Results  
+Sliders become full-width  
+Impact cards stack vertically (1 column)  
+Comparison view: All charts stacked  
+Scorecard table scrollable horizontally
+
+Performance Considerations  
+Real-Time Calculation Optimization  
+typescript  
+// Debounce slider updates  
+const debouncedCalculate \= useMemo(  
+  () \=\> debounce(calculateImpactMetrics, 300),  
+  \[baselineInputs\]  
+);
+
+// Memoize expensive calculations  
+const calculationEngine \= useMemo(  
+  () \=\> new GrowthCalculationEngine(baselineInputs),  
+  \[baselineInputs\]  
+);
+
+// Use React.memo for impact cards  
+const ImpactCard \= React.memo(({ title, value, unit }: ImpactCardProps) \=\> {  
+  return \<Card\>...\</Card\>;  
+});
+
+Chart Rendering  
+typescript  
+// Lazy load comparison charts  
+const TreadmillChart \= lazy(() \=\> import('./charts/TreadmillChart'));  
+const ProfitChart \= lazy(() \=\> import('./charts/ProfitChart'));  
+const StrainChart \= lazy(() \=\> import('./charts/StrainChart'));
+
+// In ComparisonView  
+\<Suspense fallback={\<ChartSkeleton /\>}\>  
+  \<TreadmillChart data={comparisonData} /\>  
+  \<ProfitChart data={comparisonData} /\>  
+  \<StrainChart data={comparisonData} /\>  
+\</Suspense\>
+
+END OF DOCUMENT 3
+
+Summary: Component Architecture V2  
+✅ Two-tab system (Standard Calculator | Scenario Builder)  
+ ✅ Tier gating (Free: 3 calcs/day, Pro: unlimited \+ scenarios)  
+ ✅ Auto-population from Agency Snapshot  
+ ✅ Real-time calculations (debounced slider updates)  
+ ✅ Saved scenarios with comparison functionality  
+ ✅ GPT synthesis with caching  
+ ✅ Pressure dashboard (6 family cards with conditional alerts)  
+Next: Document 4 (GPT Integration & Synthesis) 
+
+Please review this material and provide a summary of your understanding of the vision outlined here and the changes proposed compared to the current structure. Please do not begin editing anything or creating any implementation plans yet. Please just confirm your understanding and let's ensure alignment before we proceed.

@@ -1,0 +1,406 @@
+# Architect OS — Execution Layer
+## Functional Spec: Execution Overview Page
+
+**Document Type:** Functional Specification — Pre-Build
+**Follows:** `ArchitectOS_Execution_Layer_FunctionalSpec.md`
+**Purpose:** Define the complete feature set, layout, states, interactions, and data requirements for the Execution Overview page — the navigation hub for the entire execution layer.
+
+---
+
+## Page Purpose
+
+The Execution Overview is the first page a founder sees when they enter the Execution section. Its job is to orient, inform, and direct — telling the founder exactly where they are in their sprint lifecycle and what the most important next action is. It is not a dashboard. It is not a reporting surface. It is a smart doorway that changes based on context.
+
+The page has one primary question it must answer at every visit: *"What does this founder need to do or know right now?"* The layout, the content, and the navigation cards on this page all answer that question differently depending on sprint state.
+
+---
+
+## Sprint Naming Convention
+
+### Default System Name
+When a sprint is created, the platform assigns a default name using the following format:
+
+**"Sprint [N] — [Truncated Goal]"**
+
+- N = sequential sprint number for this account (1, 2, 3...)
+- Truncated goal = the first 6–8 words of the sprint goal, followed by an ellipsis if needed
+- Example: *"Sprint 1 — Stabilize delivery floor and reduce founder..."*
+
+### Founder Override
+The sprint name is always editable. An edit icon appears inline next to the sprint name wherever it is displayed on this page. Clicking it activates an inline text input. The founder can name their sprint anything they want:
+- "Q1 2026"
+- "The Stabilization Quarter"
+- "Foundation Sprint"
+- "Jan–Apr 2026"
+
+The custom name replaces the system default everywhere the sprint name appears — across the execution section, sprint history, and any exported documents.
+
+**Behavior rules:**
+- Name input: single-line text, max 60 characters
+- Save on blur — auto-save pattern consistent with the rest of the platform
+- If left blank and blurred: reverts to system default name
+- The sprint goal is always shown as a subtitle regardless of what the sprint name is set to — so even if the founder names it something abstract, the goal text remains visible for context
+
+---
+
+## Sprint Lifecycle States
+
+The Execution Overview page renders differently across six distinct sprint states. Every layout decision below is state-aware.
+
+| State | Trigger | Primary Founder Action |
+|---|---|---|
+| **No Sprint** | No sprint has been locked yet | Begin planning |
+| **Pre-Launch** | Sprint locked, kickoff date not set or in future | Set kickoff date, share launch summary |
+| **Active** | Kickoff date has passed, < 63 days elapsed | Update progress, run standups |
+| **Wind-Down** | 63–84 days elapsed (final 21 days) | Complete wind-down review |
+| **Closed — Retro Pending** | 84 days elapsed or manually closed, retrospective not started | Begin retrospective |
+| **Closed — Complete** | Retrospective approved and finalized | Begin next sprint planning |
+
+All state transitions are automatic based on the kickoff date and 84-day sprint duration — except the Closed state, which can also be triggered manually by the founder via a "Close Sprint Early" option in the page settings menu.
+
+---
+
+## Page Layout — All States
+
+### Persistent Elements (Appear in All States Except No Sprint)
+
+**Page Header**
+- Page title: "Execution & Review" — consistent with current build
+- Subtitle: dynamic based on state (see state-specific content below)
+- Top-right: settings icon (gear) — opens a small dropdown with: "Rename Sprint," "Close Sprint Early," "View Sprint History"
+
+**Sprint Identity Block**
+Appears directly below the page header. Always visible when a sprint exists.
+
+| Element | Content | Editable |
+|---|---|---|
+| Sprint name | System default or founder-custom name | Yes — inline edit via pencil icon |
+| Sprint goal | Full sprint goal text — always shown as subtitle | No — edit in Planning |
+| Sprint status badge | PRE-LAUNCH / ACTIVE / WIND-DOWN / CLOSED | No — system-calculated |
+| Sprint dates | "Started [date] · Ends [date]" or "Kicks off [date]" if pre-launch | No |
+| Days remaining pill | "[N] days remaining" — shown in active and wind-down states only | No |
+
+---
+
+## State 1 — No Sprint
+
+### When It Renders
+The founder has never locked a sprint plan, or all previous sprints are closed and no new sprint has been started.
+
+### Layout
+No sprint identity block. No navigation cards. A centered orientation state.
+
+**Content:**
+- Section icon — a simple compass or arrow icon, consistent with platform style
+- Heading: *"Your execution layer is ready."*
+- Body: two sentences maximum. *"Once you lock your sprint plan, this section becomes your operational home for the quarter — progress tracking, weekly standups, strategic synthesis, and your sprint retrospective all live here."*
+- Single CTA button: "Go to Planning" — links to the Planning section
+
+**What NOT to show:**
+- No placeholder cards with locked states
+- No statistics or progress elements
+- No navigation cards in disabled state
+
+The empty state should feel intentional and calm — not like something is broken or missing.
+
+---
+
+## State 2 — Pre-Launch
+
+### When It Renders
+The sprint is locked. The executive summary has been generated. The kickoff date has either not been set yet, or has been set to a future date. The sprint clock has not started.
+
+### What the Founder Needs
+Two things: set the kickoff date, and share the launch summary with the team. These are the only actions that matter in this state. Everything else waits.
+
+### Layout
+
+**Sprint Identity Block** — as defined above. Status badge shows PRE-LAUNCH. Dates show: "Kicks off [date]" if set, or "Kickoff date not set" in amber if not yet set.
+
+**Primary Action Banner**
+A visually distinct banner below the sprint identity block — not a card, a full-width prompt:
+
+If kickoff date is NOT set:
+- Amber left border treatment
+- Heading: *"Set your sprint kickoff date to start the clock."*
+- Body: *"Your sprint plan is locked and ready. Choose the date your team officially kicks off this sprint — this is when your 84-day countdown begins."*
+- Inline date picker — founder selects the kickoff date directly in this banner
+- "Confirm Kickoff Date" button — saves the date and transitions the banner to the confirmation state
+
+If kickoff date IS set (and is in the future):
+- Blue/neutral left border
+- Heading: *"Sprint [name] kicks off on [date]."*
+- Body: *"Share your sprint launch summary with your team before the kickoff meeting."*
+- Two action buttons: "View Launch Summary" and "Share with Team"
+- Edit link: "Change kickoff date"
+
+**Navigation Cards — Pre-Launch State**
+Four cards shown below the primary action banner. Sprint Launch is fully active. The others are visible but in a pre-active state — they show their title and description but their status lines reflect that the sprint hasn't started yet.
+
+| Card | State | Status Line |
+|---|---|---|
+| Sprint Launch | **Active** — primary card | "Review and share your launch summary" |
+| Status Tracker | Muted — not yet active | "Available once your sprint begins" |
+| Momentum Synthesis | Muted — not yet active | "Available once your sprint begins" |
+| Retrospective | Muted — not yet active | "Available at sprint close" |
+
+Muted cards are visible but not clickable. They use a reduced opacity treatment and a lock icon in the corner. This is aspirational — it shows the founder what's coming without making the state feel broken.
+
+---
+
+## State 3 — Active Sprint (Primary Design Target)
+
+### When It Renders
+The kickoff date has passed and fewer than 63 days have elapsed. The sprint is in full motion.
+
+### Layout
+
+**Sprint Identity Block** — status badge: ACTIVE. Days remaining pill visible.
+
+**Sprint Health Bar**
+A horizontal summary strip directly below the sprint identity block. Four metrics displayed side by side:
+
+| Metric | Content | Visual |
+|---|---|---|
+| Overall Completion | Percentage of milestones marked Complete | Progress bar + percentage |
+| Initiatives | "X of Y complete" | Simple count |
+| Blockers | "N blocked" | Amber text + dot if > 0; muted if 0 |
+| Last Updated | "Updated [N days ago]" | Muted if ≤ 3 days; amber if 4–7 days; soft warning if > 7 days |
+
+The health bar is read-only — no interactions. It is a quick-glance surface only. Clicking anywhere on it navigates to the Status Tracker.
+
+**Navigation Cards — Active State**
+Four cards, all fully active. Arranged in a 2×2 grid on desktop, single column stack on mobile.
+
+---
+
+**Card 1 — Sprint Launch**
+- Icon: rocket or flag
+- Title: "Sprint Launch"
+- Description: "Your sprint summary and team alignment document."
+- Status line: "Shared with team · Locked [date]" if shared. "Not yet shared" in amber if not shared.
+- Action needed state: if the launch summary has not been shared, a subtle "Share with team" badge appears on the card
+- Click: navigates to Sprint Launch page
+
+---
+
+**Card 2 — Status Tracker**
+- Icon: checklist or progress circle
+- Title: "Status Tracker"
+- Description: "Update milestone progress and run your weekly standup."
+- Status line: dynamic — shows the most relevant current data point:
+  - If updated in last 3 days: "Last updated [N days ago] · [X] milestones complete"
+  - If not updated in 4–7 days: "Last updated [N days ago]" in amber
+  - If not updated in 8+ days: "No updates in [N] days — consider a check-in" in amber
+- Secondary stat: "[N] milestones targeted this month" — pulls from milestones where timeline = current month
+- Click: navigates to Status Tracker
+
+---
+
+**Card 3 — Momentum Synthesis**
+- Icon: compass or waveform
+- Title: "Momentum Synthesis"
+- Description: "Get a strategic read on how your quarter is progressing."
+- Status line:
+  - If never generated: "Generate your first synthesis" — with a subtle prompt treatment
+  - If generated: "Last generated [date] · Week [N] of 12"
+- A note below the status line if synthesis is more than 2 weeks old: "Your synthesis may not reflect recent progress."
+- Click: navigates to Momentum Synthesis page
+
+---
+
+**Card 4 — Retrospective** *(muted in active state)*
+- Icon: reflection/mirror
+- Title: "Retrospective"
+- Description: "Close the quarter with a full synthesis of what you built."
+- Status line: "Available at sprint close · [N] days remaining"
+- State: visible but not clickable — muted opacity, lock icon
+- This card exists in the active state so the founder always knows it's coming. It is not hidden.
+
+---
+
+**Wind-Down Prompt — Active State (Day 56+)**
+Starting at day 56 (4 weeks from end), a subtle informational strip appears between the health bar and the navigation cards — not alarming, just orienting:
+
+*"You have [N] days remaining in Sprint [name]. Wind-down review becomes available in [X] days."*
+
+This transitions to the full wind-down banner when the state changes.
+
+---
+
+## State 4 — Wind-Down
+
+### When It Renders
+63 to 84 days have elapsed since kickoff. Final 21 days of the sprint.
+
+### Layout
+
+**Sprint Identity Block** — status badge: WIND-DOWN. Days remaining pill shown in amber.
+
+**Wind-Down Banner**
+A full-width banner, more prominent than the active state's informational strip:
+- Amber left border
+- Heading: *"Sprint [name] ends in [N] days."*
+- Body: *"Begin your wind-down review to close this quarter with intention — decide what to complete, what to carry forward, and what to release."*
+- CTA button: "Begin Wind-Down Review" — links to the Sprint Wind-Down page
+- If wind-down is in progress: button changes to "Continue Wind-Down Review" with a progress indicator showing which of the three steps are complete
+
+**Sprint Health Bar** — same as active state.
+
+**Navigation Cards — Wind-Down State**
+Five cards now visible — the Wind-Down card activates and moves to the top of the card grid.
+
+| Card | Position | State |
+|---|---|---|
+| Sprint Wind-Down | **First — most prominent** | Active, highlighted with subtle amber border |
+| Status Tracker | Second | Active |
+| Momentum Synthesis | Third | Active |
+| Sprint Launch | Fourth | Active — reduced emphasis |
+| Retrospective | Fifth | Muted — "Available at sprint close" |
+
+**Wind-Down Card (new):**
+- Icon: hourglass or sunset
+- Title: "Sprint Wind-Down"
+- Description: "Close this quarter with intention — complete, carry forward, or release."
+- Status line: shows wind-down progress — "Step 1 of 3 complete" or "Not started"
+- Action needed state: if not started, a "Begin" badge appears
+- Click: navigates to Sprint Wind-Down page
+
+---
+
+## State 5 — Closed, Retrospective Pending
+
+### When It Renders
+84 days have elapsed from the kickoff date, or the founder has manually closed the sprint. The retrospective has not yet been started.
+
+### Layout
+
+**Sprint Identity Block** — status badge: CLOSED. No days remaining pill.
+
+**Retrospective CTA Banner**
+Full-width, prominent — this is the primary action in this state:
+- Blue/celebration left border treatment
+- Heading: *"Sprint [name] is complete."*
+- Body: *"Take a moment to close this chapter. Your retrospective synthesizes what you accomplished, how your capabilities developed, and what comes next."*
+- CTA button: "Begin Retrospective" — links to Retrospective page
+
+**Sprint Completion Summary**
+A simple summary block below the banner:
+- Milestones completed: [N] of [N]
+- Initiatives completed: [N] of [N]
+- Days in sprint: [N]
+- Sprint goal self-assessment: "Pending — answer in your retrospective"
+
+**Navigation Cards — Closed State**
+Cards simplified — only relevant completed sections remain active:
+
+| Card | State | Note |
+|---|---|---|
+| Retrospective | **Primary — active, highlighted** | The main action |
+| Status Tracker | Active — read-only reference | Founders may still want to view |
+| Sprint Launch | Active — historical reference | View the launch summary |
+| Momentum Synthesis | Active — historical reference | View past syntheses |
+| Sprint Wind-Down | Read-only | Decisions are locked |
+
+---
+
+## State 6 — Closed, Retrospective Complete
+
+### When It Renders
+The retrospective has been approved and finalized by the founder.
+
+### Layout
+
+**Sprint Identity Block** — status badge: CLOSED + "Retrospective Complete" secondary tag.
+
+**Celebration Block**
+A full-width acknowledgment moment — calm and considered, not exuberant:
+- Heading: *"[Sprint name] is documented and complete."*
+- Sprint Theme — displayed prominently: the one-line theme from the Sprint Launch, now serving as the closing summary of the quarter
+- Sprint Theme Close — the AI-generated closing line from the retrospective, shown below the theme
+
+**Sprint Summary Strip**
+Three key numbers from the completed sprint:
+- Milestones completed: [N]
+- Capability areas advanced: [N] (count of areas where score increased)
+- Sprint goal outcome: Achieved / Partially Achieved / We Learned
+
+**Forward Action — Primary CTA**
+*"Ready to begin [Sprint 2 / next quarter]?"*
+Button: "Begin Sprint 2 Planning" — links to the Planning section with the Quarter Map pre-populated from the retrospective's Forward Guidance.
+
+Secondary link: "View Sprint [N] Retrospective" — links to the completed retrospective as a historical record.
+
+**Sprint History Preview**
+A collapsed section at the bottom: "Your Sprint History." If this is Sprint 1, it shows just this sprint. As sprints accumulate, this section shows a row per completed sprint with: sprint name, dates, milestone completion rate, and a link to the retrospective. This is the beginning of the longitudinal record.
+
+---
+
+## Data Model Requirements
+
+The following fields are needed to power the Execution Overview page across all states. Flagged for Pass 3 data wiring.
+
+| Field | Table | Notes |
+|---|---|---|
+| Sprint name | sprints | Founder-editable, defaults to system name |
+| Sprint goal | sprint_goals | Read-only on this page |
+| Sprint status | sprints — calculated field | Derived from kickoff_date, end_date, retrospective_complete |
+| Lock date | sprints | Set at sprint lock |
+| Kickoff date | sprints | Founder-set, nullable until confirmed |
+| End date | sprints | Calculated: kickoff_date + 84 days |
+| Sprint number | sprints | Auto-incremented per account |
+| Milestone completion count | milestones — aggregated | count(status = Complete) / count(*) |
+| Blocker count | milestones — aggregated | count(status = Blocked) |
+| Last status update | milestones — max(updated_at) | Most recent milestone status change |
+| Initiatives complete | initiatives — aggregated | count(all milestones complete) |
+| Momentum synthesis last generated | momentum_syntheses — max(created_at) | |
+| Launch summary shared | sprint_summaries — shared boolean | |
+| Wind-down progress | wind_down_decisions — completion status | Steps 1/2/3 complete |
+| Retrospective complete | retrospective_records — approved boolean | |
+| Capability scores (start + end) | capability_scores — snapshots | Used in closed state summary |
+
+---
+
+## Navigation & Routing
+
+| Destination | Route |
+|---|---|
+| Execution Overview | /pro/execution |
+| Sprint Launch | /pro/execution/launch |
+| Status Tracker | /pro/execution/status-tracker |
+| Momentum Synthesis | /pro/execution/synthesis |
+| Sprint Wind-Down | /pro/execution/wind-down |
+| Retrospective | /pro/execution/retrospective |
+| Sprint History | /pro/execution/history |
+| Planning (for CTA links) | /pro/planning |
+
+---
+
+## Empty & Edge States Summary
+
+| Scenario | Behavior |
+|---|---|
+| No sprint ever created | Orientation state — single CTA to Planning |
+| Sprint locked, kickoff not set | Pre-launch banner with inline date picker |
+| Sprint active, no status updates in 8+ days | Amber indicator on health bar and Status Tracker card |
+| Sprint active, launch summary not shared | Action needed badge on Sprint Launch card |
+| Sprint active, no momentum synthesis ever generated | Prompt treatment on Momentum Synthesis card |
+| Wind-down period, wind-down not started | Amber wind-down banner with Begin CTA |
+| Sprint closed, retrospective not started | Retrospective CTA banner as primary action |
+| Retrospective complete | Celebration block + next sprint CTA |
+| Multiple closed sprints, new sprint not started | State 6 layout with sprint history visible |
+
+---
+
+## Design Decisions to Carry Forward
+
+1. **Sprint name edit** is available from this page via inline pencil icon — this is the primary place founders will rename their sprint, not a settings page
+2. **Kickoff date** is set from this page in the Pre-Launch state — it is not set during sprint lock, giving the founder intentional separation between locking the plan and starting the clock
+3. **Sprint goal** is always visible on this page but never editable here — it is locked at sprint lock and any changes would require unlocking the sprint plan
+4. **The Retrospective card** is always visible in some form across all active states — never hidden — so the founder always knows it is coming
+5. **Sprint history** begins appearing in State 6 — it does not have its own navigation item in V1, it lives at the bottom of the Overview page
+
+---
+
+*Architect OS Execution Layer — Execution Overview Page Functional Spec V1.0*
+*Pre-Build — Follows Execution Layer Functional Spec, Precedes Antigravity Build Prompts*

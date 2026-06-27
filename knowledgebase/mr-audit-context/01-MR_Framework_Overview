@@ -1,0 +1,139 @@
+# Maturity + Readiness Audit — Framework Overview
+
+## Purpose & Problem
+
+The Maturity + Readiness Audit (M+R Audit) transforms implicit founder knowledge into explicit strategic clarity. It diagnoses where an agency stands across the full spectrum of business maturity—from financial health to operational systems to leadership depth—and translates that assessment into actionable priorities.
+
+**The problem it solves:**
+
+Most agency founders know their business has gaps, but they don't know which gaps matter most *right now* or which should be addressed *next*. Growth plans stall because strategic priorities remain unclear, and transformation roadmaps fail because they don't account for the agency's current stage of maturity.
+
+The M+R Audit provides stage-calibrated diagnostic clarity that reveals:
+- What's working and what's not
+- What's holding growth back today
+- What needs to be built to unlock the next level
+- How to sequence improvements for maximum leverage
+
+## Role in the Architect OS Ecosystem
+
+The M+R Audit is the **diagnostic engine** that powers strategic execution within Architect OS. It sits between orientation and action:
+
+**AE Ladder (Orientation)** → Where am I today?  
+**M+R Audit (Diagnosis)** → What capabilities need development?  
+**Architect OS Pro (Execution)** → How do I build and track progress?
+
+The M+R Audit doesn't just score—it interprets. Every capability assessment feeds into:
+- **Dashboard insights** that explain performance patterns
+- **3P roadmaps** that prioritize what to fix now, plant next, and iterate ongoing
+- **Virtual CSO intelligence** that contextualizes recommendations based on the agency's unique maturity profile
+
+This framework is designed for *monthly or quarterly check-ins*, not daily management. It's a strategic partner for founders who need clarity about their trajectory, not another task tracker.
+
+## Structural Architecture
+
+The M+R Audit operates through a **three-tier hierarchy**:
+
+### Tier 1: Dimensions (5)
+The five enduring disciplines of business maturity that span every stage of growth:
+1. Financial & Business Health
+2. Client Base & Market Position
+3. Operational Systems
+4. Team Structure & Leadership
+5. Strategic Stewardship
+
+Dimensions remain constant across all stages—they represent *what* must evolve for sustainable growth.
+
+### Tier 2: Capability Areas (25)
+The core functional competencies within each dimension that can be independently measured and developed. Each dimension contains exactly 5 capability areas, creating 25 total measurement units across the framework.
+
+Examples:
+- Financial Visibility & Foresight (Dimension 1)
+- Positioning Clarity & Differentiation (Dimension 2)
+- Workflow Efficiency (Dimension 3)
+- Leadership Effectiveness & Leverage (Dimension 4)
+- Vision & Strategic Clarity (Dimension 5)
+
+Capability areas are the **primary unit of scoring and prioritization** within the M+R system.
+
+### Tier 3: Checkpoints (125)
+Observable, measurable validation points that confirm whether a capability area is functioning at the expected level of maturity. Each capability area contains exactly 5 checkpoints.
+
+Checkpoints serve as:
+- **Assessment inputs** — The questions users answer during the audit
+- **Progress markers** — Observable evidence of capability maturity
+- **Milestone triggers** — Completion updates capability scores in real-time
+
+## Stage-Calibrated Intelligence
+
+The M+R Audit is **deeply integrated with the AE Ladder**. Every user has an AE stage assignment (Rising, Striving, Thriving, Driving, or Arriving) tied to their profile, and this stage determines:
+
+- Which checkpoint language they see during assessment
+- Which "what good looks like" descriptions appear in their capability dashboards
+- How urgency and priority are weighted in their roadmap
+
+**Example:**  
+A Rising-stage agency answering questions about "Financial Visibility" sees checkpoint statements focused on establishing basic cash flow awareness and tracking consistency. A Driving-stage agency sees checkpoint statements about predictive forecasting and integrated financial intelligence systems.
+
+This stage filtering happens **automatically in Supabase**. The knowledge base documents describe *how capabilities evolve conceptually*, but don't store every variation—that lives in the database.
+
+## Scoring Logic (High-Level)
+
+Each capability area receives an **urgency score** that determines where it appears in the agency's 3P roadmap:
+
+**Urgency = Criticality × Impact**
+
+- **Criticality:** How essential this capability is for the agency's *current* stage of growth (structural importance)
+- **Impact:** How transformative mastery of this capability will be once achieved (strategic leverage)
+
+The M+R system calculates urgency automatically and distributes all 25 capability areas into three focus categories:
+
+1. **Prioritize (Top 8-10)** — Most urgent; blocking current progress
+2. **Plant (Middle 8-10)** — Future-focused; preparing for next stage
+3. **Progressively Iterate (Bottom 5-7)** — Stable; requiring ongoing refinement
+
+This creates a **living prioritization engine** that evolves as the agency progresses, recalibrating focus as capabilities mature and new strategic needs emerge.
+
+## When This Framework Is Used
+
+The M+R Audit is activated in three primary contexts:
+
+**1. Initial Diagnosis (Tier 2 Purchase)**  
+When a user purchases the full diagnostic tier, they complete the 125-question M+R assessment and receive:
+- Full capability scoring across all 25 areas
+- Stage-calibrated dashboard with insights
+- Weighted 3P roadmap showing prioritized focus areas
+
+**2. Quarterly Strategic Reviews (Tier 3 / Pro)**  
+Pro users retake portions of the audit during quarterly planning cycles to:
+- Track capability progression over time
+- Recalibrate priorities as the business evolves
+- Inform initiative planning and milestone setting
+
+**3. AI-Powered Contextual Guidance (Virtual CSO)**  
+The M+R framework provides the foundational context that powers the Virtual CSO feature. Every capability score, stage assignment, and checkpoint completion feeds the AI's understanding of:
+- Where the agency is strong
+- Where it's vulnerable
+- What sequence of development makes strategic sense
+
+## Key Principles
+
+**Stage-Fit Over Prescriptive:**  
+The M+R Audit doesn't impose a universal "best practice." It recognizes that what's critical at one stage may be premature or already stabilized at another.
+
+**Observational Over Judgmental:**  
+Language focuses on "this implies" rather than "you should." The system reveals structural implications and lets founders decide how to respond.
+
+**Integration Over Isolation:**  
+Capability insights don't stand alone—they inform dashboards, roadmaps, sprint planning, and AI advisory across the entire Architect OS platform.
+
+**Living System Over Static Snapshot:**  
+As users complete milestones, capability scores update automatically. The M+R Audit becomes a closed-loop system where execution drives assessment, and assessment drives execution.
+
+---
+
+**Related Documentation:**
+- `MR_Dimensions.md` — The 5 foundational disciplines
+- `MR_Capability_Areas.md` — The 25 measurable competencies
+- `MR_Checkpoints_Concept.md` — How validation and scoring work
+- `MR_Stage_Progression_Philosophy.md` — How maturity evolves across stages
+

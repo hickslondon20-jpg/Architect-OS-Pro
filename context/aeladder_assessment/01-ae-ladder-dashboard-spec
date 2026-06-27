@@ -1,0 +1,480 @@
+# AE Ladder Results Dashboard — Wiring Spec & Build Guide
+
+**Version:** 1.0  
+**Status:** Ready for Antigravity build  
+**Supabase View:** `vw_ae_dashboard_results`  
+**Primary Table:** `ae_assessment_insights`  
+**Supporting Tables:** `ae_assessments`, `ae_dimension_scores`, `ae_dimension_band_stage_meanings`
+
+---
+
+## Overview
+
+This document defines the complete field mapping, component structure, and incremental build sequence for the AE Ladder Results Dashboard. It serves as the permanent technical reference for how the dashboard is wired and as the step-by-step Antigravity build instruction.
+
+The dashboard renders results from a single Supabase view query:
+
+```sql
+SELECT * FROM vw_ae_dashboard_results
+WHERE ae_assessment_id = '<current_user_assessment_id>'
+```
+
+All dashboard sections bind their content directly to named fields from this view. No additional transformation or secondary queries are needed for dashboard rendering.
+
+---
+
+## Part 1 — Technical Spec
+
+### 1.1 Data Source
+
+**View:** `vw_ae_dashboard_results`
+
+This view joins the following tables into a single flat result:
+
+| Source Table | What It Contributes |
+|---|---|
+| `ae_assessments` | Assessment identity, overall score, submitted_at |
+| `ae_frontend_stages` | Stage label, tagline, description |
+| `ae_assessment_insights` | All GPT-generated narrative content + signal headlines |
+| `ae_dimension_scores` | Per-dimension avg scores and band IDs |
+| `ae_dimension_band_stage_meanings` | Deterministic meaning text, signal tags, focus areas |
+
+Query pattern for the dashboard component:
+
+```typescript
+const { data, error } = await supabase
+  .from('vw_ae_dashboard_results')
+  .select('*')
+  .eq('ae_assessment_id', assessmentId)
+  .single()
+```
+
+---
+
+### 1.2 Dashboard Section Map
+
+The dashboard is structured into six sections. Each section lists its fields, their source in the view, the collapsed default state, and the expanded state where applicable.
+
+---
+
+#### SECTION 1 — Hero
+
+**Purpose:** Stage identity, overall score, and strategic orientation
+
+**Collapsed state — always visible:**
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Stage tagline | `ae_stage_tagline` | Bold headline |
+| Stage interpretation | `stage_brief_interpretation` | 1–2 sentence subheading |
+| Overall score | `overall_score` | Numeric display |
+| Stage label | `ae_frontend_stage` | Badge or label |
+
+**Expanded state — revealed on user interaction:**
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Strategic overview paragraph | `strategic_insights_overall` | 2–4 sentence GPT synthesis |
+
+---
+
+#### SECTION 2 — Dimension Snapshot
+
+**Purpose:** Per-dimension score and band, with expandable meaning context
+
+Five cards, one per dimension. All five follow the same pattern.
+
+**Dimension to view field mapping:**
+
+| Dimension | avg field | band_label field | band_stage_meaning field | signal_tag field | primary_focus field | secondary_focus field |
+|---|---|---|---|---|---|---|
+| Financial & Business Health | `financial_avg` | `financial_band_label` | `financial_band_stage_meaning` | `financial_signal_tag` | `financial_primary_focus` | `financial_secondary_focus` |
+| Client Base & Positioning | `client_avg` | `client_band_label` | `client_band_stage_meaning` | `client_signal_tag` | `client_primary_focus` | `client_secondary_focus` |
+| Operational Systems | `ops_avg` | `ops_band_label` | `ops_band_stage_meaning` | `ops_signal_tag` | `ops_primary_focus` | `ops_secondary_focus` |
+| Team & Leadership | `team_avg` | `team_band_label` | `team_band_stage_meaning` | `team_signal_tag` | `team_primary_focus` | `team_secondary_focus` |
+| Strategic Stewardship | `stewardship_avg` | `stewardship_band_label` | `stewardship_band_stage_meaning` | `stewardship_signal_tag` | `stewardship_primary_focus` | `stewardship_secondary_focus` |
+
+**Collapsed state — always visible per card:**
+
+- Dimension name (static label)
+- `{dimension}_avg` — numeric score
+- `{dimension}_band_label` — band name
+
+**Expanded state — revealed on card interaction:**
+
+- `{dimension}_band_stage_meaning` — paragraph text block
+- `{dimension}_signal_tag` — rendered as a small chip or tag
+- `{dimension}_primary_focus` — rendered as a chip
+- `{dimension}_secondary_focus` — rendered as a chip
+
+Chips are display-only. No interaction required on chips.
+
+---
+
+#### SECTION 3 — Agency Signal Identity
+
+**Purpose:** Compressed, scannable read of the agency's current momentum posture
+
+This section **replaces** the previous card grid. It renders as a content block: one short paragraph followed by three declarative headline bullets.
+
+**Field mapping:**
+
+| UI Element | View Field | Format |
+|---|---|---|
+| Stage description paragraph | `ae_stage_description` | Static paragraph, pulled from stage reference |
+| Strength headline | `signal_headline_strength` | Single declarative bullet |
+| Friction headline | `signal_headline_friction` | Single declarative bullet |
+| Synthesis headline | `signal_headline_synthesis` | Single declarative bullet |
+
+**Rendering notes:**
+- The three headlines render as styled list items, not as prose
+- Each headline is one sentence, 10–18 words
+- No expand/collapse needed on this section — it is always fully visible
+- If any of the three headline fields are null (GPT not yet fired), render a neutral placeholder: `—` or leave the bullet row empty rather than showing a broken state
+
+---
+
+#### SECTION 4 — Core Strengths & Primary Gaps
+
+**Purpose:** GPT-generated narrative interpretation of each dimension's current operating state
+
+One paragraph per dimension, rendered in a list or stacked card layout.
+
+**Field mapping:**
+
+| Dimension | View Field |
+|---|---|
+| Financial & Business Health | `dimension_insight_financials` |
+| Client Base & Positioning | `dimension_insight_client_base` |
+| Operational Systems | `dimension_insight_ops` |
+| Team & Leadership | `dimension_insight_team` |
+| Strategic Stewardship | `dimension_insight_founder_role` |
+
+**Rendering notes:**
+- Each paragraph is 2–3 sentences of GPT-generated text
+- Render in the same visual order as the Dimension Snapshot cards above
+- If a field is null, render an empty state: `"Insights generating..."` or similar
+
+---
+
+#### SECTION 5 — Strategic Focus Priorities
+
+**Purpose:** Four engine-selected strategic callouts directing the founder's attention
+
+Renders as four distinct cards or blocks, each with a bold headline and body text.
+
+**Field mapping:**
+
+| Priority | View Field | Notes |
+|---|---|---|
+| Focus Priority 1 | `focus_point_1` | Primary leverage dimension |
+| Focus Priority 2 | `focus_point_2` | Primary friction dimension |
+| Focus Priority 3 | `focus_point_3` | Stage posture / evolution cue |
+| Focus Priority 4 | `focus_point_4` | Pattern-level synthesis |
+
+**Rendering notes:**
+- Each focus point field contains a full string with bold headline and body text as returned by GPT
+- If the field contains a structured headline + body pattern, parse and render the headline in bold and the body below it
+- If fields are null, render empty state cards rather than hiding the section
+
+---
+
+#### SECTION 6 — Report Download CTA
+
+**Purpose:** Link to the generated PDF report
+
+**Field mapping:**
+
+| UI Element | Source | Notes |
+|---|---|---|
+| Download button | Signed URL from `ae_assessments.report_pdf_url` or equivalent | Existing logic — no change needed |
+
+This section requires no changes as part of this build.
+
+---
+
+### 1.3 Null State Handling
+
+The dashboard must account for two possible states:
+
+**State A — Assessment complete, GPT insights not yet generated**
+- `overall_score`, `ae_frontend_stage`, all dimension scores and band labels: populated
+- All GPT fields (`strategic_insights_overall`, `signal_headline_*`, `dimension_insight_*`, `focus_point_*`, `stage_brief_interpretation`): null
+
+In this state, render score-based sections normally. Render all GPT-dependent sections with a neutral loading/pending state. Do not show broken or empty content blocks.
+
+**State B — Assessment complete, GPT insights populated**
+- All fields populated
+- Full dashboard renders
+
+---
+
+## Part 2 — Antigravity Build Sequence
+
+Execute each step in order. Do not proceed to the next step until the verification checkpoint passes. Each step is designed to leave the dashboard in a working state throughout the build.
+
+---
+
+### STEP 1 — Connect the Dashboard to the View
+
+**Goal:** Replace whatever the dashboard currently uses to fetch assessment data with a single query to `vw_ae_dashboard_results`.
+
+**Instructions:**
+1. Locate the dashboard component or data-fetching hook that currently queries assessment results
+2. Replace the existing query with:
+   ```typescript
+   const { data, error } = await supabase
+     .from('vw_ae_dashboard_results')
+     .select('*')
+     .eq('ae_assessment_id', assessmentId)
+     .single()
+   ```
+3. Store the result in a single data object accessible to all dashboard sections
+4. Log the full response to the console temporarily so we can verify field presence
+
+**Verification checkpoint:**
+- Open the dashboard for the test assessment `abb9615b-0712-48f8-a3c7-d52239b254c4`
+- Console log should show the view response with `overall_score`, `ae_frontend_stage`, `financial_avg`, `client_avg` and all other dimension fields populated
+- GPT fields (`strategic_insights_overall`, `signal_headline_strength`, etc.) will be null at this point — that is expected and correct
+- No UI regression — the dashboard should still display the same content it showed before this change
+
+---
+
+### STEP 2 — Rebind Existing Fields to View Field Names
+
+**Goal:** Ensure all currently visible dashboard content is reading from the correct view field names.
+
+**Instructions:**
+1. Audit every field currently displayed on the dashboard
+2. Re-map each binding to the exact view field name from the Section Map in Part 1
+3. Pay particular attention to:
+   - `ae_stage_tagline` (Hero headline)
+   - `overall_score` (Hero score)
+   - `{dimension}_avg` for all five dimensions
+   - `{dimension}_band_label` for all five dimensions
+4. Do not change any visual layout or styling in this step — field name rebinding only
+
+**Verification checkpoint:**
+- Dashboard renders with correct stage tagline, score, and all five dimension scores and band labels
+- All content matches what was visible before Step 1
+- No visual changes — this is a data binding step only
+
+---
+
+### STEP 3 — Make the Hero Section Expandable
+
+**Goal:** Add expand/collapse behaviour to the Hero section. The `strategic_insights_overall` paragraph appears on expand.
+
+**Instructions:**
+1. Add a toggle control to the Hero section (chevron, "See more" link, or equivalent — match the existing design language)
+2. Default state: collapsed — show `ae_stage_tagline`, `stage_brief_interpretation`, `overall_score`, `ae_frontend_stage`
+3. Expanded state: show all of the above plus `strategic_insights_overall` paragraph below
+4. If `strategic_insights_overall` is null, do not show the toggle or show it in a disabled state — do not render an empty expandable panel
+
+**Verification checkpoint:**
+- Hero shows collapsed state by default
+- Toggle reveals `strategic_insights_overall` text (will be null on test assessment until n8n fires — confirm toggle hides gracefully when null)
+- Collapsing the hero hides the paragraph and returns to default state
+
+---
+
+### STEP 4 — Make Dimension Snapshot Cards Expandable
+
+**Goal:** Each dimension card expands to show the band-stage meaning paragraph and metadata chips.
+
+**Instructions:**
+1. Add expand/collapse behaviour to each of the five dimension cards
+2. Default state: dimension name, `{dimension}_avg`, `{dimension}_band_label`
+3. Expanded state: add below the existing content:
+   - `{dimension}_band_stage_meaning` — paragraph text block
+   - `{dimension}_signal_tag` — small chip
+   - `{dimension}_primary_focus` — small chip
+   - `{dimension}_secondary_focus` — small chip
+4. Chips are display-only labels — no click behaviour required
+5. Apply the same expand pattern to all five cards consistently
+6. If `{dimension}_band_stage_meaning` is null for any card, do not show a toggle for that card
+
+**Verification checkpoint:**
+- All five cards expand independently
+- Expanded state shows meaning paragraph and three chips
+- Chips render cleanly without overflow
+- Cards collapse back to default state correctly
+
+---
+
+### STEP 5 — Replace Signal Identity Section
+
+**Goal:** Remove the existing card grid in the Signal Identity section. Replace with a paragraph block followed by three headline bullets.
+
+**Instructions:**
+1. Remove the existing card grid component from the Signal Identity section
+2. In its place, render:
+   - `ae_stage_description` as a paragraph (this is static, sourced from the stage reference — it should already be in the view)
+   - Three bullet items below the paragraph:
+     - `signal_headline_strength`
+     - `signal_headline_friction`
+     - `signal_headline_synthesis`
+3. Style the bullets as styled list items, not prose — visually distinct from the paragraph above
+4. Null handling: if any headline field is null, render the bullet row as `—` or omit it cleanly — do not show an empty bullet point
+
+**Verification checkpoint:**
+- Signal Identity section shows the stage description paragraph
+- Three headline bullets render below it (will be `—` or omitted on test assessment until GPT fires)
+- Old card grid is fully removed
+- Section fits within the existing dashboard layout without visual breaks
+
+---
+
+### STEP 6 — Wire Core Strengths Section
+
+**Goal:** Bind the five dimension insight paragraph fields to the Core Strengths section.
+
+**Instructions:**
+1. Locate the Core Strengths / Primary Gaps section
+2. Bind each paragraph slot to the corresponding view field:
+   - Financial → `dimension_insight_financials`
+   - Client Base → `dimension_insight_client_base`
+   - Ops → `dimension_insight_ops`
+   - Team → `dimension_insight_team`
+   - Strategic Stewardship → `dimension_insight_founder_role`
+3. Render in the same visual order as the Dimension Snapshot cards
+4. Null handling: if a field is null, render `"Insights generating..."` in the paragraph slot — do not hide the slot entirely
+
+**Verification checkpoint:**
+- Five paragraph slots render in correct order
+- Each slot is bound to the correct field name
+- Null state renders the placeholder text rather than a broken or empty UI
+
+---
+
+### STEP 7 — Expand Strategic Focus Priorities to Four Points
+
+**Goal:** Ensure all four focus point fields are rendered, not just the subset currently shown.
+
+**Instructions:**
+1. Locate the Strategic Focus Priorities section
+2. Confirm it renders four items bound to `focus_point_1`, `focus_point_2`, `focus_point_3`, `focus_point_4`
+3. If fewer than four are currently shown, add the missing ones
+4. Each focus point field contains a headline + body string as returned by GPT. Parse and render:
+   - If the string contains a bold markdown pattern (`**Headline:**`), render the headline in bold and the body below
+   - If not parseable, render the full string as a paragraph
+5. Null handling: if a field is null, render an empty state card — `"Priority generating..."` — rather than hiding the card slot
+
+**Verification checkpoint:**
+- Four focus point slots render
+- Each is bound to the correct field
+- Null state renders placeholder rather than broken UI
+- No visual regression on the section layout
+
+---
+
+### STEP 8 — Remove Console Logs and Final Review
+
+**Goal:** Clean up temporary debug output and do a full dashboard review.
+
+**Instructions:**
+1. Remove the console.log added in Step 1
+2. Do a full visual pass of the dashboard with the test assessment
+3. Confirm all seven sections render correctly in both null and populated states
+4. Confirm no hardcoded sample data remains — all content should come from the view
+
+**Verification checkpoint:**
+- No console output from dashboard queries
+- Dashboard renders cleanly across all sections
+- All field bindings confirmed against the Section Map in Part 1
+- Dashboard is ready to receive live data once n8n workflow fires
+
+---
+
+## Part 3 — n8n Workflow Connection Notes
+
+Once the dashboard build is complete, the n8n workflow must be updated to write the three new signal headline fields to `ae_assessment_insights`. The Supabase insert node in n8n should map:
+
+| GPT Response Path | Supabase Column |
+|---|---|
+| `outputs.signal_headlines.signal_headline_strength` | `signal_headline_strength` |
+| `outputs.signal_headlines.signal_headline_friction` | `signal_headline_friction` |
+| `outputs.signal_headlines.signal_headline_synthesis` | `signal_headline_synthesis` |
+
+No other changes to the n8n workflow are required. All other insight fields are already mapped. Once n8n fires for a completed assessment, the view will automatically return the populated fields and the dashboard will render live content without any additional dashboard changes.
+
+---
+
+## Reference — Full View Field Index
+
+Complete list of all fields available from `vw_ae_dashboard_results` for dashboard use:
+
+```
+ae_assessment_id
+user_id
+overall_score
+submitted_at
+ae_frontend_stage
+ae_stage_tagline
+ae_stage_description
+page1_tldr
+exec_summary_strength
+exec_summary_friction
+stage_brief_interpretation
+strategic_insights_overall
+opening_framing
+closing_framing
+friction_framing
+dimension_insight_financials
+dimension_insight_client_base
+dimension_insight_ops
+dimension_insight_team
+dimension_insight_founder_role
+focus_point_1
+focus_point_2
+focus_point_3
+focus_point_4
+signal_headline_strength
+signal_headline_friction
+signal_headline_synthesis
+financial_avg
+financial_band_id
+financial_band_label
+financial_band_stage_meaning
+financial_signal_tag
+financial_primary_focus
+financial_secondary_focus
+financial_primary_insight_tag
+financial_secondary_insight_tag
+client_avg
+client_band_id
+client_band_label
+client_band_stage_meaning
+client_signal_tag
+client_primary_focus
+client_secondary_focus
+client_primary_insight_tag
+client_secondary_insight_tag
+ops_avg
+ops_band_id
+ops_band_label
+ops_band_stage_meaning
+ops_signal_tag
+ops_primary_focus
+ops_secondary_focus
+ops_primary_insight_tag
+ops_secondary_insight_tag
+team_avg
+team_band_id
+team_band_label
+team_band_stage_meaning
+team_signal_tag
+team_primary_focus
+team_secondary_focus
+team_primary_insight_tag
+team_secondary_insight_tag
+stewardship_avg
+stewardship_band_id
+stewardship_band_label
+stewardship_band_stage_meaning
+stewardship_signal_tag
+stewardship_primary_focus
+stewardship_secondary_focus
+stewardship_primary_insight_tag
+stewardship_secondary_insight_tag
+```

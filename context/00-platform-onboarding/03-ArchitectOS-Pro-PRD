@@ -1,0 +1,898 @@
+# ArchitectOS Pro — Product Requirements Document (PRD)
+
+**Version:** 1.1 | **Date:** May 2026 | **Status:** Beta Launch Spec — Revised
+**Stack:** React 19 + Vite 6 + TypeScript | Supabase (DB + Auth) | Claude Sonnet via N8N (AI) | Stripe (post-beta)
+
+> **Revision 1.1 Summary:** Updated to reflect actual platform build state as of May 2026. The majority of core features are functional and wired to Supabase. This PRD revision corrects the framing from "build from scratch" to "verify, wire, test, and design-align." Closed resolved open questions (MRA content, OpenAI deprecation, team access model). Added fractional CSO/CFO service layer as V2 scope. Updated milestone hierarchy definition and Sprint Launch Document PDF requirement.
+
+---
+
+## 1. Overview
+
+**Product:** ArchitectOS Pro
+**One-liner:** The strategic operating system for marketing agency founders — a closed-loop platform that turns stage-calibrated diagnostics into executable quarterly plans, keeps teams aligned, and prevents strategy from becoming shelf-ware.
+**Objective:** Deliver a fully functional beta platform to 10 agency founders through the 12-week Architect Advantage Accelerator, with weekly feature unlocks, Supabase data persistence, and Claude-powered AI synthesis at every diagnostic and planning layer.
+**Differentiation:** Agency-specific, methodology-first (Architect Method), stage-calibrated, closed-loop quarterly execution system. The software delivers the IP — not generic planning features.
+**Magic Moment:** Founder completes the MRA (125Q) and receives a Claude-synthesized 30-page report that accurately describes their business's structural dynamics, capability gaps, and a ranked shortlist of what to focus on this quarter.
+**Success Criteria (Beta):**
+- 10/10 founders complete Agency Snapshot + receive AI synthesis in Program Week 1
+- 8+/10 complete full MRA by Week 5
+- 8+/10 have a live sprint by Week 7
+- Zero critical data loss events
+- Beta cohort NPS: 8+/10
+
+### Platform Build Status (as of May 2026)
+
+The platform is substantially built. The pre-beta push is not a greenfield build — it is a verification, wiring, design-alignment, and codebase cleanup sprint. The table below reflects current build state per feature area.
+
+| Feature | Build Status | Pre-Beta Work Required |
+|---------|-------------|----------------------|
+| Agency Snapshot (input + AI synthesis) | Built | Verify Supabase wiring; test synthesis end-to-end |
+| Growth Velocity Calculator (standalone + scenario) | Built | Verify save/compare wiring; confirm real-time and saved tables |
+| Clarity Compass | Built | Remove dev artifacts; verify horizon lock → Quarter Map unlock |
+| AE Ladder Assessment + Report | Built & Tested | Live user flow testing only |
+| MRA Assessment + Report (125Q) | Built & Tested | Live user flow testing only |
+| Quarter Map (3P Selection) | Built | Design alignment; verify lock → Capability Card generation |
+| Sprint Board + Initiative/Milestone Builder | Built | Design alignment; verify all Supabase writes |
+| Sprint Launch Document (platform view) | Built | Add PDF download (P1 for beta) |
+| Status Tracker (bulk milestone editor) | Built | Design alignment; verify milestone → maturity score update |
+| Reflection Review + Rollover Logic | Partial | Scoping and build needed |
+| Dashboard + progress tracking | Built | Verify dynamic state rendering |
+| Beta Tier Gating | Built | Seed beta_feature_gates table; verify RLS enforcement |
+| Settings (Account, Data Manager) | Built | Verify Supabase wiring |
+| Codebase cleanup (remove openai, dead code) | Not started | Full cleanup pass required |
+| Design system alignment | Not started | Full UI pass against updated design spec |
+
+---
+
+## 2. Technical Architecture
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  React + Vite SPA                    │
+│        (React Router v7, TypeScript, Recharts)       │
+└──────────────────────┬──────────────────────────────┘
+                       │ HTTPS
+┌──────────────────────▼──────────────────────────────┐
+│                    Supabase                          │
+│  Auth (JWT) │ PostgreSQL │ RLS Policies │ Storage    │
+│             │ Vector Stores (report embeddings)      │
+└─────┬───────────────┬──────────────────────────────-┘
+      │               │ triggers / webhooks
+      │          ┌────▼──────────────────────────────┐
+      │          │         N8N Automation             │
+      │          │  Primary AI synthesis orchestrator │
+      │          │  - AE Ladder report generation     │
+      │          │  - MRA report generation (multi-   │
+      │          │    call synthesis chain)            │
+      │          │  - Sprint Launch Document gen       │
+      │          │  - Google Docs merge field delivery │
+      │          │  - PDF packaging + Supabase storage │
+      │          │  - Beta cohort week unlock emails   │
+      │          └────┬──────────────────────────────┘
+      │               │ Anthropic API
+      │          ┌────▼──────────────────────────────┐
+      │          │    Claude Sonnet (latest)          │
+      │          │  AI synthesis — all reports and    │
+      │          │  document generation               │
+      │          └───────────────────────────────────┘
+```
+
+> **Architecture note:** AI synthesis is orchestrated through N8N, not Supabase Edge Functions. N8N handles the multi-call synthesis chains (especially MRA, which requires sequential Claude calls), merge field population into Google Docs templates, PDF packaging, storage back to Supabase, and delivery triggers. Supabase Edge Functions may be used for lightweight, synchronous AI calls (e.g., Agency Snapshot synthesis) but N8N is the primary synthesis engine.
+
+### Stack Table
+
+| Layer | Technology | Notes |
+|-------|-----------|-------|
+| Frontend | React 19, Vite 6, TypeScript | Existing codebase; React Router DOM v7 |
+| State / Context | React Context API | AuthContext, AppContext already exist |
+| UI Components | Custom + Lucide React | See ArchitectOS Design System |
+| Charts | Recharts | Already installed |
+| Backend | Supabase | PostgreSQL + Row-Level Security |
+| Auth | Supabase Auth | Email/password; JWT sessions |
+| AI | Anthropic Claude Sonnet (latest) | Via N8N automation workflows (primary); Supabase Edge Functions for lightweight sync calls |
+| File Storage | Supabase Storage | PDF report storage; vector stores for report embeddings |
+| Payments | Stripe | Post-beta only; not required for beta launch |
+| Automation | N8N | Primary AI synthesis orchestrator; beta unlock triggers; Google Docs merge field delivery; PDF packaging |
+| Hosting | To be determined | Vercel or Supabase hosting |
+
+### Repo Structure
+
+```
+ArchitectOS Pro_beta/
+├── App.tsx                    # Root router and auth wrapper
+├── index.tsx                  # Entry point
+├── types.ts                   # Shared TypeScript interfaces
+├── context/
+│   ├── AuthContext.tsx         # Supabase auth state
+│   └── AppContext.tsx          # Global app state, tier gating
+├── components/
+│   ├── Header.tsx
+│   ├── Sidebar.tsx
+│   ├── Layouts.tsx             # DashboardLayout, SectionLayout
+│   ├── ProtectedRoute.tsx
+│   ├── ErrorBoundary.tsx
+│   ├── ui.tsx                  # Shared UI primitives
+│   ├── pro-suite/              # Pro Suite specific components
+│   └── SprintPlanning/         # Sprint Planning components
+├── pages/
+│   ├── PublicPages.tsx         # Landing, SignIn, SignUp
+│   ├── DashboardPage.tsx
+│   ├── Foundations/            # Orientation layer pages
+│   ├── Diagnostics/            # AE Ladder + MRA pages
+│   ├── ProSuite/               # Pro Suite pages
+│   ├── SprintPlanning/         # Sprint Planning sub-pages
+│   ├── SettingsPages.tsx
+│   └── ResourcesPage.tsx
+├── lib/
+│   └── supabase.ts             # Supabase client initialization
+├── config/
+│   └── ae-ladder-content.ts    # AE Ladder question content
+├── knowledgebase/              # AI prompt templates and knowledge base
+└── docs/
+    └── migrations/             # Supabase migration files
+```
+
+### Security
+- All authenticated routes wrapped in `ProtectedRoute` component — redirect to `/sign-in` if no session
+- Supabase Row-Level Security (RLS) on all user data tables — users can only read/write their own rows
+- Beta tier gating enforced at RLS level via `user_tier` field in `profiles` table — not just frontend routing
+- Claude API key stored as Supabase secret / environment variable — never exposed to client
+- Stripe webhook signature verification on all payment events (post-beta)
+
+### Cost Estimate (Beta — 10 users)
+- Supabase: Free tier sufficient for 10 users
+- Anthropic Claude API: ~$0.005/1K tokens; ~50-100 report generations at ~10K tokens each = ~$5-10 total for beta
+- N8N: Self-hosted or cloud free tier
+- Total beta infrastructure cost: <$50/month
+
+---
+
+## 3. Data Model
+
+### MRA Content Tables (Already Live in Supabase)
+
+> **Important:** The 125 MRA checkpoints × 5 AE Ladder stages = 500 stage-calibrated checkpoint definitions are already live in Supabase. These are not defined in a frontend config file — they live in Supabase tables that the assessment reads at runtime. Each checkpoint has a stage-calibrated "what good looks like" definition for every AE Ladder stage (Rising through Arriving). These tables also feed the AI synthesis layer via N8N — the report generation workflow pulls the relevant definitions and uses them in Claude prompt construction. Vector stores for report embeddings are also already set up in Supabase. No build work is needed on MRA content — only verification that the wiring is reading the correct tables correctly.
+
+### Core Tables
+
+#### `profiles`
+Extends Supabase `auth.users`. Created automatically on sign-up via trigger.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK, FK auth.users) | User ID |
+| email | text | User email |
+| full_name | text | Display name |
+| agency_name | text | Agency name |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+| tier | text | 'free' \| 'orientation' \| 'diagnostics' \| 'pro' \| 'beta' |
+| beta_cohort_week | integer | Current unlocked week (1-12) for beta users |
+| is_beta | boolean | Whether user is in beta cohort |
+| onboarding_completed | boolean | Has completed onboarding flow |
+
+#### `agency_snapshots`
+Stores Agency Snapshot input data.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+| financial_data | jsonb | Revenue, margins, cash, MRR/ARR data |
+| market_footprint | jsonb | Positioning, niche, services, ICP |
+| delivery_architecture | jsonb | Team structure, delivery model, capacity |
+| revenue_model | jsonb | Client mix, ACV, concentration, pipeline |
+| synthesis_generated | boolean | Has AI synthesis been generated |
+| synthesis_content | text | Claude-generated synthesis text |
+| synthesis_generated_at | timestamptz | |
+
+#### `ae_ladder_assessments`
+Stores AE Ladder (19Q) responses and results.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| created_at | timestamptz | |
+| completed_at | timestamptz | |
+| responses | jsonb | Array of {question_id, answer, score} |
+| stage_placement | text | 'rising' \| 'driving' \| 'thriving' \| 'striving' \| 'arriving' |
+| dimension_scores | jsonb | {financial, client_base, operations, team, stewardship} |
+| report_content | text | Claude-generated stage profile report |
+| stage_guide_content | text | Auto-generated stage guide content |
+| report_generated_at | timestamptz | |
+
+#### `mra_assessments`
+Stores Maturity and Readiness Audit (125Q) responses.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| ae_ladder_id | uuid (FK ae_ladder_assessments) | Stage calibration reference |
+| created_at | timestamptz | |
+| completed_at | timestamptz | |
+| completion_percentage | integer | 0-100, for split-session support |
+| responses | jsonb | Array of {checkpoint_id, dimension, capability_area, answer, maturity_score, urgency_score} |
+| dimension_scores | jsonb | {financial, client_base, operations, team, stewardship} maturity + readiness scores |
+| capability_area_scores | jsonb | 25 capability areas with maturity, readiness, urgency, 3p_tag |
+| overall_maturity_score | integer | 0-100 |
+| overall_readiness_score | integer | 0-100 |
+| report_content | text | Claude-generated full report (Act 1 + Act 2 + Act 3) |
+| report_generated_at | timestamptz | |
+| three_p_tags | jsonb | {prioritize: [], plant: [], progressively_iterate: []} AI-suggested tags |
+
+#### `clarity_compass`
+Stores Clarity Compass horizon declarations.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+| ultimate_vision | text | The ultimate destination declaration |
+| horizon_12_month | jsonb | {qualitative, quantitative, feels_like, optimizing_for} |
+| horizon_24_month | jsonb | Same structure |
+| horizon_36_month | jsonb | Same structure |
+| synthesis_content | text | Claude-generated synthesis of horizon picture |
+| locked | boolean | Has the declaration been confirmed/locked |
+
+#### `gv_calculator_scenarios`
+Stores Growth Velocity Calculator scenarios.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| created_at | timestamptz | |
+| scenario_name | text | |
+| current_state | jsonb | {revenue, team_size, margin, utilization} |
+| target_state | jsonb | {revenue, horizon_months, constraints} |
+| pressure_families | jsonb | 6 pressure families surfaced |
+| synthesis_content | text | |
+
+#### `quarter_maps`
+Stores quarterly 3P capability selection.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| sprint_number | integer | 1, 2, 3... |
+| quarter_label | text | e.g. 'Q3 2026' |
+| created_at | timestamptz | |
+| locked_at | timestamptz | |
+| prioritize | text[] | 3 capability area IDs |
+| plant | text[] | 3 capability area IDs |
+| progressively_iterate | text[] | 3 capability area IDs |
+| parking_lot | text[] | Deprioritized capability area IDs |
+| horizon_declaration_id | uuid (FK clarity_compass) | |
+| mra_assessment_id | uuid (FK mra_assessments) | |
+| synthesis_content | text | Roadmap review synthesis from Claude |
+
+#### `capability_cards`
+One card per capability area per sprint.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| quarter_map_id | uuid (FK quarter_maps) | |
+| capability_area_id | text | e.g. 'client_concentration' |
+| capability_area_name | text | Display name |
+| dimension | text | Which of 5 dimensions |
+| three_p_classification | text | 'prioritize' \| 'plant' \| 'progressively_iterate' |
+| maturity_score | integer | From MRA |
+| urgency_score | integer | From MRA |
+| created_at | timestamptz | |
+
+#### `initiatives`
+Initiatives within a Capability Card.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| capability_card_id | uuid (FK capability_cards) | |
+| user_id | uuid (FK profiles) | |
+| name | text | Initiative name |
+| what_we_are_addressing | text | Problem/opportunity statement |
+| what_success_looks_like | text | Completion definition (result, not activity) |
+| sprint_goal_connection | text | How this connects to the quarter goal |
+| known_constraints | text | |
+| owner_name | text | Initiative owner |
+| status | text | 'not_started' \| 'in_progress' \| 'complete' \| 'deprioritized' |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+#### `milestones`
+Milestones within an Initiative.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| initiative_id | uuid (FK initiatives) | |
+| user_id | uuid (FK profiles) | |
+| outcome_description | text | Result marker (what exists when this is done) |
+| measure | text | How you know it's done |
+| owner_name | text | Specific person who owns this |
+| target_date | date | |
+| dependencies | text | |
+| status | text | 'not_started' \| 'in_progress' \| 'complete' \| 'blocked' |
+| health_score | integer | 1-3 (1=on_track, 2=at_risk, 3=blocked) |
+| completed_at | timestamptz | Triggers maturity score update |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+#### `sprints`
+Locked sprint records.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| user_id | uuid (FK profiles) | |
+| quarter_map_id | uuid (FK quarter_maps) | |
+| sprint_number | integer | |
+| sprint_goal | text | One-sentence sprint goal |
+| sprint_theme | text | Quarter theme |
+| locked_at | timestamptz | When sprint was locked |
+| launch_document_content | text | Auto-generated Sprint Launch Document |
+| launch_document_shared | boolean | Has been distributed to team |
+| status | text | 'planning' \| 'active' \| 'retrospective' \| 'closed' |
+| starts_at | date | |
+| ends_at | date | |
+
+#### `beta_feature_gates`
+Controls which features are available to beta cohort by week.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | |
+| week_number | integer | Program week (1-12) |
+| feature_key | text | e.g. 'agency_snapshot', 'ae_ladder', 'mra', 'quarter_map' |
+| feature_label | text | Display name |
+| unlocked | boolean | Is this feature available |
+| unlocked_at | timestamptz | When it was unlocked |
+
+### Key Relationships
+- One user → many assessments (retakes allowed)
+- AE Ladder assessment → calibrates MRA assessment (stage-specific scoring)
+- MRA assessment → feeds Quarter Map (3P tags, capability scores)
+- Quarter Map → generates Capability Cards (one per selected capability area)
+- Capability Cards → contain Initiatives → contain Milestones
+- Milestone completion → triggers maturity score recalculation on MRA
+- Locked Quarter Map → generates Sprint → generates Sprint Launch Document
+
+---
+
+## 4. API Specification
+
+All data operations go through the Supabase client directly from the React frontend using the `@supabase/supabase-js` SDK. Claude API calls are made via Supabase Edge Functions to keep the API key server-side.
+
+### Supabase Edge Functions
+
+#### `generate-snapshot-synthesis`
+**Trigger:** POST from frontend after user completes Agency Snapshot
+**Input:** `{ user_id, snapshot_data: { financial, market, delivery, revenue } }`
+**Process:** Constructs prompt from snapshot inputs + Architect Method context → calls Claude Sonnet → returns synthesis
+**Output:** `{ synthesis_content: string }`
+**Stores:** Updates `agency_snapshots.synthesis_content` and `synthesis_generated = true`
+
+#### `generate-ae-ladder-report`
+**Trigger:** POST after AE Ladder Assessment submission
+**Input:** `{ user_id, assessment_id, responses, stage_placement, dimension_scores }`
+**Process:** Stage placement + scores + methodology prompts → Claude Sonnet → full stage profile report + stage guide
+**Output:** `{ report_content: string, stage_guide_content: string }`
+**Stores:** Updates `ae_ladder_assessments.report_content`, `stage_guide_content`, `report_generated_at`
+
+#### `generate-mra-report`
+**Trigger:** POST after MRA Assessment completion (125Q)
+**Input:** `{ user_id, assessment_id, responses, stage_placement, dimension_scores, capability_scores }`
+**Process:** Full checkpoint data + stage calibration + methodology prompts → Claude Sonnet → Act 1 (executive narrative) + Act 2 (dimension/capability breakdown) + Act 3 (cross-dimensional pattern read) + 3P priority tags
+**Output:** `{ report_content: string, three_p_tags: { prioritize, plant, progressively_iterate } }`
+**Stores:** Updates `mra_assessments` with report and tags; `report_generated_at`
+**Note:** This is the largest Claude call. Budget ~15-20K tokens. Target latency < 60 seconds.
+
+#### `generate-roadmap-synthesis`
+**Trigger:** POST when user locks Horizon Declaration and Quarter Map
+**Input:** `{ user_id, quarter_map_id, horizon_data, mra_scores, ae_stage }`
+**Process:** Goal-calibrated horizon requirements + MRA data → Claude → horizon-specific synthesis for each of 12/24/36 month horizons
+**Output:** `{ synthesis_content: string }` (structured by horizon)
+**Stores:** Updates `quarter_maps.synthesis_content`
+
+#### `generate-sprint-launch-document`
+**Trigger:** POST when sprint is locked
+**Input:** `{ user_id, sprint_id, quarter_map, initiatives, milestones, sprint_goal }`
+**Process:** Sprint data → Claude → formats Sprint Launch Document with narrative executive summary, full 3P plan, team roster with assignments
+**Output:** `{ launch_document_content: string }`
+**Stores:** Updates `sprints.launch_document_content`
+
+### Frontend Supabase Client Patterns
+
+```typescript
+// Auth
+supabase.auth.signUp({ email, password })
+supabase.auth.signInWithPassword({ email, password })
+supabase.auth.signOut()
+supabase.auth.getSession()
+
+// Data reads (RLS enforced automatically)
+supabase.from('profiles').select('*').eq('id', userId).single()
+supabase.from('mra_assessments').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+
+// Data writes
+supabase.from('milestones').update({ status: 'complete', completed_at: new Date() }).eq('id', milestoneId)
+
+// Beta tier gate check
+supabase.from('beta_feature_gates').select('feature_key, unlocked').lte('week_number', currentUserWeek)
+```
+
+---
+
+## 5. User Stories
+
+**US-001** — As a beta founder, I want to complete the Agency Snapshot and immediately receive an AI-synthesized readback of my business, so that I can see my business as a strategic advisor would see it.
+
+**US-002** — As a beta founder, I want to be able to split the MRA (125Q) across two sessions without losing my progress, so that I can complete it honestly without feeling rushed.
+
+**US-003** — As a beta founder, I want to select my 3P capability areas and have the system enforce the limit (3 Prioritize, 3 Plant, 3 Progressively Iterate), so that I am forced to prioritize rather than trying to fix everything.
+
+**US-004** — As a beta founder, I want the Sprint Launch Document to be auto-generated when I lock my sprint, so that I have a professional artifact to share with my team in our alignment session.
+
+**US-005** — As a beta founder, I want my maturity scores to update automatically as my team completes milestones, so that my dashboard reflects real execution progress without manual score management.
+
+**US-006** — As a beta founder, I want to resume incomplete assessments from where I left off, so that I do not have to restart a 125-question audit.
+
+**US-007** — As a beta founder, I want my AE Ladder stage placement to inform the MRA — so that the 125 checkpoints are calibrated to where I actually am, not what an industry average looks like.
+
+**US-008** — As a founder, I want to open the Status Tracker during a team stand-up and hide sensitive founder-level initiatives before sharing my screen, so that the team sees only the milestones relevant to their work without exposing strategic data I'm not ready to share.
+
+**US-009** — As a platform admin (London), I want to control which features are unlocked for the beta cohort on a per-week basis, so that I can manage the program rollout without code changes.
+
+**US-010** — As a beta founder, I want to download my MRA report as a PDF, so that I can share it with advisors and reference it offline.
+
+---
+
+## 6. Functional Requirements
+
+### FR-001 — User Authentication
+**Priority:** P0 | **Feature:** Auth
+- Users must register with email + password via Supabase Auth
+- Session persists across browser refreshes via Supabase JWT
+- All routes behind `/app/*` redirect to `/sign-in` if unauthenticated
+- On sign-up, a `profiles` row is automatically created via Supabase trigger
+- Acceptance: User can sign up, log in, refresh browser, and remain authenticated
+
+### FR-002 — Beta Tier Gating
+**Priority:** P0 | **Feature:** Tier Gating
+- Beta users (is_beta = true) can only access features unlocked for their current cohort week
+- `beta_cohort_week` on the `profiles` table controls access
+- Feature gates are checked from `beta_feature_gates` table; features with `unlocked = true` AND `week_number <= user.beta_cohort_week` are accessible
+- Locked features render a "Coming in Program Week X" state — not a 404
+- Admin can update `beta_cohort_week` for all beta users to advance feature access
+- Acceptance: User cannot navigate to MRA page when `beta_cohort_week < 5`
+
+### FR-003 — Agency Snapshot
+**Priority:** P0 | **Feature:** Foundations — Snapshot
+- Five input sections: Economic Foundation, Revenue Model, Market Footprint, Delivery Architecture, Team Structure
+- All fields auto-save to Supabase as user types (debounced, 2s)
+- "Generate Synthesis" button triggers `generate-snapshot-synthesis` edge function
+- Loading state shown during synthesis generation (skeleton/spinner with copy: "Synthesizing your current state model...")
+- Synthesis displayed on Dashboard tab as a structured readback
+- If snapshot is incomplete when synthesis is requested, highlight missing required fields
+- Acceptance: User completes all sections, clicks Generate, waits ≤30s, sees AI readback
+
+### FR-004 — AE Ladder Assessment
+**Priority:** P0 | **Feature:** Diagnostics — AE Ladder
+- 19 questions across 5 dimensions (Financial Health, Client Base, Operations, Team, Stewardship)
+- Question content loaded from `config/ae-ladder-content.ts`
+- Progress indicator shows "Question X of 19"
+- Responses auto-saved to Supabase after each question (no risk of loss)
+- On final submission: stage placement calculated deterministically from scores
+- Report generation triggered automatically (`generate-ae-ladder-report` edge function)
+- Results Dashboard shows: stage badge, dimension score breakdown, active roadblocks, upcoming challenges
+- Stage Profile tab shows full report text
+- Stage Guide auto-delivered as secondary content
+- Acceptance: 19 questions completed → stage placement shown within 60s
+
+### FR-005 — Maturity and Readiness Audit (MRA)
+**Priority:** P0 | **Feature:** Diagnostics — MRA
+- 125 checkpoints across 5 dimensions × 25 capability areas × 5 checkpoints each
+- Checkpoints stage-calibrated from AE Ladder placement (questions ask "does your business have X at your stage?")
+- Split-session support: auto-saves after every checkpoint; resume from last answered on return
+- Completion percentage shown at top: "87 of 125 checkpoints completed"
+- "Assessment Approach Note" shown before starting: "Answer based on how your business actually operates on an ordinary week — not its best week, not what you're building toward."
+- On completion: MRA scores calculated, `generate-mra-report` edge function triggered
+- Results page: Act 1 (executive narrative), Act 2 (dimension breakdown with scores), Act 3 (cross-dimensional patterns)
+- 3P priority tags shown on capability areas (AI-suggested; founder can adjust)
+- Maturity score + Readiness score shown prominently on dashboard after completion
+- Acceptance: 125 checkpoints completed → full report generated within 90s
+
+### FR-006 — Clarity Compass
+**Priority:** P1 | **Feature:** Foundations — Clarity Compass
+- Four input levels: Ultimate Vision + 12-month + 24-month + 36-month horizons
+- Each horizon captures: qualitative picture, quantitative targets, what it feels like, what it's optimizing for
+- All inputs auto-save to Supabase
+- "Confirm Horizons" action locks the declaration and unlocks Horizon Declaration in Quarter Map
+- Dashboard tab shows a synthesis view of all declared horizons
+- Acceptance: User declares all horizons → Horizon Declaration appears as available in Quarter Map
+
+### FR-007 — Growth Velocity Calculator
+**Priority:** P1 | **Feature:** Foundations — GV Calculator
+- Input: current revenue, team size, target revenue scenario, horizon (12/24/36 months)
+- Output: surfaced pressure families at that growth level (6 pressure families defined in methodology)
+- Scenario Planner: side-by-side comparison of 2+ scenarios
+- Results saved to Supabase
+- Acceptance: User inputs current state + target → pressure family analysis renders
+
+### FR-008 — Quarter Map (3P Capability Selection)
+**Priority:** P0 | **Feature:** Pro Suite — Planning
+- **Orientation tab:** Shows current AE Ladder stage, MRA scores summary, and "what this quarter requires"
+- **Strategic Horizons tab:** Reads from Clarity Compass + MRA synthesis; shows roadmap review synthesis
+- **12-Month Plan tab:** Execution Sequencer — platform-proposed quarterly sprint sequence with contextual override fields
+- **Quarter Map / Current Quarter Focus tab:** The 3P selector
+  - All 25 capability areas displayed, grouped by dimension, sortable by urgency score and maturity score
+  - Drag/click to assign capability areas to buckets: Prioritize (max 3), Plant (max 3), Progressively Iterate (max 3), Parking Lot (remainder)
+  - System enforces exactly 3 in each active bucket; "Lock and Proceed" button only activates when all 3 buckets have exactly 3 areas
+  - On lock: `quarter_maps` record created; Capability Cards auto-generated for all 9 selected areas
+- Acceptance: User selects 9 areas (3+3+3) → Lock button activates → sprint board populates with 9 capability cards
+
+### FR-009 — Capability Cards and Initiative/Milestone Builder
+**Priority:** P0 | **Feature:** Pro Suite — Sprint Planning | **Build Status:** Built — verify/design-align
+
+**Execution Hierarchy (ArchitectOS does not go below milestone level):**
+- **Capability Area** → the strategic domain being developed this quarter (e.g., Cash Flow Forecasting)
+- **Initiative** → the structured effort within that capability (e.g., "Build Financial Dashboard") — describes what is being addressed, what success looks like, and who owns it
+- **Milestone** → a result marker that confirms meaningful progress (e.g., "Live dashboard accessible to executive team") — outcomes, not activities
+- **Tasks** → explicitly NOT tracked in ArchitectOS. Task-level detail lives in the team's existing project management tool (ClickUp, Asana, Monday, etc.). ArchitectOS is not a task tracker and should never create that perception.
+
+This hierarchy is non-negotiable and must be reinforced in all inline copy, altitude guidance, and empty states throughout the platform.
+
+- Sprint Board shows all 9 capability cards in 3P column layout (Prioritize | Plant | Progressively Iterate)
+- Each card shows: capability area name, dimension, maturity score, urgency score
+- Click into a card → slide-out detail panel (Initiative Builder + Milestone Builder)
+  - Initiative Builder: name, what_we_are_addressing, what_success_looks_like, sprint_goal_connection, known_constraints, owner_name
+  - Milestone Builder per initiative: outcome_description, measure, owner_name, target_date, dependencies, status
+  - Altitude guidance shown inline: "Milestones mark results, not activities. 'Client onboarding process documented and in use by team' = milestone. 'Draft client onboarding document' = a task — put it in ClickUp."
+  - Status options: Not Started | In Progress | At Risk | Blocked | Complete
+  - Owner assignment with avatar/initials display
+  - Checkpoint label tags linking milestones to MRA capability areas
+  - Comments and change history per initiative
+- Founder can toggle visibility on sensitive initiatives (hidden from bulk milestone editor view during team sessions)
+- All data auto-saved to Supabase
+- Acceptance: User opens capability card → adds 1 initiative with 2 milestones → data persists across sessions → hidden toggle functions correctly
+
+### FR-010 — Sprint Goal Flow
+**Priority:** P0 | **Feature:** Pro Suite — Sprint Planning
+- Before building capability cards, founder declares the sprint goal (one sentence) and sprint theme (one phrase)
+- Sprint goal saved to `sprints` table with `status = 'planning'`
+- Sprint goal shown as context at top of Sprint Board
+- Acceptance: Sprint goal declared → shown on Sprint Board throughout planning
+
+### FR-011 — Sprint Review and Lock
+**Priority:** P0 | **Feature:** Pro Suite — Sprint Planning
+- Sprint Review page: summary of all initiatives and milestones across all 9 capability cards
+- Sprint Sanity Check prompts (inline reflection, not scored):
+  - "Does the team know they own each of these initiatives?"
+  - "Is this scope genuinely achievable in 90 days?"
+  - "What breaks if this doesn't happen on time?"
+- "Lock Sprint" button (prominent CTA)
+- On lock: sprint `status` → 'active'; `locked_at` timestamp; `generate-sprint-launch-document` edge function triggered
+- Loading state: "Generating your Sprint Launch Document..."
+- Acceptance: Sprint review shown → sanity check displayed → Lock button → document generated within 45s
+
+### FR-012 — Sprint Launch Document
+**Priority:** P0 | **Feature:** Pro Suite — Execution | **Build Status:** Built (platform view) — PDF download needed (P1 for beta)
+
+- Auto-generated by Claude (via N8N) at sprint lock
+- Content structure:
+  - Sprint goal + theme
+  - Executive summary narrative (why this quarter, why these priorities)
+  - Full 3P execution plan with capability areas, initiatives, milestone summaries
+  - Team roster section with initiative ownership
+  - Sprint by the numbers (total initiatives, milestones, owners)
+  - Baseline capability scores for the 9 selected areas
+- Rendered as formatted document within the platform
+- **PDF download required for beta (P1):** The Sprint Launch Document must be downloadable as a formatted PDF so founders can share it with their team for the alignment session. The PDF workflow should follow the same N8N + Google Docs merge field pattern used for the MRA and AE Ladder reports.
+- The Status Tracker (bulk milestone editor) is the live team-facing complement to the Sprint Launch Document — it is not a task tracker, it is a milestone status view the founder opens during stand-ups and team check-ins
+- Acceptance: Sprint locked → Launch Document renders within 60s → PDF download available → founder can share outside the platform
+
+### FR-013 — Status Tracker
+**Priority:** P0 | **Feature:** Pro Suite — Execution | **Build Status:** Built — verify/design-align
+
+**Access model:** Founder-owned for beta. No separate team member accounts. The Status Tracker is designed to be opened by the founder during team stand-ups and check-ins — it is not a tool team members use independently on a daily basis. This is intentional: ArchitectOS does not compete with task managers. It stays at the milestone level.
+
+**Sensitive initiative visibility:** Founders can toggle visibility on specific initiatives or milestones (founder/leadership-level items that the full team doesn't need to see). Hidden items are excluded from the bulk editor view when the founder opens the tracker in a team session.
+
+- Bulk milestone editor: all non-hidden initiatives and milestones across all 9 capability cards
+- Columns: Capability Area | Initiative | Milestone | Owner | Due Date | Status | Health
+- Filterable: by owner, by status, by capability area
+- Bulk status update: select multiple milestones → change status
+- Inline status update: click status cell → dropdown (Not Started | In Progress | At Risk | Blocked | Complete)
+- When milestone marked complete: `completed_at` set; maturity score recalculation triggered in background
+- Health score indicator (green/yellow/red) per milestone row
+- Post-beta (nice-to-have): monthly milestone status PDF report for founder download
+- Acceptance: Founder opens Status Tracker → hides sensitive initiative → bulk editor excludes it → updates remaining milestones → maturity score update triggers
+
+### FR-014 — Maturity Score Auto-Update
+**Priority:** P1 | **Feature:** Pro Suite — Execution
+- When a milestone is marked complete and it maps to a MRA checkpoint, the corresponding checkpoint score updates
+- Capability area maturity score recalculates from updated checkpoint scores
+- Dashboard badge updates to show new overall maturity and readiness scores
+- Score delta shown: "Client Concentration maturity improved from 28 → 34 since sprint start"
+- Acceptance: Milestone completed → related checkpoint score increments → dashboard score updates within 5s
+
+### FR-015 — Sprint Retrospective and Reflection/Review
+**Priority:** P1 | **Feature:** Pro Suite — Execution
+- Unlocks at sprint end (status = 'retrospective')
+- Reflection prompts:
+  - What got done? (auto-populated from milestone completions)
+  - What didn't, and why?
+  - Rollover decisions: each incomplete initiative → prompt: "Roll into next sprint? / Deprioritize? / Abandon?"
+  - Updated maturity scores shown with delta from sprint start
+- "Close Sprint" action: marks sprint 'closed', increments sprint_number
+- Acceptance: Sprint end → retrospective prompts → rollover decisions → sprint closed → next sprint planning unlocks
+
+### FR-016 — Dashboard
+**Priority:** P0 | **Feature:** Navigation
+- Shows: current program phase, next action prompt, overall maturity + readiness scores, active sprint summary
+- Sections visible based on what the user has completed: no MRA → shows "Complete your MRA to unlock planning"
+- Quick-access links to most recently active tools
+- For beta users: shows current program week and what's unlocking next
+- Acceptance: User logs in → dashboard shows appropriate next action based on their current progress
+
+### FR-017 — Settings — Account
+**Priority:** P1 | **Feature:** Settings
+- Edit full_name, agency_name
+- Change password (via Supabase Auth)
+- Delete account (soft delete + email confirmation)
+- Acceptance: User can update name → change password → see confirmation
+
+### FR-018 — Settings — Data Manager
+**Priority:** P1 | **Feature:** Settings
+- View all stored data by category (Snapshot, AE Ladder, MRA, Sprint data)
+- Delete individual assessments or reset a section
+- Export data as JSON
+- Acceptance: User can see stored data and delete specific records
+
+### FR-019 — Beta Admin Controls
+**Priority:** P0 | **Feature:** Admin (internal)
+- Admin interface (or direct Supabase dashboard) to:
+  - Advance `beta_cohort_week` for all beta users (global unlock)
+  - View per-user progress (snapshot completed, assessments completed, sprint status)
+  - Manually unlock specific features for specific users
+- Note: This can be managed directly in the Supabase dashboard for beta; no frontend admin UI required for beta launch
+- Acceptance: Admin can update cohort week in Supabase → users immediately see new features unlocked
+
+---
+
+## 7. Non-Functional Requirements
+
+### Performance
+- Page load time (authenticated): < 2s on standard broadband
+- Claude API report generation: < 60s for Snapshot/AE Ladder, < 90s for MRA (show progress state)
+- Status Tracker milestone update: < 500ms round trip to Supabase
+- Auto-save (all input forms): debounce 2s, save to Supabase within 3s of last keystroke
+- Sprint Board load: < 1.5s even with 9 capability cards and 20+ milestones
+
+### Security
+- All user data protected by Supabase RLS — no user can read another user's data
+- Claude API key never exposed to client — all AI calls via Supabase Edge Functions
+- Environment variables for all secrets — no hardcoded keys in codebase
+- Auth tokens validated server-side on all Edge Function calls
+
+### Accessibility
+- All interactive elements keyboard-accessible
+- Color is not the sole indicator of status (icons + labels alongside color)
+- Form fields include descriptive labels
+- Note: Full WCAG 2.1 AA compliance is a post-beta target, not a beta requirement
+
+### Scalability
+- Architecture handles 100 concurrent users without changes (Supabase scales automatically)
+- Claude API calls are stateless and parallelizable
+- Data model supports unlimited sprints, assessments, and initiatives per user
+
+### Reliability
+- Zero tolerance for data loss: all input data saved to Supabase before any navigation
+- Assessment progress preserved across browser crashes via auto-save
+- If Claude API call fails: display error state with retry button; do not lose input data
+
+---
+
+## 8. UI/UX Requirements
+
+*Reference `ArchitectOS Design System` folder for full design tokens (colors, typography, spacing, components). This section describes screen behavior and states.*
+
+### Global Layout
+- **Sidebar** (left, persistent): Foundations | Diagnostics | Pro Suite | Resources | Settings
+- **Header** (top): Page title, user avatar, notification indicator
+- **Content area** (right of sidebar): Main page content with section tabs where applicable
+- Sidebar items gated by beta tier gate — locked items show lock icon + "Week X" tooltip
+
+### Key Screen States (all major screens must handle):
+- **Empty state** — when no data exists yet; clear CTA to complete the prerequisite action
+- **In-progress state** — partial data; auto-save indicator visible
+- **Loading state** — skeleton screens for data fetches; spinner with copy for AI generation
+- **Error state** — plain language error with retry option; never lose data
+- **Populated state** — final rendered view with all data
+
+### Critical Screen Specs
+
+**Agency Snapshot — Economic Foundation Tab**
+- Form with labeled input fields for: Annual Revenue, Gross Margin %, Net Profit Margin %, Monthly Recurring Revenue (if applicable), Cash Reserve (months of runway), Largest Client as % of Revenue
+- Auto-save indicator: "Saved" with timestamp
+- Completion indicator: "3 of 6 sections complete"
+- On generating synthesis: full-page loading overlay with copy and animated indicator
+
+**MRA Assessment Screen**
+- Progress bar: "87 of 125 checkpoints"
+- Current checkpoint displayed one at a time (not all 125 on screen)
+- Each checkpoint: capability area label + dimension label + checkpoint statement + 5-point response scale (Not Present / Early Stage / Developing / Established / Optimized)
+- "Save and Continue Later" button saves progress and returns to MRA overview
+- Estimated time remaining shown: "~18 minutes remaining"
+- Stage calibration note shown before assessment: "These checkpoints are calibrated to your AE Ladder placement as a [Stage] agency"
+
+**Quarter Map — 3P Selection Tab**
+- All 25 capability areas shown as cards, grouped by dimension (accordion or tab)
+- Each card shows: capability area name, maturity score badge, urgency score badge, current 3P tag (if any)
+- Drag or click-to-assign to bucket columns
+- Bucket headers show current count: "Prioritize (2/3)" — badge turns green when exactly 3 selected
+- Lock and Proceed button: disabled until all three buckets have exactly 3 capability areas
+- Parking Lot: all unselected areas auto-populate here; founder can explicitly drag to Parking Lot
+
+**Sprint Board**
+- Three column layout: Prioritize | Plant | Progressively Iterate
+- Each column contains its 3 capability cards
+- Card shows: capability area name, initiative count, milestone count, completion percentage
+- Click card → Capability Context page
+- Sprint goal shown at top of board as a persistent banner
+
+**Status Tracker**
+- Full-width table with sortable columns
+- Sticky column headers
+- Row highlight on hover
+- Inline status dropdown (click to edit)
+- Filter bar: Owner dropdown, Status dropdown, Capability Area dropdown
+- Bulk select: checkbox per row → bulk action toolbar appears ("Mark Selected as Complete")
+
+---
+
+## 9. Auth Implementation
+
+Using Supabase Auth with email/password.
+
+**Sign-up flow:**
+1. User fills sign-up form (email, password, full_name, agency_name)
+2. `supabase.auth.signUp()` called
+3. On success: Supabase trigger creates `profiles` row with `tier = 'beta'`, `is_beta = true`, `beta_cohort_week = 1`
+4. User redirected to dashboard with onboarding prompt: "Your platform access is set up. Start with the Agency Snapshot in Program Week 1."
+
+**Sign-in flow:**
+1. `supabase.auth.signInWithPassword()`
+2. Session stored in localStorage by Supabase client
+3. AuthContext reads session on app load; provides `user` and `profile` to all components
+
+**Session management:**
+- `AuthContext` wraps the app; listens to `supabase.auth.onAuthStateChange()`
+- `ProtectedRoute` checks for valid session; redirects to `/sign-in` if none
+- Session auto-refreshes via Supabase client
+
+---
+
+## 10. Payment Integration (Post-Beta)
+
+Stripe integration is NOT required for the beta launch. Beta founders are invoiced separately. This section defines the post-beta implementation target.
+
+**Post-Beta Tier Structure:**
+| Tier | Price | Type | Stripe Product |
+|------|-------|------|----------------|
+| Orientation | $27-47 | One-time | Price ID: orientation_access |
+| Diagnostics Bundle | $500 | One-time | Price ID: diagnostics_bundle |
+| Pro Suite | $197/month | Subscription | Price ID: pro_suite_monthly |
+
+**Implementation approach:**
+- Add `stripe` package to `package.json`
+- Settings → Subscription tab: shows current tier, upgrade options
+- Stripe Checkout for one-time purchases (Orientation, Diagnostics Bundle)
+- Stripe Billing Portal for Pro Suite subscription management
+- Stripe webhook → Supabase Edge Function → updates `profiles.tier` on payment success
+- On downgrade: immediate tier change at end of billing period
+
+---
+
+## 11. Edge Cases and Error Handling
+
+| Scenario | Expected Behavior |
+|----------|------------------|
+| Claude API times out during report generation | Show error state: "Report generation timed out. Your data is saved — click Retry to try again." Log error to Supabase. |
+| User loses internet mid-assessment | Auto-save fires on every response; on reconnect, resume from last saved checkpoint |
+| MRA submitted before AE Ladder completed | Block MRA access; show prompt: "Complete the AE Ladder Assessment first — it calibrates your MRA checkpoints." |
+| Sprint locked before Quarter Map completed | Block Sprint Lock; prompt to complete Quarter Map first |
+| User tries to add 4th area to Prioritize bucket | Button/drag target disabled; toast: "Prioritize has 3 areas. Move one to Plant or Progressively Iterate to make room." |
+| Milestone marked complete with no checkpoint mapping | Update milestone status; skip maturity score recalculation; log warning |
+| Beta user tries to access Week 6 feature in Week 3 | Show gated state: "This feature unlocks in Program Week 6. Your coach will let you know when it's time." |
+| Auto-save fails (Supabase error) | Show inline warning: "Changes not saved — check your connection." Retry automatically every 30s. |
+| Synthesis generation called with incomplete inputs | Validate required fields before triggering Claude call; highlight missing fields |
+| User retakes AE Ladder | Create new `ae_ladder_assessments` record; use most recent for MRA calibration; old records preserved |
+
+---
+
+## 12. Dependencies and Integrations
+
+**Already installed (keep):**
+- `@supabase/supabase-js` ^2.93.3 — database, auth, storage, vector stores
+- `react` ^19.2.3 + `react-dom` + `react-router-dom` ^7.12.0
+- `recharts` ^3.7.0 — score charts and progress visualization
+- `lucide-react` ^0.562.0 — icons
+
+**To remove (legacy — no longer used):**
+- `openai` ^6.17.0 — **Remove entirely.** The platform was originally built with OpenAI but has been fully migrated to Claude Sonnet via N8N automations. This package is dead code and should be removed in the codebase cleanup pass. All AI synthesis now routes through N8N → Anthropic API.
+
+**Needs to be added:**
+- `stripe` — post-beta payment integration only; not needed for beta launch
+
+**PDF Report Generation (existing workflow — not a frontend library):**
+- MRA Report and AE Ladder Report already have downloadable PDFs built via: N8N synthesis workflow → Google Docs merge field templates → Claude synthesis calls → merge field population → PDF packaging → stored to Supabase Storage → download link surfaced in platform
+- Sprint Launch Document PDF will use the same pattern
+- No `jspdf` or `react-to-pdf` needed — PDF generation is backend (N8N), not frontend
+
+**External services:**
+- Anthropic API — Claude Sonnet (latest) for all AI synthesis, routed through N8N
+- N8N — primary AI synthesis orchestrator; merge field delivery; PDF packaging; beta unlock triggers; cohort email notifications
+- Supabase — database (PostgreSQL), auth (JWT), storage (PDF files), vector stores, RLS
+- Google Docs — report templates with merge fields for PDF generation
+
+---
+
+## 13. Out of Scope (This PRD)
+
+**V2 — Post-Beta Platform Features:**
+- Virtual CSO (AI strategic advisor with RAG) — V2
+- Trend Analysis / Business Intelligence (financial data upload + AI) — V2
+- Goal-to-Capability Connection Engine — V2
+- Stripe payment integration — post-beta
+- Mobile responsive design — post-beta
+- Team member sub-accounts / granular RBAC — post-beta
+- Public marketing site — separate project
+- Founder Evolution module — deprioritized from beta
+- Resource Vault section — content, not platform
+- Email notification system beyond basic Supabase auth emails — N8N handles during beta
+
+**Fractional CSO/CFO Service Layer (V2 — Platform Extension):**
+
+Post-beta, graduates of the Architect Advantage Accelerator become eligible for a $5K/month fractional CSO/CFO engagement. The platform becomes the home base for those advisory sessions. This layer will require V2 platform capabilities including:
+
+- **Advisor view:** Read access to a client's sprint plan, maturity/readiness scores, goal declarations, and milestone progress — gated by client permission
+- **Financial data integration:** Cash flow forecasting, P&L summary, and balance sheet inputs that sit alongside the strategic execution data — enabling monthly advisory sessions that connect strategic priorities to financial capacity
+- **Utilization signals:** High-level utilization indicators (not granular operations data) to understand whether the business has capacity to fund growth investments
+- **Maturity evolution tracking:** Quarter-over-quarter maturity and readiness score progression visible to both founder and advisor
+- **Monthly session prep view:** A pre-built advisor dashboard that surfaces the key questions for each monthly engagement: "What did we commit to? What did we execute? Is the cash supporting the investment? What decisions need to be made this month?"
+
+This service layer is intentionally out of scope for the beta build but must be architecturally anticipated. The data model already supports it (maturity scores, sprint history, quarterly progression are all stored). The beta build should not create technical debt that blocks this V2 capability. During beta, the platform's sprint plan and MRA data will serve as the foundation for advisor sessions — advisors will access this data directly in the platform during coaching sessions.
+
+---
+
+## 14. Open Questions
+
+### Resolved
+
+1. ~~**Claude vs. OpenAI API**~~ — **RESOLVED.** The `openai` package is legacy and unused. All synthesis has been migrated to Claude Sonnet via N8N automations. The openai package must be removed in the codebase cleanup pass. No `@anthropic-ai/sdk` needed on the frontend — Claude calls are made server-side through N8N, not from the React app.
+
+2. ~~**PDF Report Generation (MRA + AE Ladder)**~~ — **RESOLVED.** Both reports already have downloadable PDFs built via N8N + Google Docs merge fields. The PDF infrastructure, automation, and Supabase storage are already in place. Sprint Launch Document PDF is the remaining PDF gap — confirmed as P1 for beta, using the same workflow pattern.
+
+3. ~~**Status Tracker team access**~~ — **RESOLVED.** Founder-only for beta. No team member accounts. The founder opens the Status Tracker during team sessions and can toggle sensitive initiatives hidden before sharing their screen. Post-beta: role-based permission model may be introduced, but it is explicitly out of scope for beta.
+
+4. ~~**Stripe timing**~~ — **RESOLVED.** Stripe is entirely post-beta. Beta founders are invoiced separately. No payment infrastructure needed for the 12-week program.
+
+5. ~~**MRA checkpoint content**~~ — **RESOLVED.** All 125 checkpoints × 5 AE Ladder stages = 500 stage-calibrated definitions are already live in Supabase. The assessment reads them at runtime. The N8N synthesis workflow also reads these tables. No config file or build work needed — only wiring verification.
+
+### Active
+
+6. **Sprint Launch Document PDF workflow:** Confirm whether the Sprint Launch Document PDF should use the same N8N + Google Docs merge field pattern as the MRA/AE Ladder reports, or whether a lighter in-platform formatting approach (e.g., browser print-to-PDF) is sufficient for beta. The N8N pattern produces the most polished output but requires building a new Google Docs template for the Sprint Launch Document format.
+
+7. **Reflection Review rollover logic:** When a sprint closes and incomplete initiatives roll over, does the system auto-populate them into the new Quarter Map, or does the founder manually re-select them during 3P selection? This feature has not been built out fully and needs scoping before it can be implemented. Recommendation: founders make an explicit rollover decision for each incomplete initiative (roll forward / deprioritize / abandon), and rolled-forward initiatives auto-appear on the new Sprint Board without requiring re-selection in the Quarter Map.

@@ -1,0 +1,189 @@
+# Maturity + Readiness Audit — Checkpoints Concept
+
+## What Checkpoints Represent
+
+Checkpoints are the **observable, measurable validation points** that confirm whether a capability area is functioning at the expected level of maturity. They are the tactical layer of the M+R framework—the specific behaviors, processes, or artifacts that demonstrate capability strength.
+
+Each of the 25 capability areas contains exactly **5 checkpoints**, creating **125 total validation points** across the framework. These checkpoints serve three primary functions:
+
+1. **Assessment inputs** — The questions users answer during the M+R Audit
+2. **Progress markers** — Observable evidence that capability maturity is advancing
+3. **Milestone triggers** — Completion updates capability scores in real-time within Architect OS Pro
+
+Checkpoints translate abstract capability concepts into concrete, evaluable actions. For example, the capability "Forecasting & Visibility" might have checkpoints like "Financial data is current and accurate" or "Leaders have unified visibility into core financial drivers." These statements are specific enough to assess, yet flexible enough to evolve across stages.
+
+---
+
+## Why 5 Checkpoints Per Capability
+
+The five-checkpoint structure creates a **balanced assessment framework** that is:
+
+- **Comprehensive enough** to capture the full scope of a capability
+- **Specific enough** to guide actionable improvement
+- **Manageable enough** to avoid assessment fatigue
+
+Five validation points per capability allow the M+R system to measure:
+- **Foundational elements** — Basic structures or awareness required to begin
+- **Operational rhythms** — Processes or cadences that sustain performance
+- **Integration points** — How the capability connects with other systems
+- **Optimization markers** — Evidence of refinement and efficiency gains
+- **Strategic leverage** — Indicators that the capability drives enterprise value
+
+This structure ensures each capability is evaluated holistically—not just by whether it exists, but by how well it's built, maintained, and leveraged.
+
+---
+
+## Stage Calibration — How Checkpoints Evolve
+
+The M+R Audit is deeply integrated with the AE Ladder. Every user has a stage assignment (Rising, Striving, Thriving, Driving, or Arriving) that determines **which version of each checkpoint statement they see** during assessment.
+
+**Example: Financial Visibility Checkpoint**
+
+The underlying checkpoint intent might be: *"Leadership maintains visibility into core financial performance drivers."*
+
+But the **stage-calibrated language** shifts:
+
+- **Rising:** "Revenue and expenses are viewed in aggregate, offering basic awareness of profitability."
+- **Striving:** "Core drivers (services, clients, labor costs) are tracked separately to clarify where margin is won or lost."
+- **Thriving:** "Dashboards connect driver data for real-time margin and utilization visibility across projects and teams."
+- **Driving:** "Financial drivers are modeled dynamically to predict margin impact and guide resource allocation decisions."
+- **Arriving:** (Arriving stage is not explicitly in the current data model for this example, but conceptually represents fully autonomous, predictive systems)
+
+This calibration happens **automatically in Supabase**. The knowledge base documents describe *what checkpoints measure* and *how they progress conceptually*, but the specific language variations are stored in the database and filtered based on the user's profile.
+
+---
+
+## Relationship to the 3P Model
+
+Every checkpoint is assigned a **3P level** that determines how it should be approached within the agency's execution rhythm:
+
+### Prioritize (Fix Now)
+Checkpoints that represent critical gaps blocking current performance. These are structural weaknesses that must be addressed immediately to unlock progress. High urgency, high impact—these drive the agency's "Now Focus" initiatives.
+
+### Plant (Build Next)
+Checkpoints that represent future-focused capabilities. These aren't urgent today, but will become critical in the next stage of growth. Agencies begin foundational work here—setting up systems, gathering early data, or experimenting with processes that will scale later.
+
+### Progressively Iterate (Maintain & Refine)
+Checkpoints that represent stable, functional capabilities requiring ongoing refinement. These areas are working well but need continuous attention to prevent regression or to optimize further as context evolves.
+
+The 3P assignment for each checkpoint is **stage-specific**. A checkpoint that's "Prioritize" at Rising stage might be "Progressively Iterate" at Thriving stage—because what was once a critical gap has now become a stabilized strength.
+
+This dynamic assignment ensures the M+R Audit always guides agencies toward **stage-appropriate focus**, not universal best practices.
+
+---
+
+## How Checkpoint Completion Feeds Capability Scores
+
+The M+R Audit operates as a **closed-loop system** where assessment drives insight, and execution drives reassessment.
+
+When a user completes the initial 125-question audit:
+- Each checkpoint receives a score (typically a Likert scale or binary yes/no)
+- Checkpoint scores aggregate into **capability area scores**
+- Capability scores determine **urgency rankings** (Criticality × Impact)
+- Urgency rankings drive **3P roadmap distribution**
+
+But the system doesn't stop there. Within **Architect OS Pro**, users can:
+- Mark checkpoints as completed when milestones are achieved
+- Update checkpoint scores as processes mature
+- Trigger automatic recalculation of capability and urgency scores
+
+This creates a **living diagnostic** where strategic progress is continuously measured and roadmaps dynamically adjust as the agency evolves.
+
+---
+
+## Checkpoint Anatomy — Three Core Components
+
+Every checkpoint in the M+R system contains three elements that work together to create both assessment clarity and strategic context:
+
+### 1. Intent Summary
+A high-level explanation of *what* the checkpoint validates and *why* it matters. This provides strategic rationale and ensures users understand the purpose behind each validation point.
+
+**Example:**  
+*"To ensure financial data is captured accurately and reviewed on a predictable cadence, creating reliable visibility and trust in reported numbers."*
+
+### 2. Stage-Specific Statement
+The actual assessment question or validation statement that users evaluate. This is the version that appears during the audit, tailored to the user's current AE stage.
+
+**Example (Thriving stage):**  
+*"Automated accounting and dashboard reports deliver real-time financial data with minimal manual input."*
+
+### 3. Progression Summary
+A condensed narrative that describes how the checkpoint evolves across all five stages—moving from foundational awareness to institutionalized mastery.
+
+**Example:**  
+*"Moves from manual tracking → structured cadence → automation → autonomous accuracy and alerting."*
+
+Together, these three components ensure that every checkpoint serves both **tactical assessment** (what to measure now) and **strategic guidance** (how to evolve over time).
+
+---
+
+## Why Checkpoints Are Stored in Supabase, Not the Knowledge Base
+
+The M+R framework is designed for **dynamic, personalized assessment**. Because each checkpoint has five stage-specific variations, storing all 625 statements (125 checkpoints × 5 stages) in static documentation would be:
+
+- **Unmaintainable** — Updates would require editing multiple files
+- **Overwhelming** — Builders and AI would struggle to parse relevant context
+- **Inflexible** — Users couldn't receive stage-appropriate content automatically
+
+Instead, **Supabase stores the stage-calibrated checkpoint language**, filtered by the user's AE stage assignment. The knowledge base provides:
+- **Conceptual understanding** of what checkpoints are
+- **Structural logic** of how they function in the system
+- **Progression patterns** that explain how they evolve
+
+This separation ensures the system remains both scalable and intelligent—knowledge base explains the *framework*, while the database delivers the *personalized experience*.
+
+---
+
+## Observable vs. Aspirational — The Assessment Balance
+
+Checkpoints are designed to be **observable and evidence-based**, not aspirational or theoretical. Users should be able to answer checkpoint questions by looking at their current systems, not by imagining ideal states.
+
+**Good checkpoint language:**
+- "Financial data is reconciled monthly and shared with leadership."
+- "Core workflows follow defined sequences with standardized milestones."
+- "Leadership meets on a predictable cadence to review performance metrics."
+
+**Poor checkpoint language:**
+- "The agency has perfect financial visibility." *(too vague)*
+- "We should implement better forecasting systems." *(aspirational, not observable)*
+- "Teams feel aligned around strategic goals." *(subjective, hard to validate)*
+
+This observable focus ensures assessment results are **grounded in current reality**, creating diagnostic clarity that drives actionable improvement rather than wishful thinking.
+
+---
+
+## How Checkpoints Drive Insight Generation
+
+Beyond scoring, checkpoints feed the **Insight Engine** that powers M+R dashboards and the Virtual CSO. When checkpoint data is analyzed:
+
+- **Patterns emerge** across capability areas (e.g., "Financial visibility is strong, but margin discipline lags")
+- **Stage misalignments surface** (e.g., "Systems mastery checkpoints showing up in Scale-stage agency")
+- **3P priorities clarify** (e.g., "8 checkpoints flagged as Prioritize—these should drive Q1 focus")
+
+The system can generate contextual insights like:
+- *"Your operational checkpoints score highest—delivery is strong. Focus on market positioning to unlock growth."*
+- *"Three financial checkpoints are incomplete. These gaps are likely constraining reinvestment confidence."*
+
+Checkpoints transform from static assessment questions into **dynamic intelligence signals** that guide strategic decision-making throughout the platform.
+
+---
+
+## Key Principles for Checkpoint Design
+
+When checkpoints are created or updated, they follow these principles:
+
+- **Stage-appropriate language** — Rising agencies see foundational statements; Arriving agencies see mastery-level statements
+- **Observable validation** — Focused on what exists, not what's desired
+- **Specificity without rigidity** — Clear enough to assess, flexible enough to fit diverse agency contexts
+- **Progression consistency** — Evolution follows predictable patterns (manual → structured → automated → intelligent)
+- **Strategic relevance** — Each checkpoint connects to broader capability intent, not isolated tasks
+
+These principles ensure the M+R Audit remains both **rigorous and flexible**—precise enough to measure progress, adaptable enough to honor each agency's unique path.
+
+---
+
+**Related Documentation:**
+- `MR_Framework_Overview.md` — How checkpoints fit in the diagnostic system
+- `MR_Capability_Areas.md` — The 25 capabilities that checkpoints validate
+- `MR_Stage_Progression_Philosophy.md` — How maturity evolves across the five stages
+

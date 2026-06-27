@@ -1,0 +1,722 @@
+# **🔨 TEAM & DELIVERY TAB — COMPLETE BUILD SPECIFICATION**
+
+---
+
+## **DOCUMENT PURPOSE**
+
+This document provides complete specifications for building the **Team & Delivery tab** within the Agency Snapshot feature. Use this as the single source of truth for implementation.
+
+---
+
+## **THE NARRATIVE THIS TAB TELLS**
+
+### **Core Question:**
+
+*"How is your team structured, how efficiently do they create value, what level of complexity exists in your delivery model, and where are the capacity constraints or growth enablers?"*
+
+This tab answers the **human capital dimension** — completely independent of financial health or client dynamics.
+
+### **The Story (5 Beats):**
+
+1. **Team Scale & Efficiency** → How much value does each person generate?  
+2. **Operational Leverage** → What's the ratio of doers to managers/support?  
+3. **Delivery Model Complexity** → Generalist vs. specialist structure  
+4. **Founder Dependency** → How involved is the founder in delivery?  
+5. **Capacity Dynamics** → Do you have headroom or are you maxed out?
+
+---
+
+## **TAB STRUCTURE OVERVIEW**
+
+┌─────────────────────────────────────────────────────────────┐  
+│  Team & Delivery Tab                                        │  
+│  💡 Ballpark figures are perfectly fine                     │  
+├────────────────────────────────┬────────────────────────────┤  
+│                                │                            │  
+│  BASELINE FIELDS               │  📊 Calculated Metrics     │  
+│  (Always visible)              │  \[Real-time calculations\]  │  
+│                                │                            │  
+│  \[6-7 baseline fields\]         │  AGI per FTE:              │  
+│                                │    Monthly: $X | Annual: $Y│  
+│  ▶ Enhanced Metrics (Optional) │                            │  
+│    \[Initially collapsed\]       │  Billable:Non-Billable:    │  
+│                                │    X:1                     │  
+│    \[4 enhanced fields when     │                            │  
+│     expanded\]                  │  Contractor %:             │  
+│                                │    X% contractors          │  
+│  \[Save Team & Delivery Data\]  │                            │  
+│                                │  ─────────────────────     │  
+│                                │                            │  
+│                                │  💡 What This Tells Us     │  
+│                                │  \[GPT synthesis after save\]│  
+│                                │                            │  
+└────────────────────────────────┴────────────────────────────┘  
+---
+
+## **BASELINE FIELDS — COMPLETE SPECIFICATIONS**
+
+### **Field 1: Total Team Size (FTE)**
+
+**Field Name:** `total_team_size_fte`  
+ **Data Type:** Decimal (allows .5, .25 for part-time)  
+ **Input Type:** Number input with decimal support  
+ **Validation:**
+
+* Minimum: 0.5  
+* Maximum: 500  
+* Optional field
+
+**Placeholder:** `0.0`  
+ **Label:** "Total Team Size (FTE)"  
+ **Helper Text:** "Full-time equivalent employee count (e.g., 65.5 for 65 full-time \+ 1 half-time)"  
+ **Info Icon/Tooltip:** "FTE \= Full-Time Equivalent. Count part-time staff proportionally (e.g., 2 half-time \= 1 FTE). Include yourself if you're active in the business."
+
+**Auto-formatting:** Display with one decimal place (65.5)
+
+---
+
+### **Field 2: Billable Staff Count**
+
+**Field Name:** `billable_staff_count`  
+ **Data Type:** Integer  
+ **Input Type:** Number input  
+ **Validation:**
+
+* Minimum: 0  
+* Maximum: 500  
+* Optional field  
+* Should not exceed `total_team_size_fte`
+
+**Placeholder:** `0`  
+ **Label:** "Billable Staff Count"  
+ **Helper Text:** "People who primarily do client-facing delivery work"  
+ **Info Icon/Tooltip:** "Staff whose time is 80%+ billable to clients. Includes account managers, strategists, creatives, media buyers, developers — anyone primarily doing client work."
+
+---
+
+### **Field 3: Non-Billable Staff Count**
+
+**Field Name:** `non_billable_staff_count`  
+ **Data Type:** Integer  
+ **Input Type:** Number input  
+ **Validation:**
+
+* Minimum: 0  
+* Maximum: 100  
+* Optional field
+
+**Placeholder:** `0`  
+ **Label:** "Non-Billable Staff Count"  
+ **Helper Text:** "People in support, operations, leadership, or admin roles"  
+ **Info Icon/Tooltip:** "Staff who support the business but don't bill directly to clients. Includes operations, finance, HR, leadership, admin, business development, etc."
+
+**Validation Note:** System should show gentle warning (not error) if `billable_staff_count + non_billable_staff_count` significantly differs from `total_team_size_fte`. Message: "Your billable \+ non-billable counts total \[X\], which differs from your total team size of \[Y FTE\]. This is fine if you have part-time staff or hybrid roles."
+
+---
+
+### **Field 4: Team Structure Type**
+
+**Field Name:** `team_structure_type`  
+ **Data Type:** String (enum)  
+ **Input Type:** Dropdown select  
+ **Options:**
+
+* `all_generalists` — "All generalists (everyone does everything)"  
+* `mostly_generalists` — "Mostly generalists with some specialists"  
+* `balanced_mix` — "Balanced mix of generalists and specialists"  
+* `mostly_specialists` — "Mostly specialists with dedicated roles"  
+* `fully_specialized` — "Fully specialized (distinct role for each function)"
+
+**Validation:** Optional field  
+ **Placeholder:** "Select team structure..."  
+ **Label:** "Team Structure Type"  
+ **Helper Text:** "How would you describe your delivery model?"
+
+---
+
+### **Field 5: Founder Time Allocation**
+
+**Field Name:** `founder_time_allocation`  
+ **Data Type:** String (enum)  
+ **Input Type:** Dropdown select  
+ **Options:**
+
+* `mostly_client_work` — "Mostly client work (I'm still the primary deliverer)"  
+* `mix_client_ops` — "Mix of client work and operations"  
+* `mostly_operations` — "Mostly operations (managing team, building processes)"  
+* `mostly_strategy_sales` — "Mostly sales and strategy (growth-focused)"
+
+**Validation:** Optional field  
+ **Placeholder:** "Select time allocation..."  
+ **Label:** "Founder Time Allocation"  
+ **Helper Text:** "Where do you spend most of your time?"
+
+---
+
+### **Field 6: Average Team Utilization**
+
+**Field Name:** `average_team_utilization`  
+ **Data Type:** String (enum)  
+ **Input Type:** Dropdown select  
+ **Options:**
+
+* `under_60` — "\<60% (significant capacity available)"  
+* `60_to_70` — "60-70% (healthy capacity)"  
+* `70_to_80` — "70-80% (well-utilized)"  
+* `80_to_85` — "80-85% (near capacity)"  
+* `over_85` — "85%+ (at/over capacity)"
+
+**Validation:** Optional field  
+ **Placeholder:** "Select utilization rate..."  
+ **Label:** "Average Team Utilization (Optional)"  
+ **Helper Text:** "What's your typical team utilization? Leave blank if you don't track this."
+
+**Behavior:**
+
+* If left blank → Don't mention utilization in synthesis at all  
+* If filled → Include in synthesis context
+
+---
+
+### **Field 7: Average Contractor Count**
+
+**Field Name:** `average_contractor_count`  
+ **Data Type:** Integer  
+ **Input Type:** Number input  
+ **Validation:**
+
+* Minimum: 0  
+* Maximum: 200  
+* Optional field
+
+**Placeholder:** `0`  
+ **Label:** "Average Contractor Count (Optional)"  
+ **Helper Text:** "How many contractors/freelancers do you typically work with?"  
+ **Info Icon/Tooltip:** "Average number of contractors you engage in a typical month, not a point-in-time count. Include freelancers, agencies, and specialists you regularly work with."
+
+---
+
+## **ENHANCED FIELDS (OPTIONAL DEPTH)**
+
+### **Enhanced Section Header:**
+
+▶ Enhanced Metrics (Optional)  
+  Provide additional context for deeper team insights
+
+Initially collapsed. When expanded, shows 4 additional fields:
+
+---
+
+### **Field 8: Key Leadership Roles Present**
+
+**Field Name:** `key_leadership_roles` (array)  
+ **Data Type:** Array of strings  
+ **Input Type:** Multi-select checklist  
+ **Options:**
+
+* `coo` — "COO / General Manager"  
+* `head_of_delivery` — "Head of Delivery / Operations Director"  
+* `creative_director` — "Creative Director"  
+* `strategy_lead` — "Strategy Lead / Director"  
+* `account_director` — "Account Director / Client Services Lead"  
+* `media_lead` — "Media Director / Paid Media Lead"  
+* `operations_manager` — "Operations Manager"  
+* `finance_lead` — "CFO / Finance Director"  
+* `hr_lead` — "HR Director / People Ops"  
+* `biz_dev_lead` — "Business Development / Sales Director"
+
+**Validation:** Optional field (can select 0 or multiple)  
+ **Placeholder:** "Select all roles present..."  
+ **Label:** "Key Leadership Roles Present"  
+ **Helper Text:** "Select all formal leadership roles that exist in your organization"
+
+---
+
+### **Field 9: Management Layers**
+
+**Field Name:** `management_layers`  
+ **Data Type:** String (enum)  
+ **Input Type:** Dropdown select  
+ **Options:**
+
+* `one_to_two` — "1-2 levels (flat structure)"  
+* `three_to_four` — "3-4 levels (moderate hierarchy)"  
+* `five_plus` — "5+ levels (complex hierarchy)"
+
+**Validation:** Optional field  
+ **Placeholder:** "Select management layers..."  
+ **Label:** "Management Layers"  
+ **Helper Text:** "How many levels of management exist from front-line to founder?"  
+ **Info Icon/Tooltip:** "Example: 1-2 levels \= Team → Founder. 3-4 levels \= Team → Manager → Director → Founder."
+
+---
+
+### **Field 10: Specialized Roles Present**
+
+**Field Name:** `specialized_roles` (array)  
+ **Data Type:** Array of strings  
+ **Input Type:** Multi-select checklist  
+ **Options:**
+
+* `strategist` — "Strategist"  
+* `copywriter` — "Copywriter"  
+* `designer` — "Designer / Art Director"  
+* `developer` — "Developer / Engineer"  
+* `media_buyer` — "Media Buyer / Paid Specialist"  
+* `seo_specialist` — "SEO Specialist"  
+* `data_analyst` — "Data Analyst"  
+* `content_producer` — "Content Producer / Video"  
+* `account_manager` — "Account Manager"  
+* `project_manager` — "Project Manager"
+
+**Validation:** Optional field  
+ **Placeholder:** "Select all specialized roles..."  
+ **Label:** "Specialized Roles Present (Optional)"  
+ **Helper Text:** "What specialized roles exist on your team?"
+
+**Conditional Display:** Only show if `team_structure_type` is "mostly\_specialists" or "fully\_specialized"
+
+---
+
+### **Field 11: Average Team Experience Level**
+
+**Field Name:** `average_team_experience`  
+ **Data Type:** String (enum)  
+ **Input Type:** Dropdown select  
+ **Options:**
+
+* `mostly_junior` — "Mostly junior (0-3 years experience)"  
+* `mix_junior_mid` — "Mix of junior and mid-level"  
+* `mostly_mid` — "Mostly mid-level (3-7 years)"  
+* `mix_mid_senior` — "Mix of mid-level and senior"  
+* `mostly_senior` — "Mostly senior (7+ years)"
+
+**Validation:** Optional field  
+ **Placeholder:** "Select experience level..."  
+ **Label:** "Average Team Experience Level (Optional)"  
+ **Helper Text:** "What's the typical experience level of your team?"
+
+---
+
+## **CALCULATED METRICS (IMMEDIATE, CLIENT-SIDE)**
+
+These calculate in real-time as users enter data:
+
+### **Calculation 1: AGI per FTE (Monthly & Annual)**
+
+**Field Names:**
+
+* `agi_per_fte_monthly` (calculated)  
+* `agi_per_fte_annual` (calculated)
+
+**Formulas:**
+
+javascript  
+// Requires: monthly\_agi from Financial tab  
+agi\_per\_fte\_monthly \= monthly\_agi / total\_team\_size\_fte  
+agi\_per\_fte\_annual \= agi\_per\_fte\_monthly \* 12  
+\`\`\`
+
+\*\*Display Format:\*\*  
+\`\`\`  
+AGI per FTE  
+  Monthly: $18,462  ✓ Healthy  
+  Annually: $221,544
+
+**Conditional Display:** Only show if both `monthly_agi` (from Financial tab) AND `total_team_size_fte` are provided
+
+**Benchmark Zones (Monthly):**
+
+* \<$12,000 \= Concerning (🔴 red)  
+* $12,000-$15,000 \= Acceptable (🟡 yellow)  
+* $15,000-$20,000 \= Healthy (🟢 green)  
+* $20,000+ \= Excellent (🟢 bright green)
+
+**Benchmark Zones (Annual):**
+
+* \<$144,000 \= Concerning  
+* $144,000-$180,000 \= Acceptable  
+* $180,000-$240,000 \= Healthy  
+* $240,000+ \= Excellent
+
+**Visual Indicator:**
+
+* Show checkmark ✓ or colored dot next to monthly figure  
+* Include benchmark label: "Healthy" / "Acceptable" / "Concerning"
+
+---
+
+### **Calculation 2: Billable:Non-Billable Ratio**
+
+**Field Name:** `billable_ratio_calculated`
+
+**Formula:**
+
+javascript  
+billable\_ratio \= billable\_staff\_count / non\_billable\_staff\_count  
+\`\`\`
+
+\*\*Display Format:\*\*  
+\`\`\`  
+Billable:Non-Billable Ratio  
+  3.2:1  ✓ Healthy Leverage
+
+**Special Cases:**
+
+* If `non_billable_staff_count = 0`, display: "All billable (no support staff)"  
+* If `billable_staff_count = 0`, display: "All non-billable (no delivery staff)"
+
+**Conditional Display:** Only show if both `billable_staff_count` AND `non_billable_staff_count` are provided
+
+**Benchmark Zones:**
+
+* \<2:1 \= Top-heavy (🟡 yellow) "More management/support than ideal"  
+* 2:1-2.5:1 \= Balanced (🟢 green)  
+* 2.5:1-4:1 \= Healthy leverage (🟢 bright green)  
+* 4:1 \= Very lean (🟡 yellow) "May need more support infrastructure"
+
+**Visual Indicator:**
+
+* Show checkmark ✓ or colored dot  
+* Include benchmark label
+
+---
+
+### **Calculation 3: Contractor % of Workforce**
+
+**Field Name:** `contractor_percentage_calculated`
+
+**Formula:**
+
+javascript  
+total\_workforce \= total\_team\_size\_fte \+ average\_contractor\_count  
+contractor\_percentage \= (average\_contractor\_count / total\_workforce) \* 100  
+ft\_percentage \= 100 \- contractor\_percentage  
+\`\`\`
+
+\*\*Display Format:\*\*  
+\`\`\`  
+Contractor % of Workforce  
+  13% contractors, 87% full-time  
+\`\`\`
+
+\*\*Conditional Display:\*\* Only show if \`average\_contractor\_count\` is provided (greater than 0\)
+
+\*\*No Benchmark Zones:\*\* This is contextual — some agencies intentionally use high contractor %, others don't
+
+\---
+
+\#\# \*\*CALCULATED METRICS PANEL — VISUAL LAYOUT\*\*  
+\`\`\`  
+┌────────────────────────────────────────────────┐  
+│ 📊 Calculated Metrics                          │  
+│                                                │  
+│ These metrics calculate automatically based on │  
+│ your inputs.                                   │  
+├────────────────────────────────────────────────┤  
+│                                                │  
+│ AGI per FTE                                    │  
+│   Monthly: $18,462  ✓ Healthy                  │  
+│   Annually: $221,544                           │  
+│                                                │  
+│ Billable:Non-Billable Ratio                    │  
+│   3.2:1  ✓ Healthy Leverage                    │  
+│                                                │  
+│ Contractor % of Workforce                      │  
+│   13% contractors, 87% full-time               │  
+│                                                │  
+└────────────────────────────────────────────────┘  
+\`\`\`
+
+\*\*Design Notes:\*\*  
+\- Use side-by-side format for monthly/annual (Monthly: $X | Annually: $Y OR on same line)  
+\- Show benchmark indicators (checkmark \+ label OR colored dot \+ label)  
+\- Keep layout clean and scannable  
+\- Gray placeholder text when metrics can't calculate yet: "Complete Financial and Team data to see metrics"
+
+\---
+
+\#\# \*\*GPT SYNTHESIS SECTION\*\*
+
+\#\#\# \*\*Before Save:\*\*  
+\`\`\`  
+┌────────────────────────────────────────────────┐  
+│ 💡 What This Tells Us                          │  
+│                                                │  
+│ \[Empty state with icon\]                        │  
+│                                                │  
+│ Click "Save Team & Delivery Data" below to    │  
+│ generate contextual insights and benchmark     │  
+│ comparisons for your team structure.           │  
+│                                                │  
+└────────────────────────────────────────────────┘  
+\`\`\`
+
+\#\#\# \*\*After Save:\*\*  
+\`\`\`  
+┌────────────────────────────────────────────────┐  
+│ 💡 What This Tells Us                          │  
+│                                                │  
+│ \[GPT-generated synthesis appears here\]         │  
+│                                                │  
+│ At 65 FTE generating $1.2M monthly AGI...     │  
+│ \[Full narrative continues\]                     │  
+│                                                │  
+└────────────────────────────────────────────────┘  
+\`\`\`
+
+\---
+
+\#\# \*\*GPT SYNTHESIS PROMPT STRUCTURE\*\*
+
+\#\#\# \*\*System Prompt:\*\*  
+\`\`\`  
+You are an organizational analyst specializing in marketing agency team structures and efficiency. Analyze the provided team data and generate contextual insights using observational language (not prescriptive or directive).
+
+Focus on:  
+1\. Team efficiency (AGI per FTE benchmarking)  
+2\. Operational leverage (billable:non-billable ratio)  
+3\. Delivery model complexity and coordination requirements  
+4\. Founder involvement and delegation maturity  
+5\. Capacity dynamics and headroom
+
+CRITICAL CONSTRAINTS:  
+\- Use ONLY observational language ("indicates," "suggests," "positions you")  
+\- NO prescriptive/directive language ("you should," "you need to")  
+\- NO time-series comparisons or historical references  
+\- NO goal-based recommendations or future targets  
+\- NO stage-prescriptive judgments (team complexity varies by stage)  
+\- Acknowledge that founder involvement, complexity, and structure appropriateness depends on stage and scale
+
+Use benchmark ranges:  
+\- AGI per FTE: $20K+ (excellent), $15-20K (healthy), $12-15K (acceptable), \<$12K (concerning)  
+\- Billable:Non-Billable: \>4:1 (very lean), 3-4:1 (healthy), 2-3:1 (balanced), \<2:1 (top-heavy)  
+\- Founder Time: Mostly client work (high involvement), Mix (transition), Mostly ops (delegated), Mostly strategy (highly scalable)  
+\- Team Structure: Generalist (simple/flexible), Specialist (complex/coordinated), Hybrid (highest complexity)
+
+Keep tone observational and stage-aware. Length: 200-300 words.  
+---
+
+### **User Prompt Payload:**
+
+json  
+{  
+  "total\_team\_size\_fte": 65,  
+  "billable\_staff\_count": 52,  
+  "non\_billable\_staff\_count": 13,  
+  "team\_structure\_type": "mostly\_specialists",  
+  "founder\_time\_allocation": "mix\_client\_ops",  
+  "average\_team\_utilization": "70\_to\_80",  
+  "average\_contractor\_count": 10,  
+    
+  "enhanced\_fields\_provided": {  
+    "key\_leadership\_roles": \["head\_of\_delivery", "creative\_director", "account\_director"\],  
+    "management\_layers": "three\_to\_four",  
+    "specialized\_roles": \["strategist", "copywriter", "designer", "media\_buyer", "account\_manager"\],  
+    "average\_team\_experience": "mix\_mid\_senior"  
+  },  
+    
+  "calculated\_metrics": {  
+    "agi\_per\_fte\_monthly": 18462,  
+    "agi\_per\_fte\_annual": 221544,  
+    "billable\_ratio": 4.0,  
+    "contractor\_percentage": 13.3  
+  },  
+    
+  "cross\_tab\_context": {  
+    "monthly\_agi": 1200000,  
+    "monthly\_revenue": 1300000,  
+    "average\_client\_value": 2857  
+  }  
+}  
+\`\`\`
+
+\*\*Note:\*\* Only include enhanced fields that were actually filled out. Don't send empty/null values.
+
+\---
+
+\#\#\# \*\*Expected GPT Response Format:\*\*  
+\`\`\`  
+Team Efficiency & Scale
+
+At 65 FTE generating $1.2M monthly AGI, you're producing $18,462 per person. This positions you solidly in the healthy efficiency range, above the $15K threshold that separates sustainable agencies from those struggling with team productivity. Your efficiency suggests good pricing discipline and reasonable productivity levels for an agency at your scale.
+
+Operational Leverage
+
+Your 4:1 billable-to-support ratio (52 delivery staff, 13 operations/leadership) indicates very lean operational leverage. You're operating efficiently with minimal overhead, though this ratio suggests you may be near the threshold where additional support infrastructure could enhance delivery team productivity. This lean structure is typical for agencies prioritizing efficiency over extensive management layers.
+
+Delivery Model Complexity
+
+Your "mostly specialists" structure with dedicated roles (strategists, creatives, media buyers, account managers) creates moderate coordination complexity. With 3-4 management layers and formal leadership roles like Head of Delivery and Creative Director present, you've built infrastructure to orchestrate specialist collaboration. This structure aligns with the complexity required to serve mid-market clients — simpler clients wouldn't justify specialist overhead, while your current scale supports role specialization.
+
+Founder Involvement
+
+You're spending time on a "mix of client work and operations," indicating you're in the transition phase between being the primary deliverer and orchestrating delivery through others. With leadership infrastructure present (Head of Delivery, Creative Director, Account Director), the delegation framework exists, though you haven't fully transitioned out of client work. This is a common inflection point at your scale where completing the shift to "mostly operations" or "mostly strategy" unlocks further growth capacity.
+
+Capacity Dynamics
+
+Your 70-80% utilization indicates the team is well-utilized with some headroom. Combined with 13% contractor workforce, you have flexibility to scale through a mix of contractor expansion and selective hiring. This balanced capacity position suggests you're not maxed out but operating at healthy productivity levels.  
+\`\`\`
+
+\---
+
+\#\# \*\*BALLPARK GUIDANCE MESSAGING\*\*
+
+Place this at the top of the Team & Delivery tab:  
+\`\`\`  
+💡 Ballpark figures are perfectly fine
+
+These numbers can be as exact or approximate as you prefer. Rounded estimates work great for directional insights. More precision enables deeper analysis, but ballpark figures are sufficient for meaningful benchmarking.  
+\`\`\`
+
+\---
+
+\#\# \*\*UI/UX IMPLEMENTATION NOTES\*\*
+
+\#\#\# \*\*Page Layout:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────────────────┐  
+│  Team & Delivery Tab                                        │  
+│  \[Ballpark guidance message\]                                │  
+├────────────────────────────────┬────────────────────────────┤  
+│                                │                            │  
+│  BASELINE FIELDS               │  📊 Calculated Metrics     │  
+│  (Always visible)              │  \[Real-time calculations\]  │  
+│                                │                            │  
+│  \[7 baseline fields\]           │  AGI per FTE: Monthly/Annl │  
+│                                │  Billable Ratio: X:1       │  
+│  ▶ Enhanced Metrics (Optional) │  Contractor %: X%          │  
+│    \[Initially collapsed\]       │                            │  
+│                                │  ─────────────────────     │  
+│    \[4 enhanced fields when     │                            │  
+│     expanded\]                  │  💡 What This Tells Us     │  
+│                                │  \[GPT synthesis after save\]│  
+│  \[Save Team & Delivery Data\]   │                            │  
+│                                │                            │  
+└────────────────────────────────┴────────────────────────────┘
+
+### **Field Behavior:**
+
+* All fields optional (no required validation)  
+* Tab order follows logical flow (Team Size → Billable → Non-Billable → Structure → Founder → Utilization → Contractors)  
+* Number fields auto-format with commas where appropriate  
+* Dropdowns show placeholder text when empty  
+* Info icons next to field labels trigger tooltips on hover  
+* Helper text appears below each field (gray, smaller font)
+
+### **Calculated Metrics Behavior:**
+
+* Start with placeholder "---" for all metrics  
+* Update immediately as relevant fields change  
+* Show smooth transition animation when values populate  
+* If required fields are empty, show: "Complete fields above to calculate" or similar  
+* If cross-tab data missing (Financial AGI), show: "Complete Financial tab to calculate AGI per FTE"
+
+### **Save Button Behavior:**
+
+* **Label:** "Save Team & Delivery Data"  
+* **Position:** Bottom of left column  
+* **Disabled state** if no data entered (gray, not clickable)  
+* **Active state** once any field has data (blue, clickable)  
+* **On click:**  
+  * Show loading spinner  
+  * Send data to GPT synthesis endpoint  
+  * Update right panel with insights  
+  * Change button to "Update Team & Delivery Data"
+
+### **Enhanced Accordion:**
+
+* **Label:** "▶ Enhanced Metrics (Optional)"  
+* **Subtext:** "Provide additional context for deeper team insights"  
+* **On click:**  
+  * Expand to show 4 additional fields  
+  * Icon changes to "▼" when expanded  
+  * Smooth height transition animation
+
+---
+
+## **DATABASE SCHEMA NOTES**
+
+### **Table: `agency_snapshots` (or separate `team_delivery` table)**
+
+All team & delivery fields should be stored with these columns:
+
+sql  
+\-- Baseline fields  
+total\_team\_size\_fte DECIMAL(5,1)  
+billable\_staff\_count INTEGER  
+non\_billable\_staff\_count INTEGER  
+team\_structure\_type VARCHAR(50)  
+founder\_time\_allocation VARCHAR(50)  
+average\_team\_utilization VARCHAR(50)  
+average\_contractor\_count INTEGER
+
+\-- Enhanced fields  
+key\_leadership\_roles TEXT\[\] \-- PostgreSQL array  
+management\_layers VARCHAR(50)  
+specialized\_roles TEXT\[\] \-- PostgreSQL array  
+average\_team\_experience VARCHAR(50)
+
+\-- Calculated fields (store for historical reference)  
+agi\_per\_fte\_monthly DECIMAL(12,2)  
+agi\_per\_fte\_annual DECIMAL(12,2)  
+billable\_ratio\_calculated DECIMAL(5,2)  
+contractor\_percentage\_calculated DECIMAL(5,2)
+
+\-- GPT synthesis output  
+team\_synthesis TEXT  
+team\_synthesis\_generated\_at TIMESTAMP
+
+\-- Metadata  
+created\_at TIMESTAMP  
+updated\_at TIMESTAMP  
+user\_id UUID (foreign key to users table)  
+---
+
+## **SUMMARY — READY FOR IMPLEMENTATION**
+
+### **Baseline Fields: 7 fields (\~5-10 min completion)**
+
+1. Total Team Size (FTE)  
+2. Billable Staff Count  
+3. Non-Billable Staff Count  
+4. Team Structure Type (dropdown)  
+5. Founder Time Allocation (dropdown)  
+6. Average Team Utilization (dropdown, optional)  
+7. Average Contractor Count (optional)
+
+### **Enhanced Fields: 4 fields (optional depth)**
+
+8. Key Leadership Roles Present (multi-select)  
+9. Management Layers (dropdown)  
+10. Specialized Roles Present (multi-select)  
+11. Average Team Experience Level (dropdown)
+
+### **Calculated Metrics: 3 immediate calculations**
+
+1. AGI per FTE (Monthly \+ Annual)  
+2. Billable:Non-Billable Ratio  
+3. Contractor % of Workforce
+
+### **GPT Synthesis: After save**
+
+* Contextual insights (200-300 words)  
+* Benchmark comparisons  
+* Team structure implications  
+* Observational language (no prescriptions, no time comparisons, no goal references)
+
+---
+
+## **CRITICAL REMINDERS FOR IMPLEMENTATION**
+
+✅ **Side-by-side format** for monthly/annual AGI per FTE  
+ ✅ **Benchmark indicators** via color or icons \+ labels  
+ ✅ **No conditional field showing** — just optional fields that can be blank  
+ ✅ **"Average" not "active"** in contractor count language  
+ ✅ **Stage-aware synthesis** — avoid prescriptive judgments about complexity/founder involvement  
+ ✅ **Observational language only** in GPT synthesis  
+ ✅ **No time-series or goal-based** language in synthesis
+
+---
+
+**END OF TEAM & DELIVERY TAB SPECIFICATION**

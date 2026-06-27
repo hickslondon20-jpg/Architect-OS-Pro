@@ -1,0 +1,254 @@
+/* ============================================================
+   ArchitectOS — Colors & Type
+   The strategic operating system for scaling agencies.
+   ============================================================ */
+
+/* -------- Webfonts (Google Fonts) --------
+   Primary UI: Geist (sans) + Geist Mono
+   Editorial accent: Instrument Serif (used only on brand/editorial
+   surfaces — never inside dashboards)
+*/
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
+
+:root {
+  /* ---------- COLOR — Primary palette ---------- */
+  --aos-obsidian:        #193052;  /* primary actions, nav, key headings */
+  --aos-obsidian-deep:   #11233F;  /* press / pressed nav */
+  --aos-obsidian-hover:  #213E63;  /* hover */
+  --aos-slate-blue:      #335373;  /* secondary actions, charts, supporting structure */
+  --aos-steel-blue:      #5F7EA3;  /* data viz, muted accents */
+  --aos-deep-teal:       #143E43;  /* score rings, confidence states */
+  --aos-brass:           #B8922A;  /* premium accents, focus highlights, selection */
+  --aos-brass-soft:      #D4B45F;  /* hover/lighter brass */
+  --aos-brass-tint:      rgba(184, 146, 42, 0.10); /* selection wash */
+
+  /* ---------- COLOR — Neutrals ---------- */
+  --aos-parchment:       #F7F4EF;  /* warm canvas */
+  --aos-parchment-deep:  #EFEAE0;  /* sunken parchment, table stripe */
+  --aos-cloud:           #FCFBF8;  /* cards, primary surfaces */
+  --aos-graphite:        #222B38;  /* main text */
+  --aos-cool-gray:       #667085;  /* metadata, quiet labels */
+  --aos-mist:            #E6E8EC;  /* hairlines, dividers */
+  --aos-sage:            #C7D5CF;  /* soft secondary surfaces */
+  --aos-sage-soft:       #DDE7E2;  /* lighter sage tint */
+
+  /* off-black (never pure black) */
+  --aos-ink:             #0E141C;
+
+  /* ---------- COLOR — Semantic ---------- */
+  --aos-success:         #2E7D5B;
+  --aos-success-tint:    #E2EEE8;
+  --aos-warning:         #C79A2E;
+  --aos-warning-tint:    #F3EAD2;
+  --aos-insight:         #3B6EA8;
+  --aos-insight-tint:    #DCE7F2;
+  --aos-risk:            #9A5B52;
+  --aos-risk-tint:       #EFDFDB;
+
+  /* ---------- COLOR — Foregrounds (semantic aliases) ---------- */
+  --fg-1: var(--aos-graphite);     /* default body text, headings */
+  --fg-2: #3F4A59;                 /* secondary text */
+  --fg-3: var(--aos-cool-gray);    /* tertiary / metadata */
+  --fg-4: #93999F;                 /* placeholder, disabled */
+  --fg-on-dark: var(--aos-cloud);  /* text on navy/teal */
+  --fg-accent: var(--aos-brass);
+
+  /* ---------- COLOR — Backgrounds ---------- */
+  --bg-canvas: var(--aos-parchment);
+  --bg-surface: var(--aos-cloud);
+  --bg-sunken:  var(--aos-parchment-deep);
+  --bg-inverse: var(--aos-obsidian);
+  --bg-mist:    #FAFAFB;
+
+  /* ---------- BORDERS ---------- */
+  --border-hairline: 1px solid var(--aos-mist);
+  --border-subtle:   1px solid #DDE0E5;
+  --border-strong:   1px solid #C7D0DA;
+  --border-focus:    1px solid var(--aos-obsidian);
+  --border-accent:   1px solid var(--aos-brass);
+  --border-sage:     1px solid var(--aos-sage);
+
+  /* ---------- RADII ---------- */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-full: 999px;
+
+  /* ---------- SHADOWS — soft, tinted, never glow ---------- */
+  --shadow-soft-1: 0 1px 2px rgba(25, 48, 82, 0.04), 0 4px 12px rgba(25, 48, 82, 0.04);
+  --shadow-soft-2: 0 8px 24px rgba(25, 48, 82, 0.06);
+  --shadow-elevated: 0 16px 40px rgba(25, 48, 82, 0.10);
+  --shadow-inner-hairline: inset 0 0 0 1px rgba(25, 48, 82, 0.06);
+  --shadow-focus-ring: 0 0 0 3px rgba(184, 146, 42, 0.22);
+
+  /* ---------- SPACING (8-pt) ---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ---------- LAYOUT ---------- */
+  --canvas-max: 1440px;
+  --gutter: 24px;
+  --section-gap: 48px;
+
+  /* ---------- TYPE — Families ---------- */
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  --font-editorial: 'Instrument Serif', Georgia, 'Times New Roman', serif; /* editorial only */
+
+  /* ---------- TYPE — Scale (per spec) ---------- */
+  --t-display-size:  40px; --t-display-weight: 600; --t-display-track: -0.5px; --t-display-lh: 1.1;
+  --t-h1-size:       30px; --t-h1-weight: 500;     --t-h1-track: -0.3px;     --t-h1-lh: 1.18;
+  --t-h2-size:       24px; --t-h2-weight: 500;     --t-h2-track: 0;          --t-h2-lh: 1.25;
+  --t-h3-size:       20px; --t-h3-weight: 500;     --t-h3-track: 0;          --t-h3-lh: 1.3;
+  --t-body-size:     16px; --t-body-weight: 400;   --t-body-track: 0;        --t-body-lh: 1.55;
+  --t-small-size:    14px; --t-small-weight: 400;  --t-small-track: 0;       --t-small-lh: 1.5;
+  --t-caption-size:  12px; --t-caption-weight: 400;--t-caption-track: 0;     --t-caption-lh: 1.45;
+  --t-eyebrow-size:  11px; --t-eyebrow-weight: 500;--t-eyebrow-track: 0.18em;--t-eyebrow-lh: 1.2;
+
+  /* ---------- MOTION ---------- */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-fast:     140ms;
+  --t-standard: 180ms;
+  --t-measured: 240ms;
+}
+
+/* ============================================================
+   Base elements
+   ============================================================ */
+html, body {
+  background: var(--bg-canvas);
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: var(--t-body-size);
+  line-height: var(--t-body-lh);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+   Semantic type classes
+   ============================================================ */
+.aos-display {
+  font-family: var(--font-sans);
+  font-size: var(--t-display-size);
+  font-weight: var(--t-display-weight);
+  letter-spacing: var(--t-display-track);
+  line-height: var(--t-display-lh);
+  color: var(--fg-1);
+}
+.aos-h1 {
+  font-size: var(--t-h1-size);
+  font-weight: var(--t-h1-weight);
+  letter-spacing: var(--t-h1-track);
+  line-height: var(--t-h1-lh);
+  color: var(--fg-1);
+}
+.aos-h2 {
+  font-size: var(--t-h2-size);
+  font-weight: var(--t-h2-weight);
+  letter-spacing: var(--t-h2-track);
+  line-height: var(--t-h2-lh);
+  color: var(--fg-1);
+}
+.aos-h3 {
+  font-size: var(--t-h3-size);
+  font-weight: var(--t-h3-weight);
+  line-height: var(--t-h3-lh);
+  color: var(--fg-1);
+}
+.aos-body { font-size: var(--t-body-size); line-height: var(--t-body-lh); color: var(--fg-1); }
+.aos-small { font-size: var(--t-small-size); line-height: var(--t-small-lh); color: var(--fg-2); }
+.aos-caption { font-size: var(--t-caption-size); line-height: var(--t-caption-lh); color: var(--fg-3); }
+
+/* Eyebrow — uppercase tracked label used above sections, on cards, etc. */
+.aos-eyebrow {
+  font-size: var(--t-eyebrow-size);
+  font-weight: var(--t-eyebrow-weight);
+  letter-spacing: var(--t-eyebrow-track);
+  line-height: var(--t-eyebrow-lh);
+  text-transform: uppercase;
+  color: var(--aos-cool-gray);
+}
+
+/* Editorial — used only on marketing / brand surfaces, never in dashboards */
+.aos-editorial {
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Mono — for metric values, code, kbd shortcuts */
+.aos-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "ss01" on, "tnum" on;
+}
+
+/* Numeric / metric — tabular figures */
+.aos-metric {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" on;
+  letter-spacing: -0.01em;
+}
+
+/* ============================================================
+   OS Engine — reader markdown (scoped to the reader panel)
+   ============================================================ */
+.os-reader-markdown {
+  font-family: var(--font-sans);
+  font-size: var(--t-small-size);
+  line-height: 1.6;
+  color: var(--fg-1);
+}
+.os-reader-markdown h1 {
+  font-size: var(--t-h2-size);
+  font-weight: var(--t-h2-weight);
+  line-height: var(--t-h2-lh);
+  margin: 0 0 var(--space-3);
+  color: var(--fg-1);
+}
+.os-reader-markdown h2 {
+  font-size: var(--t-h3-size);
+  font-weight: var(--t-h3-weight);
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--fg-1);
+}
+.os-reader-markdown h3 {
+  font-size: var(--t-body-size);
+  font-weight: 600;
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--fg-1);
+}
+.os-reader-markdown p { margin: 0 0 var(--space-3); }
+.os-reader-markdown ul,
+.os-reader-markdown ol { margin: 0 0 var(--space-3) var(--space-5); }
+.os-reader-markdown li { margin-bottom: var(--space-1); }
+.os-reader-markdown strong { font-weight: 600; color: var(--fg-1); }
+.os-reader-markdown a { color: var(--aos-brass); text-decoration: underline; }
+.os-reader-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg-sunken);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.os-reader-markdown blockquote {
+  border-left: 3px solid var(--aos-brass);
+  background: var(--aos-brass-tint);
+  margin: var(--space-4) 0;
+  padding: var(--space-2) var(--space-4);
+  color: var(--fg-2);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+}
+.os-reader-markdown blockquote p { margin: 0; }
+.os-reader-markdown hr { border: none; border-top: 1px solid var(--aos-mist); margin: var(--space-5) 0; }

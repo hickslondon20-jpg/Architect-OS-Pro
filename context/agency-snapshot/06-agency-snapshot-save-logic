@@ -1,0 +1,266 @@
+UI/UX Design Review - Profile Sections Across All Tabs
+Excellent thinking on the user experience. Let me help you architect this properly before we build it out.
+
+The Core UX Pattern We're Building
+Three Key Behaviors:
+Persistence on Return - If user has saved data, profile section is visible on page load
+Change Detection - Button state reflects whether current form differs from saved data
+Prevent Accidental Re-runs - Disable save when nothing has changed
+
+Save Button State Machine
+State 1: Initial (No Saved Data)
+Condition: User has never saved this tab
+ Button Display: "Save [Tab] Data"
+ Button State: Enabled when required fields valid, disabled otherwise
+ Profile Section: Hidden
+
+State 2: Saved (No Changes)
+Condition: User has saved data, form matches database
+ Button Display: "Saved" or "Save [Tab] Data"
+ Button State: Disabled (grayed out)
+ Profile Section: Visible, showing last saved data
+ Visual Indicator: Maybe checkmark icon, muted color
+
+State 3: Edited (Has Changes)
+Condition: User modified any field after loading saved data
+ Button Display: "Update [Tab] Data"
+ Button State: Enabled
+ Profile Section: Still visible (showing previous saved version)
+ Visual Indicator: Different color (maybe orange/amber) to indicate "pending changes"
+
+State 4: Processing
+Condition: Save/Update in progress
+ Button Display: "Processing..."
+ Button State: Disabled with spinner
+ Profile Section: Still visible (showing old data) OR show loading overlay
+
+State 5: Success
+Condition: Save completed successfully
+ Button Display: "✓ Saved" (briefly, 2 seconds)
+ Button State: Disabled
+ Profile Section: Updates with new data
+ Then transitions to: State 2 (Saved, No Changes)
+
+Change Detection Logic
+How do we know if form has changed?
+Approach 1: Deep Comparison (Recommended)
+javascript
+// On component mount, store saved data as reference
+const savedDataRef = useRef(savedDataFromDB);
+
+// On any field change, compare current form state to saved reference
+const hasChanges = !isEqual(currentFormState, savedDataRef.current);
+
+// Update button state based on hasChanges
+if (hasChanges) {
+  buttonText = "Update Identity Data";
+  buttonEnabled = true;
+} else {
+  buttonText = "Saved";
+  buttonEnabled = false;
+}
+Approach 2: Dirty Flag (Simpler)
+javascript
+// Track if ANY field has been edited since load
+const [isDirty, setIsDirty] = useState(false);
+
+// On any field onChange event
+const handleFieldChange = (value) => {
+  setIsDirty(true);
+  // update form state
+};
+
+// After successful save
+const handleSaveSuccess = () => {
+  setIsDirty(false);
+  savedDataRef.current = currentFormState; // Update reference
+};
+Recommendation: Use Approach 1 (deep comparison) - more accurate, handles edge cases where user changes then reverts a field.
+
+Profile Section Visibility Rules
+Rule 1: On Page Load
+javascript
+useEffect(() => {
+  // Load saved data from database
+  const savedData = await loadIdentityData(userId);
+  
+  if (savedData) {
+    // Populate form fields
+    setFormState(savedData);
+    
+    // Show profile section immediately
+    setShowProfile(true);
+    
+    // Store reference for change detection
+    savedDataRef.current = savedData;
+    
+    // Button starts in "Saved" state (disabled)
+    setButtonState('saved');
+  } else {
+    // No saved data
+    setShowProfile(false);
+    setButtonState('initial');
+  }
+}, [userId]);
+Rule 2: After Save/Update
+javascript
+const handleSave = async () => {
+  setButtonState('processing');
+  
+  // Save to database
+  await saveIdentityData(formState);
+  
+  // Update reference
+  savedDataRef.current = formState;
+  
+  // Show/update profile section
+  setShowProfile(true);
+  
+  // Button success state
+  setButtonState('success');
+  
+  // After 2 seconds, return to saved state
+  setTimeout(() => setButtonState('saved'), 2000);
+};
+Rule 3: While Editing
+javascript
+// Profile section stays visible even when editing
+// This lets user see their previous data while making changes
+// Only updates after successful save
+```
+
+---
+
+## **Button Text & Color Scheme**
+
+| State | Text | Color | Icon | Enabled |
+|-------|------|-------|------|---------|
+| Initial | "Save [Tab] Data" | Blue | - | Conditional |
+| Saved | "Saved" | Gray/Muted | ✓ | No |
+| Edited | "Update [Tab] Data" | Amber/Orange | - | Yes |
+| Processing | "Processing..." | Blue | ⟳ spinner | No |
+| Success | "✓ Saved" | Green | ✓ | No |
+
+---
+
+## **Profile Section Structure (All Tabs)**
+
+Each tab should have consistent structure:
+
+### **Financial Tab Profile:**
+```
+📊 Financial Profile
+
+BUSINESS SCALE
+[Classification based on revenue]
+Monthly Revenue: $XXX,XXX
+Annual Revenue: $X,XXX,XXX
+
+PROFITABILITY
+[Classification based on margin]
+Margin: XX%
+Monthly AGI: $XXX,XXX
+
+FINANCIAL HEALTH
+[Classification based on cash runway]
+Cash Runway: X.X months
+Financial Status: [Stable/Growing/Concerning]
+```
+
+### **Growth & Pipeline Tab Profile:**
+```
+📈 Growth & Pipeline Profile
+
+CLIENT ECONOMICS
+[Classification based on ACV]
+Average Client Value: $X,XXX
+Client Lifetime: XX months
+
+REVENUE STABILITY
+[Classification based on MRR %]
+Recurring Revenue: XX%
+Project Revenue: XX%
+
+ACQUISITION EFFICIENCY
+[Classification based on channels/win rate]
+Primary Channels: [List]
+Win Rate: XX%
+```
+
+### **Team & Delivery Tab Profile:**
+```
+👥 Team & Delivery Profile
+
+TEAM STRUCTURE
+[Classification based on size/structure]
+Total Team: XX FTE
+Billable Ratio: X.X:1
+
+DELIVERY MODEL
+[Classification based on structure type]
+Model: [Generalist/Specialist/Hybrid]
+Key Roles: [List]
+
+CAPACITY DYNAMICS
+[Classification based on utilization]
+Utilization: XX%
+Capacity Status: [Available/Balanced/Constrained]
+
+Recommended UI Implementation
+Button Component State:
+jsx
+const SaveButton = ({ tabName, hasChanges, isProcessing, onSave }) => {
+  const getButtonState = () => {
+    if (isProcessing) return 'processing';
+    if (justSaved) return 'success'; // tracks recent save
+    if (hasChanges) return 'edited';
+    if (hasSavedData) return 'saved';
+    return 'initial';
+  };
+  
+  const state = getButtonState();
+  
+  const config = {
+    initial: {
+      text: `Save ${tabName} Data`,
+      color: 'blue',
+      disabled: !isValid,
+      icon: null
+    },
+    saved: {
+      text: 'Saved',
+      color: 'gray',
+      disabled: true,
+      icon: <CheckIcon />
+    },
+    edited: {
+      text: `Update ${tabName} Data`,
+      color: 'amber',
+      disabled: false,
+      icon: null
+    },
+    processing: {
+      text: 'Processing...',
+      color: 'blue',
+      disabled: true,
+      icon: <SpinnerIcon />
+    },
+    success: {
+      text: '✓ Saved',
+      color: 'green',
+      disabled: true,
+      icon: <CheckIcon />
+    }
+  };
+  
+  return (
+    <button 
+      className={`btn-${config[state].color}`}
+      disabled={config[state].disabled}
+      onClick={onSave}
+    >
+      {config[state].icon}
+      {config[state].text}
+    </button>
+  );
+};

@@ -1,0 +1,528 @@
+# Agency Snapshot — Standalone Narrative & Story Framework
+**Architect OS | Reference Guide for Four-Lens Current-State Assessment**
+*Version 1.0*
+
+---
+
+## Overview: The Agency Snapshot
+
+The Agency Snapshot is a **current-state business model portrait**. It captures who the agency is and how it operates right now — not where it has been, not where it is going, and not how it is performing against goals.
+
+> **Core Purpose:** Establish the contextual baseline that makes every downstream tool smarter — so the Growth Velocity Calculator knows what it's simulating on top of, the Clarity Compass knows what kind of agency it's advising, and the Virtual CSO knows what operating context it's working within.
+
+---
+
+### The Critical Philosophical Distinction
+
+The most important framing distinction in this tool is the difference between **current-state portrait** and **performance evaluation**.
+
+- We are **not** asking: *"How well are you doing?"*
+- We **are** asking: *"What kind of agency are you and how are you currently constituted?"*
+
+This means every insight is **observational rather than evaluative**, and **descriptive rather than prescriptive**. When we ask for churn rate, we are not asking "how has your churn changed over time?" We are asking "what does your churn generally look like right now?" It is a characteristic of the business, not a performance measurement being evaluated against a trajectory.
+
+This posture keeps the snapshot from feeling like a performance review. It should feel like a **neutral intake form** — no judgment, just orientation.
+
+---
+
+### What We Are Capturing vs. What We Are Not
+
+| ✅ We ARE Capturing | ❌ We Are NOT Capturing |
+|---|---|
+| Current size, scale, and complexity | Historical growth rates or trajectories |
+| Current structural composition | Performance against goals over time |
+| Typical / average performance indicators (not trended) | Forward projections or targets |
+| How the business is currently configured | Operational metrics that change week to week |
+| Who they serve and how they position themselves | Competitive positioning or market share |
+| General health signals at a point in time | Strategic intent or future direction |
+
+---
+
+### The Four Lenses
+
+| Order | Tab Name | Core Question |
+|---|---|---|
+| 1st | 🗺️ Market Footprint | Who are you as an agency and who do you serve? |
+| 2nd | 💰 Economic Foundation | How big, how profitable, and how financially stable is your operation? |
+| 3rd | 📈 Revenue Model | How does money flow into your business, who sends it, and how long do they stay? |
+| 4th | 👥 Delivery Architecture | How is your agency structurally built to do the work? |
+
+---
+
+---
+
+## Lens 1: Market Footprint
+*Tab 1 of 4 · Most qualitative entry point · Establishes the agency's identity baseline*
+
+> **Core Question:** Who are you as an agency, who do you serve, what markets do you operate in, and how do you go to market?
+
+---
+
+### What This Lens Is Really Doing
+
+Market Footprint is the **identity layer** of the snapshot. It is the most qualitative of the four lenses — less about numbers and more about the fundamental character of the agency. This tab takes the agency's self-description at face value as a current-state descriptor. We are not evaluating whether the positioning is differentiated or effective (that is Clarity Compass territory). We are simply capturing what the agency currently is, who it currently serves, and how it currently presents itself to the world.
+
+This tab should feel like the **lowest-friction entry point** in the entire snapshot. A founder describing who they are and who they serve requires no math, no looking up numbers, no uncertainty. It creates immediate engagement and positions the rest of the snapshot as context for understanding this agency specifically.
+
+---
+
+### The 5 Story Beats
+
+#### Beat 01 — Agency Type & Service Scope
+*What kind of agency is this and what does it primarily do?*
+
+**Key Metrics:** Agency type, primary service categories, number of service areas
+
+**Aha Moment:** A founder who says they are a "digital marketing agency" is describing something fundamentally different from a "PR agency with a content practice." The type and scope of services sets the context for everything else — team structure, client complexity, pricing model, and competitive positioning all flow from this foundational identity.
+
+---
+
+#### Beat 02 — ICP & Industry Focus
+*Who are your ideal clients and what industries do you specialize in?*
+
+**Key Metrics:** Primary industries served, client type (B2B/B2C), number of industries
+
+**Aha Moment:** An agency serving 8 industries is operating very differently from one serving 2. Industry focus signals whether the agency competes on specialist depth or generalist flexibility. Industry mix also reveals implicit team and knowledge requirements — serving regulated industries like Financial Services or Healthcare implies different expertise and process requirements than serving CPG or e-commerce.
+
+---
+
+#### Beat 03 — Geographic Market
+*How wide is your market footprint geographically?*
+
+**Key Metrics:** Geographic scope (Local / Regional / National / International)
+
+**Aha Moment:** Geography reveals market ceiling and acquisition strategy implications. A local agency competes differently, prices differently, and has fundamentally different growth constraints than a national or international one. It also contextualizes client acquisition — referral networks have different saturation points depending on geographic scope.
+
+---
+
+#### Beat 04 — Pricing Model
+*How does the agency structure its commercial relationships?*
+
+**Key Metrics:** Pricing strategies in use (Retainer, Project, Value-based, Hourly)
+
+**Aha Moment:** Pricing model is a proxy for relationship type. Retainer-heavy models signal ongoing strategic partnerships. Project-based signals transactional relationships. Value-based signals mature positioning and confidence. The pricing mix directly affects revenue predictability, cash flow dynamics, and client relationship depth — all of which connect to downstream insights in Economic Foundation and Revenue Model.
+
+---
+
+#### Beat 05 — Positioning Context
+*How does the agency describe its differentiation and positioning?*
+
+**Key Metrics:** Self-described positioning, website URL, positioning statement (optional)
+
+**Aha Moment:** This is the most qualitative field in the entire snapshot. It captures the agency's own narrative about why clients choose them. Even if incomplete or aspirational, it provides critical context for interpreting everything else. An agency that positions on speed tells a different structural story than one that positions on strategic depth or niche expertise.
+
+---
+
+### Key Insight Moments
+
+**Insight 1: Generalist vs. Specialist Signal**
+Number of service areas + number of industries served together reveal the specialization-to-breadth ratio. A narrow service scope across few industries signals deep specialist positioning. Broad services across many industries signals generalist or full-service positioning. Neither is inherently better, but each has distinct structural implications for how the agency competes, prices, and builds its team.
+
+**Insight 2: Pricing Model → Revenue Stability Connection**
+Pricing model is a leading indicator for revenue predictability. Retainer-heavy agencies will show more MRR stability in the Revenue Model tab. Project-heavy agencies will show more volatility. When Market Footprint shows "primarily project-based pricing" and Revenue Model shows high project revenue percentage, those two findings reinforce a coherent story. Mismatches are themselves interesting insights worth surfacing at the dashboard level.
+
+**Insight 3: Geographic Scope → Acquisition Ceiling**
+Local agencies with referral-heavy acquisition face different saturation dynamics than national agencies. A local agency hitting 28 clients in a mid-size city may be closer to its referral ceiling than it realizes. This connection only becomes visible at the dashboard level when Market Footprint geography and Revenue Model acquisition channels are read together.
+
+---
+
+### Ownership Boundaries
+
+| ✅ This Tab OWNS | 🚫 Cannot Tell Alone |
+|---|---|
+| Agency type and service scope | Whether positioning is effective or differentiated → Clarity Compass |
+| ICP and industry specialization | How pricing model affects cash flow → Revenue Model + Economic Foundation |
+| Geographic market footprint | Whether geographic scope limits growth → Dashboard cross-tab |
+| Pricing model and commercial structure | Competitive positioning assessment → Clarity Compass |
+| Self-described positioning and differentiation | |
+
+---
+
+### Dashboard Handoff Flags
+*These insights require cross-tab data and only appear in the Dashboard synthesis:*
+
+- 🔄 Pricing model vs. MRR percentage (Market Footprint + Revenue Model) — confirms or contradicts stated pricing approach
+- 🔄 Geographic scope vs. acquisition channels (Market Footprint + Revenue Model) — reveals network saturation risk
+- 🔄 Service scope vs. team specialization (Market Footprint + Delivery Architecture) — confirms or contradicts delivery model alignment
+- 🔄 Industry focus vs. ACV level (Market Footprint + Revenue Model) — validates whether pricing matches client complexity
+
+---
+
+---
+
+## Lens 2: Economic Foundation
+*Tab 2 of 4 · Financial structure and health · Sets the scale and sustainability context*
+
+> **Core Question:** How big is your agency, how efficiently do you capture revenue, how profitable are you, and how financially stable is your operation?
+
+---
+
+### What This Lens Is Really Doing
+
+Economic Foundation captures the **financial structure** of the business — not how well it is performing financially, but how it is financially constituted. The name is intentional: "foundation" implies something structural and stable. We are not evaluating financial performance against goals or trajectories. We are establishing **financial character**.
+
+A $500K agency and a $5M agency are fundamentally different organisms even if they have identical margin percentages. Scale, efficiency, and liquidity together tell us what kind of financial organism we are dealing with — its economic carrying capacity, what it can bear, what it can invest, and how much runway it has for strategic moves.
+
+---
+
+### The 5 Story Beats
+
+#### Beat 01 — Scale & Complexity
+*How large is this agency and what does that imply about operational complexity?*
+
+**Key Metrics:** Monthly revenue, annual revenue run rate
+
+**Aha Moment:** Revenue scale is not just a size metric — it is a complexity indicator. A $500K agency is a micro-operation; a $5M agency is a mid-size enterprise. Each scale band implies different infrastructure requirements, team structures, client expectations, and management complexity. Scale sets the context for interpreting every other metric in this tab.
+
+---
+
+#### Beat 02 — Revenue Quality
+*How much of revenue does the agency actually retain after pass-through costs?*
+
+**Key Metrics:** Monthly AGI, AGI as a percentage of revenue
+
+**Aha Moment:** AGI percentage reveals the service model. A 90%+ AGI agency is running a pure labor model — almost all value comes from people, not media or platforms. A 70% AGI agency is running significant pass-through costs. Neither is inherently better, but each implies different margin structures, client relationships, and team efficiency benchmarks. AGI% is the single most important efficiency signal in this tab.
+
+---
+
+#### Beat 03 — Profitability
+*Is this agency pricing its work appropriately and managing costs with discipline?*
+
+**Key Metrics:** Operating profit margin, monthly operating profit, monthly operating expenses
+
+**Aha Moment:** Margin percentage shows financial discipline and pricing power. A 30%+ margin at any revenue level suggests strong cost management and appropriate pricing. A sub-15% margin at any scale is a warning signal. Profitability is the clearest indicator of whether the agency has built a sustainable business model or is working very hard to stay flat.
+
+---
+
+#### Beat 04 — Financial Stability
+*How much strategic flexibility does this agency have?*
+
+**Key Metrics:** Cash available, cash runway (months), financial health self-assessment
+
+**Aha Moment:** Cash runway is the most operationally urgent metric in this entire tab. A profitable agency with 0.5 months of runway cannot make strategic hiring decisions, cannot weather a client loss, and cannot invest in growth infrastructure. Cash runway translates profitability into actual strategic capacity. Healthy margin means nothing without corresponding liquidity.
+
+---
+
+#### Beat 05 — Financial Maturity
+*How financially sophisticated and stable is this operation overall?*
+
+**Key Metrics:** Synthesis of scale + AGI efficiency + profitability + cash position
+
+**Aha Moment:** The synthesis of all four beats tells the overall financial story. A mature economic foundation combines healthy scale, efficient revenue capture, strong profitability, and adequate liquidity. Most agencies are strong on some dimensions and weak on others — the combination reveals the financial character and strategic constraints of the business.
+
+---
+
+### Benchmark Reference
+
+| Metric | Critical | Acceptable | Healthy | Excellent |
+|---|---|---|---|---|
+| AGI % | <75% | 75–85% | 85–95% | 95%+ |
+| Operating Margin | <15% | 15–20% | 20–30% | 30%+ |
+| Cash Runway | <1 month | 1–3 months | 3–6 months | 6+ months |
+
+### **AGI % Benchmarks:**
+
+* **90-95%:** Pure labor services (consulting, design, strategy)  
+* **85-90%:** Balanced mix (some media, mostly labor)  
+* **75-85%:** Media-heavy or platform-fee models  
+* **\<75%:** Very high pass-through (media buying, platform reseller)
+
+### **Profit Margin Benchmarks:**
+
+* **30%+:** Excellent (strong discipline, pricing power)  
+* **20-30%:** Healthy (sustainable, reinvestment capacity)  
+* **15-20%:** Acceptable (tight but viable)  
+* **10-15%:** Concerning (limited runway, vulnerable)  
+* **\<10%:** Critical (unsustainable without changes)
+
+### **Revenue Scale Complexity Bands:**
+
+* **\<$1.5M:** Solo/micro (founder-led, minimal infrastructure)  
+* **$1.5M-$3M:** Small (emerging systems, early specialization)  
+* **$3M-$10M:** Established small (formalized processes, management layer)  
+* **$10M-$10M:** Mid-size (departmentalization, significant infrastructure)  
+* **$10M+:** Large (full executive team, complex operations)
+
+### **Cash Runway Benchmarks:**
+
+* **6+ months:** Very healthy (strategic flexibility)  
+* **3-6 months:** Healthy (standard cushion)  
+* **1-3 months:** Tight (limited flexibility)  
+* **\<1 month:** Critical (vulnerable)
+
+---
+
+### Ownership Boundaries
+
+| ✅ This Tab OWNS | 🚫 Cannot Tell Alone |
+|---|---|
+| Business size and revenue scale | Team efficiency → needs Delivery Architecture data |
+| Revenue efficiency (AGI %) | Client economics → needs Revenue Model data |
+| Operating profit margin | Revenue per FTE → needs Delivery Architecture team size |
+| Cash position and runway | Growth sustainability → needs Revenue Model churn data |
+| Overall financial health signal | |
+
+---
+
+### Dashboard Handoff Flags
+*These insights require cross-tab data and only appear in the Dashboard synthesis:*
+
+- 🔄 Cash runway vs. client concentration (Economic Foundation + Revenue Model) — reveals vulnerability if key client is lost
+- 🔄 AGI % vs. team structure (Economic Foundation + Delivery Architecture) — confirms whether margins match delivery model
+- 🔄 Operating margin vs. payroll ratio (Economic Foundation + Delivery Architecture) — reveals labor cost efficiency
+- 🔄 Cash position vs. replacement revenue requirement (Economic Foundation + Revenue Model) — shows liquidity vs. growth treadmill dynamics
+
+---
+
+---
+
+## Lens 3: Revenue Model
+*Tab 3 of 4 · Client economics and revenue dynamics · Reveals how money flows and who sends it*
+
+> **Core Question:** How does money flow into your business, who are your clients, how long do they stay, how do you attract them, and how dependent are you on key relationships?
+
+---
+
+### What This Lens Is Really Doing
+
+Revenue Model captures how the business **earns its revenue and who it earns it from**. The name shift from "Growth & Pipeline" is intentional and important. "Pipeline" implies forward motion — something you are filling, growth you are pursuing. But at the snapshot level we are not asking about pipeline volume, lead generation metrics, or growth targets. We are asking about the **current revenue model and client dynamics** as they exist today.
+
+This lens answers the revenue character question: how money flows in, how long it stays, how predictable it is, and how dependent the business is on any particular relationship or channel. It is a **business model description**, not a performance assessment.
+
+---
+
+### The 5 Story Beats
+
+#### Beat 01 — Client Economics
+*How valuable are your clients and what does that reveal about your service complexity?*
+
+**Key Metrics:** Average Client Value (ACV), average client lifetime, active client count
+
+**Aha Moment:** ACV is the single most revealing metric in this tab. It signals client complexity, service depth, relationship type, and operational requirements all at once. A $500/month ACV agency and a $15,000/month ACV agency are running fundamentally different businesses even if their total revenue is identical. ACV directly implies team structure, founder involvement requirements, and the appropriate sales and delivery model.
+
+---
+
+#### Beat 02 — Revenue Stability
+*How predictable and stable is the revenue base?*
+
+**Key Metrics:** MRR percentage, project revenue percentage, MRR vs. project split
+
+**Aha Moment:** The recurring-to-project ratio reveals business model stability. A 70%+ MRR agency has a predictable foundation and can plan forward with confidence. A project-heavy agency faces feast/famine dynamics and must maintain constant pipeline activity even with excellent retention. The split also connects directly back to the pricing model described in Market Footprint — consistency between pricing model and revenue mix is itself an insight.
+
+---
+
+#### Beat 03 — Retention & Replacement Pressure
+*How hard must this agency work just to stay flat?*
+
+**Key Metrics:** Monthly churn rate, annual churn rate, replacement revenue calculation
+
+**Aha Moment:** This is the most important insight in the Revenue Model tab and one of the most important in the entire snapshot. Many founders do not realize how much churn creates hidden growth requirements. At 3% monthly churn, an agency must generate 36% of its revenue in new business annually just to maintain current scale — before a single dollar of actual growth. This replacement treadmill reframes every growth conversation and sets up a critical cross-tab connection at the dashboard level.
+
+---
+
+#### Beat 04 — Acquisition Efficiency
+*How does this agency attract new clients and how efficient is that process?*
+
+**Key Metrics:** Primary acquisition channels (ranked), win rate, average sales cycle length
+
+**Aha Moment:** Acquisition channel mix reveals the growth model. Referral-heavy agencies grow through relationships and network cultivation. Content or paid acquisition agencies grow through systems and spend. Each has different scalability profiles, cost structures, and ceiling dynamics. Win rate and sales cycle together reveal sales efficiency. A 40% win rate over a 2-month cycle is a very different acquisition profile than a 20% win rate over a 6-month cycle, even if total new revenue is similar.
+
+---
+
+#### Beat 05 — Client Concentration Risk
+*How dependent is this business on its most valuable relationships?*
+
+**Key Metrics:** Top 5 client revenue concentration, concentration risk classification
+
+**Aha Moment:** Revenue concentration reveals structural vulnerability. An agency with 70% of revenue in 5 clients has a fundamentally different risk profile than one with 70% of revenue distributed across 30 clients. Concentration risk is especially meaningful when read alongside cash runway from Economic Foundation — a concentrated revenue base and thin cash runway together create significant exposure to client churn events.
+
+---
+
+### Benchmark Reference
+
+| Metric | Concerning | Acceptable | Healthy | Excellent |
+|---|---|---|---|---|
+| Monthly Churn | >3.5% | 2.5–3.5% | 2–2.5% | <2% |
+| MRR Percentage | <40% | 40–60% | 60–80% | 80%+ |
+| Win Rate | <20% | 20–30% | 30–40% | 40%+ |
+| Top 5 Concentration | >70% | 50–70% | 30–50% | <30% |
+
+---
+
+### Ownership Boundaries
+
+| ✅ This Tab OWNS | 🚫 Cannot Tell Alone |
+|---|---|
+| Client economics (ACV, lifetime value) | Team efficiency serving those clients → Delivery Architecture |
+| Revenue stability (MRR vs. project split) | Profitability per client → needs Economic Foundation margin data |
+| Retention health (churn, replacement pressure) | Whether acquisition model can scale → Dashboard cross-tab |
+| Acquisition efficiency (channels, win rate, cycle) | Service positioning driving ACV → Market Footprint connection |
+| Client concentration risk | |
+
+---
+
+### Dashboard Handoff Flags
+*These insights require cross-tab data and only appear in the Dashboard synthesis:*
+
+- 🔄 Replacement revenue requirement vs. cash runway (Revenue Model + Economic Foundation) — shows if liquidity can survive churn pressure
+- 🔄 ACV complexity vs. team structure (Revenue Model + Delivery Architecture) — validates whether delivery model matches client complexity
+- 🔄 Acquisition channels vs. geographic scope (Revenue Model + Market Footprint) — reveals network saturation risk
+- 🔄 Churn rate vs. founder involvement (Revenue Model + Delivery Architecture) — shows if key account retention depends on founder presence
+- 🔄 Concentration risk vs. cash buffer (Revenue Model + Economic Foundation) — reveals worst-case scenario exposure
+
+---
+
+---
+
+## Lens 4: Delivery Architecture
+*Tab 4 of 4 · Human capital and operational structure · How the agency is built to do the work*
+
+> **Core Question:** How is your agency structured to deliver services — how many people, in what configuration, at what efficiency, and how founder-dependent is the operation?
+
+---
+
+### What This Lens Is Really Doing
+
+Delivery Architecture captures how the agency is **structurally built to do the work**. The name shift from "Team & Delivery" to "Delivery Architecture" is intentional. "Architecture" implies intentional structural design rather than just headcount. We are not evaluating delivery quality or operational efficiency as a performance metric. We are capturing the **structural composition of the delivery engine** — how it is built, not how well it is running.
+
+This lens answers the organizational DNA question: how is the human capital investment configured, where are the leverage points, and where are the dependencies and constraints that define the operational ceiling of the business.
+
+---
+
+### The 5 Story Beats
+
+#### Beat 01 — Team Scale & Efficiency
+*How much value does each person on this team generate?*
+
+**Key Metrics:** Total team FTE, AGI per FTE (calculated cross-tab from Economic Foundation)
+
+**Aha Moment:** AGI per FTE is the primary efficiency signal for this tab. It reveals whether the agency is extracting healthy value from its human capital investment or carrying excess overhead. At a given revenue level, a smaller team generating high AGI per FTE signals a lean, high-leverage model. A larger team generating lower AGI per FTE signals either a service-complexity-driven structure (which may be appropriate) or operational inefficiency (which is a concern).
+
+---
+
+#### Beat 02 — Operational Leverage
+*Is the agency structured with the right ratio of doers to managers and support?*
+
+**Key Metrics:** Billable staff count, non-billable staff count, billable:non-billable ratio
+
+**Aha Moment:** The billable-to-non-billable ratio reveals operational leverage. A 3:1 ratio means 3 revenue-generating people for every 1 overhead person. This is the structural efficiency indicator — it shows whether the agency has built appropriate infrastructure without excess overhead. Both extremes have implications: a 5:1 ratio may indicate under-investment in support functions, while a 1.5:1 ratio suggests top-heavy management structure.
+
+---
+
+#### Beat 03 — Delivery Model Complexity
+*How complex is the delivery structure and what does that imply about coordination overhead?*
+
+**Key Metrics:** Team structure type (generalist/specialist/hybrid), key roles present, management layers
+
+**Aha Moment:** Delivery model type combined with management layers creates a complexity profile. A generalist team with 1–2 layers is nimble and simple. A specialist team with 3+ layers is sophisticated and complex. Neither is inherently better — complexity should match client complexity. A specialist model serving $500/month clients is over-engineered. A generalist model serving $15,000/month enterprise clients is under-equipped. Alignment between delivery complexity and ACV (from Revenue Model) is a key cross-tab signal.
+
+---
+
+#### Beat 04 — Founder Dependency
+*Is the agency built to scale or is it built around the founder?*
+
+**Key Metrics:** Founder time allocation, key leadership roles present
+
+**Aha Moment:** Founder involvement in delivery is the single most common constraint on agency scale. An agency where the founder spends most time on client work is structurally capped at roughly $1–1.5M AGI — not because of market limitations but because the founder's time is finite. This beat reveals where on the delegation spectrum the agency currently sits and whether the leadership infrastructure exists to support further transition. The transition from "client work" to "strategy/sales" founder time is the inflection point that unlocks the next growth phase.
+
+---
+
+#### Beat 05 — Capacity Dynamics
+*Does this agency have headroom to grow or is it already at capacity?*
+
+**Key Metrics:** Utilization rate (if tracked), contractor count, self-assessed capacity constraint
+
+**Aha Moment:** Capacity headroom is the growth enabler or constraint that makes replacement revenue and growth targets real or theoretical. An agency at 90% utilization with no contractors and no hiring pipeline cannot grow — regardless of how healthy its margins or retention look. Capacity context gives meaning to the growth math that emerges at the dashboard level when Economic Foundation, Revenue Model, and Delivery Architecture combine.
+
+---
+
+### Benchmark Reference
+
+| Metric | Concerning | Acceptable | Healthy | Excellent |
+|---|---|---|---|---|
+| AGI per FTE (monthly) | <$12K | $12K–$15K | $15K–$20K | $20K+ |
+| Billable:Non-Billable | <2:1 | 2:1–2.5:1 | 2.5:1–4:1 | 4:1 lean |
+| Founder Time | Mostly delivery | Mix delivery/ops | Mostly ops | Strategy/sales |
+
+---
+
+### Ownership Boundaries
+
+| ✅ This Tab OWNS | 🚫 Cannot Tell Alone |
+|---|---|
+| Team size and scale | Profitability per team member → needs Economic Foundation margin data |
+| Team efficiency (AGI per FTE) | Revenue per FTE → needs Economic Foundation revenue data |
+| Operational leverage (billable ratio) | Client load per person → needs Revenue Model client count |
+| Delivery model complexity | Payroll as % of revenue → needs Economic Foundation payroll + revenue |
+| Founder dependency level | Whether capacity matches growth targets → Dashboard cross-tab |
+| Capacity constraints and headroom | |
+
+---
+
+### Dashboard Handoff Flags
+*These insights require cross-tab data and only appear in the Dashboard synthesis:*
+
+- 🔄 AGI per FTE vs. ACV complexity (Delivery Architecture + Revenue Model) — validates whether team productivity matches service depth required
+- 🔄 Founder time allocation vs. client concentration (Delivery Architecture + Revenue Model) — reveals whether key account retention depends on founder
+- 🔄 Team capacity vs. replacement revenue + growth target (Delivery Architecture + Revenue Model + Economic Foundation) — the hiring math
+- 🔄 Delivery model complexity vs. margin (Delivery Architecture + Economic Foundation) — shows whether complexity is justified by profitability
+- 🔄 Billable ratio vs. payroll efficiency (Delivery Architecture + Economic Foundation) — reveals structural leverage health
+
+---
+
+---
+
+## How the Four Lenses Work Together
+
+Each lens tells a standalone story. The value of the full snapshot — and what the Dashboard synthesis must deliver — is what becomes visible only when all four are read together.
+
+| Lens | The Story It Tells |
+|---|---|
+| 🗺️ Market Footprint | Here is who you are, who you serve, and how you go to market. |
+| 💰 Economic Foundation | Here is how big, how profitable, and how financially stable your operation is. |
+| 📈 Revenue Model | Here is how valuable your clients are, how stable your revenue is, and how hard you work to maintain it. |
+| 👥 Delivery Architecture | Here is how your team is structured, how efficiently they create value, and where the capacity constraints exist. |
+
+---
+
+### The Dashboard Synthesis Mandate
+
+Individual tab profiles deliver standalone insights. The Dashboard synthesis must deliver something none of the individual tabs can: the **interconnected story** of what these four dimensions mean together. The Dashboard is where the business model portrait becomes complete.
+
+> **Dashboard Mandate:** Reveal the structural patterns, dependencies, vulnerabilities, and operational requirements that only become visible when all four lenses are combined. Not a repetition of tab-level insights — a synthesis that advances the story.
+
+---
+
+### Key Cross-Tab Insight Themes (Dashboard Only)
+
+**Theme 1: The Growth Treadmill**
+Revenue Model churn rate + Economic Foundation profitability + Delivery Architecture capacity. Reveals the hidden growth requirement: how much new revenue is needed just to stay flat, and whether current team capacity can support actual growth targets on top of churn replacement.
+
+**Theme 2: Cash vs. Profitability Disconnect**
+Economic Foundation margin + Economic Foundation cash runway + Revenue Model revenue mix. Strong margins with thin cash runway reveals either distribution behavior, AR/AP timing issues, or project revenue volatility. Profitability without liquidity is strategic paralysis.
+
+**Theme 3: Concentration Dependency**
+Revenue Model concentration + Economic Foundation cash runway + Delivery Architecture founder time. High revenue concentration + thin cash + founder in client work creates a structural vulnerability triangle: the business is dependent on a few relationships that require founder presence, with no financial buffer if one ends.
+
+**Theme 4: Service-Structure Alignment**
+Market Footprint service scope + Revenue Model ACV + Delivery Architecture delivery model. The right combination validates that the agency has built the right machine for the market it serves. Misalignment — such as a generalist team serving enterprise-complexity clients, or a specialist structure serving commodity clients — is itself a significant structural insight.
+
+**Theme 5: The Founder Transition Imperative**
+Delivery Architecture founder time + Economic Foundation scale + Revenue Model client concentration. At $1M+ AGI with high client concentration, continued founder involvement in delivery creates a compounding bottleneck. Scale without delegation transition is a ceiling, not a foundation.
+
+---
+
+### Important Boundary Note
+
+The Agency Snapshot is the **first tool** in the platform journey, not the last. Its job is to establish the contextual baseline, deliver the current-state portrait, and create the "aha moment" that motivates deeper engagement.
+
+It should **NOT** attempt to:
+- Diagnose capability gaps → that is the Maturity & Readiness Audit
+- Assess stage of evolution → that is the AE Ladder
+- Model growth scenarios → that is the Growth Velocity Calculator
+
+Every insight produced by this tool should feel **observational and descriptive** — illuminating, not prescriptive.
+
+---
+
+*Agency Snapshot Narrative Reference Guide · Architect OS v1.0*

@@ -1,0 +1,1078 @@
+Readback of your intended logic + workflow
+1) Report layout + where personalization starts
+Front of the report is mostly static framing:
+
+
+What the 5 Dimensions are, what Capability Areas are, what Checkpoints are, how scoring works, how to read the tables. (This aligns with your “category context + progression” style framing.
+ Category Context & Progression …
+)
+
+
+Then each Dimension section becomes the personalized checkpoint library:
+
+
+A short dimension synthesis (GPT-generated)
+
+
+A table of 25 checkpoints (data-driven from Supabase)
+
+
+2) How each checkpoint is scored
+For every checkpoint:
+You already have a static urgency score = Impact × Criticality.
+
+
+You already have the user’s checkpoint attainment score from the assessment response:
+
+
+Yes = 2, Somewhat = 1, No = 0
+
+
+You’re considering either:
+
+
+Using that raw score directly, or
+
+
+Normalizing it (e.g., % of max points), or
+
+
+Computing a “gap” or “priority” value that blends urgency with attainment.
+
+
+3) How checkpoints are ranked (the core of the system)
+You want ranking at the Dimension level (1–25) so you avoid extra complexity and still preserve strong prioritization signal.
+Your intent for ordering is:
+Primary sorting is based on a calculated “priority” (you mentioned urgency + the user’s level / gap).
+
+
+Ties are handled deterministically via a predefined fallback rank (an “answer key” order) so results are stable:
+
+
+Sort key #1: the computed priority score
+
+
+Sort key #2: predefined tie-breaker order
+
+
+4) What comes from Supabase vs GPT
+Supabase does all computation:
+
+
+per-checkpoint scores
+
+
+per-checkpoint priority score
+
+
+per-dimension rank 1–25
+
+
+and a view that returns the ordered list with all fields needed for merge (checkpoint name/desc, capability area, user score, max score, urgency, etc.)
+
+
+GPT only does synthesis:
+
+
+Reads the ranked list (or summary statistics derived from it)
+
+
+Generates a dimension-level interpretation (“what’s strong, what’s missing, where the leverage is”)
+
+
+5) How the PDF merge happens
+You’re envisioning a template with placeholders like:
+
+
+Dim1_Checkpoint_1_Title … Dim1_Checkpoint_25_Title
+
+
+Dim1_Checkpoint_1_Desc … etc.
+
+
+Dim1_Checkpoint_1_Score, Dim1_Checkpoint_1_Urgency, Dim1_Checkpoint_1_CapabilityArea, etc.
+
+
+Those get populated from a Supabase “merge view” that returns exactly those ordered values (either as columns or as a JSON payload that your merge step expands).
+
+Urgency is already solved:
+
+
+You already have a stage-calibrated urgency score per checkpoint (Impact × Criticality), and that urgency is specific to the respondent’s AE Ladder stage.
+
+
+So the “importance weighting” is not generic; it’s already aligned to “what matters at this stage.”
+
+
+Priority ranking should be a “directional, data-only” ordering:
+
+
+Not capacity-aware, not dependency-aware, not roadmap-aware.
+
+
+It’s simply: “Given this stage, and your self-reported maturity (Yes/Somewhat/No), what should rise to the top?”
+
+
+Your intuitive ordering logic is:
+
+
+Highest urgency + biggest gap should be top.
+
+
+Practically, that means high urgency items with No come first, then high urgency with Somewhat, then high urgency with Yes.
+
+
+At the bottom: low urgency + Yes.
+
+
+You’re also acknowledging 3P may already be embedded in urgency (so you don’t want to double-count it).
+
+
+Backend reality (important):
+
+
+Each stage has its own calibrated checkpoint set (125 per stage), so across 4 stages there are ~500 “stage-specific checkpoint records.”
+
+
+The user only ever sees their stage’s 125.
+
+
+Priority = f(Stage-Calibrated Urgency, Response Gap)
+Where:
+“Response Gap” is highest when the answer is No, medium for Somewhat, and lowest for Yes.
+
+
+The key design decision is how sharply you want “No vs Somewhat vs Yes” to dominate urgency.
+That’s what the formulas control.
+
+Priority-score formulas (2–3 options)
+Formula 1: Multiplicative gap-weighting (simple, strong, and intuitive)
+This is the cleanest expression of your intent.
+PriorityScore = Urgency × GapWeight(response)
+Where:
+GapWeight(No) = 1.0
+
+
+GapWeight(Somewhat) = 0.5
+
+
+GapWeight(Yes) = 0.0 (or 0.1 if you never want “Yes” to be truly zero)
+
+
+Effect
+“No” items rise to the top in proportion to urgency.
+
+
+“Somewhat” items still matter, but are consistently lower than “No” at the same urgency.
+
+
+“Yes” sinks (and can be fully pushed to the bottom if you use 0.0).
+
+
+When to use
+If the report is meant to highlight gaps, not reinforce strengths.
+
+
+
+Formula 2: Gap points based on your 0/1/2 scoring (smooth and normalized)
+This uses the scoring system you already have.
+Let:
+MaxPoints = 2
+
+
+ResponsePoints ∈ {0,1,2} for {No, Somewhat, Yes}
+
+
+GapPoints = (MaxPoints − ResponsePoints) ∈ {2,1,0}
+
+
+Optional normalization: GapPct = GapPoints / MaxPoints ∈ {1.0, 0.5, 0.0}
+
+
+Then:
+PriorityScore = Urgency × GapPct
+This is basically Formula 1, but it’s “derived” from the scoring system rather than hardcoding weights.
+Effect
+Same behavior as Formula 1, but more defensible: “We prioritize based on urgency times gap from target.”
+
+
+When to use
+If you want the priority definition to be explainable in one sentence without extra rules.
+
+
+
+Formula 3: Lexicographic ranking (tier-first, then urgency) — most faithful to your stated ordering
+If you want your ordering to be exactly:
+All “No” first (sorted by urgency)
+
+
+Then all “Somewhat” (sorted by urgency)
+
+
+Then all “Yes” (sorted by urgency)
+
+
+…then don’t rely on a single numeric score. Use a two-key sort:
+SortKey1 = ResponseTier (No=1, Somewhat=2, Yes=3)
+ SortKey2 = Urgency DESC
+ SortKey3 = DefaultTieBreakOrder ASC
+You can still store a numeric “PriorityScore” if you want, but the truth is the ordering is the product.
+Effect
+Guarantees that a “No” always outranks a “Somewhat,” even if urgency is slightly lower.
+
+
+This matches your “hard buckets” mental model.
+
+
+When to use
+If you want absolute predictability in how the list reads.
+
+
+If you don’t want weird edge cases where a very high-urgency “Somewhat” outranks a low-urgency “No.”
+
+
+your clarified intent (plain English → system logic)
+What you’re saying is:
+Urgency is the primary signal
+
+
+Stage-calibrated urgency already encodes “importance at this stage.”
+
+
+A very high-urgency item should outrank a low-urgency item, even if the low-urgency item is a “No.”
+
+
+Response maturity refines urgency, it doesn’t override it
+
+
+Among equally urgent things, maturity matters.
+
+
+But maturity alone should not dominate urgency.
+
+
+“Yes” items should be deprioritized globally
+
+
+Even if something is urgent, if it’s already a “Yes,” it should fall to the bottom as a class.
+
+
+Within the “Yes” class, urgency still determines order — but the whole class comes last.
+
+
+Your mental priority flow is actually four bands, not three:
+
+ In descending priority:
+
+
+High urgency + No
+
+
+High urgency + Somewhat
+
+
+Lower urgency + No
+
+
+Lower urgency + Somewhat
+
+
+All Yes, ordered by urgency (acknowledgement / maintenance tier)
+
+
+That is a tiered-by-response, ordered-by-urgency model — with one special rule for “Yes.”
+This is not the same as “tier-first, then urgency” across all responses.
+ It’s more nuanced — and better.
+
+2. The correct conceptual model (this is important)
+You are not saying:
+“Always show all No’s before all Somewhats.”
+You are saying:
+“Urgency decides where something sits overall — but response maturity decides how it competes near similar urgency.”
+That means:
+Urgency = horizontal axis (importance)
+
+
+Response = vertical modifier
+
+
+“Yes” = a separate acknowledgment tier, not a competitor
+
+
+That’s a subtle but very strong design decision.
+
+3. The cleanest way to express this in logic (no hand-waving)
+Step 1: Define a Response Tier (hard rule)
+This is not the same as gap weighting.
+Response
+ResponseTier
+No
+1
+Somewhat
+2
+Yes
+3
+
+This gives you the ability to force all Yes items to the bottom, regardless of urgency.
+
+Step 2: Use urgency as the primary sort within non-Yes items
+Your ranking logic becomes lexicographic, not a single blended number:
+Final Sort Order (Dimension-level)
+ResponseTier ASC
+
+
+All No + Somewhat first
+
+
+All Yes last
+
+
+Urgency DESC
+
+
+Higher urgency always outranks lower urgency within the same tier
+
+
+ResponseScore ASC (optional but useful)
+
+
+No (0) before Somewhat (1) when urgency is similar
+
+
+DefaultTieBreaker ASC
+
+
+Predefined static order to ensure deterministic output
+
+
+In SQL terms (conceptually):
+ORDER BY
+  response_tier ASC,
+  urgency_score DESC,
+  response_points ASC,
+  default_dimension_rank ASC
+
+
+4. Why this matches your plain-English intent exactly
+Let’s test edge cases:
+Case A
+Checkpoint A: Urgency 95, Response = Somewhat
+
+
+Checkpoint B: Urgency 20, Response = No
+
+
+Result:
+A ranks higher than B
+ ✅ Matches your stated preference
+
+
+
+Case B
+Checkpoint C: Urgency 90, Response = Yes
+
+
+Checkpoint D: Urgency 40, Response = No
+
+
+Result:
+D ranks higher than C
+ ✅ Matches your “Yes is last-tier” rule
+
+
+
+Case C
+Two “No” items, different urgency
+
+
+Higher urgency wins
+ ✅ Correct
+
+
+
+Case D
+Two “Yes” items
+
+
+Ranked by urgency within the Yes tier
+ ✅ Acknowledgement without distraction
+
+
+
+5. Why I do not recommend a single numeric “priority score” here
+You could compress this into a formula — but you’d lose clarity and invite edge-case confusion.
+This is one of those cases where:
+Explicit ordering rules > clever math
+
+
+You gain:
+Interpretability
+
+
+Debuggability
+
+
+Trust
+
+
+Easy explanation to users and internal teams
+
+
+And SQL is very good at this.
+
+6. What this unlocks downstream (quietly important)
+Because this is tiered logic, you can later:
+Add a “show me only No + Somewhat” filter
+
+
+Visually separate “Maintain / Monitor” (Yes tier) in dashboards
+
+
+Feed the top N (say top 5 or 10) into:
+
+
+3P classification
+
+
+Pathway planning
+
+
+Initiative generation
+
+
+All without changing the ranking logic.
+
+Canonical ranking spec (plain English)
+Purpose
+ Produce a deterministic, stage-calibrated ranked list of 25 checkpoints per Dimension for a given respondent, where:
+Urgency is the primary signal (already stage-calibrated).
+
+
+“Yes” items are always deprioritized into a “Maintain / Already in place” tier.
+
+
+Within each tier, higher urgency comes first.
+
+
+Ties resolve predictably and repeatably using a predefined default order (so the output never “shuffles”). This supports auditability and consistent report merges.
+
+
+Inputs assumed available per respondent + checkpoint (within the respondent’s stage set of 125 checkpoints)
+ For every checkpoint in the respondent’s stage-calibrated library:
+urgency_score (Impact × Criticality; already stage-calibrated)
+
+
+response_points from the assessment:
+
+
+Yes = 2
+
+
+Somewhat = 1
+
+
+No = 0
+
+
+Checkpoint metadata:
+
+
+Dimension
+
+
+Capability Area
+
+
+Description / label(s)
+
+
+A default tie-break rank within its Dimension (predefined “answer key” order)
+
+
+Ranking rules (in order of precedence)
+Tier rule (hard rule): move “Yes” to the bottom
+
+
+Create a response_tier:
+
+
+No → 1
+
+
+Somewhat → 2
+
+
+Yes → 3
+ This ensures “Yes” checkpoints are always ranked after all “No” and “Somewhat” checkpoints, regardless of urgency. (This aligns with your intent to keep the list focused on gaps, while still acknowledging what’s already in place.
+ Category Context & Progression …
+)
+
+
+Urgency rule (primary ordering within each tier)
+
+
+Sort by urgency_score descending.
+
+
+Gap refinement rule (only as a tie-refiner, not a primary driver)
+
+
+Sort by response_points ascending (so for the same urgency score within non-Yes tiers, No (0) comes before Somewhat (1); within Yes tier it’s stable but effectively redundant).
+
+
+Deterministic tie-break rule (final)
+
+
+Sort by default_dimension_rank ascending (a static “answer key” ordering that never changes unless you intentionally update it).
+
+
+Output
+ For each respondent and each Dimension:
+A ranked list rank_in_dimension from 1 to 25
+
+
+Each row includes checkpoint identifiers + all fields required for the report table
+
+
+
+Canonical ranking spec (SQL definition)
+Below is the canonical ordering expressed in SQL terms. This is written to be implemented as a view (or materialized view) in Supabase.
+Required fields referenced
+user_id (or assessment_id)
+
+
+checkpoint_id
+
+
+dimension_id
+
+
+urgency_score
+
+
+response_points (0/1/2)
+
+
+default_dimension_rank (int; static per checkpoint within its dimension)
+
+
+SQL pattern (conceptual, Supabase/Postgres)
+WITH scored AS (
+  SELECT
+    r.assessment_id,
+    c.checkpoint_id,
+    c.dimension_id,
+    c.capability_area_id,
+    c.checkpoint_title,
+    c.checkpoint_description,
+
+    c.urgency_score,
+
+    /* assessment response mapped to points */
+    r.response_points, -- 0=no, 1=somewhat, 2=yes
+
+    /* tier rule: push YES to bottom */
+    CASE
+      WHEN r.response_points = 2 THEN 3  -- Yes
+      WHEN r.response_points = 1 THEN 2  -- Somewhat
+      ELSE 1                              -- No
+    END AS response_tier,
+
+    c.default_dimension_rank
+
+  FROM assessment_checkpoint_responses r
+  JOIN checkpoints c
+    ON c.checkpoint_id = r.checkpoint_id
+
+  /* Important: ensure this is already stage-calibrated */
+  WHERE r.assessment_id = :assessment_id
+    AND c.stage_id = :stage_id
+),
+
+ranked AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY assessment_id, dimension_id
+      ORDER BY
+        response_tier ASC,
+        urgency_score DESC,
+        response_points ASC,
+        default_dimension_rank ASC
+    ) AS rank_in_dimension
+  FROM scored
+)
+
+SELECT *
+FROM ranked
+ORDER BY dimension_id, rank_in_dimension;
+
+Notes for implementation (handoff-friendly)
+Stage calibration: the WHERE c.stage_id = :stage_id (or equivalent join to an assessment stage field) is what guarantees each respondent only ranks their 125 checkpoints.
+
+
+Determinism: the default_dimension_rank is required so you never have “random” ordering when urgency/response are identical.
+
+
+No need for a single numeric “priority score”: the ordering above is the priority definition, and it’s easier to explain, debug, and trust than a blended formula.
+
+
+Rank stability for merges: since the output is always rank_in_dimension = 1..25, your Google Docs template can reliably map to DimX_Row01..Row25.
+
+ if n8n is essentially acting as a “dumb pipe,” then the database needs to do two things really well:
+Produce a ranked-rows view (truth layer)
+
+
+Produce a wide merge view (presentation layer) that maps 1:1 to Google Doc merge fields
+
+
+Below is a clean, handoff-ready architecture for checkpoint table fields + views.
+
+Checkpoint data model: what tables/fields should exist
+A) Reference tables (static)
+dimensions
+dimension_id (PK)
+
+
+dimension_name
+
+
+dimension_order (1–5)
+
+
+capability_areas
+capability_area_id (PK)
+
+
+dimension_id (FK)
+
+
+capability_area_name
+
+
+capability_area_order (1–5 within dimension)
+
+
+B) Checkpoint master vs stage-calibrated checkpoint
+Because you said you effectively have 125 per stage (≈500 total rows across 4 stages), the cleanest structure is:
+checkpoints (the conceptual checkpoint identity; stable)
+checkpoint_id (PK)
+
+
+capability_area_id (FK)
+
+
+checkpoint_code (optional; stable human-readable ID)
+
+
+checkpoint_short_name (optional; for tables)
+
+
+is_active
+
+
+checkpoint_stage (the stage-specific instantiation; this is what you actually score/rank against)
+checkpoint_stage_id (PK)
+
+
+checkpoint_id (FK)
+
+
+stage_id (FK) — Rising / Striving / Thriving / Driving
+
+
+checkpoint_title (stage-specific wording if needed)
+
+
+checkpoint_description (stage-specific meaning if needed)
+
+
+impact_score (int)
+
+
+criticality_score (int)
+
+
+urgency_score (int) (can be stored or computed; stored is fine if it’s curated)
+
+
+default_dimension_rank (int) (your deterministic tie-break “answer key” order within a dimension for this stage)
+
+
+max_points (default 2, but explicit is safer)
+
+
+Optional “display helpers”:
+
+
+checkpoint_display_order (if you ever want a non-priority reference ordering)
+
+
+report_table_group_label (only if you want pretty grouping without joining)
+
+
+This structure makes stage-calibration explicit and avoids ambiguity later.
+Note: Your “static framing / stage-fit tone” principles are already consistent with this approach because the stage-specific checkpoint descriptions can stay respectful and non-deficit by design.
+Category Context & Progression …
+C) Assessment + response tables (runtime)
+assessments
+assessment_id (PK)
+
+
+user_id (FK)
+
+
+stage_id (FK) (the respondent’s stage outcome used to select the correct 125)
+
+
+created_at
+
+
+other metadata (versioning, etc.)
+
+
+assessment_checkpoint_responses
+assessment_id (FK)
+
+
+checkpoint_stage_id (FK) (important: links to stage-calibrated record, not generic checkpoint)
+
+
+response_value (enum: yes/somewhat/no)
+
+
+response_points (int: 2/1/0)
+
+
+optional: response_notes (if you ever capture text)
+
+
+
+Views you’ll want
+View 1: Ranked rows (truth layer)
+v_checkpoint_ranked_rows
+ One row per checkpoint (125 rows per assessment), including the computed rank_in_dimension (1–25).
+This is basically what we already specced, but implemented against checkpoint_stage_id so stage-calibration is guaranteed.
+Output fields (minimum):
+assessment_id
+
+
+dimension_id, dimension_name
+
+
+capability_area_name
+
+
+checkpoint_title, checkpoint_description
+
+
+urgency_score
+
+
+response_value, response_points
+
+
+response_tier (No=1, Somewhat=2, Yes=3)
+
+
+default_dimension_rank
+
+
+rank_in_dimension (1–25)
+
+
+This view is what you’ll use for:
+Debugging
+
+
+Dashboard tables (future)
+
+
+Any “top N gaps” logic later
+
+
+
+View 2: Wide merge view per dimension (presentation layer)
+v_checkpoint_dimension_merge_wide
+ One row per (assessment_id, dimension_id) with 25×field columns that match Google Doc merge tags.
+Example column naming pattern (pick one and stick to it):
+d1_r01_title, d1_r01_desc, d1_r01_urgency, d1_r01_response_points, d1_r01_capability
+
+
+…
+
+
+d1_r25_title, …
+
+
+But because this view is already filtered by dimension, you can keep it dimension-agnostic:
+r01_title, r01_desc, … r25_title, etc.
+ …and let n8n map the correct dimension block.
+
+
+How it’s built (SQL pattern): conditional aggregation off the ranked rows view.
+For each field you want to merge:
+MAX(CASE WHEN rank_in_dimension = 1 THEN checkpoint_title END) AS r01_title,
+MAX(CASE WHEN rank_in_dimension = 1 THEN checkpoint_description END) AS r01_desc,
+MAX(CASE WHEN rank_in_dimension = 1 THEN urgency_score END) AS r01_urgency,
+MAX(CASE WHEN rank_in_dimension = 1 THEN response_points END) AS r01_points,
+MAX(CASE WHEN rank_in_dimension = 1 THEN capability_area_name END) AS r01_capability,
+...
+MAX(CASE WHEN rank_in_dimension = 25 THEN checkpoint_title END) AS r25_title
+
+This is verbose, but it’s exactly what you want for “one-to-one column-to-merge-field mapping.”
+
+View 3: Full report merge payload (optional but usually helpful)
+v_assessment_report_merge_payload
+ One row per assessment with:
+global summary fields (overall score, stage label, etc.)
+
+
+and either:
+
+
+five joined dimension-wide rows (if n8n can nest objects), or
+
+
+five separate wide views joined into a single mega-row
+
+
+This makes n8n dead simple:
+pull one record
+
+
+map fields to Google Doc placeholders
+
+
+generate doc
+
+
+
+Practical recommendation for your n8n + Google Docs approach
+Use both:
+v_checkpoint_ranked_rows for correctness + debugging
+
+
+v_checkpoint_dimension_merge_wide for the actual doc merge
+
+
+That way:
+You never troubleshoot a 400-column wide view directly.
+
+
+If something looks off in a PDF, you inspect the ranked rows view first.
+
+Store the fallback rank as a column on the stage-calibrated checkpoint record (i.e., on checkpoint_stage.default_dimension_rank).
+ No separate “universal table” is required unless you want extra governance/versioning.
+Why it should live on the checkpoint record (recommended)
+Simplest SQL: the tie-break is just the last ORDER BY key.
+
+
+Deterministic by design: every checkpoint already “knows” its fallback position.
+
+
+Easy to maintain: you can edit the tie-break order in one table without managing joins.
+
+
+Stage-specific compatibility: because you have ~125 per stage (≈500 total), the fallback order must be valid within that stage’s dimension set anyway. Putting it on checkpoint_stage avoids accidentally applying a “universal” order that doesn’t match that stage’s wording/structure.
+
+
+How ties are actually handled (important nuance)
+You don’t need SQL to explicitly “detect ties.” You simply define a stable ordering:
+ORDER BY
+  response_tier ASC,
+  urgency_score DESC,
+  response_points ASC,
+  default_rank ASC
+
+If two checkpoints have the same urgency_score and the same response (same response_tier / response_points), Postgres will naturally fall through to the next sort key, default_dimension_rank.
+So the tie-break logic works automatically; no IF statements required.
+Addendum — Fallback Rank Order (Tie-Break Logic)
+Purpose
+ Ensure that checkpoint ranking is fully deterministic, stable, and auditable, even when multiple checkpoints share the same urgency score and response state.
+Design Decision
+ The fallback (tie-break) rank order is stored directly on the stage-calibrated checkpoint record, not in a separate universal table.
+Implementation
+Field name: checkpoint_stage.default_dimension_rank
+
+
+Type: Integer
+
+
+Scope: Unique within each (stage_id, dimension_id)
+
+
+Each stage-specific checkpoint is assigned a predefined position that represents its canonical fallback order within its Dimension for that stage. This value is only used when all higher-priority ranking criteria are equal.
+How It’s Used in Ranking
+ The SQL ranking logic does not explicitly detect ties. Instead, it relies on a stable, ordered sort sequence:
+response_tier (No → Somewhat → Yes)
+
+
+urgency_score (DESC)
+
+
+response_points (ASC)
+
+
+default_dimension_rank (ASC) ← fallback
+
+
+When two checkpoints have identical urgency and response values, the system automatically falls through to default_dimension_rank to resolve ordering.
+Why This Approach
+Keeps ranking logic simple and transparent
+
+
+Avoids unnecessary joins or lookup tables
+
+
+Supports stage-specific calibration (125 checkpoints per stage)
+
+
+Allows easy maintenance or refinement of fallback order
+
+
+Guarantees consistent output for report merges and dashboards
+
+
+Data Integrity Requirement
+Enforce a uniqueness constraint on
+ (stage_id, dimension_id, default_dimension_rank)
+ to prevent ambiguous tie-breaks.
+
+
+This ensures that every checkpoint has a deterministic position in the ranked list under all conditions.
+Readback of your confirmations
+1) Canonical stage library — confirmed and locked
+You do have two distinct layers, which is exactly right:
+
+
+Universal checkpoint table
+
+
+Holds the canonical intent/identity of a checkpoint.
+
+
+Used for conceptual linkage, traceability, and future cross-stage analysis.
+
+
+Stage-calibrated checkpoint table (~500 rows)
+
+
+Each row is:
+
+
+Mapped to a universal checkpoint
+
+
+Mapped to a Dimension + Capability Area
+
+
+Assigned to a specific AE Ladder stage
+
+
+Each has:
+
+
+Its own wording
+
+
+Its own urgency score (1–25)
+
+
+Its own default rank within that stage + dimension
+
+
+Its own unique ID
+
+
+This fully validates the decision to store default_dimension_rank on the stage-calibrated checkpoint record and nowhere else.
+
+
+✅ No ambiguity here. This is the correct structural choice.
+
+2) Urgency scale — confirmed
+Impact × Criticality is always 1–25.
+
+
+No fractional or dynamic weights.
+
+
+No need (for this report) to normalize or compare urgency across stages.
+
+
+Any future cross-stage analysis can be handled later without changing this design.
+
+
+✅ Nothing else needed here.
+
+3) Ranked table display — confirmed
+All 25 checkpoints always appear per Dimension.
+
+
+No split tables, no hiding “Yes” rows.
+
+
+Ordering alone communicates priority vs maintenance.
+
+
+✅ This simplifies the wide merge view and keeps the report predictable.
+
+4) Tie-break scope — confirmed
+Fallback rank is:
+
+
+Stage-specific
+
+
+Dimension-specific
+
+
+Not global, not cross-stage.
+
+
+Terminology tweak noted: “universal rank” → better framed as
+ “stage-calibrated default dimension rank.”
+
+
+✅ Fully aligned with the canonical ranking spec.
+
+
+From a backend / data architecture standpoint:
+This topic is essentially complete.
+You have now locked:
+Canonical ranking logic
+
+
+Tie-break mechanics
+
+
+Data ownership
+
+
+Stage calibration strategy
+
+
+Display constraints
+
+
+Merge strategy implications
+
+
+You are safe to:
+Build the stage-calibrated default rank lists
+
+
+Populate the checkpoint_stage table
+
+
+Create:
+
+
+v_checkpoint_ranked_rows
+
+
+v_checkpoint_dimension_merge_wide
+
+
+Wire Supabase → n8n → Google Docs
+

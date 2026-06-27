@@ -1,0 +1,549 @@
+# **Growth Velocity Calculator \- Benchmarks & Thresholds**
+
+**Purpose:** Hard reference data for deterministic lookups and pressure flag calculations. This document contains NO interpretation—just the numbers that power the calculator logic and reveal structural implications of growth goals.
+
+**Philosophy:** These thresholds reveal what a given growth path requires or implies. They are observational, not prescriptive.
+
+---
+
+## **1\. AGI per FTE Benchmarks**
+
+### **By Agency Maturity Stage**
+
+**Early Stage (≤$1M AGI)**
+
+* Annual Range: $140,000 \- $160,000 per FTE  
+* Monthly Range: $11,667 \- $13,333 per FTE  
+* Context: Building toward healthy leverage
+
+**Mid Stage ($1-3M AGI)**
+
+* Annual Range: $160,000 \- $180,000 per FTE  
+* Monthly Range: $13,333 \- $15,000 per FTE  
+* Context: Establishing operational efficiency
+
+**Scalable ($3-7M AGI)**
+
+* Annual Range: $180,000 \- $200,000 per FTE  
+* Monthly Range: $15,000 \- $16,667 per FTE  
+* Context: Healthy sustainable efficiency
+
+**Elite (Operationally Mature)**
+
+* Annual Range: $200,000 \- $225,000 per FTE  
+* Monthly Range: $16,667 \- $18,750 per FTE  
+* Context: Elite operational leverage
+
+### **Critical Thresholds**
+
+| Threshold | Annual AGI per FTE | Meaning |
+| ----- | ----- | ----- |
+| **Below Sustainable** | \< $140,000 | Below sustainable efficiency—margin pressure likely |
+| **Sustainable** | $140,000 \- $180,000 | Building toward healthy leverage |
+| **Healthy** | $180,000 \- $200,000 | Target range for mature agencies |
+| **Stretched** | $200,000 \- $225,000 | Elite leverage, approaching upper sustainable limit |
+| **Burnout Zone** | \> $225,000 | Efficiency appears high but may indicate understaffing pressure |
+| **Critical** | \> $250,000 | Unsustainable—quality degradation and retention risk likely |
+
+---
+
+## **2\. Pressure Family Trigger Thresholds**
+
+### **A. Treadmill (Retention Pressure)**
+
+**What it measures:** What percentage of growth effort goes to replacing churned revenue
+
+**Green (Low Retention Pressure)**
+
+* Threshold: Churn consumes \< 20% of growth target  
+* Implication: Churn is manageable—growth is mostly net expansion
+
+**Yellow (Moderate Retention Pressure)**
+
+* Threshold: Churn consumes 20-50% of growth target  
+* Implication: Meaningful portion of sales effort replaces churned revenue
+
+**Red (High Retention Pressure)**
+
+* Threshold: Churn consumes \> 50% of growth target  
+* Implication: Growth is mostly replacement—you're on a treadmill
+
+---
+
+### **B. Capacity Wall (Hiring Velocity)**
+
+**What it measures:** How fast you must add people relative to team size
+
+**Green (Sustainable Hiring Pace)**
+
+* Threshold Option 1: Less than 1 hire per quarter  
+* Threshold Option 2: Less than 10% quarterly team growth  
+* Implication: Hiring pace allows for proper onboarding and integration
+
+**Yellow (Accelerated Hiring Pace)**
+
+* Threshold Option 1: 1-2 hires per quarter  
+* Threshold Option 2: 10-20% quarterly team growth  
+* Implication: Hiring velocity requires focused management attention
+
+**Red (High Hiring Velocity Pressure)**
+
+* Threshold Option 1: More than 2 hires per quarter  
+* Threshold Option 2: More than 20% quarterly team growth  
+* Implication: Onboarding and culture integration becomes execution risk
+
+**Note:** Use the MORE CONCERNING of the two thresholds (hires per quarter OR % team growth)
+
+---
+
+### **C. New Capability (Sales Acceleration)**
+
+**What it measures:** How much faster acquisition pace must be vs. current state
+
+**Green (Incremental Sales Growth)**
+
+* Threshold: Less than 2x current pace  
+* Implication: Required pace achievable through optimization of current systems
+
+**Yellow (Elevated Sales Pace)**
+
+* Threshold: 2-3x current pace  
+* Implication: Achieving this pace likely requires process changes or additional capacity
+
+**Red (Sales System Transformation Required)**
+
+* Threshold: More than 3x current pace  
+* Implication: This pace implies fundamentally different acquisition systems, channels, or team structure
+
+---
+
+### **D. Profit Trap (Economic Pressure)**
+
+**What it measures:** Margin compression during growth
+
+**Green (Healthy Profit Path)**
+
+* Conditions: Margin maintained AND profit dollars increasing  
+* Implication: Growth generates increasing profit dollars while maintaining margin health
+
+**Yellow (Margin Pressure During Growth)**
+
+* Threshold: 3-7 percentage point margin compression  
+* Implication: Growth temporarily compresses margin—common during scale-up phase
+
+**Red (Profit Deterioration)**
+
+* Threshold: More than 7 percentage point margin compression OR profit dollars decreasing  
+* Implication: Growth is consuming profit—economics may be structurally challenged
+
+---
+
+### **E. Whale Trap (Concentration Risk)**
+
+**What it measures:** Client portfolio concentration
+
+**Green (Diversified Revenue Base)**
+
+* Threshold: No single client \> 15% of revenue AND top 3 clients \< 35% of revenue  
+* Implication: Revenue risk is well-distributed across client portfolio
+
+**Yellow (Moderate Concentration Risk)**
+
+* Threshold: Single client 15-25% of revenue OR top 3 clients 35-50% of revenue  
+* Implication: Loss of a large client would materially impact operations
+
+**Red (High Concentration Risk)**
+
+* Threshold: Single client \> 25% of revenue OR top 3 clients \> 50% of revenue  
+* Implication: Single client departure could threaten business continuity
+
+---
+
+### **F. Positioning Pressure (Value Capture & Monetization Evolution)**
+
+**Measures:** Whether the agency's pricing, service mix, and value capture model can support the intended growth path—or whether transformation requires fundamental repositioning.
+
+**Key Concept:** ACV (Average Client Value) serves as a composite proxy for monetization effectiveness. ACV can shift through multiple mechanisms: pricing adjustments, service bundling, contract restructuring, client segment shifts, or service mix evolution. This pressure detects when growth plans structurally depend on monetization evolution rather than just operational execution.
+
+**Three Independent Signals:**
+
+1. **ACV Delta** — Magnitude of value capture change required  
+2. **ACV Rate of Change** — Pace of monetization evolution needed  
+3. **ACV Dependency Ratio** — How much growth relies on ACV expansion vs. client volume
+
+---
+
+#### **ACV Delta Thresholds (Magnitude Signal)**
+
+Measures the absolute and percentage change in required Average Client Value from current to target state.
+
+| Threshold | ACV Increase | Interpretation |
+| ----- | ----- | ----- |
+| **Small** | \< 15% | Modest pricing evolution or service optimization |
+| **Moderate** | 15-40% | Material value capture improvement required |
+| **Large** | \> 40% | Fundamental repositioning or market shift needed |
+
+**What This Reveals:**
+
+* Small: Minor adjustments through optimization or incremental price increases  
+* Moderate: Requires deliberate service evolution or segment shift  
+* Large: Implies becoming a different kind of agency (service model, client type, or market position)
+
+**Stage Context:**
+
+* **Rising:** 20-30% ACV evolution over 12-18 months is common during productization  
+* **Striving:** 15-25% increase typical when formalizing premium positioning  
+* **Thriving:** \>30% increase usually signals upmarket pivot or transformation
+
+---
+
+#### **ACV Rate of Change Thresholds (Pace Signal)**
+
+Measures the annualized growth rate required in Average Client Value—how fast monetization must evolve.
+
+| Threshold | Annual ACV Growth | Interpretation |
+| ----- | ----- | ----- |
+| **Evolutionary** | \< 10% | Normal pricing evolution and value optimization |
+| **Active** | 10-25% | Requires intentional repositioning or service evolution |
+| **Transformational** | \> 25% | Aggressive monetization acceleration needed |
+
+**What This Reveals:**
+
+* Evolutionary: Changes can happen through execution (gradual price increases, service refinement)  
+* Active: Requires focus and strategy but achievable within growth timeline  
+* Transformational: Must restructure business model before or during growth phase
+
+**Time Compression Context:**
+
+* Same 30% ACV increase over 36 months \= Evolutionary (\~9% annually)  
+* Same 30% ACV increase over 12 months \= Transformational (30% annually)  
+* Timeline determines feasibility, not just magnitude
+
+---
+
+#### **ACV Dependency Ratio Bands (Structural Reliance Signal)**
+
+Measures what percentage of total revenue growth comes from ACV expansion vs. client volume growth.
+
+| Threshold | Growth from ACV | Interpretation |
+| ----- | ----- | ----- |
+| **Low** | \< 30% | Volume-driven growth; ACV is optional leverage |
+| **Medium** | 30-60% | Balanced approach; both volume and value required |
+| **High** | \> 60% | Value-driven growth; plan collapses without ACV expansion |
+
+**What This Reveals:**
+
+* Low: Multiple viable paths; if monetization stalls, volume can compensate  
+* Medium: Both engines required; risk is moderate if one underperforms  
+* High: Structural dependency; if ACV doesn't expand as planned, targets unreachable through volume alone
+
+**Formula:**
+
+ACV Dependency Ratio \= (Target ACV \- Current ACV) × Target Client Count / Total Revenue Growth
+
+---
+
+#### **Composite Positioning Pressure Severity Logic**
+
+How the three signals combine to determine overall positioning pressure level:
+
+| Severity | Trigger Conditions | Implication |
+| ----- | ----- | ----- |
+| **🟢 Latent (Green)** | Small magnitude AND evolutionary pace AND low dependency | Multiple viable growth paths; positioning evolution is optional leverage |
+| **🟡 Active (Yellow)** | (Moderate magnitude OR active pace) AND medium dependency | Monetization improvements are material contributor but not prerequisite |
+| **🔴 Dominant (Red)** | (Large magnitude OR transformational pace) AND high dependency | Plan only works if agency becomes fundamentally different business |
+
+**Key Principle:** Severity escalates when **both** strain indicators (magnitude/pace) **and** structural dependency are elevated. High dependency alone doesn't trigger Red if changes are modest. Large changes alone don't trigger Red if volume paths remain viable.
+
+---
+
+#### **Sensitivity Thresholds (How ACV Affects Other Pressures)**
+
+When ACV changes materially impact other pressure calculations:
+
+| Interconnection | Threshold | Effect |
+| ----- | ----- | ----- |
+| **Sales Velocity Relief** | \+20% ACV increase | Reduces required deal volume by \~15-20% for same revenue target |
+| **Capacity Relief** | \+30% ACV increase | May reduce client count by 20-25%, potentially easing delivery strain |
+| **Economic Improvement** | \+25% ACV with stable delivery cost | Can improve margin by 8-12 points if value capture exceeds cost increase |
+| **Concentration Risk** | \+40% ACV with stable client count | Increases whale trap risk if revenue consolidates into fewer clients |
+
+**Usage Note:** These are directional sensitivities, not prescriptive formulas. Actual impact depends on how ACV increase is achieved (pricing vs. scope vs. segment) and whether delivery model scales accordingly.
+
+---
+
+#### **Stage-Based ACV Evolution Benchmarks**
+
+Typical ACV ranges and healthy evolution patterns by agency maturity stage:
+
+| Stage | Typical ACV Range | Healthy Annual Evolution | Red Flags |
+| ----- | ----- | ----- | ----- |
+| **Rising** | $8K \- $25K | 15-25% annual increase during productization | \>40% increase (likely pricing without delivery evolution) |
+| **Striving** | $20K \- $60K | 10-20% annual increase through positioning | \<5% increase (commoditization creep) |
+| **Thriving** | $50K \- $150K+ | 5-15% annual increase via service mix | Frequent price decreases (competitive pressure) |
+
+**What "Healthy" Looks Like:**
+
+* ACV grows modestly faster than inflation (\~3-5%) through value optimization  
+* Significant increases (\>20% annually) accompanied by service model evolution  
+* Decreases or stagnation signal competitive pressure or delivery commoditization
+
+**Transformation Signals:**
+
+* Rising → Striving: Often includes 30-50% ACV increase over 18-24 months  
+* Striving → Thriving: May include upmarket pivot with 40-60% ACV increase over 24-36 months  
+* Within-stage optimization: Typically 10-15% annual increase through service refinement
+
+## **3\. Financial Health Benchmarks**
+
+### **Cost Structure Ratios (as % of AGI)**
+
+**Payroll (Unburdened Compensation)**
+
+* Target: 45% of AGI  
+* Acceptable: Up to 50% of AGI  
+* Concern: Above 55% of AGI indicates margin pressure
+
+**Overhead (SG\&A)**
+
+* Target: 20% of AGI  
+* Acceptable: Up to 25% of AGI  
+* Concern: Above 30% of AGI indicates bloat
+
+**Total Costs (Payroll \+ Overhead)**
+
+* Target: 65% of AGI  
+* Acceptable: Up to 70% of AGI  
+* Concern: Above 75% of AGI leaves insufficient margin
+
+---
+
+### **Profit Margin Benchmarks (EBITDA as % of AGI)**
+
+| Band | Range | Label |
+| ----- | ----- | ----- |
+| **Struggling** | \< 10% | Below healthy margin |
+| **Acceptable** | 10-20% | Baseline profitability |
+| **Healthy** | 20-30% | Strong margin |
+| **Elite** | 30%+ | Elite profitability |
+
+---
+
+### **Client Retention Benchmarks**
+
+**Annual Retention Rates:**
+
+| Band | Retention Rate | Annual Churn | Label |
+| ----- | ----- | ----- | ----- |
+| **Weak** | \< 80% | \> 20% | High churn environment |
+| **Average** | 80-88% | \~12% | Moderate retention |
+| **Good** | 88-92% | \~8% | Good retention |
+| **Excellent** | 92%+ | \< 5% | Excellent retention |
+
+**Monthly Churn Thresholds:**
+
+* Healthy: \< 2.5% monthly churn  
+* Concerning: 2.5-5% monthly churn  
+* Critical: \> 5% monthly churn
+
+---
+
+## **4\. Preset Scenario Configurations**
+
+### **Steady Climb**
+
+**Strategic Intent:** Conservative, organic growth with operational stability
+
+**Slider Adjustments:**
+
+* Revenue Growth: \+15%  
+* ACV Change: 0% (no change)  
+* Efficiency Change: 0% (no change)  
+* Retention Change: 0 points (no change)  
+* Margin Change: 0 points (no change)
+
+**Characteristics:** Sustainable pace that maintains current operational model
+
+---
+
+### **Rocket Ship**
+
+**Strategic Intent:** Aggressive scaling, typically volume-based
+
+**Slider Adjustments:**
+
+* Revenue Growth: \+50%  
+* ACV Change: 0% (volume play, not value play)  
+* Efficiency Change: \-10% (hiring inefficiency drag during rapid scaling)  
+* Retention Change: 0 points (no change)  
+* Margin Change: \-5 points (reinvestment cost and scale-up inefficiency)
+
+**Characteristics:** High velocity growth with temporary efficiency dips and margin compression
+
+---
+
+### **Profit Squeeze**
+
+**Strategic Intent:** Maximize profitability over top-line growth
+
+**Slider Adjustments:**
+
+* Revenue Growth: \+5% (near flat)  
+* ACV Change: \+10% (pricing power)  
+* Efficiency Change: \+15% (do more with less)  
+* Retention Change: 0 points (no change)  
+* Margin Change: \+5 points (margin expansion focus)
+
+**Characteristics:** Bottom-line optimization through pricing and efficiency, minimal scaling
+
+---
+
+### **Up-Market Pivot**
+
+**Strategic Intent:** Move to premium clients, reduce operational complexity
+
+**Slider Adjustments:**
+
+* Revenue Growth: \+25%  
+* ACV Change: \+50% (significant move upmarket)  
+* Efficiency Change: 0% (no change)  
+* Retention Change: \+5 points (better clients stay longer)  
+* Margin Change: 0 points (no change)
+
+**Characteristics:** Fewer, larger clients with improved retention and reduced operational volume
+
+---
+
+## **5\. Operational Constants & Benchmarks**
+
+### **Management Span of Control**
+
+* **Standard:** 1 Striving per 7 direct reports  
+* **Stretched:** 1 Striving per 10 direct reports (upper limit before quality suffers)  
+* **Meaning:** Number of individual contributors a Striving can effectively support
+
+### **Team Structure Break Points**
+
+| Team Size | Structure Label | Implication |
+| ----- | ----- | ----- |
+| 1-3 FTEs | Founder \+ Small Team | All decisions route through founder |
+| 4-8 FTEs | First Management Layer Needed | Span of control requires delegation of people management |
+| 9-20 FTEs | Multi-Layer Structure Required | Requires formal org chart and management systems |
+| 20-40 FTEs | Enterprise Structure | Multiple management layers and informal structure developing/emerging |
+| 40+ FTEs | Enterprise Structure | Multiple management layers and formal departments required |
+
+### **Utilization Benchmarks**
+
+| Band | Range | Label | Meaning |
+| ----- | ----- | ----- | ----- |
+| **Healthy** | 70-80% | Sustainable capacity | Balanced workload with room for slack |
+| **Stretched** | 80-90% | High capacity—limited slack | Little buffer for variations |
+| **Burnout** | 90%+ | Unsustainable—no buffer | High risk of quality degradation and turnover |
+
+### **Billable to Non-Billable Ratio**
+
+* **Target:** 3:1 (75% billable, 25% support)  
+* **Acceptable:** 2.5:1  
+* **Inefficient:** Below 2:1 indicates overhead bloat
+
+### **Payroll Ratio (as % of AGI)**
+
+Used for cash flow and hiring capacity calculations:
+
+* **Standard:** 45% is healthy benchmark  
+* **Maximum:** 50% is upper sustainable limit  
+* **Critical:** Above 55% indicates margin pressure
+
+### **Cash Reserves Benchmarks (Months of Operating Expenses)**
+
+* **Minimum:** 3 months for stability  
+* **Comfortable:** 6 months provides strategic flexibility  
+* **Strong:** 12 months enables major investments or scaling
+
+---
+
+## **6\. Growth Rate Benchmarks (By Stage)**
+
+### **Early Stage (≤$1.5M AGI)**
+
+| Growth Type | Annual Growth Rate | Interpretation |
+| ----- | ----- | ----- |
+| **Sustainable** | 15-30% | Healthy growth pace |
+| **Aggressive** | 30-60% | High velocity, requires careful execution |
+| **Overextended** | 60%+ | Likely to strain operations and quality |
+
+### **Mid Stage ($1.5-5M AGI)**
+
+| Growth Type | Annual Growth Rate | Interpretation |
+| ----- | ----- | ----- |
+| **Sustainable** | 10-25% | Healthy growth pace |
+| **Aggressive** | 25-40% | High velocity, requires careful execution |
+| **Overextended** | 40%+ | Likely to strain operations and quality |
+
+### **Scalable Stage ($5-10M AGI)**
+
+| Growth Type | Annual Growth Rate | Interpretation |
+| ----- | ----- | ----- |
+| **Sustainable** | 10-20% | Healthy growth pace |
+| **Aggressive** | 20-30% | High velocity, requires careful execution |
+| **Overextended** | 30%+ | Likely to strain operations and quality |
+
+### **Mature Stage ($10M+ AGI)**
+
+| Growth Type | Annual Growth Rate | Interpretation |
+| ----- | ----- | ----- |
+| **Sustainable** | 5-15% | Healthy growth pace |
+| **Aggressive** | 15-25% | High velocity, requires careful execution |
+| **Overextended** | 25%+ | Likely to strain operations and quality |
+
+**Note:** Larger agencies naturally grow at lower percentage rates due to the base effect. A $10M agency growing 20% is adding $2M—the same absolute growth as a $2M agency doubling.
+
+---
+
+## **7\. Usage Notes for AI & Development**
+
+### **How to Use These Benchmarks**
+
+**For Calculation Logic:**
+
+* Use thresholds to determine pressure level flags (green/yellow/red)  
+* Compare user metrics against appropriate maturity stage benchmarks  
+* Calculate derived metrics using operational constants
+
+**For GPT Synthesis:**
+
+* Reference specific thresholds when explaining why a flag triggered  
+* Use implication language to describe what crossing a threshold means  
+* Combine multiple benchmarks to identify pattern combinations
+
+**For User Communication:**
+
+* Always frame in terms of "what this implies" not "what you should do"  
+* Use the benchmark ranges as objective reference points  
+* Highlight which specific threshold triggered a pressure flag
+
+### **Example Usage Pattern**
+
+User's calculated metrics:  
+\- Churn replacement: 55% of growth target  
+\- Hiring velocity: 2.5 hires per quarter (team of 8\)
+
+Benchmark lookups:  
+\- Treadmill threshold: 55% \> 50% → RED  
+\- Capacity Wall threshold: 2.5 hires/qtr AND 31% quarterly growth → RED
+
+Context for GPT synthesis:  
+"Based on the benchmarks, this growth path crosses two critical thresholds:  
+1\. More than 50% of new revenue replaces churn (treadmill pressure)  
+2\. Hiring 2.5 people per quarter with current team of 8 (capacity wall pressure)
+
+These thresholds indicate that..."
+
+---
+
+## **Document Metadata**
+
+**Version:** 1.0 **Last Updated:** 2025-01-09 **Maintained By:** Architect OS Product Team **Related Documents:**
+
+* `optimization-variables.md`  
+* `growth-velocity-insights.md`

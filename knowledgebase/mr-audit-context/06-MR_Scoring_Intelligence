@@ -1,0 +1,240 @@
+# Maturity + Readiness Audit — Scoring Intelligence
+
+## The Dual Metric System
+
+The M+R Audit generates two complementary scores that work together to provide nuanced positioning within the agency's growth journey:
+
+**Maturity Score** — Measures capability strength *within* the current stage  
+**Readiness Score** — Measures preparedness to *transition to* the next stage
+
+These metrics answer fundamentally different strategic questions:
+- **Maturity:** "How developed are we for where we are?"
+- **Readiness:** "How close are we to the next inflection point?"
+
+An agency can be **highly mature** (strong capabilities for their stage) yet **low readiness** (not prepared for next-level complexity). Conversely, an agency might be **moderately mature** but **high readiness** because they've already built several next-stage capabilities.
+
+This dual lens prevents premature advancement and reveals when an agency has truly earned the transition to greater complexity.
+
+---
+
+## What Maturity Score Represents
+
+**Maturity Score** evaluates how well the agency has developed the capabilities expected at its current AE Ladder stage. It's a measure of **internal strength and capability depth** relative to stage-appropriate benchmarks.
+
+### Conceptual Calculation Logic
+
+Maturity is calculated by aggregating performance across all 25 capability areas, weighted by their **criticality at the current stage**:
+
+- Capabilities that are **mission-critical** for the current stage carry higher weight
+- Capabilities that are **emerging or contextual** carry lower weight
+- Each capability's score reflects checkpoint completion and performance quality
+
+**Example:**  
+A Striving-stage agency's maturity score heavily weights:
+- Operational efficiency (building workflow rhythm)
+- Portfolio optimization (balancing client mix)
+- Financial visibility (tracking margin and cash flow)
+
+But gives less weight to:
+- Leadership succession planning (premature at this stage)
+- Governance structures (not yet critical)
+
+### What a Maturity Score Reveals
+
+| Score Range | Interpretation | Strategic Implication |
+|-------------|----------------|----------------------|
+| **85-100%** | Exceptional strength for this stage | Capabilities are highly developed; agency is ready to focus on next-stage preparation |
+| **70-84%** | Solid performance; stage-appropriate strength | Core systems are functioning well; refine and optimize existing capabilities |
+| **55-69%** | Functional but gaps exist | Some capabilities need attention; prioritize shoring up weaknesses before advancing |
+| **Below 55%** | Foundational gaps present | Significant work needed to stabilize current-stage capabilities before considering progression |
+
+Maturity score provides a **confidence baseline**: "Are we strong enough *here* before moving *there*?"
+
+---
+
+## What Readiness Score Represents
+
+**Readiness Score** evaluates how prepared the agency is to handle the complexity and demands of the next stage. It's a measure of **transition proximity**—whether the structural, leadership, and strategic foundations exist to support advancement.
+
+### Conceptual Calculation Logic
+
+Readiness is calculated by assessing performance in capabilities that are **high-priority in the next stage**:
+
+- The system looks ahead to identify what will become critical soon
+- It evaluates whether those "next-stage enablers" are already emerging
+- It assesses whether inflection markers (leadership readiness, systems maturity) are present
+
+**Example:**  
+A Thriving-stage agency's readiness score (preparing for Driving stage) heavily evaluates:
+- Leadership development and succession planning
+- Strategic governance and decision frameworks
+- Performance management systems and cultural cohesion
+
+Even if these aren't yet weighted heavily in current-stage maturity, they're **essential prerequisites** for the next level.
+
+### What a Readiness Score Reveals
+
+| Score Range | Interpretation | Strategic Implication |
+|-------------|----------------|----------------------|
+| **80-100%** | Ready for transition | Next-stage capabilities are emerging; agency can confidently advance focus |
+| **60-79%** | Approaching readiness | Several enablers are forming; continue building transition-critical capabilities |
+| **40-59%** | Early preparation phase | Some next-stage work has begun, but more development needed before transition |
+| **Below 40%** | Focus on current stage | Premature to prioritize next-stage capabilities; stabilize present foundations first |
+
+Readiness score provides **transition guidance**: "Are we prepared for what comes next?"
+
+---
+
+## How Maturity and Readiness Work Together
+
+The power of this dual metric system lies in their **interaction**. Different score combinations reveal distinct strategic positions:
+
+### High Maturity, High Readiness
+**Profile:** Strong in current stage *and* prepared for next stage  
+**Interpretation:** Agency is operating from strength and building future capability simultaneously  
+**Strategic Focus:** Continue balanced approach—maintain excellence while planting next-stage seeds  
+**Example:** Thriving-stage agency with mature operations *and* emerging leadership depth
+
+---
+
+### High Maturity, Low Readiness
+**Profile:** Excellent at current stage, but unprepared for next level  
+**Interpretation:** Agency is optimized for today but hasn't started building for tomorrow  
+**Strategic Focus:** Begin investing in next-stage capabilities before current success creates complacency  
+**Example:** Striving-stage agency with strong workflows but no leadership pipeline forming
+
+---
+
+### Moderate Maturity, High Readiness
+**Profile:** Functional at current stage, already building next-stage capabilities  
+**Interpretation:** Agency is forward-focused but may have gaps in present-stage fundamentals  
+**Strategic Focus:** Balance attention—don't advance prematurely while current gaps remain  
+**Example:** Rising-stage agency with emerging systems but inconsistent cash flow
+
+---
+
+### Low Maturity, Low Readiness
+**Profile:** Struggling with current stage, unprepared for next stage  
+**Interpretation:** Agency needs focused attention on stabilizing current foundations  
+**Strategic Focus:** Prioritize current-stage gaps exclusively; next stage isn't yet relevant  
+**Example:** Early Rising-stage agency still establishing delivery consistency and margin clarity
+
+---
+
+## Dynamic Score Updates — The Living Diagnostic
+
+Unlike traditional assessments that provide a static snapshot, the M+R Audit operates as a **closed-loop intelligence system**. Scores evolve dynamically as the agency makes progress within Architect OS Pro Suite.
+
+### How Milestone Completion Triggers Recalculation
+
+When users work in the Pro Suite, they:
+1. Select capability areas to focus on (based on 3P roadmap)
+2. Identify checkpoints within those capabilities that need development
+3. Create initiatives (strategic projects) to address those checkpoints
+4. Define milestones (measurable achievements) within each initiative
+5. **Mark milestones as complete** as work progresses
+
+**Each milestone completion updates the corresponding checkpoint score**, which cascades upward:
+- Checkpoint scores aggregate into **capability area scores**
+- Capability scores feed into **maturity and readiness calculations**
+- Updated scores trigger **3P roadmap recalibration**
+
+This creates a **feedback loop** where execution informs assessment, and assessment refines priorities.
+
+### Example: Real-Time Score Evolution
+
+**Initial State (Post-Assessment):**
+- Maturity: 68% (Striving stage)
+- Readiness: 52% (preparing for Thriving)
+- Top Priority: Workflow Efficiency (3 of 5 checkpoints incomplete)
+
+**After 3 Months of Focused Execution:**
+- User completes 2 workflow efficiency milestones
+- Checkpoints update from "incomplete" to "developing"
+- Workflow Efficiency capability score rises from 55% → 78%
+- **Maturity recalculates:** 68% → 73%
+- **Readiness shifts slightly:** 52% → 56% (as operational maturity supports next-stage preparation)
+- **3P Roadmap adjusts:** Workflow Efficiency moves from "Prioritize" to "Progressively Iterate"
+
+The system doesn't wait for a full reassessment—it responds in real time to the agency's actual progress.
+
+---
+
+## Why Full Reassessments Aren't Frequent
+
+The M+R Audit is designed to be **taken once, used continuously**. Most agencies won't need to retake the full 125-question assessment for **6-12+ months**, and here's why:
+
+### 1. The Initial Assessment Provides 12-18 Months of Focus
+A well-calibrated diagnostic reveals capability gaps that typically take 6-18 months to address meaningfully. Agencies don't "run out" of things to work on—they have a clear roadmap that unfolds over multiple quarters.
+
+### 2. The Platform Updates Scores Through Usage
+As long as users are actively working in Architect OS Pro (marking milestones, completing initiatives, tracking progress), their scores stay current. The system knows what's been addressed without requiring another full audit.
+
+### 3. Reassessment Is Triggered by Transition, Not Time
+The best time to retake the full M+R Audit is when:
+- The agency is **approaching or crossing a stage transition** (e.g., moving from Striving to Thriving)
+- **Major organizational changes occur** (leadership shifts, service pivots, market repositioning)
+- The agency wants to **recalibrate priorities comprehensively** after a year of focused execution
+
+Otherwise, the living diagnostic provides continuous intelligence without assessment fatigue.
+
+---
+
+## Interpreting Score Trajectories Over Time
+
+Scores aren't just about the number—they're about the **trend**. The platform tracks score evolution across quarters, revealing momentum and velocity:
+
+### Positive Trajectory
+**Pattern:** Maturity rising steadily, readiness beginning to climb  
+**Interpretation:** Agency is executing effectively and building toward transition  
+**Strategic Signal:** Continue current focus; maintain momentum
+
+### Stagnant Trajectory
+**Pattern:** Scores flat or fluctuating minimally over 6+ months  
+**Interpretation:** Execution isn't translating to measurable capability improvement  
+**Strategic Signal:** Revisit priorities; check if initiatives are addressing root gaps or just symptoms
+
+### Accelerating Readiness
+**Pattern:** Readiness climbing faster than maturity  
+**Interpretation:** Agency is planting next-stage capabilities aggressively, possibly prematurely  
+**Strategic Signal:** Rebalance focus—ensure current-stage stability before over-investing in future
+
+### Declining Scores
+**Pattern:** Scores dropping despite milestone activity  
+**Interpretation:** Either regression in capabilities or reassessment revealing previously hidden gaps  
+**Strategic Signal:** Diagnose root cause—is this operational backslide or newly surfaced awareness?
+
+---
+
+## How Scores Drive System Intelligence
+
+Maturity and readiness scores aren't just metrics—they're **inputs to every intelligent feature** across Architect OS:
+
+- **3P Roadmaps:** Urgency calculations adjust based on score positioning
+- **Dashboard Insights:** Narrative generation contextualizes performance within stage expectations
+- **Virtual CSO:** AI recommendations account for both current strength and transition proximity
+- **Quarterly Planning:** Pro Suite suggests focus areas based on score trajectories and gaps
+- **Milestone Prioritization:** System highlights initiatives most likely to move scores meaningfully
+
+The scores transform from static assessment outputs into **dynamic strategy drivers** that guide the entire planning and execution cycle.
+
+---
+
+## Key Principles of the Scoring System
+
+**Stage-Calibrated, Not Universal:** What's "good" at Rising is different from what's "good" at Driving—scores always contextualize performance within the agency's current reality.
+
+**Complementary, Not Redundant:** Maturity and readiness measure different dimensions of growth. Both are essential for complete strategic positioning.
+
+**Dynamic, Not Static:** Scores update continuously through usage. The system learns from execution and recalibrates priorities accordingly.
+
+**Guiding, Not Prescriptive:** Scores reveal patterns and suggest focus areas, but founders retain full agency over what to prioritize and when.
+
+**Transparent, Not Black-Box:** The logic behind scoring is clear and explainable. Agencies understand *why* their scores are what they are and *what actions* will move them.
+
+---
+
+**Related Documentation:**
+- `MR_Framework_Overview.md` — How scoring fits in the diagnostic system
+- `MR_Stage_Progression_Philosophy.md` — How stage context influences score interpretation
+- `MR_Execution_Integration.md` — How scores cascade into quarterly plans and milestone tracking

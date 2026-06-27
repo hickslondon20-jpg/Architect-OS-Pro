@@ -1,0 +1,617 @@
+Identity & Context Tab - Complete UI Specification
+
+1. SUPABASE REFERENCE TABLES
+Table: agency_snapshot_services_ref
+Sql
+CREATE TABLE services (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  category TEXT, -- Optional: 'Digital Marketing', 'Creative', 'Development', etc.
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Example entries:
+-- ('SEO', 'Digital Marketing', 1, true)
+-- ('Paid Media (PPC/SEM)', 'Digital Marketing', 2, true)
+-- ('Social Media Marketing', 'Digital Marketing', 3, true)
+-- ('Content Marketing', 'Digital Marketing', 4, true)
+-- ('Creative/Design', 'Creative', 5, true)
+-- ('Branding/Strategy', 'Strategy', 6, true)
+-- ('Web Development', 'Development', 7, true)
+-- ('Email Marketing', 'Digital Marketing', 8, true)
+-- ('Marketing Automation', 'Technology', 9, true)
+-- ('Analytics/BI', 'Technology', 10, true)
+-- ('Other', NULL, 999, true)
+
+Table: industries
+Sql
+CREATE TABLE agency_snapshot_industries_ref (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Example entries:
+-- ('B2B SaaS', 1, true)
+-- ('E-commerce', 2, true)
+-- ('Healthcare', 3, true)
+-- ('Finance/Financial Services', 4, true)
+-- ('Professional Services', 5, true)
+-- ('Manufacturing', 6, true)
+-- ('Real Estate', 7, true)
+-- ('Education', 8, true)
+-- ('Nonprofit', 9, true)
+-- ('Hospitality/Travel', 10, true)
+-- ('Technology (non-SaaS)', 11, true)
+-- ('Retail', 12, true)
+-- ('Other', 999, true)
+
+Table: agency_identity (Main Storage)
+Sql
+CREATE TABLE agency_identity (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  
+  -- Service Scope
+  primary_services UUID[] REFERENCES services(id), -- Array of service IDs
+  primary_services_other TEXT, -- If "Other" selected
+  secondary_services UUID[], -- Array of service IDs
+  secondary_services_other TEXT, -- If "Other" selected
+  
+  -- Market Focus
+  primary_industries UUID[] REFERENCES industries(id), -- Array of industry IDs, max 5
+  primary_industries_other TEXT, -- If "Other" selected
+  geographic_footprint TEXT, -- 'local', 'regional', 'national', 'international'
+  
+  -- Pricing Model
+  pricing_models TEXT[], -- Array of pricing approach strings
+  
+  -- Positioning
+  website_url TEXT,
+  website_scraped_content JSONB, -- Stores FireCrawl results
+  positioning_context TEXT, -- Manual fallback/additional context
+  
+  -- Synthesis Results
+  identity_profile JSONB, -- Stores structured synthesis + narrative
+  
+  -- Metadata
+  completed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for user lookups
+CREATE INDEX idx_agency_identity_user_id ON agency_identity(user_id);
+```
+
+---
+
+## **2. FIELD SPECIFICATIONS**
+
+### **SECTION 1: Service Scope**
+
+#### **Field: Primary Services**
+- **Type:** Multi-select dropdown (checkboxes)
+- **Required:** Yes
+- **Data Source:** `services` table (WHERE is_active = true ORDER BY sort_order ASC)
+- **Display:** Service name from table
+- **Behavior:**
+  - If "Other" is checked, show text input field below
+  - Text input: 100 character limit, placeholder "Specify other services"
+  - Validation: At least 1 service must be selected
+- **Storage:** Array of service UUIDs in `primary_services`, custom text in `primary_services_other`
+
+#### **Field: Secondary Services**
+- **Type:** Multi-select dropdown (checkboxes)
+- **Required:** No (optional)
+- **Data Source:** Same `services` table
+- **Behavior:** Same as Primary Services
+- **Storage:** Array of service UUIDs in `secondary_services`, custom text in `secondary_services_other`
+- **Helper Text:** "Optional: Additional services you offer"
+
+---
+
+### **SECTION 2: Market Focus**
+
+#### **Field: Primary Industries Served**
+- **Type:** Multi-select dropdown (checkboxes)
+- **Required:** Yes
+- **Max Selection:** 5 industries
+- **Data Source:** `industries` table (WHERE is_active = true ORDER BY sort_order ASC)
+- **Display:** Industry name from table
+- **Behavior:**
+  - Show counter: "X of 5 selected"
+  - Disable additional selections once 5 reached
+  - If "Other" checked, show text input below
+  - Text input: 100 character limit, placeholder "Specify other industries"
+  - Validation: At least 1 industry, max 5 industries
+- **Storage:** Array of industry UUIDs in `primary_industries`, custom text in `primary_industries_other`
+
+#### **Field: Geographic Footprint**
+- **Type:** Single-select dropdown
+- **Required:** Yes
+- **Options:** (Hardcoded)
+  - Local (single city/metro area)
+  - Regional (state or multi-state region)
+  - National (US-wide)
+  - International
+- **Storage:** String in `geographic_footprint`
+
+---
+
+### **SECTION 3: Pricing Model**
+
+#### **Field: How do you price your work?**
+- **Type:** Multi-select dropdown (checkboxes)
+- **Required:** Yes
+- **Options:** (Hardcoded)
+  - Value-based pricing
+  - Retainer (ongoing monthly)
+  - Project-based (fixed scope/price)
+  - Hourly/Time-based
+  - Cost-plus (expenses + markup)
+  - Performance/Results-based
+  - Hybrid model
+- **Behavior:** Can select multiple
+- **Validation:** At least 1 pricing model
+- **Storage:** Array of strings in `pricing_models`
+- **Helper Text:** "Select all that apply"
+
+---
+
+### **SECTION 4: Positioning (Enhanced/Optional)**
+
+#### **Field: Website URL**
+- **Type:** Text input (URL)
+- **Required:** No (optional)
+- **Validation:** Valid URL format (https://...)
+- **Storage:** String in `website_url`
+- **Helper Text:** "We'll analyze your web presence to understand your market positioning"
+- **Note:** Placeholder for n8n FireCrawl integration (implemented separately)
+
+#### **Field: Additional Positioning Context**
+- **Type:** Text area
+- **Required:** No (optional)
+- **Rows:** 4
+- **Character Limit:** 500 characters
+- **Storage:** String in `positioning_context`
+- **Helper Text:** "If our web analysis doesn't capture your full positioning, add context here"
+- **Placeholder:** "Optional: Add any additional context about your positioning, differentiation, or unique approach..."
+
+---
+
+## **3. LAYOUT STRUCTURE**
+
+### **Left Panel (Form)**
+```
+┌─────────────────────────────────────────────┐
+│  Identity & Context                         │
+│  Who you are, who you serve, how you work.  │
+├─────────────────────────────────────────────┤
+│                                             │
+│  SERVICE SCOPE                              │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                             │
+│  Primary Services *                         │
+│  ☐ SEO                                      │
+│  ☐ Paid Media (PPC/SEM)                     │
+│  ☐ Social Media Marketing                   │
+│  ☐ Content Marketing                        │
+│  ☐ Creative/Design                          │
+│  ☐ Branding/Strategy                        │
+│  ☐ Web Development                          │
+│  ☐ Email Marketing                          │
+│  ☐ Marketing Automation                     │
+│  ☐ Analytics/BI                             │
+│  ☐ Other                                    │
+│                                             │
+│  [If Other checked]                         │
+│  └─ [Specify other services________]        │
+│     100 characters max                      │
+│                                             │
+│  Secondary Services (Optional)              │
+│  [Same structure as Primary]                │
+│                                             │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│  MARKET FOCUS                               │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                             │
+│  Primary Industries Served * (Max 5)        │
+│  2 of 5 selected                            │
+│  ☐ B2B SaaS                                 │
+│  ☐ E-commerce                               │
+│  ☐ Healthcare                               │
+│  ☐ Finance/Financial Services               │
+│  ☐ Professional Services                    │
+│  ☐ Manufacturing                            │
+│  ☐ Real Estate                              │
+│  ☐ Education                                │
+│  ☐ Nonprofit                                │
+│  ☐ Hospitality/Travel                       │
+│  ☐ Technology (non-SaaS)                    │
+│  ☐ Retail                                   │
+│  ☐ Other                                    │
+│                                             │
+│  [If Other checked]                         │
+│  └─ [Specify other industries_______]       │
+│     100 characters max                      │
+│                                             │
+│  Geographic Footprint *                     │
+│  [Dropdown: Select footprint...]            │
+│                                             │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│  PRICING MODEL                              │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                             │
+│  How do you price your work? *              │
+│  Select all that apply                      │
+│  ☐ Value-based pricing                      │
+│  ☐ Retainer (ongoing monthly)               │
+│  ☐ Project-based (fixed scope/price)        │
+│  ☐ Hourly/Time-based                        │
+│  ☐ Cost-plus (expenses + markup)            │
+│  ☐ Performance/Results-based                │
+│  ☐ Hybrid model                             │
+│                                             │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│  POSITIONING (ENHANCED - OPTIONAL)          │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                             │
+│  Website URL                                │
+│  [https://yourwebsite.com____________]      │
+│  We'll analyze your web presence to         │
+│  understand your market positioning         │
+│                                             │
+│  Additional Positioning Context             │
+│  [Text area - 500 char limit]               │
+│  If our web analysis doesn't capture        │
+│  your full positioning, add context here    │
+│                                             │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│                                             │
+│  [Save Identity Data]  ← Button             │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+### **Right Panel (Calculated Metrics - Empty State)**
+```
+┌─────────────────────────────────────────┐
+│  📊 Calculated Metrics & Benchmarks     │
+│                                         │
+│  No calculated metrics for this section │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## **4. SAVE BEHAVIOR & STATES**
+
+### **Button States**
+
+#### **Default State (Before Validation)**
+```
+[ Save Identity Data ]
+```
+- Enabled if all required fields filled
+- Disabled if validation fails
+- Shows validation errors inline above button
+
+#### **Processing State**
+```
+[ ⟳ Processing... ]  (disabled, with spinner)
+```
+- Button disabled
+- Text changes to "Processing..."
+- Spinner icon animates
+
+#### **Success State**
+```
+[ ✓ Saved ]  (briefly, then returns to default)
+```
+- Shows checkmark for 2 seconds
+- Returns to "Save Identity Data" (allows re-save)
+
+---
+
+### **Processing Flow**
+
+1. **User clicks "Save Identity Data"**
+2. **Validation runs:**
+   - Primary Services: At least 1 selected
+   - Primary Industries: 1-5 selected
+   - Geographic Footprint: 1 selected
+   - Pricing Model: At least 1 selected
+   - Website URL (if provided): Valid URL format
+3. **If validation fails:**
+   - Show inline error messages
+   - Button remains enabled
+   - Don't proceed
+4. **If validation passes:**
+   - Button enters "Processing..." state
+   - Form data saves to `agency_identity` table
+   - Loading indicator appears below button
+5. **Background Processing:**
+   - If Website URL provided → Trigger n8n FireCrawl workflow (separate implementation)
+   - n8n stores scraped content in `website_scraped_content` JSONB field
+6. **GPT Synthesis:**
+   - Payload includes: form data + scraped content (if available) + positioning context
+   - GPT generates structured profile + narrative
+   - Result stored in `identity_profile` JSONB field
+7. **Results Display:**
+   - "Identity Profile" section appears below button
+   - Loading indicator disappears
+   - Button returns to "Saved" state briefly, then "Save Identity Data"
+
+---
+
+## **5. IDENTITY PROFILE SECTION**
+
+This section appears **below the Save button** after synthesis completes.
+
+### **Structure:**
+```
+┌─────────────────────────────────────────────────────┐
+│  📋 Identity Profile                                 │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│  SERVICE SCOPE                                       │
+│  Full-Service Agency                                 │
+│  Primary: SEO, Paid Media, Content Marketing,       │
+│           Creative/Design, Branding/Strategy,        │
+│           Web Development, Email Marketing,          │
+│           Marketing Automation                       │
+│  Secondary: Analytics/BI                             │
+│                                                      │
+│  MARKET FOCUS                                        │
+│  Multi-Industry Focus                                │
+│  Industries: B2B SaaS, Healthcare, Professional      │
+│              Services, Finance                       │
+│  Geography: National (US-wide)                       │
+│                                                      │
+│  PRICING APPROACH                                    │
+│  Hybrid Model                                        │
+│  Methods: Value-based pricing, Retainer             │
+│                                                      │
+│  POSITIONING ANALYSIS                                │
+│  [Narrative synthesis from GPT]                      │
+│                                                      │
+│  Your web presence emphasizes three core themes:     │
+│  data-driven decision making, creative excellence,   │
+│  and mid-market expertise. Your tone is              │
+│  professional but approachable, avoiding technical   │
+│  jargon. You position yourself as a strategic        │
+│  partner rather than an execution vendor, with       │
+│  language like "we embed with your team" and         │
+│  "long-term growth partner."                         │
+│                                                      │
+│  Your full-service offering (8 service categories)   │
+│  positions you as an integrated solution provider    │
+│  for clients who need multiple disciplines           │
+│  coordinated under one roof. This breadth suggests   │
+│  you serve clients who value convenience and         │
+│  relationship continuity over specialized depth in   │
+│  any single area.                                    │
+│                                                      │
+│  Your multi-industry focus (4 primary industries)    │
+│  indicates generalist positioning without vertical   │
+│  specialization. This approach allows flexibility    │
+│  in client acquisition but requires strong           │
+│  relationship-building and referral networks rather  │
+│  than market authority in specific niches.           │
+│                                                      │
+│  Your hybrid pricing approach (value-based +         │
+│  retainer) suggests flexibility in client            │
+│  engagement models, likely adapting pricing to       │
+│  client preferences and project types.               │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+Data Structure (identity_profile JSONB):
+json{
+  "service_scope": {
+    "classification": "Full-Service Agency",
+    "primary_services": ["SEO", "Paid Media", "Content Marketing", ...],
+    "secondary_services": ["Analytics/BI"],
+    "service_count": 9
+  },
+  "market_focus": {
+    "classification": "Multi-Industry Focus",
+    "industries": ["B2B SaaS", "Healthcare", "Professional Services", "Finance"],
+    "industry_count": 4,
+    "geography": "National (US-wide)"
+  },
+  "pricing_approach": {
+    "classification": "Hybrid Model",
+    "methods": ["Value-based pricing", "Retainer"]
+  },
+  "positioning_analysis": {
+    "narrative": "[GPT-generated synthesis text]",
+    "key_themes": ["data-driven", "creative excellence", "mid-market expertise"],
+    "tone": "professional but approachable",
+    "positioning_type": "strategic partner"
+  },
+  "synthesis_timestamp": "2026-02-16T10:30:00Z"
+}
+```
+
+---
+
+## **6. LOADING STATES**
+
+### **During Synthesis Processing:**
+```
+┌─────────────────────────────────────────┐
+│  [ ⟳ Processing... ]  (disabled button)  │
+│                                         │
+│  ⟳ Analyzing your positioning...        │
+│                                         │
+│  This typically takes 15-30 seconds     │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+**Visual Details:**
+- Animated spinner
+- Status text
+- Estimated time
+- Appears immediately below button
+
+---
+
+## **7. ERROR HANDLING**
+
+### **Validation Errors (Before Save):**
+```
+Primary Services is required
+Please select at least one primary industry
+Geographic footprint is required
+Please select at least one pricing model
+```
+- Display inline above save button
+- Red text, icon
+- Prevent save
+
+### **Processing Errors (During Save):**
+```
+⚠️ Unable to save data. Please try again.
+```
+- Display if database save fails
+- Button returns to enabled state
+- Allow retry
+
+### **Synthesis Errors (During GPT Call):**
+```
+⚠️ Unable to generate profile analysis. Your data has been saved.
+   You can try again by clicking "Save Identity Data".
+```
+- Data is saved, but synthesis failed
+- Allow user to retry
+- Button returns to enabled state
+
+### **Web Scrape Errors (Background):**
+```
+⚠️ Unable to analyze website. Profile generated from form data only.
+
+Show in Identity Profile section
+Synthesis proceeds with form data only
+Not a blocking error
+
+
+8. MOBILE RESPONSIVENESS
+Considerations:
+
+Multi-select checkboxes stack vertically
+Text inputs full width
+"Other" text fields appear below checkboxes, indented
+Save button full width on mobile
+Identity Profile section scrolls vertically
+Right panel (Calculated Metrics) moves below form on mobile
+
+Breakpoints:
+
+Desktop: 1024px+ (side-by-side layout)
+Tablet: 768px-1023px (stacked, wider inputs)
+Mobile: <768px (full-width everything)
+
+
+9. ACCESSIBILITY
+
+All form fields have proper labels
+Required fields marked with asterisk and aria-required
+Error messages associated with fields via aria-describedby
+Button states announced to screen readers
+Loading state has aria-live region
+Multi-select checkboxes keyboard navigable
+
+
+10. DEVELOPMENT NOTES
+Frontend Implementation:
+
+Component Structure:
+
+IdentityForm.tsx - Main form component
+ServiceSelect.tsx - Reusable multi-select with "Other" handling
+IndustrySelect.tsx - Multi-select with max 5 limit
+IdentityProfile.tsx - Results display component
+
+
+State Management:
+
+Form state in local component state
+Save to Supabase on submit
+Poll for synthesis completion or use websocket
+
+
+Supabase Queries:
+
+SELECT * FROM services WHERE is_active = true ORDER BY sort_order
+SELECT * FROM industries WHERE is_active = true ORDER BY sort_order
+INSERT INTO agency_identity (user_id, ...)
+UPDATE agency_identity SET identity_profile = ... WHERE user_id = ...
+
+
+
+Backend Integration Points:
+
+n8n Workflow Trigger: POST to webhook when Website URL provided
+GPT Synthesis: Separate function/workflow that:
+
+Receives form data + scraped content
+Generates structured profile + narrative
+Updates identity_profile JSONB field
+
+
+Webhook Response: Updates UI when synthesis completes
+
+
+11. TESTING CHECKLIST
+Functional Tests:
+
+ Can select multiple primary services
+ "Other" text field appears when "Other" selected
+ Cannot select more than 5 industries
+ Industry counter updates correctly
+ All required fields validate before save
+ Save button disabled during processing
+ Data persists to database correctly
+ Identity Profile section appears after synthesis
+ Can edit and re-save (re-runs synthesis)
+ Web scrape triggers when URL provided
+ Synthesis works without web scrape (fallback)
+
+Error Tests:
+
+ Validation errors display correctly
+ Database save failure handled
+ GPT synthesis failure handled
+ Web scrape failure handled gracefully
+ Network timeout handled
+
+Edge Cases:
+
+ Long "Other" text (at 100 char limit)
+ Invalid URL format rejected
+ Max 5 industries enforced
+ Multiple pricing models selected
+ Empty optional fields (Secondary Services, Website URL)
+ Re-save with modified data
+ Simultaneous saves prevented
+
+
+12. PLACEHOLDER CONTENT FOR WEB SCRAPE
+Note: FireCrawl integration implemented separately via n8n. For now:
+
+Website URL field saves to website_url
+Scraped content will be stored in website_scraped_content JSONB
+GPT synthesis function will check for scraped content and include if present
+If no scraped content, synthesis uses form data + positioning_context only
+
+
+This specification is ready for implementation. All fields, behaviors, states, and data structures are defined. Developer can proceed with building the UI and connecting to Supabase.

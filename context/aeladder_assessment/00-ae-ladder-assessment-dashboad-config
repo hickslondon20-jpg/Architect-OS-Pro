@@ -1,0 +1,1433 @@
+# **🚀 AE Ladder Results Dashboard — V1 Structure**
+
+The dashboard is organized into **5 core sections**, each with clear purpose and clean visual hierarchy:
+
+1. **Hero Stage Header**
+
+2. **Score Snapshot (Overall \+ Dimensions)**
+
+3. **Strengths & Gaps Overview**
+
+4. **Signals & Identity Snapshot**
+
+5. **Focus Priorities (Top 3\)**
+
+6. **Download Report \+ Next-Step CTA Card**
+
+Optional for V1.5+ (not needed for launch but easy later):
+
+* Highlights timeline (“Your previous stage: X”)
+
+* Stage journey/AE Ladder visual
+
+* Buttons that link into Maturity & Readiness Audit
+
+Now let’s break down each section in detail.
+
+---
+
+# **1️⃣ HERO STAGE HEADER**
+
+**Purpose:** Immediately confirms “where they are” in the AE Ladder.  
+ **Backend fields powering it:**
+
+* `frontend_stage_label`
+
+* `overall_score`
+
+* `assessment_completed_at`
+
+* (Optional) `ae_stage_tag` from the user profile
+
+**UI Components:**
+
+* Large **stage badge** (e.g., *Striving*)
+
+* Short tagline (predefined per stage)
+
+* Date of assessment completion
+
+* Small description (2 lines max, static per stage)
+
+**Visual goal:**  
+ Clean, hero-style top section. Instant recognition.
+
+---
+
+# **2️⃣ SCORE SNAPSHOT (Overall \+ 5 Dimensions)**
+
+This is the backbone of the dashboard.  
+ **Purpose:** Provide a quick quantitative overview.
+
+### **Layout:**
+
+* **Left side:** Overall score card
+
+* **Right side:** Dimension chart or tiles (choose one for V1)
+
+### **Backend fields:**
+
+From GPT input row:
+
+* `overall_score`
+
+* For each dimension object in `dimensions[]`:
+
+  * `dimension_name`
+
+  * `avg_score`
+
+  * `delta`
+
+  * `deviation_bucket` (above, at, below)
+
+  * `dimension_band_summary_label`
+
+  * `signal_tag`
+
+### **Option A: Radar chart**
+
+Shows all 5 dimensions on a single shape.
+
+### **Option B (cleaner for V1): Dimension Tiles**
+
+Each tile contains:
+
+* Dimension name
+
+* Score (e.g., 3.25)
+
+* Band summary label (“Confident Momentum”)
+
+* Small color indicator based on `deviation_bucket`:
+
+  * strongly above \= deep green
+
+  * above \= soft green
+
+  * at \= gray
+
+  * below \= yellow
+
+  * strongly below \= red
+
+**Benefit:**  
+ Extremely scannable, instantly shows strengths vs weaknesses.
+
+---
+
+# **3️⃣ STRENGTHS & GAPS OVERVIEW**
+
+This is where the backend intelligence shines.  
+ We don’t write logic — we just read:
+
+* `dimensions_above_overall[]`
+
+* `dimensions_below_overall[]`
+
+* `is_strong_strength`, `is_moderate_strength`
+
+* `is_moderate_gap`, `is_strong_gap`
+
+* `score_rank_desc`
+
+### **Layout:**
+
+Two horizontal cards:
+
+---
+
+### **STRENGTHS CARD**
+
+Data source:  
+ Dimensions where:
+
+* `is_strong_strength = true` OR
+
+* `deviation_bucket = strongly_above` OR
+
+* highest `score_rank_desc`
+
+Each row displays:
+
+* Dimension name
+
+* Signal tag (short identity)
+
+* Score \+ delta
+
+* Optional micro-label (e.g., “Your strongest area”)
+
+---
+
+### **GAPS CARD**
+
+Data source:
+
+* Dimensions where `is_moderate_gap` OR `is_strong_gap` OR lowest score rank
+
+Each row displays:
+
+* Dimension name
+
+* Signal tag
+
+* Score \+ delta
+
+* Optional micro-label (“Primary developmental area”)
+
+**Purpose:**  
+ Gives instant clarity without reading paragraphs.
+
+---
+
+# **4️⃣ SIGNALS & IDENTITY SNAPSHOT**
+
+This is a signature UX moment.
+
+Every dimension in the GPT input includes a **signal\_tag** — these are identity-level descriptors like:
+
+* “Early Functional Ownership”
+
+* “Leveraged Client Design”
+
+* “External-Facing Growth Operator”
+
+These signals capture the “essence” of how the agency operates.
+
+### **Layout:**
+
+A 5-tile grid (1 per dimension):
+
+Each tile:
+
+* Dimension Name
+
+* **Signal Tag** (large, bold)
+
+* Color-coded deviation indicator
+
+* Tooltip with:
+
+  * One-line meaning
+
+  * Dimension band summary label
+
+**Purpose:**  
+ Gives the founder an instant identity mirror:  
+ “How your agency shows up across the 5 AE dimensions.”
+
+---
+
+# **5️⃣ FOCUS PRIORITIES (TOP 3\)**
+
+Our backend row includes:
+
+* `focus1_dimension_id` \+ `focus1_reason_code`
+
+* `focus2_dimension_id` \+ `focus2_reason_code`
+
+* `focus3_dimension_id` \+ `focus3_reason_code`
+
+These map to:
+
+* Top priority area
+
+* Why it matters (“reason code” could decode into things like “top\_strong\_strength”, “primary\_moderate\_gap”, etc.)
+
+### **Layout:**
+
+Three horizontal cards or vertical stack:
+
+---
+
+### **Priority Card Example:**
+
+**Priority 1 — Stewardship**  
+ Reason: *top\_strong\_strength*  
+ Interpretation: “This dimension already leads your performance and creates leverage. Build from here.”
+
+---
+
+### **Priority 2 — Team**
+
+Reason: *primary\_moderate\_gap*  
+ Interpretation: “This is the most constraining friction area.”
+
+---
+
+### **Priority 3 — Operations**
+
+Reason: *no\_secondary\_gap*  
+ Interpretation: “This dimension is neutral but relevant for scale-time readiness.”
+
+---
+
+**Purpose:**  
+ This becomes the bridge into areas like:
+
+* Maturity & Readiness Audit
+
+* 3P prioritization engine
+
+* Architect OS planning modules
+
+This is the dashboard’s “so what” moment.
+
+---
+
+# **6️⃣ DOWNLOAD REPORT \+ CTA CARD**
+
+### **Download Report Card:**
+
+* Button: **Download Full Report**
+
+  * Powered by `pdf_url`
+
+* Small text:
+
+  * “This report includes your stage narrative, diagnostic insights, and recommended focus areas.”
+
+### **CTA (Soft):**
+
+* “Continue to Maturity & Readiness Audit”
+
+* “Explore Your Growth Mastery Pathway”
+
+No heavy selling — it should feel like the next natural step.
+
+---
+
+# **🌐 Combined Layout (At a Glance)**
+
+`------------------------------------------------`  
+`| AE Ladder Stage Header (hero)                |`  
+`------------------------------------------------`  
+`| Overall Score | Dimension Snapshot Tiles     |`  
+`------------------------------------------------`  
+`| Strengths Overview | Gaps Overview           |`  
+`------------------------------------------------`  
+`| Signals & Identity Snapshot (5 tiles)        |`  
+`------------------------------------------------`  
+`| Focus Priorities (Top 3)                     |`  
+`------------------------------------------------`  
+`| Download Report + CTA                        |`  
+`------------------------------------------------`
+
+Everything is:
+
+* Data-driven
+
+* Backend-derived
+
+* Non-narrative
+
+* High clarity
+
+* High usability
+
+* Low cognitive load
+
+* Complementary to the PDF report (never duplicative)
+
+---
+
+# **✔️ Next Step**
+
+If you like this structure, the next step is:
+
+### **I’ll map this into a functional spec \+ component list for Lovable, including:**
+
+* Each component
+
+* Required props and bindings
+
+* What API calls supply the data
+
+* Handling loading, empty, and error states
+
+Just reply:
+
+**“Proceed with functional spec \+ component list.”**
+
+##### **You said:**
+
+Proceed with functional spec \+ component list.
+
+###### **ChatGPT said:**
+
+Thought for 6s
+
+Awesome, let’s turn that dashboard concept into something a developer in Lovable can actually build without guessing.
+
+I’ll break this into:
+
+1. **Result route \+ data flow (functional spec backbone)**
+
+2. **Screen states (ready / processing / locked / error)**
+
+3. **Component list \+ props \+ behavior**
+
+4. **Data interaction rules (what the API should return / what the frontend needs)**
+
+---
+
+## **1️⃣ Route & Data Flow – AE Ladder Results**
+
+### **Primary route (example)**
+
+* **`/assessments/ae-ladder/results`**
+
+### **Entry behavior (controller logic)**
+
+Any time a user hits this route:
+
+1. **Call status API**
+
+   * `GET /assessments/ae-ladder/status`
+
+Returns something like:
+
+ `{`  
+  `"status": "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED",`  
+  `"ae_assessment_id": "uuid-or-null",`  
+  `"report_ready": true | false`  
+`}`
+
+*   
+2. **Branching**
+
+   * `NOT_STARTED`
+
+     * Redirect to `/assessments` with a small notice:  
+        “You haven’t completed the AE Ladder Assessment yet.”
+
+   * `IN_PROGRESS`
+
+     * Redirect to question flow controller (resume) route.
+
+   * `COMPLETED`:
+
+     * If `report_ready = false` → show **Processing State** (see below).
+
+     * If `report_ready = true` → proceed to **load full results**.
+
+3. **When ready, load full results**
+
+   * `GET /assessments/ae-ladder/latest-full`
+
+   * Returns a single structured payload with:
+
+     * Hero data (stage, overall score, dates)
+
+     * Dimension array with all the GPT view metadata
+
+     * Strength/gap info
+
+     * Focus priorities (focus1/2/3)
+
+     * PDF URL
+
+   * This payload is essentially a shaped version of the GPT input row you showed.  
+      vw\_ae\_assessment\_gpt\_inputs\_row…
+
+Frontend never needs to hit raw Supabase; it just consumes this API.
+
+---
+
+## **2️⃣ Screen States**
+
+The results route needs to be able to display four high-level states:
+
+1. **Loading**
+
+   * While `status` or `latest-full` is being fetched.
+
+   * Show skeleton UI or spinners in key regions.
+
+2. **Processing**
+
+   * `status = COMPLETED` but `report_ready = false`.
+
+   * Show a “We’re preparing your report & dashboard” message.
+
+   * Optionally poll `status` every 10–20 seconds until `report_ready = true`.
+
+3. **Ready**
+
+   * `status = COMPLETED`, `report_ready = true`, and `latest-full` payload loaded.
+
+   * Render full dashboard.
+
+4. **Error**
+
+   * If status or results call fails or returns invalid data.
+
+   * Show a generic error message and a “Try again” button.
+
+All other cases (NOT\_STARTED, IN\_PROGRESS) are **handled upstream** via redirect, not via this route.
+
+---
+
+## **3️⃣ Component List & Specs**
+
+I’ll list components in the order they appear on the page.
+
+---
+
+### **A. `<AeLadderResultsPage />`**
+
+**Role:** Top-level container for the entire dashboard.
+
+**Responsibilities:**
+
+* Call `status` API and branch logic.
+
+* Call `latest-full` when appropriate.
+
+* Manage loading/processing/error state.
+
+* Decide which view to show.
+
+**Inputs/Dependencies:**
+
+* Auth context (`user_id` / session)
+
+* API client
+
+**Key internal state:**
+
+* `status` (`NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`)
+
+* `reportReady` (bool)
+
+* `resultsData` (object | null)
+
+* `isLoading`, `isError`
+
+**Interactions:**
+
+* On mount:
+
+  * Fetch status → branch as described above.
+
+* When `reportReady` is true:
+
+  * Fetch full results.
+
+---
+
+### **B. `<StageHeroHeader />`**
+
+**Purpose:** Give an immediate sense of “where I am” in the AE Ladder.
+
+**Props:**
+
+* `stageLabel` (e.g., "Striving")
+
+* `stageTagline` (static-per-stage string)
+
+* `overallScore` (e.g., 2.63)
+
+* `completedAt` (date/time)
+
+* Optional: `aeStageTag` (for future permissions)
+
+**Behavior:**
+
+* Stateless display.
+
+* No interactivity beyond maybe a tooltip for the stage definition.
+
+---
+
+### **C. `<ScoreSnapshotSection />`**
+
+Wraps two subcomponents:
+
+* `<OverallScoreCard />`
+
+* `<DimensionSnapshotTiles />`
+
+#### **C1. `<OverallScoreCard />`**
+
+**Props:**
+
+* `overallScore`
+
+* `stageLabel`
+
+* Optional: `overallBand` (if meaningful for display)
+
+**Behavior:**
+
+* Displays:
+
+  * Score prominently
+
+  * Stage label
+
+  * Short microcopy: “Your AE Ladder score is X.X at the \[Stage\] level.”
+
+#### **C2. `<DimensionSnapshotTiles />`**
+
+**Props:**
+
+`dimensions`: array of objects, one per dimension:
+
+ `{`  
+  `id: string,`  
+  `name: string,`  
+  `avgScore: number,`  
+  `deviationBucket: "strongly_above" | "above" | "at_overall" | "below" | "strongly_below",`  
+  `bandSummaryLabel: string,     // e.g., "Strategic Maturity"`  
+  `signalTag: string             // e.g., "External-Facing Growth Operator"`  
+`}`
+
+* 
+
+**Behavior:**
+
+* Renders 5 tiles:
+
+  * Name
+
+  * Value (avgScore)
+
+  * Band summary label
+
+  * Small color-coded deviation indicator (icon or border)
+
+* Hover/tooltip can optionally show:
+
+  * `deviationBucket` meaning (e.g., “Above your overall average”)
+
+**Loading/Error:**
+
+* If `dimensions` is empty or missing, fallback text:  
+   “We couldn’t load your dimension scores. Please refresh.”
+
+---
+
+### **D. `<StrengthsAndGapsSection />`**
+
+Wraps:
+
+* `<StrengthsCard />`
+
+* `<GapsCard />`
+
+**Props:**
+
+* `dimensionsAboveOverall`: array of dimension objects (pre-filtered server-side)
+
+* `dimensionsBelowOverall`: array of dimension objects (pre-filtered server-side)
+
+#### **D1. `<StrengthsCard />`**
+
+**Props:**
+
+`strengths`: array, e.g.:
+
+ `{`  
+  `id: string,`  
+  `name: string,`  
+  `avgScore: number,`  
+  `delta: number,`  
+  `signalTag: string,`  
+  `isStrongStrength: boolean,`  
+  `isModerateStrength: boolean`  
+`}[]`
+
+* 
+
+**Behavior:**
+
+* Show top 1–3 strengths.
+
+* Each row shows:
+
+  * Dimension name
+
+  * Signal tag
+
+  * “Score: 4.00 (+1.37 vs overall)”
+
+* If no strengths, show:  
+   “No standout strengths above your overall average — your performance is evenly distributed.”
+
+#### **D2. `<GapsCard />`**
+
+**Props:**
+
+`gaps`: array, e.g.:
+
+ `{`  
+  `id: string,`  
+  `name: string,`  
+  `avgScore: number,`  
+  `delta: number,`  
+  `signalTag: string,`  
+  `isModerateGap: boolean,`  
+  `isStrongGap: boolean`  
+`}[]`
+
+* 
+
+**Behavior:**
+
+* Show 1–3 most important gaps.
+
+* Each row shows:
+
+  * Dimension name
+
+  * Signal tag
+
+  * “Score: 2.00 (-0.63 vs overall)”
+
+* If no gaps flagged:
+
+  * “No clear friction signals — you’re broadly aligned across dimensions.”
+
+**Note:**  
+ We strongly prefer the **backend** to decide which dimensions land in `strengths` / `gaps`, so the frontend doesn’t replicate logic.
+
+---
+
+### **E. `<SignalsIdentitySection />`**
+
+**Purpose:** Express the agency’s “five-part identity” across dimensions.
+
+**Props:**
+
+`dimensions`: array:
+
+ `{`  
+  `id: string,`  
+  `name: string,`  
+  `signalTag: string,`  
+  `deviationBucket: string,      // for color`  
+  `bandSummaryLabel: string`  
+`}[]`
+
+* 
+
+**Behavior:**
+
+* 5 tiles, each:
+
+  * Dimension name
+
+  * Big text: `signalTag`
+
+  * Chip/pill: `bandSummaryLabel`
+
+  * Color-coded accent based on `deviationBucket`
+
+* Tooltip or small info icon could show a compact meaning:
+
+  * e.g., `dimension_band_meaning` or `dimension_stage_meaning` truncated.
+
+**Interaction:**
+
+* No complex interactions needed for V1.
+
+* Could later be clickable to show more details or link to Maturity Audit.
+
+---
+
+### **F. `<FocusPrioritiesSection />`**
+
+**Purpose:** Show the top 2–3 focus areas from backend fields (`focus1`, `focus2`, `focus3`).
+
+**Props:**
+
+`priorities`: array:
+
+ `{`  
+  `rank: 1 | 2 | 3,`  
+  `dimensionId: string,`  
+  `dimensionName: string,`  
+  `reasonCode: string   // e.g., "top_strong_strength", "primary_moderate_gap"`  
+`}[]`
+
+* 
+
+**Behavior:**
+
+* Renders up to 3 cards in order of `rank`.
+
+* Each card:
+
+  * “Priority 1 — Stewardship”
+
+  * Short interpretation generated client-side from `reasonCode` using a simple mapping table (static JS), NOT GPT.
+
+    * Example:
+
+      * `top_strong_strength` → “Use this as your foundation — it already creates leverage.”
+
+      * `primary_moderate_gap` → “Addressing this will relieve friction in your current stage.”
+
+      * `no_secondary_gap` → “This area isn’t critical yet but will matter as you scale.”
+
+**Loading/Error:**
+
+* If `priorities` is empty:
+
+  * “Focus priorities are currently unavailable — refer to your full report for detailed recommendations.”
+
+---
+
+### **G. `<ReportDownloadCard />`**
+
+**Purpose:** Let them download the full long-form PDF and gently suggest next steps.
+
+**Props:**
+
+* `pdfUrl`: string | null
+
+* Optional: `assessmentDate`, `stageLabel`
+
+**Behavior:**
+
+* If `pdfUrl` exists:
+
+  * Show primary button: **Download Full Report**
+
+  * `href` \= `pdfUrl`, `target="_blank"`
+
+* If `pdfUrl` is null but `reportReady` is true:
+
+  * Show disabled state \+ message:
+
+    * “We’re finalizing your report link. Please refresh in a moment.”
+
+* Optional subtext:
+
+  * “Your report includes your stage narrative, dimension-by-dimension insight, and next-step recommendations.”
+
+**Secondary CTA:**
+
+* “Continue to Maturity & Readiness Audit”
+
+  * Link to `/assessments/maturity-readiness` or similar.
+
+---
+
+### **H. Shared / Utility Components**
+
+You’ll also want:
+
+* `<LoadingState />`:  
+   Skeletons or shimmer blocks approximating the layout.
+
+* `<ProcessingState />`:  
+   Card that says:
+
+   “We’re processing your AE Ladder results and preparing your dashboard. This typically takes under a minute.”
+
+* `<ErrorState />`:  
+   Generic error with “Try again” button → refetch.
+
+* `<RedirectNotice />`:  
+   For cases where someone hits results without a completed assessment:
+
+   “You need to complete your AE Ladder Assessment before viewing results.”
+
+---
+
+## **4️⃣ Data Interaction Rules**
+
+Here’s what the frontend **should** do and **should not** do.
+
+### **What the frontend SHOULD do**
+
+1. **Status check on entry**
+
+   * Always call `/assessments/ae-ladder/status` before anything else.
+
+   * Use this to:
+
+     * Redirect to start or resume.
+
+     * Or show processing state.
+
+     * Or load full data.
+
+2. **Single “latest-full” fetch**
+
+   * Call `/assessments/ae-ladder/latest-full` (naming flexible) to get a **single hydrated payload** that contains:
+
+     * Stage & header info
+
+     * Overall score
+
+     * Dimensions array with all the GPT metadata (avg score, delta, band labels, signal tags, booleans like `is_strong_strength` etc.)
+
+     * Pre-filtered strengths array (or dimension fields enabling easy client grouping)
+
+     * Pre-filtered gaps array
+
+     * Focus priorities (focus1/2/3)
+
+     * PDF URL
+
+3. **Render-only logic**
+
+   * Use the provided booleans (`is_strong_strength`, `is_moderate_gap`, etc.), IDs, and tags to determine:
+
+     * What to show in strengths/gaps sections.
+
+     * How to label priority reasons (via static mapping).
+
+4. **Avoid editing anything**
+
+   * This dashboard is strictly read-only.
+
+   * No writes from this page.
+
+---
+
+### **What the frontend SHOULD NOT do**
+
+* Recalculate scores, deltas, or bands.
+
+* Infer strengths/gaps based on raw values (backend already did it).
+
+* Call dozens of small endpoints for each component.
+
+* Duplicate narrative copy from the PDF or GPT logic.
+
+The ideal is:
+
+**Two calls:**
+
+1. status → route handling
+
+2. latest-full → render dashboard
+
+Everything else is just UI.
+
+## **“Stage Deep Dive” tab**
+
+### **What this tab *is***
+
+It’s essentially a **“Stage Deep Dive” tab** inside the AE Ladder results area — separate from the metrics-heavy dashboard, and more like a one-page narrative explainer.
+
+Its job is to:
+
+* Ground them in **what their AE Ladder stage actually means** in plain language.
+
+* Show **how that stage fits into the overall AE Ladder journey** (Rising → Striving → Thriving → Driving → Arriving).
+
+* Add a layer of **nuance based on their specific band** (where they sit *inside* that stage) — without ever using the word “band” on the front end.
+
+* Optionally **link to a stage-specific video / mini-training** that can warm them into the Masterclass or deeper training.
+
+It’s not agency-specific. It’s **stage- and band-specific**, powered by static snippets tied to the tags the system already has.
+
+---
+
+### **What powers it (data-wise)**
+
+This tab uses two main types of tags that already exist in your backend:
+
+1. **Front-end stage tag**
+
+   * e.g., `frontend_stage_label = "Striving"`
+
+   * Drives which **stage overview** block we show:
+
+     * “What this stage is”
+
+     * “What matters most at this stage”
+
+     * “How this stage generally feels/operates”
+
+     * “Where this sits in the overall AE Ladder journey”
+
+2. **Back-end stage/band tag**
+
+   * e.g., an overall `backend_stage_name` / `overall_band_id` / `band_label` representing which of the 11 bands they landed in.  
+      vw\_ae\_assessment\_gpt\_inputs\_row…
+
+   * This is more granular: early, mid, or late within a stage and the edge-case nuance.
+
+   * It pulls from your pre-written **band meanings** and **summary labels** (e.g., “Ready to Evolve,” “Strategic Maturity,” etc.), but the UI talks about it as:
+
+     * “Where you sit inside this stage”
+
+     * “How your version of this stage behaves right now”
+
+     * “What good looks like from where you are”
+
+So:
+
+* **Stage content** \= static, keyed by `frontend_stage_label`
+
+* **Band nuance content** \= static, keyed by `backend stage/band id` and attached to this stage
+
+The front end doesn’t calculate anything; it just looks up the right snippet(s) based on those tags.
+
+---
+
+### **What lives on this tab (content structure)**
+
+Conceptually, this tab might have 3–4 blocks:
+
+1. **Stage Overview (static by frontend stage)**
+
+   * “What \[Stage\] means”
+
+   * High-level description of what agencies at this stage are doing/facing
+
+   * Where this stage sits in the ladder and the overall transformation path
+
+2. **Where You Are *Within* This Stage (band nuance)**
+
+   * Uses the band-specific meaning, but rephrased as:
+
+     * “You’re in the early/mid/late zone of this stage.”
+
+     * “At this point, you’ve likely already X, but still need Y.”
+
+   * Draws from your **band meaning text** and **summary label**, without exposing the word “band.”
+
+3. **Why You Landed Here (light grounding)**
+
+   * Not full GPT narrative, but:
+
+     * A short explanation of *how* they ended up in this stage/band:
+
+       * “Your average score places you here relative to the full ladder.”
+
+       * “Certain dimensions are giving you leverage, others are applying pressure.”
+
+   * This can be powered partly by tags already used for GPT inputs (e.g., which dimensions are above/below overall), but expressed in a very compact way.
+
+4. **Stage-Specific Video / Deeper Training Link (optional)**
+
+   * Static URL mapped to `frontend_stage_label` (and optionally the band).
+
+   * Example:
+
+     * For Striving: link to “Striving Stage Deep Dive” video.
+
+   * Below the video or button:
+
+     * Gentle CTA: “Want to go deeper? Watch the full Stage Training” or “Explore the Masterclass for your stage.”
+
+All of this is **templated**: same structure for every stage, with different snippets and URLs swapped in based on stage/band tags.
+
+---
+
+### **How it behaves in the product**
+
+* It’s likely a **second tab** within the AE Ladder results area:
+
+  * Tab 1: “Dashboard”
+
+  * Tab 2: “Your Stage Overview” (or similar label)
+
+* When user clicks the tab:
+
+  * Front end uses the data it already has from the results payload:
+
+    * `frontend_stage_label`
+
+    * Overall band / backend stage tag
+
+  * Looks up:
+
+    * Stage overview text (from a static mapping or ref table)
+
+    * Band nuance text (from a static mapping or ref table)
+
+    * Optional video URL and CTA config
+
+  * Renders a **single, scrollable stage overview page** — no extra logic.
+
+It’s mostly read-only content with **light dynamic selection**:
+
+* Stage determines the “frame”
+
+* Band determines the “zoomed-in nuance”
+
+## **1️⃣ Where This Lives in the Overall Layout**
+
+**Location:** Inside the AE Ladder Results area as a **second tab**.
+
+* **Tab 1:** “Overview” or “Dashboard”
+
+  * All the stuff we’ve already designed: scores, dimensions, strengths/gaps, signals, priorities, download button.
+
+* **Tab 2:** “Your Stage” or “Stage Deep Dive”
+
+  * A narrative \+ contextual explainer:
+
+    * What the AE Ladder is (universal).
+
+    * What *their* front-end stage means.
+
+    * Where they fall *within* that stage based on their band.
+
+    * A soft primer leading into the Masterclass / deeper training.
+
+**Routing/State:**
+
+* Same route, just a tab state inside:
+
+  * `/assessments/ae-ladder/results?tab=overview`
+
+  * `/assessments/ae-ladder/results?tab=stage`  
+     (or internal state instead of query param.)
+
+* Uses the **same `latest-full` payload** — no extra API call required.
+
+* All stage/band text is pulled from **static content tables/mappings**, keyed by:
+
+  * `frontend_stage_label`
+
+  * `overall_band_id` or `backend_stage_name` (or equivalent overall band tag)
+
+---
+
+## **2️⃣ Stage Tab – Functional Spec**
+
+### **Tab Container: `<AeStageTab />`**
+
+**Role:**  
+ Render the entire Stage Deep Dive view, given:
+
+* Their AE Ladder stage (frontend)
+
+* Their overall band/segment within that stage (backend)
+
+* Static content for stage \+ band
+
+**Inputs/Props:**
+
+From the results payload (same as dashboard):
+
+* `frontendStageLabel` (e.g., `"Striving"`, `"Rising"`, etc.)
+
+* `overallBandId` **or** `backendStageName` / `overall_band_label` (whatever represents their overall band placement)
+
+* Optional: `overallScore` (for light grounding copy)
+
+From static content / ref tables:
+
+* `stageOverviewContent[stage]`
+
+  * Headline
+
+  * Short summary
+
+  * 2–4 bullets: “What matters here”
+
+* `stageJourneyContent[stage]`
+
+  * Where this stage sits in the Ladder
+
+  * 1–2 lines on the transition from previous stage and into next
+
+* `bandProfileContent[band]`
+
+  * Text that explains “where you sit within this stage”
+
+  * Derived from your existing band meaning / summary copy, but written in a public-facing way (no word “band”).
+
+* `aeLadderOverviewVideoUrl` (universal)
+
+  * One static URL for the Ladder overview/primer video.
+
+* `masterclassCtaConfig` (static)
+
+  * Title, one-line description, button label, and external link to Go High-Level education portal.
+
+**Loading/Error behavior:**
+
+* **Loading:** Use same loading state as main results page.
+
+* **Error:** If `frontendStageLabel` or band mapping is missing, show fallback:
+
+   “We couldn’t load your stage overview. Please download your report for full details.”
+
+No writes from this tab; it is 100% read-only.
+
+---
+
+## **3️⃣ Component List for the Stage Tab**
+
+Think of the Stage tab as 4 stacked sections:
+
+1. AE Ladder Overview (universal video \+ short text)
+
+2. Stage Summary (front-end stage)
+
+3. “Where You Are Within This Stage” (band nuance)
+
+4. Soft Masterclass / deeper training CTA
+
+I’ll break each into components.
+
+---
+
+### **A. `<AeLadderOverviewBlock />`**
+
+**Purpose:**  
+ Ground them in the AE Ladder framework and terminology with a universal explainer.
+
+**Props:**
+
+* `videoUrl` (universal) – can be:
+
+  * Embedded player (if direct video)
+
+  * Or a “Watch in Training Portal” button linking out
+
+* `copy`: static:
+
+  * Short description of:
+
+    * What the AE Ladder is
+
+    * The major stages (Rising → Striving → Thriving → Driving → Arriving)
+
+    * How it fits into the overall Architect OS ecosystem
+
+**Behavior:**
+
+* If `videoUrl` is available:
+
+  * Show video embed (or thumbnail \+ play button).
+
+* If not:
+
+  * Show a “Learn More About the AE Ladder” button linking to the Go High-Level lesson.
+
+**Data:**
+
+* All static / config-level; no need to pull from Supabase.
+
+* Tied to product version, not the user.
+
+---
+
+### **B. `<StageSummaryBlock />`**
+
+**Purpose:**  
+ Explain their **front-end stage** in simple language.
+
+**Props:**
+
+* `stageLabel` (e.g., `"Striving"`)
+
+`stageOverview`: from `stageOverviewContent[stageLabel]`, containing:
+
+ `{`  
+  `title: string,        // e.g., "What it Means to be Striving"`  
+  `summary: string,      // 2–3 sentence overview`  
+  `keyThemes: string[]   // 3–4 bullets: "What matters here"`  
+`}`
+
+* 
+
+`stageJourney`: from `stageJourneyContent[stageLabel]`, containing:
+
+ `{`  
+  `ladderPositionSummary: string,  // e.g. "Striving is the stage where..."`  
+  `nextStageHint: string           // e.g. "From here, your path is toward Thriving..."`  
+`}`
+
+* 
+
+**Behavior:**
+
+* Stateless display.
+
+* Uses the same structure for every stage:
+
+  * Title: “Your Stage: Striving”
+
+  * Paragraph summary
+
+  * Bullet list: “At this stage, you’re typically…”
+
+  * A short “Where this fits in the Ladder” line.
+
+**Data:**
+
+* `stageLabel` comes from results payload.
+
+* `stageOverviewContent` and `stageJourneyContent` live in a **stage content table** (Supabase ref) or static code mapping.
+
+---
+
+### **C. `<StagePositionBlock />` (Band-Specific Nuance)**
+
+**Purpose:**  
+ Explain where they sit **within** their stage, based on their band — without using the word “band.”
+
+**Props:**
+
+* `stageLabel`
+
+* `overallBandId` or equivalent (from results payload)
+
+`bandProfile`: pulled from `bandProfileContent[overallBandId]`, e.g.:
+
+ `{`  
+  `positionLabel: string,   // e.g., "Early Striving", "Late Rising"`  
+  `introLine: string,       // e.g., "You're in the early part of the Striving stage..."`  
+  `narrative: string,       // 2–3 sentence summary`  
+  `whatGoodLooksLike: string[], // 3 bullets`  
+`}`
+
+* 
+
+**Behavior:**
+
+* Renders something like:
+
+  * Small label: “Where You Sit in This Stage”
+
+  * Subheading: `positionLabel` (e.g., “Early Striving”)
+
+  * Short paragraph (`introLine + narrative`)
+
+  * Bullets (e.g., “What good looks like from here…”)
+
+**Data:**
+
+* `overallBandId` is already in the GPT inputs for the assessment row (or equivalent).
+
+* `bandProfileContent` gets built from the **existing band meaning text** you’ve already created, slightly adapted for this context (but that’s content work, not platform work).
+
+**Important:**  
+ The front-end does **no logic** here; it just:
+
+1. Reads `overallBandId` from the results payload.
+
+2. Looks up the matching band profile snippet.
+
+3. Shows it.
+
+---
+
+### **D. `<StageTrainingTeaserBlock />` (Masterclass Primer)**
+
+**Purpose:**  
+ Prime them for the deeper Masterclass/training that lives in Go High-Level.
+
+**Props:**
+
+* `stageLabel` (for stage-specific labeling, if you want)
+
+`ctaConfig`, which can be:
+
+ `{`  
+  `title: string,             // e.g. "Go Deeper Into Your Stage"`  
+  `description: string,       // 1–2 lines`  
+  `buttonLabel: string,       // e.g. "Open AE Ladder Masterclass"`  
+  `linkUrl: string            // GHL portal link (universal or stage-specific)`  
+`}`
+
+* 
+
+**Behavior:**
+
+* Displays a clean, non-pushy CTA card:
+
+  * Title
+
+  * Short description
+
+  * Button → `linkUrl` (target `_blank` or route into portal)
+
+* For now, you said this is a **universal AE Ladder intro video \+ masterclass CTA**, so:
+
+  * `ctaConfig.linkUrl` can be the general AE Ladder Masterclass module in Go High-Level.
+
+  * Later you could make it stage-specific if you want (e.g., pre-filtered lesson path).
+
+**Data:**
+
+* All static; just configuration.
+
+* If you want to personalize by stage, you can map `stageLabel → ctaConfig`.
+
+---
+
+## **4️⃣ Data Requirements & Interaction Rules**
+
+### **Data the Stage Tab Needs from Backend**
+
+Everything this tab needs should already be in — or derived from — your current backend structures:
+
+From `latest-full` assessment payload:
+
+1. `frontend_stage_label`
+
+2. Overall band tag, e.g.:
+
+   * `overall_band_id` or
+
+   * `backend_stage_name` or
+
+   * `overall_band_label` (whatever identifies where they fall on the 11-level band scale)
+
+3. Optional:
+
+   * `overall_score` (for context in copy)
+
+The rest comes from **static content mappings**, not from per-user dynamic logic.
+
+---
+
+### **Content Tables / Static Mappings You’ll Want**
+
+To keep the front-end simple, we define 3 content layers:
+
+1. **Stage Overview Content (by frontend stage)**
+
+   * Keyed by `frontend_stage_label`.
+
+   * Used by `<StageSummaryBlock />`.
+
+2. **Band Profile Content (by overall band)**
+
+   * Keyed by the band id or backend stage band label.
+
+   * Used by `<StagePositionBlock />`.
+
+3. **Global Ladder Overview \+ CTA Config**
+
+   * Contains:
+
+     * `aeLadderOverviewVideoUrl`
+
+     * `masterclassCtaConfig`
+
+   * Used by `<AeLadderOverviewBlock />` \+ `<StageTrainingTeaserBlock />`.
+
+You already have most of the raw ingredients for (1) and (2) in your band and stage meaning tables; this is about **wiring them up** for UI use.
+
+---
+
+### **API / Interaction Pattern**
+
+Good news: no new endpoints are strictly required.
+
+* The **Stage tab** uses the same `latest-full` assessment payload as the main dashboard.
+
+* The only backend requirements are:
+
+  * Include `frontend_stage_label` in that payload.
+
+  * Include a single, consistent field that identifies the **overall band** for the assessment (`overall_band_id` or similar).
+
+Everything else is controlled by static stage/band content the app already has access to.
+

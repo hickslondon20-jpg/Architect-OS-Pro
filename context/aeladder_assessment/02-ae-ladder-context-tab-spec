@@ -1,0 +1,442 @@
+# AE Ladder — Stage Context Tab Wiring Spec & Build Guide
+
+**Version:** 1.0  
+**Status:** Ready for content population → then Antigravity build  
+**Supabase View:** `vw_ae_stage_context`  
+**Primary Table:** `ae_backend_stage_ref_table`  
+**Tab Label:** Stage Context *(renamed from Stage Deep Dive)*  
+**Tab Position:** Second pill toggle on the Results Dashboard, after Results Overview
+
+---
+
+## Overview
+
+The Stage Context tab provides orientation — not education. Its job is to ground the founder in what their specific sub-stage looks and feels like operationally, show where they sit on the full five-stage ladder, preview what the next stage requires, and direct them toward the Maturity & Readiness Audit as the logical next action.
+
+This tab contains no GPT-generated content. All content is deterministic, pulled from `vw_ae_stage_context` using the user's `ae_assessment_id`. No secondary queries are needed.
+
+**Dashboard query pattern:**
+
+```typescript
+const { data, error } = await supabase
+  .from('vw_ae_stage_context')
+  .select('*')
+  .eq('ae_assessment_id', assessmentId)
+  .single()
+```
+
+---
+
+## Prerequisites Before Building
+
+The following must be complete before Antigravity begins this build:
+
+- [ ] `stage_key_themes`, `stage_transition_quote`, and `field_guide_url` columns added to `ae_backend_stage_ref_table` via the Stage Context SQL script
+- [ ] All 11 rows populated with content from the content extraction pass
+- [ ] `vw_ae_stage_context` view created and verified returning correct data for the test assessment
+- [ ] Field guide PDF URLs loaded into `field_guide_url` for all frontend stages
+
+Antigravity should verify the view returns populated data before beginning any UI work.
+
+---
+
+## Part 1 — Technical Spec
+
+### 1.1 Data Source
+
+**View:** `vw_ae_stage_context`
+
+This view joins `ae_assessments` and `ae_backend_stage_ref_table` and returns a flat payload containing all content needed to render the full tab. It also includes five static ladder overview fields — one per frontend stage — so the full five-rung ladder overview at the top of the tab renders from the same single query.
+
+| Field Group | Source |
+|---|---|
+| Assessment identity | `ae_assessments` |
+| Current sub-stage content | `ae_backend_stage_ref_table` (joined on `ae_backend_stage_id`) |
+| Five-stage ladder overview | Five static joins to canonical mid-stage rows |
+
+---
+
+### 1.2 Tab Section Map
+
+The tab is structured into five sections rendered in order. None of the sections are expandable — all content is always visible. The tab is intentionally compact.
+
+---
+
+#### SECTION 1 — The Agency Engine Ladder (Framework Overview)
+
+**Purpose:** Orient the founder in the full five-stage model before showing their specific position. This is the same for all users regardless of stage.
+
+**Layout:** A brief intro paragraph followed by a five-stage visual ladder — each rung showing the stage name and its one-liner description.
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Intro heading | Static: "The Agency Engine (AE) Ladder" | Hard-coded string |
+| Intro paragraph | Static | Hard-coded: "The AE Ladder is the roadmap for agency maturity, defining the 5 stages of evolution: Rising, Striving, Thriving, Driving, and Arriving. Understanding your stage is the first step to unlocking the next level of growth." |
+| Rising rung label | Static: "Rising" | |
+| Rising rung description | `ladder_rising_description` | `ae_stage_description_short` from `ae_bk_stg_1` |
+| Striving rung label | Static: "Striving" | |
+| Striving rung description | `ladder_striving_description` | `ae_stage_description_short` from `ae_bk_stg_4` |
+| Thriving rung label | Static: "Thriving" | |
+| Thriving rung description | `ladder_thriving_description` | `ae_stage_description_short` from `ae_bk_stg_7` |
+| Driving rung label | Static: "Driving" | |
+| Driving rung description | `ladder_driving_description` | `ae_stage_description_short` from `ae_bk_stg_10` |
+| Arriving rung label | Static: "Arriving" | |
+| Arriving rung description | `ladder_arriving_description` | `ae_stage_description_short` from `ae_bk_stg_11` (proxy until Arriving row exists) |
+| Active stage highlight | `ae_frontend_stage` | Visually highlight the user's current stage on the ladder |
+
+**Rendering notes:**
+- The user's current frontend stage should be visually distinguished on the ladder — highlighted, bolded, or marked with an indicator
+- The ladder is display-only — no click or interaction needed on individual rungs
+
+---
+
+#### SECTION 2 — What It Means to Be [Stage]
+
+**Purpose:** Explain what this frontend stage represents as a whole — the posture, the challenges, the opportunity. This is stage-level context, not sub-stage specific.
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Section heading | `ae_frontend_stage` | Rendered as: "What It Means to Be [Stage]" |
+| Stage tagline | `ae_stage_tagline` | Sub-headline below the heading |
+| Stage description paragraph | `ae_stage_description` | Full paragraph body |
+
+---
+
+#### SECTION 3 — Where You Sit Within This Stage
+
+**Purpose:** Show the founder their precise sub-stage position — whether they're early in the stage, in the core, or approaching the transition to the next stage. This is the personalization layer.
+
+**Layout:** Two side-by-side cards — Key Themes and Journey Context.
+
+**Sub-stage position label:**
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Position label | `ae_backend_stage` | The sub-stage name e.g. "Early Striving", "Striving → Thriving Transition" |
+| Short description | `ae_stage_description_short` | One-liner below the position label |
+
+**Key Themes card:**
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Card heading | Static: "Key Themes at This Stage" | |
+| Theme bullets | `stage_key_themes` | JSONB array — render each item as a bullet point |
+
+**Journey Context card:**
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Card heading | Static: "Your Journey Context" | |
+| Context paragraph | `next_stage_description` | Describes what moving toward the next stage looks and requires |
+| Pull quote | `stage_transition_quote` | Rendered in italics below the paragraph |
+
+**Rendering notes:**
+- `stage_key_themes` is a JSONB array — parse and render each string as a bullet item
+- If `stage_key_themes` is null (content not yet loaded), render a neutral placeholder: `"Stage themes loading..."` rather than an empty card
+- If `stage_transition_quote` is null, omit the pull quote entirely — do not render empty italics
+
+---
+
+#### SECTION 4 — Your Next Growth Milestone
+
+**Purpose:** Preview what the next stage looks like so the founder understands what they are working toward.
+
+| UI Element | View Field | Notes |
+|---|---|---|
+| Section heading | Static: "Your Next Growth Milestone" |  |
+| Next stage label | `next_ae_stage` | Displayed as: "Stage: [next_ae_stage]" |
+| Next stage tagline | `ae_next_stage_tagline` | Sub-headline |
+| Next stage description | `next_stage_description` | Full paragraph — same field as Journey Context above, used again here in a different layout context |
+
+**Rendering notes:**
+- If the user is at the Arriving stage (highest stage), this section should render a completion message instead: "You've reached the top of the AE Ladder. The focus now is on optionality, durability, and intentional evolution." Hide the next stage fields gracefully.
+- `next_ae_stage` will be null for Arriving-stage users — use this as the conditional flag
+
+---
+
+#### SECTION 5 — CTA Block
+
+**Purpose:** Direct the founder to the Maturity & Readiness Audit as the clear next action. Tier-aware copy — same destination, different framing based on access level.
+
+**Layout:** Dark background block at the bottom of the tab. Heading, supporting copy, one primary CTA button, one secondary resource link.
+
+| UI Element | Source | Notes |
+|---|---|---|
+| Block heading | Static: "Ready to Map Your Next Move?" | Hard-coded |
+| Supporting copy — Free / Tier 1 users | Static | "You know your stage. The Maturity & Readiness Audit goes deeper — mapping exactly what needs attention, in what order, to reach your next level." |
+| Supporting copy — Pro / Coaching users | Static | "Your stage is set. The Maturity & Readiness Audit is your next step — a full diagnostic of where to focus and what to build first." |
+| CTA button — Free / Tier 1 | Static | Label: "Get the Full Diagnostic" → links to M&R Audit upgrade or purchase page |
+| CTA button — Pro / Coaching | Static | Label: "Take the Maturity & Readiness Audit" → links to M&R Audit intake within the platform |
+| CTA supporting line | `ae_stage_cta_tagline` | Displayed in smaller text beneath the button |
+| Secondary link | `field_guide_url` | Label: "Download Your [Stage] Field Guide" — only shown if `field_guide_url` is not null |
+
+**Tier detection logic:**
+- Check the user's current access tier from the auth/profile context already available in the dashboard
+- Tier 0 (Free) and Tier 1 (AE Ladder Snapshot) → show upgrade-framed CTA copy
+- Tier 2 (Full Diagnostic), Tier 3 (Pro), or Coaching → show action-framed CTA copy
+- If tier cannot be determined, default to the upgrade-framed version
+
+---
+
+### 1.3 Null State Handling
+
+The Stage Context tab has two possible null conditions:
+
+**Content not yet loaded (new columns exist but not yet populated)**
+- `stage_key_themes` null → show "Stage themes loading..." placeholder in Key Themes card
+- `stage_transition_quote` null → omit pull quote entirely
+- `field_guide_url` null → hide the secondary download link entirely
+
+**No assessment found**
+- If the view returns no row for the assessment ID, do not render the tab — show the same locked/pending state used elsewhere in the dashboard
+
+---
+
+### 1.4 Full View Field Index
+
+All fields available from `vw_ae_stage_context`:
+
+```
+ae_assessment_id
+user_id
+overall_score
+ae_backend_stage_id
+ae_backend_stage
+ae_stage_min_score
+ae_stage_max_score
+ae_frontend_stage
+ae_stage_tagline
+ae_stage_description_short
+ae_stage_description
+ae_stage_cta_tagline
+stage_key_themes
+stage_transition_quote
+next_ae_stage
+next_stage_description
+ae_next_stage_tagline
+field_guide_url
+ladder_rising_description
+ladder_striving_description
+ladder_thriving_description
+ladder_driving_description
+ladder_arriving_description
+```
+
+---
+
+## Part 2 — Antigravity Build Sequence
+
+Execute each step in order. Verify each checkpoint before proceeding. The tab should be in a working state after every step.
+
+---
+
+### STEP 1 — Verify Data Before Building
+
+**Goal:** Confirm the view is returning correct data for a real assessment before any UI work begins.
+
+**Instructions:**
+1. Query `vw_ae_stage_context` directly via the Supabase MCP for the test assessment `abb9615b-0712-48f8-a3c7-d52239b254c4`
+2. Confirm the following fields are populated and correct:
+   - `ae_frontend_stage` matches the known stage for this assessment
+   - `ae_backend_stage` shows the correct sub-stage label
+   - `ae_stage_tagline`, `ae_stage_description`, `ae_stage_description_short` all have content
+   - `next_ae_stage` and `next_stage_description` are populated
+   - All five `ladder_*_description` fields are populated
+3. Note which of the three new fields (`stage_key_themes`, `stage_transition_quote`, `field_guide_url`) are null — this is expected if content population has not yet run
+4. Do not proceed until the view returns a valid row with at least the existing fields populated
+
+**Verification checkpoint:**
+- View query returns one row
+- Core stage content fields are populated
+- New fields may be null — that is acceptable at this stage
+
+---
+
+### STEP 2 — Create the Tab and Wire the Data Query
+
+**Goal:** Add the Stage Context tab to the Results Dashboard pill toggle and connect the view query.
+
+**Instructions:**
+1. Locate the pill toggle component on the Results Dashboard that currently shows "Results Overview" and "Stage Deep Dive"
+2. Rename "Stage Deep Dive" to "Stage Context"
+3. Ensure the Stage Context tab panel is connected to the same assessment ID already available in the dashboard context
+4. Add the data fetch for `vw_ae_stage_context`:
+   ```typescript
+   const { data: stageContext, error } = await supabase
+     .from('vw_ae_stage_context')
+     .select('*')
+     .eq('ae_assessment_id', assessmentId)
+     .single()
+   ```
+5. Store the result in a `stageContext` object accessible to all sections of the tab
+6. Log the response temporarily to verify field presence
+
+**Verification checkpoint:**
+- Tab label shows "Stage Context"
+- Clicking the tab does not error
+- Console log shows the view response with expected fields
+- Switching between tabs works correctly
+
+---
+
+### STEP 3 — Build Section 1: Framework Ladder Overview
+
+**Goal:** Render the five-stage AE Ladder with the user's current stage highlighted.
+
+**Instructions:**
+1. Render the static heading "The Agency Engine (AE) Ladder" and the static intro paragraph
+2. Build a five-rung ladder display using the five `ladder_*_description` fields:
+   - Rising → `stageContext.ladder_rising_description`
+   - Striving → `stageContext.ladder_striving_description`
+   - Thriving → `stageContext.ladder_thriving_description`
+   - Driving → `stageContext.ladder_driving_description`
+   - Arriving → `stageContext.ladder_arriving_description`
+3. Highlight the rung matching `stageContext.ae_frontend_stage` — apply a visual distinction (bold, color accent, or active indicator consistent with the existing design language)
+4. Ladder is display-only — no click interaction needed
+
+**Verification checkpoint:**
+- All five stage names and descriptions render
+- The user's current stage is visually highlighted
+- Layout is clean and consistent with the existing dashboard design
+
+---
+
+### STEP 4 — Build Section 2: What It Means to Be [Stage]
+
+**Goal:** Render the stage-level context heading, tagline, and description paragraph.
+
+**Instructions:**
+1. Render the heading dynamically: `"What It Means to Be " + stageContext.ae_frontend_stage`
+2. Render `stageContext.ae_stage_tagline` as the sub-headline
+3. Render `stageContext.ae_stage_description` as the body paragraph
+
+**Verification checkpoint:**
+- Heading correctly interpolates the stage name
+- Tagline and description paragraph render with correct content
+- No overflow or layout issues
+
+---
+
+### STEP 5 — Build Section 3: Where You Sit Within This Stage
+
+**Goal:** Render the sub-stage position label, Key Themes card, and Journey Context card.
+
+**Instructions:**
+1. Render `stageContext.ae_backend_stage` as the sub-stage position label
+2. Render `stageContext.ae_stage_description_short` as the one-liner below it
+3. Build the Key Themes card:
+   - Heading: "Key Themes at This Stage"
+   - Parse `stageContext.stage_key_themes` as a JSONB array
+   - Render each string as a bullet item
+   - If null: render "Stage themes loading..." placeholder text inside the card
+4. Build the Journey Context card:
+   - Heading: "Your Journey Context"
+   - Body: `stageContext.next_stage_description`
+   - If `stageContext.stage_transition_quote` is not null: render it in italics below the paragraph, wrapped in quotation marks
+   - If null: omit entirely — do not render empty italics or a blank line
+
+**Verification checkpoint:**
+- Sub-stage position label renders correctly
+- Key Themes card shows bullet list (or placeholder if null)
+- Journey Context card shows paragraph text
+- Pull quote renders in italics if present, is absent if null
+- Two-card layout displays side by side at wider viewports, stacks on mobile
+
+---
+
+### STEP 6 — Build Section 4: Your Next Growth Milestone
+
+**Goal:** Render the next stage preview block.
+
+**Instructions:**
+1. Check if `stageContext.next_ae_stage` is null or empty:
+   - If null → render the Arriving completion message: "You've reached the top of the AE Ladder. The focus now is on optionality, durability, and intentional evolution." Hide all next stage fields.
+   - If populated → render the full next stage block
+2. For the full next stage block render:
+   - Heading: "Your Next Growth Milestone"
+   - Stage label: `"Stage: " + stageContext.next_ae_stage`
+   - Tagline: `stageContext.ae_next_stage_tagline`
+   - Description: `stageContext.next_stage_description`
+
+**Verification checkpoint:**
+- Next stage name, tagline, and description render correctly
+- Arriving-stage null case renders the completion message without errors
+- No layout breaks
+
+---
+
+### STEP 7 — Build Section 5: CTA Block
+
+**Goal:** Render the tier-aware CTA block directing the founder to the Maturity & Readiness Audit.
+
+**Instructions:**
+1. Retrieve the user's current access tier from the auth or profile context already available in the dashboard
+2. Determine CTA variant:
+   - Tier 0 or Tier 1 → upgrade variant
+   - Tier 2, Tier 3, or Coaching → action variant
+   - Unknown tier → default to upgrade variant
+3. Render the block:
+   - Heading: "Ready to Map Your Next Move?" (static, both variants)
+   - Body copy: tier-dependent (see Section Map above)
+   - CTA button: tier-dependent label and destination (see Section Map above)
+   - Supporting line below button: `stageContext.ae_stage_cta_tagline`
+4. Render the field guide download link:
+   - Only if `stageContext.field_guide_url` is not null
+   - Label: `"Download Your " + stageContext.ae_frontend_stage + " Field Guide"`
+   - Opens URL in a new tab
+   - If null: hide entirely — do not render a broken or empty link
+
+**Verification checkpoint:**
+- CTA block renders with correct heading and body copy for the test user's tier
+- Button label and destination are correct for the tier
+- `ae_stage_cta_tagline` renders beneath the button
+- Field guide link renders if `field_guide_url` is populated, is absent if null
+- Dark background styling is consistent with the existing dashboard design language
+
+---
+
+### STEP 8 — Remove Console Logs and Final Review
+
+**Goal:** Clean up and do a full tab review.
+
+**Instructions:**
+1. Remove the console.log added in Step 2
+2. Do a full visual pass of the tab with the test assessment
+3. Confirm all five sections render correctly
+4. Confirm null states (stage_key_themes, stage_transition_quote, field_guide_url) render gracefully
+5. Confirm the tab toggle switches cleanly between Results Overview and Stage Context without data bleed or layout issues
+6. Confirm no hardcoded sample data remains — all content reads from `vw_ae_stage_context`
+
+**Verification checkpoint:**
+- No console output
+- All sections render cleanly
+- Null states handled gracefully throughout
+- Tab toggle works correctly
+- Tab is ready to display live content once content population is complete
+
+---
+
+## Part 3 — Content Population Sequence
+
+The tab build can proceed in parallel with content population since null states are handled throughout. The sequence for content readiness is:
+
+1. Run the Stage Context SQL script to add columns and create the view
+2. Run the content extraction prompt with all five Field Guide PDFs and framework reference docs
+3. Review and approve the returned JSON
+4. Run the 11 UPDATE statements to populate `stage_key_themes`, `stage_transition_quote`, and `field_guide_url` for all rows
+5. Upload the Field Guide PDFs to Supabase Storage or equivalent and replace `PENDING_[STAGE]` placeholder values with real signed or public URLs
+6. Re-verify the view returns fully populated data for the test assessment
+
+Once content population is complete, the tab will render with full content automatically — no additional code changes needed.
+
+---
+
+## Part 4 — Relationship to Results Overview Tab
+
+The Stage Context tab is the second of two pill toggle views on the Results Dashboard. It is intentionally separate from the Results Overview tab and shares no components with it. The two tabs:
+
+- Use different data sources: Results Overview queries `vw_ae_dashboard_results`, Stage Context queries `vw_ae_stage_context`
+- Serve different purposes: Results Overview is personalized diagnostic output, Stage Context is orientation and framework context
+- Share the same assessment ID as their query key
+
+The CTA block in Stage Context (directing to the M&R Audit) is the primary conversion bridge between the AE Ladder assessment layer and the next tier of the platform.

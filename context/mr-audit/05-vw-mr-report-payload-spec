@@ -1,0 +1,244 @@
+# vw_mr_report_payload — View Specification
+## M+R Audit PDF Report Assembly View
+
+---
+
+## Purpose
+
+This view assembles the complete, flat, merge-field-keyed payload for a given `assessment_id` that WF-MR-03 uses to populate the PDF report template. It must return exactly one row per assessment, with every merge field resolved to its final display value. WF-MR-03 reads this view once and uses the result to execute all find-and-replace operations against the Google Docs template copy.
+
+---
+
+## Design Principles
+
+- One row per `assessment_id`
+- Every column name maps directly to a `{{MERGE_FIELD}}` token in the report template
+- All GPT output rows from `gm_assessment_gpt_outputs` are pivoted into named columns (not returned as array rows)
+- All percentage values are formatted as display strings (e.g. `'74%'` not `0.74`)
+- All nullable fields must return empty string `''` rather than `NULL` to prevent broken merge tokens
+- Stage label must be the human-readable display name, not the `stage_id` FK value
+- Cross-section labels must be the human-readable `cross_section_label`, not the `cross_section_id`
+
+---
+
+## Source Tables
+
+| Table | Role |
+|---|---|
+| `gm_assessments` | Assessment record — `assessment_id`, `calibration_stage_id`, `respondent_name`, `submitted_at` |
+| `gm_stages` | Stage display name, `stage_maturity_context`, `stage_readiness_context` |
+| `gm_assessment_overall_scores` | Overall maturity %, readiness %, band labels, quadrant ID/label |
+| `gm_quadrant_meaning` | `interpretation_body` keyed on `quadrant_id` |
+| `gm_assessment_dimension_scores` | Per-dimension maturity %, readiness % — 5 rows per assessment |
+| `gm_assessment_capability_scores` | Per-capability maturity %, readiness %, `cross_section_id` — 25 rows per assessment |
+| `gm_capabilities` | Capability display names |
+| `gm_capability_stage_meaning` | `tldr_line` keyed on `capability_id` + `stage_id` |
+| `gm_cross_sections` | `cross_section_label` keyed on `cross_section_id` |
+| `gm_stage_horizon` | `horizon_description`, `horizon_evolution_signals`, `transition_theme` keyed on `gm_stage_id` |
+| `gm_assessment_gpt_outputs` | All GPT content — pivoted by `slot_id` into named columns |
+| `gm_dimensions` | Dimension display names for ordering |
+
+---
+
+## Column Specification
+
+### Cover + Preface Fields
+
+| Column Name | Source | Notes |
+|---|---|---|
+| `RESPONDENT_NAME` | `gm_assessments.respondent_name` | |
+| `AE_STAGE_LABEL` | `gm_stages.stage_name` joined via `gm_assessments.calibration_stage_id` | Human-readable display name |
+| `ASSESSMENT_DATE` | `gm_assessments.submitted_at` | Format as `DD Month YYYY` |
+
+---
+
+### Act One — Block 1: Strategic Snapshot
+
+| Column Name | Source | Notes |
+|---|---|---|
+| `OVERALL_MATURITY_PCT` | `gm_assessment_overall_scores.maturity_pct` | Format as `'74%'` |
+| `MATURITY_BAND_LABEL` | `gm_assessment_overall_scores.maturity_band_label` | |
+| `OVERALL_READINESS_PCT` | `gm_assessment_overall_scores.readiness_pct` | Format as `'74%'` |
+| `READINESS_BAND_LABEL` | `gm_assessment_overall_scores.readiness_band_label` | |
+| `STAGE_MATURITY_CONTEXT` | `gm_stages.stage_maturity_context` | |
+| `STAGE_READINESS_CONTEXT` | `gm_stages.stage_readiness_context` | |
+| `QUADRANT_LABEL` | `gm_assessment_overall_scores.quadrant_label` | |
+| `QUADRANT_INTERPRETATION` | `gm_quadrant_meaning.interpretation_body` joined via `quadrant_id` | |
+
+**Dimensional Score Summary Table — 5 dimensions**
+
+| Column Name | Source | Notes |
+|---|---|---|
+| `DIM_1_MATURITY_PCT` | `gm_assessment_dimension_scores.maturity_pct` where `dimension_order = 1` | Format as `'74%'` |
+| `DIM_1_READINESS_PCT` | `gm_assessment_dimension_scores.readiness_pct` where `dimension_order = 1` | Format as `'74%'` |
+| `DIM_1_PATTERN_SIGNAL` | `gm_assessment_gpt_outputs` pivot: `slot_id = 'mr_pdf_dim_pattern_signal_1'` | |
+| `DIM_2_MATURITY_PCT` | `gm_assessment_dimension_scores.maturity_pct` where `dimension_order = 2` | Format as `'74%'` |
+| `DIM_2_READINESS_PCT` | `gm_assessment_dimension_scores.readiness_pct` where `dimension_order = 2` | Format as `'74%'` |
+| `DIM_2_PATTERN_SIGNAL` | pivot: `slot_id = 'mr_pdf_dim_pattern_signal_2'` | |
+| `DIM_3_MATURITY_PCT` | `gm_assessment_dimension_scores.maturity_pct` where `dimension_order = 3` | Format as `'74%'` |
+| `DIM_3_READINESS_PCT` | `gm_assessment_dimension_scores.readiness_pct` where `dimension_order = 3` | Format as `'74%'` |
+| `DIM_3_PATTERN_SIGNAL` | pivot: `slot_id = 'mr_pdf_dim_pattern_signal_3'` | |
+| `DIM_4_MATURITY_PCT` | `gm_assessment_dimension_scores.maturity_pct` where `dimension_order = 4` | Format as `'74%'` |
+| `DIM_4_READINESS_PCT` | `gm_assessment_dimension_scores.readiness_pct` where `dimension_order = 4` | Format as `'74%'` |
+| `DIM_4_PATTERN_SIGNAL` | pivot: `slot_id = 'mr_pdf_dim_pattern_signal_4'` | |
+| `DIM_5_MATURITY_PCT` | `gm_assessment_dimension_scores.maturity_pct` where `dimension_order = 5` | Format as `'74%'` |
+| `DIM_5_READINESS_PCT` | `gm_assessment_dimension_scores.readiness_pct` where `dimension_order = 5` | Format as `'74%'` |
+| `DIM_5_PATTERN_SIGNAL` | pivot: `slot_id = 'mr_pdf_dim_pattern_signal_5'` | |
+
+---
+
+### Act One — Block 2: TL;DR Snapshot
+
+| Column Name | Source | Notes |
+|---|---|---|
+| `PDF_TLDR_HEADLINE` | pivot: `slot_id = 'mr_pdf_tldr_headline'` | |
+| `PDF_TLDR_CONTEXT` | pivot: `slot_id = 'mr_pdf_tldr_context'` | |
+| `PDF_TLDR_RATIONALE_1` | pivot: `slot_id = 'mr_pdf_tldr_rationale_1'` | |
+| `PDF_TLDR_RATIONALE_2` | pivot: `slot_id = 'mr_pdf_tldr_rationale_2'` | |
+| `PDF_TLDR_RATIONALE_3` | pivot: `slot_id = 'mr_pdf_tldr_rationale_3'` | |
+| `PDF_TLDR_STRENGTH_SYNTHESIS` | pivot: `slot_id = 'mr_top_strengths_framing'` | WF-MR-01 reuse |
+| `PDF_TLDR_CONSTRAINT_SYNTHESIS` | pivot: `slot_id = 'mr_top_leverage_framing'` | WF-MR-01 reuse |
+| `strength_headline_1` | Capability name from top strengths selection rank 1 | Join `gm_pathway_selections` (selection_type='strength', rank_order=1) → `gm_capabilities.capability_name` |
+| `PDF_TLDR_STRENGTHS_1` | pivot: `slot_id = 'mr_capability_rationale'`, `entity_id = [strength cap 1 id]` | WF-MR-01 capability rationale |
+| `strength_headline_2` | Capability name — strength rank 2 | |
+| `PDF_TLDR_STRENGTHS_2` | pivot: capability rationale for strength rank 2 | |
+| `strength_headline_3` | Capability name — strength rank 3 | |
+| `PDF_TLDR_STRENGTHS_3` | pivot: capability rationale for strength rank 3 | |
+| `strength_headline_4` | Capability name — strength rank 4 | |
+| `PDF_TLDR_STRENGTHS_4` | pivot: capability rationale for strength rank 4 | |
+| `strength_headline_5` | Capability name — strength rank 5 | |
+| `PDF_TLDR_STRENGTHS_5` | pivot: capability rationale for strength rank 5 | |
+| `constraint_headline_1` | Capability name from top leverage selection rank 1 | Join `gm_pathway_selections` (selection_type='leverage', rank_order=1) → `gm_capabilities.capability_name` |
+| `PDF_TLDR_CONSTRAINTS_1` | pivot: capability rationale for leverage rank 1 | |
+| `constraint_headline_2` | Capability name — leverage rank 2 | |
+| `PDF_TLDR_CONSTRAINTS_2` | pivot: capability rationale for leverage rank 2 | |
+| `constraint_headline_3` | Capability name — leverage rank 3 | |
+| `PDF_TLDR_CONSTRAINTS_3` | pivot: capability rationale for leverage rank 3 | |
+| `constraint_headline_4` | Capability name — leverage rank 4 | |
+| `PDF_TLDR_CONSTRAINTS_4` | pivot: capability rationale for leverage rank 4 | |
+| `constraint_headline_5` | Capability name — leverage rank 5 | |
+| `PDF_TLDR_CONSTRAINTS_5` | pivot: capability rationale for leverage rank 5 | |
+
+---
+
+### Act One — Block 3: Executive Summary
+
+| Column Name | Source | Notes |
+|---|---|---|
+| `PDF_EXEC_STAGE_ANCHOR` | pivot: `slot_id = 'mr_pdf_exec_stage_anchor'` | |
+| `PDF_EXEC_CROSS_DIM` | pivot: `slot_id = 'mr_pdf_exec_cross_dim'` | |
+| `PDF_EXEC_PRIORITY` | pivot: `slot_id = 'mr_pdf_exec_priority'` | |
+| `PDF_EXEC_GUARDRAILS` | pivot: `slot_id = 'mr_pdf_exec_guardrails'` | |
+| `PDF_EXEC_CLOSE` | pivot: `slot_id = 'mr_pdf_exec_close'` | |
+
+---
+
+### Act Two — Dimension Profiles (pattern repeats × 5)
+> Full column set shown for Dimension 1 (Financial & Business Health). Replicate for dimensions 2–5 substituting the appropriate dimension slug, capability IDs, and slot IDs.
+
+**Profile 1 — Financial & Business Health**
+
+| Column Name | Source | Notes |
+|---|---|---|
+| `FIN_MATURITY_PCT` | `gm_assessment_dimension_scores.maturity_pct` where `dimension_order = 1` | Format as `'74%'` |
+| `FIN_READINESS_PCT` | `gm_assessment_dimension_scores.readiness_pct` where `dimension_order = 1` | Format as `'74%'` |
+| `PDF_DIM_FRAMING_FINANCIAL` | pivot: `slot_id = 'mr_pdf_dim_framing_financial'` | |
+| `WGL_CAP_1_1` | `gm_capability_stage_meaning.tldr_line` where `capability_id = [cap 1.1]` and `stage_id = [calibration stage]` | |
+| `CS_LABEL_CAP_1_1` | `gm_cross_sections.cross_section_label` joined via `gm_assessment_capability_scores.cross_section_id` for cap 1.1 | |
+| `MR_CAPABILITY_RATIONALE_1_1` | pivot: `slot_id = 'mr_capability_rationale'`, `entity_id = [cap 1.1 id]` | |
+| `WGL_CAP_1_2` | `gm_capability_stage_meaning.tldr_line` for cap 1.2 | |
+| `CS_LABEL_CAP_1_2` | cross-section label for cap 1.2 | |
+| `MR_CAPABILITY_RATIONALE_1_2` | capability rationale for cap 1.2 | |
+| `WGL_CAP_1_3` | `gm_capability_stage_meaning.tldr_line` for cap 1.3 | |
+| `CS_LABEL_CAP_1_3` | cross-section label for cap 1.3 | |
+| `MR_CAPABILITY_RATIONALE_1_3` | capability rationale for cap 1.3 | |
+| `WGL_CAP_1_4` | `gm_capability_stage_meaning.tldr_line` for cap 1.4 | |
+| `CS_LABEL_CAP_1_4` | cross-section label for cap 1.4 | |
+| `MR_CAPABILITY_RATIONALE_1_4` | capability rationale for cap 1.4 | |
+| `WGL_CAP_1_5` | `gm_capability_stage_meaning.tldr_line` for cap 1.5 | |
+| `CS_LABEL_CAP_1_5` | cross-section label for cap 1.5 | |
+| `MR_CAPABILITY_RATIONALE_1_5` | capability rationale for cap 1.5 | |
+| `PDF_DIM_TRANSLATION_FINANCIAL` | pivot: `slot_id = 'mr_pdf_dim_translation_financial'` | |
+
+**Replicate the above pattern for:**
+- Profile 2 — Client Base & Market Positioning (`CLT_`, `WGL_CAP_2_*`, `CS_LABEL_CAP_2_*`, `MR_CAPABILITY_RATIONALE_2_*`, `PDF_DIM_FRAMING_CLIENT`, `PDF_DIM_TRANSLATION_CLIENT`)
+- Profile 3 — Operational Efficiency & Scalability (`OPS_`, `WGL_CAP_3_*`, etc.)
+- Profile 4 — Team Structure & Leadership (`TM_`, `WGL_CAP_4_*`, etc.)
+- Profile 5 — Strategic Stewardship (`STW_`, `WGL_CAP_5_*`, etc.)
+
+> Antigravity: Use `gm_capabilities.capability_order` within each dimension to determine the 1–5 position mapping. Confirm capability IDs per dimension via MCP before writing any join logic.
+
+---
+
+### Act Three — Collective Synthesis
+
+| Column Name | Source | Notes |
+|---|---|---|
+| `PDF_CROSS_DIM_SYNTHESIS` | pivot: `slot_id = 'mr_pdf_cross_dim_synthesis'` | |
+| `PDF_LEVERAGE_SYNTHESIS` | pivot: `slot_id = 'mr_pdf_leverage_synthesis'` | |
+| `PDF_STRENGTHS_SYNTHESIS` | pivot: `slot_id = 'mr_pdf_strengths_synthesis'` | |
+| `horizon_description` | `gm_stage_horizon.horizon_description` keyed on `gm_stage_id` | |
+| `horizon_evolution_signals` | `gm_stage_horizon.horizon_evolution_signals` | Format jsonb array as newline-separated plain text strings |
+| `PDF_HORIZON_SYNTHESIS` | pivot: `slot_id = 'mr_pdf_horizon_synthesis'` | |
+| `PDF_FINAL_SYNTHESIS` | pivot: `slot_id = 'mr_pdf_final_synthesis'` | |
+
+---
+
+## GPT Output Pivot Pattern
+
+All `gm_assessment_gpt_outputs` columns must be pivoted using conditional aggregation. The pattern for each slot is:
+
+```sql
+MAX(CASE WHEN o.slot_id = 'slot_id_here' AND o.entity_type = 'assessment' 
+    THEN o.content_text ELSE '' END) AS "COLUMN_NAME"
+```
+
+For capability-scoped rationale slots (`slot_id = 'mr_capability_rationale'`), pivot on `entity_id` (which is the `capability_id` UUID):
+
+```sql
+MAX(CASE WHEN o.slot_id = 'mr_capability_rationale' AND o.entity_id = '[capability_uuid]'
+    THEN o.content_text ELSE '' END) AS "MR_CAPABILITY_RATIONALE_X_X"
+```
+
+All pivots must filter `WHERE o.is_current = true` to ensure only active outputs are pulled.
+
+---
+
+## Percentage Formatting
+
+All `_pct` fields must be formatted as display strings before returning. Use:
+
+```sql
+ROUND(scores.maturity_pct) || '%' AS "OVERALL_MATURITY_PCT"
+```
+
+---
+
+## Date Formatting
+
+`ASSESSMENT_DATE` must be formatted as a human-readable string:
+
+```sql
+TO_CHAR(a.submitted_at AT TIME ZONE 'UTC', 'DD Month YYYY') AS "ASSESSMENT_DATE"
+```
+
+---
+
+## Null Safety
+
+Wrap all nullable columns in `COALESCE(value, '')` to prevent null values reaching the merge workflow.
+
+---
+
+## Verification Checklist for Antigravity
+
+Before marking the view as complete, verify:
+
+- [ ] View returns exactly one row when queried with a valid completed `assessment_id`
+- [ ] All 130 merge field columns are present
+- [ ] No column returns NULL (all coalesced to empty string)
+- [ ] Percentage columns return formatted strings (e.g. `'74%'` not `0.74`)
+- [ ] GPT output pivot returns non-empty values for an assessment where WF-MR-01 and WF-MR-02 have both completed
+- [ ] `strength_headline_1-5` and `constraint_headline_1-5` return capability names from `gm_pathway_selections` correctly ordered by `rank_order`
+- [ ] `horizon_evolution_signals` jsonb is converted to readable plain text
+- [ ] WGL `tldr_line` columns are populated (non-empty) for all 25 capabilities at the test assessment's calibration stage

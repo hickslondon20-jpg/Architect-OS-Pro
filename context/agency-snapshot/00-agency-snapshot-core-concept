@@ -1,0 +1,150 @@
+## **Fleshing Out the Four Lenses — Current State Business Model Portrait**
+
+Let me start with the overarching concept, then work through each lens.
+
+---
+
+## **The Overarching Concept**
+
+What the Agency Snapshot is really doing is capturing the **structural DNA of the agency at this moment in time.** Not where it's been. Not where it's going. Not how it's performing against targets. Just — *what kind of agency is this, how is it built, and how does it sustain itself?*
+
+Think of it like a physical for a business. A doctor doing a physical isn't asking about your fitness goals or your exercise history. They're taking your vitals, understanding your current condition, and building a baseline picture of who you are physiologically — right now. Everything downstream (prescriptions, referrals, recommendations) is contextualized by that baseline.
+
+That's what this snapshot does. It creates the **contextual baseline** that makes every other tool smarter — the Growth Velocity Calculator knows what it's simulating on top of, the Clarity Compass knows what kind of agency it's advising, the Virtual CSO knows what operating context it's working within.
+
+---
+
+## **What We're Capturing vs. What We're Not**
+
+This distinction matters a lot for how we frame the lenses:
+
+**We ARE capturing:**
+
+* Current size, scale, and complexity  
+* Current structural composition  
+* Typical or average performance indicators (not trended)  
+* How the business is currently configured and operating  
+* Who they serve and how they position themselves  
+* General health signals at a point in time
+
+**We're NOT capturing:**
+
+* Historical growth rates or trajectories  
+* Performance against goals or benchmarks over time  
+* Forward projections or targets  
+* Operational metrics that change week to week  
+* Competitive positioning or market share  
+* Strategic intent or future direction
+
+The key distinction is **"typical" vs. "trended."** When we ask for churn rate, we're not asking "how has your churn changed over the last 12 months?" We're asking "what does your churn generally look like right now?" It's a characteristic of the business, not a performance measurement. Same with margins, team size, client count — these are current-state descriptors, not performance indicators being evaluated against a benchmark or trajectory.
+
+This is an important philosophical distinction because it keeps the snapshot from feeling like a performance review, which would be anxiety-inducing and likely produce inaccurate data as founders either sandbag or inflate. Instead it should feel like a **neutral intake form** — no judgment, just orientation.
+
+---
+
+## **The Four Lenses — Conceptual Framing**
+
+### **Lens 1: Market Footprint**
+
+**What it's really capturing:** Who the agency is and who it serves. The services it offers, the industries and client types it specializes in, the geographic scope of its market, how it prices its work, and how it positions itself relative to the market. This is the most qualitative of the four lenses — it's less about numbers and more about the fundamental identity of the agency.
+
+**The key distinction from other tools:** Positioning and identity will surface in the Clarity Compass as a strategic question (is your positioning clear? differentiated? compelling?). But here we're not evaluating positioning effectiveness — we're just capturing what the agency currently says it is. Not whether that positioning is right or working, but what it currently looks like. The snapshot takes it at face value as a current-state descriptor.
+
+**What this lens reveals:** The service scope and specialization depth (generalist vs. specialist, breadth vs. focus), the market the agency operates in (industries, client types, geography), the pricing model and its implications for client relationships, and the agency's self-described identity. Together these tell us the **market fingerprint** of the agency — who they are, who they serve, and how they present themselves to the world.
+
+**What it doesn't try to answer:** Whether the positioning is differentiated or effective, whether the ICP is well-defined, or how the market perceives the agency — that's Clarity Compass territory.
+
+---
+
+### **Lens 2: Economic Foundation**
+
+**What it's really capturing:** The financial structure of the business — not how well it's performing financially, but how it's financially constituted. How much revenue flows through it, how much of that revenue it actually retains after pass-through costs, how much of that retained revenue becomes profit, and how much liquid capital it has to operate with.
+
+**The key distinction from other tools:** The Growth Velocity Calculator will use revenue and growth rates to model forward scenarios. The Clarity Compass might look at financial health as a strategic constraint. But here we're not evaluating financial performance — we're establishing financial character. A $500K agency and a $5M agency are fundamentally different organisms even if they have identical margin percentages. Scale, efficiency, and liquidity together tell us what kind of financial organism we're dealing with.
+
+**What this lens reveals:** The size and complexity of the operation, the efficiency of the revenue model (what they keep vs. pass through), the sustainability of the business (profitability), and the strategic flexibility available to it (cash position). Together these tell us the **economic carrying capacity** of the agency — what it can bear, what it can invest, and how much runway it has for strategic moves.
+
+**What it doesn't try to answer:** Whether financial performance is improving or declining, what the financial goals are, or how this compares to a historical baseline.
+
+---
+
+### **Lens 3: Revenue Model**
+
+**What it's really capturing:** How the business earns its revenue and who it earns it from. This includes the composition of revenue (recurring vs. project-based), the profile of the clients generating that revenue (how valuable they are, how complex, how many), how long those clients typically stay, how concentrated the revenue is, and how the agency attracts new clients.
+
+**The key distinction from other tools:** "Growth & Pipeline" as a label implies forward motion — a pipeline is something you're filling, growth is something you're pursuing. But at the snapshot level we're not asking about pipeline volume, lead generation metrics, or growth targets. We're asking about the current revenue model and client dynamics as they exist today. The Growth Velocity Calculator is where pipeline and growth modeling happens. Here we're just asking: *what does your revenue model look like and what kind of clients are you currently serving?*
+
+**What this lens reveals:** The stability and predictability of the revenue base (MRR vs. project mix), the complexity and value of the client relationships (ACV, client count, concentration), the retention characteristics of the business (churn, lifetime value), and the acquisition approach (channels, sales cycle, win rate). Together these tell us the **revenue character** of the agency — how money flows in, how long it stays, and how dependent the business is on any particular relationship or channel.
+
+**What it doesn't try to answer:** How fast the pipeline is growing, what the growth targets are, or whether client acquisition is accelerating or declining.
+
+---
+
+### **Lens 4: Delivery Architecture**
+
+**What it's really capturing:** How the agency is structurally built to do the work. Team size and composition, how people are organized (generalist vs. specialist), how efficiently the team creates value, how founder-dependent the operation is, and whether there's capacity headroom or constraint.
+
+**The key distinction from other tools:** Team and delivery metrics will appear in other contexts — the Growth Velocity Calculator might use team capacity to model hiring requirements, the Clarity Compass might assess delivery maturity. But here we're not evaluating delivery quality or operational efficiency as a performance metric. We're capturing the **structural composition** of the delivery engine — how it's built, not how well it's running.
+
+**What this lens reveals:** The scale and structure of the human capital investment (team size, billable ratio), the operational leverage of the model (AGI per FTE, specialist vs. generalist), the founder's current role in the operation (delivery vs. management vs. strategy), and the capacity dynamics (headroom vs. constraint). Together these tell us the **delivery DNA** of the agency — how it's structured to create and deliver value, and where the human dependencies and leverage points exist.
+
+**What it doesn't try to answer:** Whether delivery quality is improving, what specific operational processes look like, or how team performance compares over time.
+
+---
+
+## **How the Four Lenses Work Together**
+
+What's worth noting is that these four lenses are **mutually reinforcing but non-overlapping**:
+
+* **Market Footprint** tells you who the agency is and who it serves  
+* **Economic Foundation** tells you what the business can sustain financially  
+* **Revenue Model** tells you how and from whom the money flows  
+* **Delivery Architecture** tells you how the agency is built to earn that money
+
+No single lens tells the full story. The value of the snapshot is precisely that you need all four to build the contextual picture. A $3M agency with a specialist team, high concentration, and a generalist positioning is a fundamentally different organism than a $3M agency with a generalist team, diversified clients, and a niche focus — even though the financial numbers look identical.
+
+That's why the dashboard synthesis matters. The individual lenses create the data. The synthesis reveals the pattern.
+
+---
+
+## **Where This Leaves Us**
+
+We now have a clear conceptual framework for what each lens is doing and why it's distinct from how similar concepts appear in other tools. The framing is:
+
+**Four moment-in-time lenses that together create a current-state portrait of the agency's business model — not its performance, not its trajectory, but its fundamental structure and character.**
+
+## **What You're Actually Capturing in Each Section**
+
+Before renaming, it's worth being precise about what each section is *really* doing — because the name should reflect the job, not just the data category:
+
+**Market Footprint** is really asking: *Who are you as an agency — what do you specialize in, who do you serve, what markets do you operate in, and how do you present yourself?*
+
+This is less about "positioning" as a marketing concept and more about **agency identity and market footprint**. It's answering "who are you and who do you serve?"
+
+**Economic Foundation** is really asking: *What does your business look like from a financial perspective — how big, how profitable, how stable, and how complex is your operation?*
+
+This is less about "finances" as a discipline and more about **business scale and economic health**. It's answering "what kind of financial organism are you?"
+
+**Revenue Model** is really asking: *How are you making your revenue, who are your clients, how long do they stay, how do you attract them, and how dependent are you on any single relationship?*
+
+This is less about "pipeline" as a sales term and more about **revenue model and client dynamics**. It's answering "how does money flow into and through your business?"
+
+**Delivery Architecture** is really asking: *How is your agency structured to deliver services — how many people, in what configuration, at what efficiency, and how founder-dependent is the operation?*
+
+This is less about "team" as headcount and more about **operational structure and delivery model**. It's answering "how is your agency built to do the work?"
+
+**What is the Agency Snapshot, as a whole, trying to do?**
+
+Based on what you've described, it's essentially a **current-state business model portrait**. It's not measuring performance against goals. It's not diagnosing problems. It's not planning for the future. It's capturing *who you are and how you operate right now* — across four lenses.
+
+If that's the framing, then the four lenses might be better named around what they *reveal* rather than what *data they collect*:
+
+Something in the direction of:
+
+* **Market Footprint** — (currently Identity & Positioning) — who the business is and who it serves  
+* **Economic Foundation** — (currently Financial) — how the business is funded and sustained  
+* **Revenue Model** — (currently Growth & Pipeline) — how the business earns and retains  
+* **Delivery Architecture** — (currently Team & Delivery) — how the business operates and scales
+
+These are rough — the point is the naming shift from *data category* to *business dimension*.
+

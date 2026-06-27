@@ -1,0 +1,456 @@
+# **✅ PROFILE SECTION SPECIFICATION — ALL TABS**
+
+## **Design Principles Confirmed**
+
+✅ **Simplicity with immediate insightfulness** — Clean, scannable, not redundant  
+ ✅ **Keep right sidebar** — Real-time calculations as they type  
+ ✅ **Profile always expanded** — No accordion, always visible when data saved  
+ ✅ **Selective benchmark badges** — Only where meaningful targets exist  
+ ✅ **Card styling** — Border/shadow like Identity screenshot  
+ ✅ **Single-dimension focus** — Don't overreach, let Dashboard connect the dots
+
+---
+
+## **BENCHMARK BADGE PHILOSOPHY**
+
+### **What Gets a Badge:**
+
+✅ Metrics with **clear, universal targets** that indicate health  
+ ✅ Ratios/percentages that have **industry-standard ranges**  
+ ✅ Efficiency indicators where **deviation signals risk**
+
+### **What Doesn't Get a Badge:**
+
+❌ Raw dollar amounts (revenue, AGI, payroll) — **context-dependent**  
+ ❌ Counts (team size, client count) — **not performance indicators**  
+ ❌ Calculated totals (annual run rate) — **just math, no inherent meaning**  
+ ❌ Metrics that require cross-tab context to evaluate
+
+### **Badge Color Logic:**
+
+* 🟢 **Green "Healthy"** — Meets or exceeds target range  
+* 🟡 **Yellow "Caution"** — Approaching threshold, monitor  
+* 🔴 **Red "Critical"** — Below acceptable range, needs attention
+
+---
+
+## **FINANCIAL PROFILE — COMPLETE SPECIFICATION**
+
+### **Profile Structure:**
+
+┌─────────────────────────────────────────────────────────────┐  
+│ 💰 Financial Profile                                         │  
+│ Last updated: February 16, 2026                             │  
+├─────────────────────────────────────────────────────────────┤  
+│                                                             │  
+│ BUSINESS SCALE                                              │  
+│ Monthly Revenue: $100,000                                   │  
+│ Monthly AGI: $94,000                                        │  
+│ Monthly Payroll: $50,000                                    │  
+│ Annual Revenue Run Rate: $1,200,000                         │  
+│                                                             │  
+│ ─────────────────────────────────────────────────────────── │  
+│                                                             │  
+│ EFFICIENCY & PROFITABILITY                                  │  
+│                                                             │  
+│ AGI Percentage: 94.0% \[✓ Healthy\]                           │  
+│ Operating Profit Margin: 32% \[✓ Excellent\]                 │  
+│                                                             │  
+│ Monthly Operating Profit: $31,960                          │  
+│ Monthly Operating Expenses: $62,040                        │  
+│                                                             │  
+│ ─────────────────────────────────────────────────────────── │  
+│                                                             │  
+│ FINANCIAL STABILITY                                         │  
+│                                                             │  
+│ Cash Available: $32,000                                     │  
+│ Cash Runway: 0.5 months \[⚠ Critical\]                        │  
+│                                                             │  
+│ Financial Health Status: Stable                            │  
+│                                                             │  
+│ ─────────────────────────────────────────────────────────── │  
+│                                                             │  
+│ 💡 FINANCIAL INSIGHTS                                       │  
+│                                                             │  
+│ \[GPT-generated narrative synthesis\]                         │  
+│                                                             │  
+│ Your 94% AGI indicates strong pass-through cost management. │  
+│ Most agencies target 85-95% depending on service mix.       │  
+│                                                             │  
+│ Your 32% operating margin exceeds healthy benchmarks for    │  
+│ agencies at your scale, suggesting strong cost discipline   │  
+│ and pricing power.                                          │  
+│                                                             │  
+│ However, with 0.5 months of cash runway, you have limited   │  
+│ buffer for strategic investments or downturns. Industry     │  
+│ standard is 3-6 months for healthy cushion.                 │  
+│                                                             │  
+└─────────────────────────────────────────────────────────────┘  
+---
+
+### **Financial Profile — Field Specifications:**
+
+#### **Section 1: Business Scale (No Badges)**
+
+| Field | Source | Display | Badge? |
+| ----- | ----- | ----- | ----- |
+| Monthly Revenue | Input | `$100,000` | ❌ No (context-dependent) |
+| Monthly AGI | Input | `$94,000` | ❌ No (context-dependent) |
+| Monthly Payroll | Input | `$50,000` | ❌ No (meaningless without team size) |
+| Annual Revenue Run Rate | Calculated | `$1,200,000` | ❌ No (just monthly × 12\) |
+
+**Why no badges here:** These are baseline facts about the business. Revenue size isn't inherently "good" or "bad" — a $100K/mo agency can be healthy or struggling depending on structure, margins, goals.
+
+---
+
+#### **Section 2: Efficiency & Profitability (Selective Badges)**
+
+| Field | Source | Display | Badge? | Target |
+| ----- | ----- | ----- | ----- | ----- |
+| AGI Percentage | Calculated | `94.0%` | ✅ Yes | 85-95% Healthy |
+| Operating Profit Margin | Calculated | `32%` | ✅ Yes | 30%+ Excellent, 20-30% Healthy |
+| Monthly Operating Profit | Calculated | `$31,960` | ❌ No | Context-dependent |
+| Monthly Operating Expenses | Calculated | `$62,040` | ❌ No | Context-dependent |
+
+**Badge Logic:**
+
+* **AGI %:**  
+  * 🟢 Green "Healthy" if 85-95%  
+  * 🟡 Yellow "Review" if 75-85% or 95-100%  
+  * 🔴 Red "Concern" if \<75% or \>100% (impossible but indicates data issue)  
+* **Operating Profit Margin:**  
+  * 🟢 Green "Excellent" if ≥30%  
+  * 🟢 Green "Healthy" if 20-29%  
+  * 🟡 Yellow "Acceptable" if 15-19%  
+  * 🔴 Red "Critical" if \<15%
+
+---
+
+#### **Section 3: Financial Stability (Selective Badges)**
+
+| Field | Source | Display | Badge? | Target |
+| ----- | ----- | ----- | ----- | ----- |
+| Cash Available | Input | `$32,000` | ❌ No | Context-dependent |
+| Cash Runway | Calculated | `0.5 months` | ✅ Yes | 3-6 months Healthy |
+| Financial Health Status | Input | `Stable` | ❌ No | Self-assessment, not benchmark |
+
+**Badge Logic:**
+
+* **Cash Runway:**  
+  * 🟢 Green "Healthy" if ≥3 months  
+  * 🟡 Yellow "Tight" if 1-3 months  
+  * 🔴 Red "Critical" if \<1 month
+
+---
+
+#### **Section 4: Insights (GPT Narrative)**
+
+* **Length:** 150-250 words  
+* **Tone:** Observational, factual, not prescriptive  
+* **Focus:** Financial dimension only (don't diagnose team, growth, positioning issues)  
+* **Structure:**  
+  1. AGI efficiency context  
+  2. Profitability health assessment  
+  3. Cash runway implications  
+  4. Overall financial profile summary
+
+**Example Narrative:**
+
+Your 94% AGI indicates strong pass-through cost management. Most agencies target   
+85-95% depending on service mix, so you're operating within healthy range for   
+balanced delivery models.
+
+Your 32% operating margin exceeds benchmarks for agencies at your scale. Most   
+$1-2M agencies operate at 20-28% margins, positioning your profitability in   
+the "excellent" range. This suggests strong cost discipline and pricing power.
+
+However, with 0.5 months of cash runway, you have limited buffer for strategic   
+investments or revenue fluctuations. Industry standard is 3-6 months for healthy   
+cushion. Your strong profitability indicates earnings capacity, but liquidity   
+management may require attention.
+
+Overall Financial Profile: Highly profitable operation with efficient cost   
+structure, but tight cash position relative to operating expenses.  
+---
+
+## **GROWTH & PIPELINE PROFILE — COMPLETE SPECIFICATION**
+
+### **Profile Structure:**
+
+┌─────────────────────────────────────────────────────────────┐  
+│ 📈 Growth & Pipeline Profile                                 │  
+│ Last updated: February 16, 2026                             │  
+├─────────────────────────────────────────────────────────────┤  
+│                                                             │  
+│ REVENUE ENGINE                                              │  
+│ Current MRR: $85,000                                        │  
+│ Active Client Count: 34                                     │  
+│ New Clients (This Month): 3                                 │  
+│ Clients Lost (This Month): 1                                │  
+│ Net MRR Change: \+$8,000                                     │  
+│                                                             │  
+│ ─────────────────────────────────────────────────────────── │  
+│                                                             │  
+│ CLIENT RETENTION                                            │  
+│                                                             │  
+│ Churn Rate: 2.9% \[⚠ Slightly High\]                         │  
+│ Client Retention Rate: 97.1% \[✓ Strong\]                     │  
+│                                                             │  
+│ ─────────────────────────────────────────────────────────── │  
+│                                                             │  
+│ 💡 GROWTH & PIPELINE INSIGHTS                               │  
+│                                                             │  
+│ \[GPT narrative about growth health, retention, pipeline\]    │  
+│                                                             │  
+└─────────────────────────────────────────────────────────────┘  
+---
+
+### **Growth Profile — Field Specifications:**
+
+#### **Section 1: Revenue Engine (No Badges)**
+
+| Field | Source | Display | Badge? |
+| ----- | ----- | ----- | ----- |
+| Current MRR | Input | `$85,000` | ❌ No (context-dependent) |
+| Active Client Count | Input | `34` | ❌ No (not a performance metric) |
+| New Clients | Input | `3` | ❌ No (depends on business model) |
+| Clients Lost | Input | `1` | ❌ No (raw count meaningless) |
+| Net MRR Change | Calculated | `+$8,000` | ❌ No (growth is good, but no universal target) |
+
+---
+
+#### **Section 2: Client Retention (Selective Badges)**
+
+| Field | Source | Display | Badge? | Target |
+| ----- | ----- | ----- | ----- | ----- |
+| Churn Rate | Calculated | `2.9%` | ✅ Yes | \<2.5% monthly |
+| Client Retention Rate | Calculated | `97.1%` | ✅ Yes | \>97.5% monthly |
+
+**Badge Logic:**
+
+* **Churn Rate:**  
+  * 🟢 Green "Healthy" if ≤2.5%  
+  * 🟡 Yellow "Monitor" if 2.6-4%  
+  * 🔴 Red "Critical" if \>4%  
+* **Retention Rate:**  
+  * 🟢 Green "Strong" if ≥97.5%  
+  * 🟡 Yellow "Acceptable" if 95-97.4%  
+  * 🔴 Red "Concerning" if \<95%
+
+---
+
+## **TEAM & CAPACITY PROFILE — COMPLETE SPECIFICATION**
+
+### **Profile Structure:**
+
+┌─────────────────────────────────────────────────────────────┐  
+│ 👥 Team & Capacity Profile                                   │  
+│ Last updated: February 16, 2026                             │  
+├─────────────────────────────────────────────────────────────┤  
+│                                                             │  
+│ TEAM COMPOSITION                                            │  
+│ Total Team Size: 65 FTE                                     │  
+│ Billable Staff: 52                                          │  
+│ Non-Billable Staff: 13                                      │  
+│ Delivery Model: Team Pods                                   │  
+│                                                             │  
+│ ─────────────────────────────────────────────────────────── │  
+│                                                             │  
+│ EFFICIENCY & LEVERAGE                                       │  
+│                                                             │  
+│ AGI per FTE: $18,462/month \[✓ Healthy\]                      │  
+│ Billable:Non-Billable Ratio: 4.0:1 \[✓ Strong\]               │  
+│                                                             │  
+│ Revenue per FTE: $19,615/month                              │  
+│                                                             │  
+│ ─────────────────────────────────────────────────────────── │  
+│                                                             │  
+│ 💡 TEAM & CAPACITY INSIGHTS                                 │  
+│                                                             │  
+│ \[GPT narrative about team efficiency, structure, leverage\]  │  
+│                                                             │  
+└─────────────────────────────────────────────────────────────┘  
+---
+
+### **Team Profile — Field Specifications:**
+
+#### **Section 1: Team Composition (No Badges)**
+
+| Field | Source | Display | Badge? |
+| ----- | ----- | ----- | ----- |
+| Total Team Size | Input | `65 FTE` | ❌ No (not a performance metric) |
+| Billable Staff | Input | `52` | ❌ No (depends on business model) |
+| Non-Billable Staff | Input | `13` | ❌ No (depends on business model) |
+| Delivery Model | Input | `Team Pods` | ❌ No (descriptive, not evaluative) |
+
+---
+
+#### **Section 2: Efficiency & Leverage (Selective Badges)**
+
+| Field | Source | Display | Badge? | Target |
+| ----- | ----- | ----- | ----- | ----- |
+| AGI per FTE | Calculated (cross-tab) | `$18,462/mo` | ✅ Yes | \>$15,500/mo |
+| Billable:Non-Billable Ratio | Calculated | `4.0:1` | ✅ Yes | 3:1 target |
+| Revenue per FTE | Calculated (cross-tab) | `$19,615/mo` | ❌ No | Service-model dependent |
+
+**Badge Logic:**
+
+* **AGI per FTE:**  
+  * 🟢 Green "Healthy" if ≥$15,500  
+  * 🟡 Yellow "Review" if $12,000-$15,499  
+  * 🔴 Red "Concerning" if \<$12,000  
+* **Billable:Non-Billable Ratio:**  
+  * 🟢 Green "Strong" if ≥3:1  
+  * 🟡 Yellow "Acceptable" if 2:1-2.9:1  
+  * 🔴 Red "Imbalanced" if \<2:1
+
+---
+
+## **VISUAL DESIGN SPECIFICATIONS**
+
+### **Profile Card Styling:**
+
+css  
+.profile-card {  
+  background: white;  
+  border: 1px solid \#E5E7EB;  
+  border-radius: 8px;  
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);  
+  padding: 24px;  
+  margin-top: 24px;  
+}
+
+.profile-header {  
+  display: flex;  
+  justify-content: space-between;  
+  align-items: center;  
+  margin-bottom: 20px;  
+  padding-bottom: 16px;  
+  border-bottom: 1px solid \#E5E7EB;  
+}
+
+.profile-title {  
+  font-size: 18px;  
+  font-weight: 600;  
+  color: \#111827;  
+}
+
+.profile-timestamp {  
+  font-size: 13px;  
+  color: \#6B7280;  
+}
+
+.profile-section {  
+  margin-bottom: 24px;  
+}
+
+.section-heading {  
+  font-size: 12px;  
+  font-weight: 600;  
+  text-transform: uppercase;  
+  letter-spacing: 0.5px;  
+  color: \#6B7280;  
+  margin-bottom: 12px;  
+}
+
+.metric-row {  
+  display: flex;  
+  justify-content: space-between;  
+  align-items: center;  
+  padding: 8px 0;  
+}
+
+.metric-label {  
+  font-size: 14px;  
+  color: \#374151;  
+}
+
+.metric-value {  
+  font-size: 14px;  
+  font-weight: 600;  
+  color: \#111827;  
+  display: flex;  
+  align-items: center;  
+  gap: 8px;  
+}
+
+.divider {  
+  height: 1px;  
+  background: \#E5E7EB;  
+  margin: 20px 0;  
+}  
+---
+
+### **Benchmark Badge Styling:**
+
+css  
+.benchmark-badge {  
+  display: inline-flex;  
+  align-items: center;  
+  gap: 4px;  
+  padding: 2px 8px;  
+  border-radius: 4px;  
+  font-size: 12px;  
+  font-weight: 500;  
+}
+
+.badge-healthy {  
+  background: \#D1FAE5;  
+  color: \#065F46;  
+  border: 1px solid \#6EE7B7;  
+}
+
+.badge-caution {  
+  background: \#FEF3C7;  
+  color: \#92400E;  
+  border: 1px solid \#FCD34D;  
+}
+
+.badge-critical {  
+  background: \#FEE2E2;  
+  color: \#991B1B;  
+  border: 1px solid \#FCA5A5;  
+}
+
+.badge-icon {  
+  width: 12px;  
+  height: 12px;  
+}  
+---
+
+### **Insights Section Styling:**
+
+css  
+.insights-section {  
+  background: \#F9FAFB;  
+  border-radius: 6px;  
+  padding: 16px;  
+  margin-top: 20px;  
+}
+
+.insights-header {  
+  display: flex;  
+  align-items: center;  
+  gap: 8px;  
+  margin-bottom: 12px;  
+  font-size: 14px;  
+  font-weight: 600;  
+  color: \#111827;  
+}
+
+.insights-content {  
+  font-size: 14px;  
+  line-height: 1.6;  
+  color: \#374151;  
+}
+
+.insights-content p {  
+  margin-bottom: 12px;  
+}
+
+.insights-content p:last-child {  
+  margin-bottom: 0;  
+}  
+---
+
+## **IMPLEMENTATION PROMPT FOR ANTIGRAVITY**

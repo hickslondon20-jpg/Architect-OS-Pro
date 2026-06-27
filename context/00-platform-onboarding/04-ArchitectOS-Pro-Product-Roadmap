@@ -1,0 +1,405 @@
+# ArchitectOS Pro — Product Roadmap
+
+**Version:** 1.1 | **Date:** May 2026
+**Beta Launch Target:** ~July 2026 (8 weeks from spec date)
+**Coding Agent:** Claude via Cowork
+
+> **Revision 1.1 Summary:** Reframed from greenfield build plan to a verify-wire-test-design plan reflecting actual platform build state. The majority of core features are functional. Pre-beta work is: (1) verification and Supabase wiring confirmation, (2) design system alignment against updated specs, (3) codebase cleanup (remove legacy openai package and dead code), (4) live end-to-end user testing, and (5) specific gaps that need genuine build work (Sprint Launch Document PDF, Reflection Review rollover logic). Task descriptions and phase goals updated accordingly. TASK-020 corrected — MRA checkpoint content is already live in Supabase (not a build task).
+
+---
+
+## Build Philosophy
+
+1. **Verify before you build.** Most features are already built and wired. The default assumption is that code exists — confirm it, test it, and fix it rather than rebuilding. If a feature is truly missing, note it explicitly.
+2. **Ship Program Week 1 features first.** Only Agency Snapshot + AI synthesis must be ready by beta launch day. Every other feature unlocks weekly after launch. Work in program-week order.
+3. **Supabase data persistence is non-negotiable.** Every feature ships with confirmed Supabase wiring — no mock data, no local state that doesn't persist. Data loss during a live coaching program is a program failure.
+4. **Claude AI synthesis via N8N is the core value prop.** The AI synthesis layer routes through N8N automations, not direct frontend API calls. When verifying synthesis flows, confirm the N8N webhook trigger and response chain, not just the UI state.
+5. **Gate by beta week, test by internal readiness.** The beta tier gate shows users what's "coming next week." Internally, features should be verified end-to-end before the cohort week that unlocks them.
+6. **Design alignment is a deliverable, not an afterthought.** The UI is functional but has not been pulled through the updated ArchitectOS Design System. A full design alignment pass is required before beta launch — this is Phase 5B in this roadmap.
+7. **Clean house before you invite guests.** Remove the legacy openai package, dev-mode artifacts (e.g., "Dev: Force Generate Dashboard" links visible in production views), and dead code before cohort launch.
+8. **Leave V2 scope strictly alone.** Virtual CSO, Trend Analysis, Stripe, fractional CSO/CFO service layer, and team member accounts are all post-beta. Do not scope-creep into them during the build — but do not create technical debt that blocks them either.
+
+---
+
+## Phase 1 — Foundation Verification and Auth Hardening
+**Goal:** Confirm that authentication, Supabase schema, and Agency Snapshot + AI synthesis are all wired correctly end-to-end. Fix what's broken. Fill what's missing. The Agency Snapshot synthesis must be confirmed live before any other work proceeds.
+**Demoable outcome:** A beta founder can sign up, land on their dashboard, complete the Agency Snapshot, and receive an AI-synthesized readback of their business within 60 seconds — confirmed with real data, not mock.
+**Must be complete before:** Beta program launches (~8 weeks from now)
+**Build status:** Existing codebase has auth, Agency Snapshot UI, and synthesis flow — this phase is verification + wiring confirmation, not a from-scratch build.
+
+**Agent session prompt:**
+> "You are working on ArchitectOS Pro, a React 19 + Vite + TypeScript SPA using Supabase for auth and database, and Claude Sonnet (via N8N) for AI synthesis. Most of the codebase is already built. Your job in this phase is to: (1) verify and harden the Supabase auth flow end-to-end, (2) audit and confirm the Supabase schema matches the PRD data model, (3) verify the Agency Snapshot input tabs are wired to Supabase with auto-save, (4) confirm the Agency Snapshot synthesis flow (N8N webhook or Edge Function) works end-to-end, and (5) verify the AI readback renders on the Snapshot Dashboard. Start by reading App.tsx and context/AuthContext.tsx to understand the existing structure. Do not rebuild things that exist — verify and fix."
+
+- [ ] **TASK-001** — Verify and harden Supabase auth flow end-to-end
+  Files: `context/AuthContext.tsx`, `pages/PublicPages.tsx`, `components/ProtectedRoute.tsx`
+  Notes: Verify ProtectedRoute redirects correctly on unauthenticated access. Confirm session persists on browser refresh. Confirm sign-out clears session. Fix any auth state race conditions. Confirm profile auto-creation trigger fires on sign-up.
+
+- [ ] **TASK-002** — Audit Supabase schema against PRD data model — fill any gaps
+  Files: `docs/migrations/` (review existing), Supabase dashboard
+  Notes: Compare existing Supabase tables against the PRD data model. Document which tables exist and which are missing. Add any missing tables or columns via migration. Confirm RLS policies are on every table. Do NOT drop existing tables — additive changes only. Use Supabase MCP to inspect current schema when available.
+
+- [ ] **TASK-003** — Verify Supabase client and typed query helpers
+  Files: `lib/supabase.ts`, `lib/queries.ts`
+  Notes: Confirm Supabase client initializes from environment variables correctly. Review existing query helpers — add any missing ones for (getProfile, getLatestSnapshot, getLatestMRAAssessment, getActiveSprint). Generate/update TypeScript types from current schema using `supabase gen types typescript`.
+
+- [ ] **TASK-004** — Verify Agency Snapshot input tabs auto-save to Supabase correctly
+  Files: `pages/Foundations/` (Snapshot tabs)
+  Notes: Test all 5 input tabs (Economic Foundation, Revenue Model, Market Footprint, Delivery Architecture, Team Structure). Confirm each saves to the correct `agency_snapshots` column in Supabase. Confirm data reloads correctly on return visit. Fix any fields that don't save or reload. "Saved" indicator should appear on each save.
+
+- [ ] **TASK-005** — Verify Agency Snapshot AI synthesis end-to-end (N8N or Edge Function)
+  Files: Snapshot synthesis trigger (confirm whether N8N webhook or Supabase Edge Function)
+  Notes: Confirm the synthesis trigger workflow: how does the "Generate Synthesis" button call Claude? Via N8N webhook or Supabase Edge Function? Trace the full path: button click → trigger → Claude call → response → stored in `agency_snapshots.synthesis_content` → displayed on Dashboard. Fix any broken steps. Confirm Claude API key is server-side only (never in client bundle).
+
+- [ ] **TASK-006** — Verify synthesis display on Snapshot Dashboard tab
+  Files: `pages/Foundations/` (Dashboard tab of Snapshot)
+  Notes: Confirm the Dashboard tab reads `synthesis_content` from Supabase and renders it correctly. If synthesis already generated: show on load without re-triggering. If not yet generated: show "Generate Synthesis" CTA. Confirm loading state during generation. Confirm error state if generation fails.
+
+- [ ] **TASK-007** — Verify beta tier gate system is functional
+  Files: `context/AppContext.tsx`, `lib/tierGate.ts` (or equivalent)
+  Notes: Confirm `useFeatureGate(featureKey)` hook (or equivalent) is implemented. Verify it reads `profiles.beta_cohort_week` and `beta_feature_gates` table. Test that a Week 1 user cannot access Week 5 features. Locked features must show a clean "This feature unlocks in Program Week X" state — not a 404 or blank page.
+
+- [ ] **TASK-008** — Verify Dashboard renders correct program state dynamically
+  Files: `pages/DashboardPage.tsx`
+  Notes: Test Dashboard for a new user (no data), a user who has completed Agency Snapshot, and a user who has completed MRA. Each state should show the correct next-action prompt. Maturity and readiness scores should appear once MRA is complete. Fix any static/hardcoded content that should be dynamic.
+
+- [ ] **TASK-009** — End-to-end test: sign-up → snapshot → synthesis → dashboard
+  Files: Test manually against real Supabase project (not mock data)
+  Notes: Create a real test user via sign-up. Complete all 5 snapshot sections. Generate synthesis. Verify synthesis appears on Dashboard. Verify data persists on browser refresh. Create a second test user and verify they cannot see user 1's data (RLS test).
+
+---
+
+## Phase 2 — Orientation Layer Verification (GV Calculator + Clarity Compass)
+**Goal:** Confirm GV Calculator and Clarity Compass are fully wired with Supabase persistence, synthesis working, and no dev artifacts in the UI.
+**Demoable outcome:** Founder can model growth scenarios (GV Calculator), compare named scenarios side-by-side, declare 12/24/36-month horizons (Clarity Compass), generate synthesis, and see all data correctly saved and reloaded across sessions.
+**Beta unlock:** Program Week 2
+**Build status:** Both features are built. GV Calculator includes save/compare functionality (both real-time and saved tables in Supabase). Clarity Compass is built but has a visible dev artifact ("Dev: Force Generate Dashboard" link) that must be removed. Verification and cleanup pass needed.
+
+**Agent session prompt:**
+> "You are continuing work on ArchitectOS Pro. Phase 1 is verified — auth works, Agency Snapshot is confirmed end-to-end. Now verify the GV Calculator and Clarity Compass. Both are already built. GV Calculator should save scenarios and support side-by-side comparison with named saved scenarios. Clarity Compass should auto-save horizon inputs, support synthesis generation, and lock into the Quarter Map. Remove the 'Dev: Force Generate Dashboard' dev artifact from the Clarity Compass UI. Do not rebuild — verify, fix, and clean."
+
+- [ ] **TASK-010** — Verify GV Calculator Supabase save/reload and scenario comparison
+  Files: `pages/GVCalculatorPage.tsx` (or equivalent)
+  Notes: Confirm scenario calculation results save to `gv_calculator_scenarios` table. Confirm Scenario Planner loads saved scenarios from Supabase and displays them for comparison. Verify scenarios can be named and the named label persists. Confirm the "Load Saved Scenario" dropdown reads from Supabase correctly. Fix any broken save or load paths.
+
+- [ ] **TASK-011** — Verify Clarity Compass auto-save and horizon data persistence
+  Files: `pages/ClarityPages.tsx` (VisionState tab)
+  Notes: Test all four input sections (Ultimate Vision + 12/24/36-month horizons). Confirm auto-save fires correctly and data reloads on return visit. Confirm "Generate My Strategic Synthesis" triggers correctly only when all 4 horizons are complete. Fix any fields that don't save or reload. Remove "Dev: Force Generate Dashboard" dev artifact link.
+
+- [ ] **TASK-012** — Verify Clarity Compass synthesis generation and storage
+  Files: Synthesis trigger (N8N or Edge Function)
+  Notes: Confirm the synthesis trigger workflow fires after all horizons are confirmed. Verify Claude synthesis is generated, stored in `clarity_compass.synthesis_content`, and displayed on the Dashboard tab. Confirm the version naming (e.g., "Clarity Compass - Feb 2026") saves correctly. Test with real data.
+
+- [ ] **TASK-013** — Verify Clarity Compass Dashboard and History tabs
+  Files: `pages/ClarityPages.tsx`
+  Notes: Dashboard tab: confirm confirmed horizons render in a clean summary view with synthesis. History tab: confirm previous versions are preserved when a retake occurs. Verify "Locked on [date]" display. Verify horizon lock status correctly gates the Horizon Declaration tab in the Quarter Map.
+
+- [ ] **TASK-014** — End-to-end test: GV scenarios save/reload, horizons lock and appear in Quarter Map
+  Files: Manual integration test
+  Notes: Run 2 GV scenarios, save both with names, verify comparison view. Complete and lock Clarity Compass. Verify Quarter Map Horizon Declaration tab shows the locked horizons. Verify all data persists across browser sessions.
+
+---
+
+## Phase 3 — Diagnostics Layer Verification (AE Ladder + MRA)
+**Goal:** Confirm both diagnostic assessments are wired correctly, reports generate end-to-end, and all results pages render accurately. Both assessments are already built and tested with mock data — this phase is live user flow verification and gap closure.
+**Demoable outcome:** Real test user completes AE Ladder → receives stage placement + Claude report (via N8N). Then completes MRA → receives full report with 4-tab results display, 3P tags, and dimension scores. Dashboard updates accordingly.
+**Beta unlock:** AE Ladder = Program Week 3. MRA = Program Week 5.
+**Build status:** AE Ladder and MRA are both fully built and tested. Reports generate via N8N + Claude. PDF downloads are built for both (Google Docs merge field templates, N8N packaging, Supabase storage). Live user flow testing is the primary deliverable here.
+
+**Agent session prompt:**
+> "You are continuing work on ArchitectOS Pro. Both the AE Ladder and MRA assessments are built and have been tested with mock data. Your job is to run live user flow tests — create a real test account and complete both assessments as if you are a real founder. Verify that every step persists to Supabase, the N8N synthesis workflows trigger correctly, and the results pages render accurately. Fix any broken steps. The MRA checkpoint content lives in Supabase (not a config file) — confirm the assessment reads from the correct Supabase tables. Document any gaps found during live testing."
+
+- [ ] **TASK-015** — Verify AE Ladder Assessment saves responses per-question to Supabase
+  Files: AE Ladder assessment page(s)
+  Notes: Complete the 19Q assessment as a real user. Verify each response auto-saves to `ae_ladder_assessments.responses`. Verify resume-from-checkpoint works (exit mid-assessment, return, confirm last answer is pre-populated). Verify progress indicator ("Question X of 19") is accurate. Confirm stage placement calculates correctly from responses.
+
+- [ ] **TASK-016** — Verify AE Ladder stage placement and scoring logic
+  Files: AE Ladder scoring logic (wherever it lives in codebase)
+  Notes: Confirm stage placement is deterministic from dimension scores (Rising / Driving / Thriving / Striving / Arriving). Verify dimension scores are saved to `ae_ladder_assessments.dimension_scores` and `stage_placement`. Confirm the stage calibration feeds into MRA configuration correctly — this is the critical dependency for stage-calibrated MRA checkpoints.
+
+- [ ] **TASK-017** — Verify AE Ladder N8N report generation end-to-end
+  Files: N8N workflow (AE Ladder report generation)
+  Notes: Trigger the report generation workflow with real assessment data. Verify Claude synthesis runs, report content is stored in `ae_ladder_assessments.report_content` and `stage_guide_content`, and the report is available for PDF download. Confirm report generation completes within 60 seconds. Fix any broken webhook triggers or storage steps.
+
+- [ ] **TASK-018** — Verify AE Ladder Results Dashboard renders correctly
+  Files: AE Ladder Results Dashboard page (3-tab: Results Dashboard, Stage Context, PDF)
+  Notes: Confirm the 3-tab results display renders with: stage badge (THRIVING etc.), Overall Score, Deep-Dive Synthesis, Dimension Snapshot (5 dimension cards with scores and insight). Confirm Stage Context tab loads. Confirm PDF download is functional. Assessed date shows correctly. Check all Recharts visualizations render without errors.
+
+- [ ] **TASK-019** — Verify MRA assessment reads checkpoint content from Supabase correctly
+  Files: MRA assessment page(s)
+  Notes: **Important:** MRA checkpoint content (125 checkpoints × 5 stages = 500 definitions) lives in Supabase — NOT in a frontend config file. Verify the assessment reads from the correct Supabase tables at runtime. Verify checkpoints are stage-calibrated based on the user's AE Ladder placement. Verify the 5-point response scale (Not Present / Early Stage / Developing / Established / Optimized) renders for each checkpoint. Confirm split-session support: exit mid-assessment, return, resume from last answered checkpoint.
+
+- [ ] **TASK-020** — Verify MRA checkpoint content wiring and stage calibration in Supabase
+  Files: Supabase MRA content tables (use Supabase MCP to inspect)
+  Notes: **This is a verification task, not a build task.** Use the Supabase MCP to confirm: (1) all 125 checkpoint content rows exist, (2) each checkpoint has stage-calibrated definitions for all 5 AE Ladder stages, (3) the frontend assessment reads the correct checkpoint for the user's stage, (4) the N8N synthesis workflow also reads these tables for report generation context. Document the table names for future reference. If any checkpoint rows are missing, flag for content review — do not create content without London's input.
+
+- [ ] **TASK-021** — Verify MRA scoring and score storage in Supabase
+  Files: MRA scoring logic (wherever it lives in codebase)
+  Notes: Complete full MRA with real responses. Verify maturity score and readiness score calculate correctly per capability area. Verify overall scores (0-100) are stored in `mra_assessments.overall_maturity_score` and `overall_readiness_score`. Verify dimension scores and capability_area_scores are populated. Verify urgency scores appear on the Structural Levers results tab. Check against screenshots: Maturity 74%, Readiness 76% should be plausible for a real assessment.
+
+- [ ] **TASK-022** — Verify MRA N8N report generation end-to-end (multi-call synthesis chain)
+  Files: N8N workflow (MRA report generation)
+  Notes: The MRA report uses a multi-call synthesis chain through N8N (not a single Claude call). Trigger with real assessment data. Verify all synthesis steps complete. Verify report is stored in `mra_assessments.report_content` and PDF is packaged and accessible for download. Confirm 3P priority tags are generated and stored in `three_p_tags`. Target latency: under 90 seconds. Fix any broken steps in the N8N chain.
+
+- [ ] **TASK-023** — Verify MRA Results 4-tab display renders correctly
+  Files: MRA Results page (Summary, Systems Perspective, Structural Levers, Direction tabs)
+  Notes: Verify all 4 tabs render with real data: (1) Summary tab — Maturity % + Readiness %, Strategic Matrix 2×2 positioning, Stage Context, Path Forward; (2) Systems Perspective — cross-dimensional pattern analysis; (3) Structural Levers — Top 5 leverage capabilities + full 25-capability priority stack with Stage Fit and Priority tags; (4) Direction — target state checklist + "Download Full Report" + CTA to Pro Suite. Confirm "Explore System Insights" navigation works.
+
+- [ ] **TASK-024** — Verify MRA completion triggers Dashboard score update
+  Files: `pages/DashboardPage.tsx`, Supabase queries
+  Notes: After MRA completes, Dashboard should show Maturity Score, Readiness Score. Verify these render dynamically from Supabase (not hardcoded). Verify top urgency capability areas appear. These scores must update when milestones complete later — confirm the score update trigger is wired.
+
+- [ ] **TASK-025** — End-to-end test: full AE Ladder + MRA flow as live user (real Supabase data)
+  Files: Full diagnostics flow
+  Notes: One complete run from sign-up through MRA results — real user, real responses, real Supabase data. Document any friction points, copy issues, broken states, or UX confusion. All P0 issues must be fixed before Phase 3 is considered complete.
+
+---
+
+## Phase 4 — Pro Suite Planning Layer Verification
+**Goal:** Verify Quarter Map, Capability Cards, Initiative/Milestone Builder, Sprint Lock, and Sprint Launch Document are all wired correctly. Add Sprint Launch Document PDF download (the one confirmed gap in this layer). Clean up any broken wiring or state issues found during live testing.
+**Demoable outcome:** Real test user runs full planning flow: MRA data populates Quarter Map → 3P selection enforces correctly → Sprint Board populates → initiatives and milestones save → Sprint locks → Launch Document generates → PDF download works.
+**Beta unlock:** Quarter Map = Program Week 6. Sprint Planning + Lock = Program Week 7.
+**Build status:** Quarter Map (including 3P selection, capability filtering, Parking Lot), Sprint Board, Initiative/Milestone Builder (slide-out panel with owners, status, checkpoint labels, comments), Sprint Goal Flow, and Sprint Lock are all built. Sprint Launch Document renders in-platform. PDF download is the confirmed gap — must be built for beta (P1). Reflection Review rollover logic is partial — needs scoping and build.
+
+**Agent session prompt:**
+> "You are continuing work on ArchitectOS Pro. The diagnostics layer is verified. Now verify the Pro Suite Planning layer — Quarter Map, Sprint Board, Initiative Builder, Milestone Builder, and Sprint Lock. These are already built. Your job is to verify all Supabase wiring is correct, the 3P enforcement (exactly 3+3+3) works, and Sprint Lock triggers the Launch Document generation. Then build the Sprint Launch Document PDF download — this is the one confirmed gap. Use the same N8N + Google Docs merge field pattern as the MRA/AE Ladder PDF reports. Reference existing pages/ProSuite/ and pages/SprintPlanning/ for current structure."
+
+- [ ] **TASK-026** — Verify Quarter Map Orientation tab reads MRA and AE Ladder data from Supabase
+  Files: Quarter Map Orientation tab
+  Notes: Confirm Orientation tab reads latest MRA scores and AE Ladder stage placement from Supabase. Verify current stage badge, maturity score, readiness score, and top urgent capability areas display correctly. Confirm gated state renders if MRA is not complete.
+
+- [ ] **TASK-027** — Verify Strategic Horizons tab reads Clarity Compass data
+  Files: Quarter Map Strategic Horizons tab
+  Notes: Confirm this tab reads the locked Clarity Compass record from Supabase. Verify all declared horizons display correctly. Verify roadmap synthesis content appears. Confirm gated state renders if Clarity Compass is not locked.
+
+- [ ] **TASK-028** — Verify 12-Month Plan tab (Execution Sequencer) wiring
+  Files: Quarter Map 12-Month Plan tab
+  Notes: Confirm this tab displays the proposed quarterly sprint sequence with contextual override fields. Verify contextual override inputs save to `quarter_maps` in Supabase. Fix any missing data connections from MRA to the sequencer recommendations.
+
+- [ ] **TASK-029** — Verify 3P Capability Selection enforces correctly and locks to Supabase
+  Files: Quarter Map — Current Quarter Focus tab
+  Notes: Test all 25 capability cards render with correct maturity scores, urgency scores, and suggested 3P tags from MRA. Test enforcement: confirm "Lock and Proceed" button only activates when all three buckets have exactly 3 capability areas. Confirm on lock: `quarter_maps` record saves with prioritize/plant/progressively_iterate arrays. Confirm 9 `capability_cards` records auto-create on lock. Confirm Parking Lot appears for unselected areas. Verify Q1 2026 / quarter label displays correctly and is selectable.
+
+- [ ] **TASK-030** — Verify Sprint Goal Flow saves and displays on Sprint Board
+  Files: Sprint Goal Flow pages
+  Notes: Confirm sprint goal and sprint theme save to `sprints` table with `status = 'planning'`. Confirm sprint goal appears as a persistent banner on the Sprint Board. Confirm "I've done this before. Skip to my current plan" link works correctly.
+
+- [ ] **TASK-031** — Verify Sprint Board renders all 9 capability cards correctly
+  Files: Sprint Board page
+  Notes: Confirm 3-column layout (Prioritize | Plant | Progressively Iterate) with correct 3 cards per column. Confirm each card shows capability area name, initiative count, milestone count, and a stage-fit badge (AT STAGE / BELOW STAGE / AHEAD OF STAGE). Confirm "Add Initiative" opens the slide-out detail panel. Confirm sprint synthesis banner and Regenerate/Dismiss actions work. Confirm "Review & Lock Sprint" button is accessible.
+
+- [ ] **TASK-032** — Verify Initiative/Milestone slide-out panel saves all fields to Supabase
+  Files: Initiative detail slide-out panel (Capability Context)
+  Notes: Test adding an initiative with all fields: name, description, owner, 3P classification, checkpoint labels, sprint goal connection, target date. Test adding milestones: outcome description, owner, due date, status. Confirm all data saves to `initiatives` and `milestones` tables in Supabase. Verify owner avatar/initials display correctly. Verify status selector (Not Started / In Progress / At Risk / Blocked / Complete) saves. Verify comments and change history save. Verify milestone visibility toggle (hide from bulk editor) works.
+
+- [ ] **TASK-033** — Verify Sprint Review and Lock triggers correctly
+  Files: Sprint Review and Lock pages
+  Notes: Confirm Sprint Review page renders summary of all initiatives and milestones. Confirm Sprint Sanity Check prompts appear. Confirm "Lock Sprint" (or "Review & Lock Sprint") sets `sprints.status = 'active'` and `locked_at = now()` in Supabase. Confirm generation trigger fires for Sprint Launch Document. Confirm loading state displays ("Generating your Sprint Launch Document...").
+
+- [ ] **TASK-034** — Verify Sprint Launch Document generates and displays in-platform
+  Files: Sprint Launch page / launch document display
+  Notes: Confirm the Claude-generated Sprint Launch Document renders in the platform after sprint lock. Confirm document content is stored in `sprints.launch_document_content` in Supabase. Confirm document persists on subsequent visits. Confirm content structure: sprint goal, executive summary, 3P plan, team roster, sprint metrics.
+
+- [ ] **TASK-035** — Build Sprint Launch Document PDF download (confirmed gap — must build)
+  Files: N8N workflow (new), Google Docs template (new), Sprint Launch page
+  Notes: **This is a genuine build task.** Create a Google Docs merge field template for the Sprint Launch Document. Build an N8N workflow that: reads the locked sprint data from Supabase → populates merge fields → triggers Claude for any narrative sections → packages as PDF → stores in Supabase Storage → returns a download URL. Wire "Download PDF" button on the Sprint Launch page. This follows the same pattern as the MRA and AE Ladder PDF reports.
+
+- [ ] **TASK-036** — End-to-end test: MRA data → Quarter Map → Sprint Board → Lock → Launch Document PDF
+  Files: Full planning flow
+  Notes: Complete full planning flow with real MRA data. Build 2 initiatives per prioritize card, each with 2 milestones. Lock sprint. Verify Launch Document renders in-platform AND PDF download works. Verify all data persists in Supabase. Verify Sprint Board shows correct initiative/milestone counts.
+
+---
+
+## Phase 5 — Execution Layer Verification (Status Tracker + Retrospective)
+**Goal:** Verify Status Tracker is correctly wired, milestone completions trigger maturity score updates, and Retrospective rollover logic is scoped and built. Momentum Synthesis and Notes Log are also in this phase.
+**Demoable outcome:** Founder opens Status Tracker during a team session, hides a sensitive initiative, updates milestone statuses in bulk, and maturity score on Dashboard updates automatically within 5 seconds.
+**Beta unlock:** Status Tracker = Program Week 10. Retrospective = Program Week 12.
+**Build status:** Status Tracker (bulk milestone editor) is built. Milestone → maturity score update trigger exists. Retrospective and Reflection Review are partially built — rollover logic needs scoping and build. Momentum Synthesis and Notes Log need verification.
+
+**Agent session prompt:**
+> "You are continuing work on ArchitectOS Pro. The planning layer is verified. Now verify the Execution layer — Status Tracker, Momentum Synthesis, and Retrospective. Status Tracker and maturity score auto-update are already built — verify they work end-to-end with real data. Build the missing Reflection Review rollover logic (founder makes explicit decisions: roll forward / deprioritize / abandon for each incomplete initiative). Reference existing pages/ProSuite/StatusTracker.tsx and related execution pages."
+
+- [ ] **TASK-037** — Verify Status Tracker reads all milestones and filters correctly
+  Files: `pages/ProSuite/StatusTracker.tsx`
+  Notes: Confirm table reads all milestones for the active sprint from Supabase. Verify filter dropdowns (by owner, status, capability area) work. Confirm bulk select + bulk status change saves correctly. Verify hidden initiative toggle — hidden initiatives should be excluded from the table view. Verify inline status dropdown saves to `milestones` table immediately.
+
+- [ ] **TASK-038** — Verify milestone completion triggers maturity score recalculation
+  Files: Score update logic (wherever it lives), Dashboard
+  Notes: Mark a milestone as complete in Status Tracker. Verify `completed_at` is set in Supabase. Verify maturity score for the related capability area recalculates and updates `mra_assessments.capability_area_scores`. Verify Dashboard score badge updates. Score delta should appear: "Cash Flow Forecasting: 34 → 41 since sprint start." Fix any broken steps in the trigger chain.
+
+- [ ] **TASK-039** — Verify Momentum Synthesis page renders with real sprint data
+  Files: `pages/ProSuite/MomentumSynthesis.tsx`
+  Notes: Confirm page reads live milestone completion data from Supabase. Verify sprint progress metrics render (total, completed, in progress, blocked). Verify Recharts progress visualization. Confirm pace assessment logic is correct relative to sprint timeline. Fix any broken data connections.
+
+- [ ] **TASK-040** — Build Reflection Review rollover logic (confirmed partial build — needs completion)
+  Files: `pages/ProSuite/Retrospective.tsx`, `pages/ProSuite/ReflectionReview.tsx`
+  Notes: **This needs genuine build work.** The Retrospective page exists but rollover decision logic is incomplete. Build: (1) auto-populate what was completed (from milestone data); (2) for each incomplete initiative: show explicit decision prompt "Roll into Sprint 2 / Deprioritize / Abandon" with reason field; (3) rolled-forward initiatives auto-appear on the new Sprint Board without requiring re-selection in Quarter Map; (4) "Close Sprint" button: sets sprint `status = 'closed'`, creates new sprint record in 'planning' status. Reflection/Review page: quarterly reflection prompts (what worked, what drifted, what to protect next quarter). Both save to Supabase.
+
+- [ ] **TASK-041** — Verify Sprint Wind-Down workflow
+  Files: `pages/ProSuite/SprintWindDown.tsx`
+  Notes: Confirm pre-retrospective checklist renders and tracks completion. Verify navigation to Retrospective page works. Fix any broken state or routing.
+
+- [ ] **TASK-042** — Verify Notes/Priority Log saves to Supabase
+  Files: `pages/ProSuite/NotesLog.tsx`
+  Notes: Confirm entry creation (text + tag) saves to Supabase with correct user_id, sprint_id, created_at. Confirm reverse-chronological display. Confirm tags (Decision / Insight / Blocker / Priority) filter correctly. Verify data persists across sessions.
+
+- [ ] **TASK-043** — End-to-end test: Status Tracker → score update → Retrospective → sprint close
+  Files: Full execution flow
+  Notes: Mark 3+ milestones as complete. Verify maturity score updates on Dashboard. Check Momentum Synthesis reflects updates. Run Retrospective: make rollover decisions for at least one incomplete initiative. Close sprint. Verify new sprint record is created in 'planning' status. Verify rolled-forward initiative appears on new Sprint Board.
+
+---
+
+## Phase 5B — Design System Alignment and UI Polish
+**Goal:** Pull the entire platform UI through the updated ArchitectOS Design System. The platform is functional but has not been aligned to the revised design spec — this is a required pre-beta deliverable, not optional polish.
+**Demoable outcome:** Every screen in the platform matches the ArchitectOS Design System tokens (colors, typography, spacing, component styles). No dev artifacts visible. Navigation and sidebar are clean and consistent. The platform feels like a premium product, not a functional prototype.
+**Must be complete before:** Beta cohort launch
+
+**What this phase covers:** The screenshots from April 2026 show a functional but visually inconsistent platform. The colored text (orange, blue, green on white), the component styling, the density of information, and the navigation structure all need a pass against the updated design spec in `ArchitectOS Design System/`. This is a UI-only phase — no Supabase wiring or logic changes. Stability of data should be preserved.
+
+**Agent session prompt:**
+> "You are doing a full design alignment pass on ArchitectOS Pro. Read the design system files in the ArchitectOS Design System folder (SKILL.md, colors_and_type.css, components.css, ArchitectOS-design-system.md) before touching any code. Then systematically update every screen to match the design tokens. Focus on: (1) typography (font families, sizes, weights, line heights), (2) color usage (primary, surface, text colors — stop using colored text as the primary hierarchy signal), (3) spacing (consistent padding, gap, margin following the spacing scale), (4) component styles (cards, buttons, badges, tabs, tables, form inputs), (5) navigation and sidebar. Do not change any data fetching, Supabase logic, or routing. Only visual layer changes."
+
+- [ ] **TASK-044** — Read and internalize the ArchitectOS Design System spec
+  Files: `ArchitectOS Design System/ArchitectOS-design-system.md`, `colors_and_type.css`, `components.css`, `SKILL.md`
+  Notes: Before any UI changes: read all design system files. Understand the color palette, typography scale, spacing system, component library, and brand personality guidelines. Document any gaps between current implementation and spec before starting changes.
+
+- [ ] **TASK-045** — Apply design tokens globally (CSS variables, base styles)
+  Files: Global CSS / Tailwind config / root stylesheet
+  Notes: Ensure all design token CSS variables (colors, fonts, spacing) are defined and applied at the root level. Remove any hardcoded color values that conflict with the design system. Confirm dark header/sidebar against light content area as seen in existing screenshots — but pull through the correct token values.
+
+- [ ] **TASK-046** — Design pass: Foundations section (Snapshot, GV Calculator, Clarity Compass)
+  Files: All Foundations page components
+  Notes: Apply design system to all Foundations screens. Priority: typography hierarchy (headers vs. body vs. labels), card component consistency, form input styling, CTA button styling, tab navigation styling.
+
+- [ ] **TASK-047** — Design pass: Diagnostics section (AE Ladder, MRA Results)
+  Files: All Diagnostics page components
+  Notes: AE Ladder Results: apply design tokens to stage badge, score cards, dimension breakdown cards, Deep-Dive Synthesis text. MRA Results: apply to all 4 tabs — Summary (maturity/readiness score badges, Strategic Matrix), Systems Perspective, Structural Levers (capability priority stack table), Direction (target state checklist). Particular attention to score visualization components (Recharts styling).
+
+- [ ] **TASK-048** — Design pass: Pro Suite (Quarter Map, Sprint Board, Initiative panel)
+  Files: All Pro Suite page components
+  Notes: Quarter Map: capability card styling, 3P bucket column headers, filter tabs, "Lock and Proceed" button. Sprint Board: 3-column layout, capability card styling, stage-fit badge colors (BELOW STAGE / AT STAGE / AHEAD OF STAGE), initiative count indicators. Initiative slide-out panel: status selector styling, owner avatar display, milestone list, checkpoint label tags, comments section.
+
+- [ ] **TASK-049** — Design pass: Execution section (Status Tracker, Momentum Synthesis)
+  Files: Execution section components
+  Notes: Status Tracker table: sticky headers, row hover states, inline dropdown styling, health score indicators (green/yellow/red), bulk select checkbox styling. Momentum Synthesis: progress chart styling, pace assessment badge. Notes Log: entry card styling, tag badge styling.
+
+- [ ] **TASK-050** — Navigation and sidebar cleanup
+  Files: `components/Sidebar.tsx`, `components/Header.tsx`, navigation-related components
+  Notes: Audit the sidebar for: correct section labels, correct icon usage (Lucide React), beta gate lock indicators, active state styling. Audit the header for: page title display, user avatar, notification indicator. Remove any nav items or links that reference V2 features (Virtual CSO, Trend Analysis) — replace with clear "Coming Soon" states or remove entirely for beta. Fix any broken routing from nav items.
+
+- [ ] **TASK-051** — Remove all dev-mode artifacts from production UI
+  Files: All pages — audit for dev-only content
+  Notes: Find and remove all "Dev: X" links, debug buttons, hardcoded test data, console.log statements left in components, and any UI elements that are clearly dev tools (like the "Dev: Force Generate Dashboard" link on Clarity Compass). Do a grep for "dev:" and "console.log" across all component files.
+
+---
+
+## Phase 6 — Codebase Cleanup and Beta Readiness
+**Goal:** Remove legacy dependencies, fix TypeScript errors, wire Settings pages, verify RLS security, seed beta feature gates, and run a full end-to-end simulation. Platform ready for 10 live users.
+**Demoable outcome:** Zero critical bugs. No legacy code. Settings work. All empty/loading/error states are implemented. Full program run-through completes without failures.
+
+**Agent session prompt:**
+> "You are in the final pre-launch cleanup phase for ArchitectOS Pro. All features are verified and design-aligned. Now: (1) remove the legacy openai package and all dead code associated with it, (2) wire Settings pages to Supabase and verify they work, (3) do a full RLS security audit, (4) fix TypeScript errors, (5) run performance checks, (6) seed the beta_feature_gates table, (7) run a full end-to-end simulation as a real beta founder. Focus on stability, security, and data integrity."
+
+- [ ] **TASK-052** — Remove legacy openai package and all associated dead code
+  Files: `package.json`, any files importing from 'openai'
+  Notes: Run `grep -r "from 'openai'" .` and `grep -r "require('openai')" .` to find all usages. Remove all imports and usages. Remove the package from `package.json`. Run `npm install` to update the lockfile. Verify the app still compiles and runs after removal. This is a required cleanup — the openai package is entirely unused since migration to Claude via N8N.
+
+- [ ] **TASK-053** — Identify and remove other dead code and unused imports
+  Files: Codebase-wide audit
+  Notes: Run TypeScript compiler and ESLint to identify unused imports, unused variables, and unreferenced functions. Specifically check: any legacy placeholder pages (RoadmapPlaceholder.tsx, ProgressPlaceholder.tsx — replace with real implementations or remove routes). Archive any commented-out code blocks older than 30 days. Remove any hardcoded mock data that should come from Supabase.
+
+- [ ] **TASK-054** — Verify Settings → Account page is wired to Supabase
+  Files: `pages/SettingsPages.tsx` (AccountSettings)
+  Notes: Test: edit full_name and agency_name → confirm saves to `profiles` table. Test: change password via `supabase.auth.updateUser({ password })`. Confirm success toast appears. Test soft delete account flow (confirmation modal). Fix any broken connections.
+
+- [ ] **TASK-055** — Verify Settings → Data Manager reads and manages Supabase data
+  Files: `pages/SettingsPages.tsx` (DataManager)
+  Notes: Confirm all stored data displays by section (Snapshot, AE Ladder, MRA, Quarter Maps, Sprints). Test delete of an individual assessment with confirmation. Test JSON export download. Verify deleted data is actually removed from Supabase.
+
+- [ ] **TASK-056** — Verify Settings → Subscription page shows correct beta state
+  Files: `pages/SettingsPages.tsx` (SubscriptionBilling)
+  Notes: Confirm page shows "Beta Program Access — Active" with current cohort week. Stripe placeholder is intentional — confirm it does not show dummy payment UI or broken Stripe elements. Confirm the page renders cleanly with a clear "Subscription management available at public launch" message.
+
+- [ ] **TASK-057** — Full Supabase RLS security audit
+  Files: Supabase dashboard / migration SQL files
+  Notes: Verify every table has RLS enabled. Test cross-user data isolation: create two test accounts, confirm user A cannot read or write user B's data via direct Supabase queries. Verify N8N workflows validate the authenticated user before reading/writing data. Document confirmed RLS policies per table.
+
+- [ ] **TASK-058** — Fix TypeScript errors (ts_errors.log and tsc_errors.log)
+  Files: `ts_errors.log`, `tsc_errors.log`, affected source files
+  Notes: Read both error logs. Systematically fix TypeScript errors — prioritize any `any` types that could cause runtime errors. Do not suppress errors with `@ts-ignore` unless absolutely unavoidable with a documented reason. Run `tsc --noEmit` before and after to confirm error count drops to zero.
+
+- [ ] **TASK-059** — Performance audit: slow queries and missing loading states
+  Files: `lib/queries.ts`, affected pages
+  Notes: Add select field limiting to Supabase queries (don't select * on large tables). Implement loading skeleton screens on all pages that fetch async data. Verify Status Tracker performs with 50+ milestones. Check for N+1 query patterns in Capability Card loading. Verify auto-save debounce is consistent at 2 seconds across all forms.
+
+- [ ] **TASK-060** — Seed beta_feature_gates table and verify gate logic
+  Files: `scripts/seed-beta-gates.sql` (create)
+  Notes: SQL script to populate `beta_feature_gates` with all 12 program weeks and their feature keys. Map: Week 1 (agency_snapshot), Week 2 (gv_calculator, clarity_compass), Week 3 (ae_ladder), Week 5 (mra), Week 6 (quarter_map), Week 7 (sprint_planning), Week 10 (status_tracker), Week 12 (retrospective). Run against Supabase before cohort launch. Test that a user at Week 1 cannot access Week 5+ features.
+
+- [ ] **TASK-061** — Full end-to-end beta simulation: sign-up through sprint retrospective
+  Files: All platform features
+  Notes: One team member completes the full program flow as a real beta founder — real account, real responses (not shortcuts). Sign-up → Agency Snapshot → GV Calculator → Clarity Compass → AE Ladder → MRA → Quarter Map → Sprint Build → Sprint Lock → Sprint Launch Document (PDF) → Status Tracker → Retrospective. Document all friction points, copy issues, broken flows. Resolve all P0 and P1 issues before cohort launch.
+
+- [ ] **TASK-062** — Verify all empty states, loading states, and error states across the platform
+  Files: All page components
+  Notes: Every major page must handle: (1) empty state — clear CTA, never a blank page; (2) loading state — skeleton or spinner with contextual copy; (3) error state — plain language error with retry. Audit: Dashboard, Snapshot Dashboard, AE Ladder Results, MRA Results (all 4 tabs), Quarter Map, Sprint Board, Sprint Launch Document, Status Tracker, Clarity Compass.
+
+---
+
+## Phase 7 — Post-Beta: Stripe, Public Launch, and Fractional Services Groundwork
+**Goal:** Stripe integration, public-facing self-serve signup, standalone tier launch. Begin technical groundwork for the fractional CSO/CFO advisor service layer.
+**Status:** Post-beta — do not start until beta program completes and beta cohort feedback is synthesized.
+
+*Note: This phase begins after the 12-week beta program closes. Estimated start: Q4 2026. Beta cohort feedback must be synthesized before final scoping of this phase.*
+
+**Fractional CSO/CFO Service Layer (V2 — scope during beta feedback period):**
+Graduates of the Architect Advantage Accelerator become eligible for $5K/month fractional services. The platform becomes the advisory home base. Before building, the following decisions need to be made post-beta: (1) advisor access model (read-only vs. collaborative view), (2) financial data integration approach (manual input vs. API connection to accounting platform), (3) monthly session prep view design (what does the advisor see when they open the platform before a client session?). These decisions will be informed by beta cohort feedback and advisor workflow observations.
+
+- [ ] **TASK-063** — Add Stripe package and configure products/prices
+  Files: `package.json`, `lib/stripe.ts` (create)
+  Notes: Add `stripe` package. Configure three products: Orientation ($27-47 one-time), Diagnostics Bundle ($500 one-time), Pro Suite ($197/month). Create Stripe webhook endpoint as Supabase Edge Function.
+
+- [ ] **TASK-064** — Implement Stripe Checkout for Orientation and Diagnostics Bundle
+  Files: `pages/SettingsPages.tsx` (SubscriptionBilling), `supabase/functions/create-checkout-session/index.ts`
+  Notes: "Upgrade to Diagnostics Bundle" button → Stripe Checkout → on success → webhook updates `profiles.tier = 'diagnostics'`.
+
+- [ ] **TASK-065** — Implement Stripe Billing for Pro Suite subscription
+  Files: `supabase/functions/create-billing-portal-session/index.ts`
+  Notes: Pro Suite monthly subscription via Stripe Billing. Stripe Customer Portal for managing subscription. On subscription active: `profiles.tier = 'pro'`. On cancellation: downgrade at period end.
+
+- [ ] **TASK-066** — Replace beta tier gating with post-beta permanent tier gating
+  Files: `context/AppContext.tsx`, `lib/tierGate.ts`
+  Notes: Replace weekly cohort unlock with permanent tier-based access. Free tier: GV Calculator + Agency Snapshot. Diagnostics tier: + AE Ladder + MRA. Pro tier: + all planning and execution tools.
+
+- [ ] **TASK-067** — Build self-serve public signup flow
+  Files: `pages/PublicPages.tsx` (LandingPage, SignUpPage)
+  Notes: Public landing page with positioning, pricing tiers, sign-up CTA. Self-serve signup leads to onboarding flow (not beta cohort management).
+
+- [ ] **TASK-068** — Scope and design Fractional CSO/CFO advisor service layer (V2)
+  Files: New design spec doc (create post-beta)
+  Notes: After beta feedback is synthesized: scope the advisor view (read access to client sprint plan, maturity scores, goal progress), financial data integration (cash flow, P&L, balance sheet inputs alongside strategic data), monthly session prep dashboard, and maturity evolution tracking quarter-over-quarter. This task is a design and scoping deliverable, not a build task. Output: a V2 feature spec that feeds the next PRD revision.
+
+---
+
+## Agent Session Guide
+
+**How to structure coding sessions for this project:**
+
+1. **Verify before you build.** Read the relevant page file(s) before writing any new code. Most features exist — confirm what's there, understand how it works, then fix or extend. Do not create duplicate implementations.
+
+2. **Start each session:** Read `App.tsx`, the relevant page file(s), and `lib/supabase.ts` to understand current state. Check `types.ts` for existing interfaces. Use the Supabase MCP (when available) to inspect the live schema before writing migrations.
+
+3. **Confirm Supabase schema before any data operations:** Verify the table exists and has the right columns. Check `docs/migrations/` for the schema. Use the Supabase MCP to inspect the live database when available. Add columns additively — never drop existing data.
+
+4. **AI synthesis routes through N8N, not the React client.** Claude API calls are handled by N8N automation workflows. The React frontend triggers synthesis via a webhook or Supabase Edge Function call — it does not call the Anthropic API directly. When debugging synthesis, trace the full N8N workflow chain, not just the UI trigger.
+
+5. **Never use local state for persistent data.** Everything that should survive a page refresh goes to Supabase immediately. Auto-save on all input forms with 2-second debounce.
+
+6. **Test with real Supabase and real user accounts — not mocks.** The codebase does not use a mock layer. All verification must be done against the actual Supabase project with real test data.
+
+7. **Feature gate checks:** Any page behind a beta gate should call `useFeatureGate(featureKey)` at the top of the component. Return the clean locked-state UI ("This feature unlocks in Program Week X") if not allowed — never a 404 or blank page.
+
+8. **Keep the platform below the task level.** If you find yourself adding task-tracking, daily check-in, or sub-milestone features — stop. ArchitectOS tracks Capabilities → Initiatives → Milestones only. Tasks go in the team's existing tool.
+
+9. **Design system compliance is required.** When modifying any UI component, reference the ArchitectOS Design System files in `ArchitectOS Design System/`. Apply correct design tokens. Do not introduce new color values, font sizes, or spacing values that aren't in the design system.
+
+10. **Check ts_errors.log and tsc_errors.log** before completing any phase. Fix TypeScript errors as you go — do not suppress with `@ts-ignore` unless absolutely necessary with a documented reason.

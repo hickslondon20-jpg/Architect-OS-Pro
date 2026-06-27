@@ -1,0 +1,282 @@
+# PRD — Capability Workspace: Drill-Down Navigation, Edit Behavior & Change Log
+**Status:** Ready for Build  
+**Last Updated:** March 2026  
+**Feature Area:** Architect OS Pro Suite — Planning & Execution  
+**Routes:** `/pro/planning/sprint-board` (overlay layers, no new routes)  
+**Depends On:** Sprint Board Phase 1 complete, tiered initiative forms built  
+
+---
+
+## 1. Overview
+
+The Sprint Board currently has two views — By Capability and By Initiative — that show aggregated counts and status. Neither provides a way to drill into the actual content without immediately triggering a creation form. This spec introduces a three-layer drill-down navigation system that lets founders review, navigate, and edit sprint content at every level of the hierarchy without leaving the Sprint Board.
+
+The three layers:
+
+| Layer | Accessed From | Shows |
+|---|---|---|
+| **Capability Workspace** | Clicking a capability card (By Capability view) | All initiatives within that capability area |
+| **Initiative Workspace** | Clicking an initiative (from Capability Workspace or By Initiative view) | Full initiative detail, all milestones |
+| **Milestone Expansion** | Clicking a milestone (from Initiative Workspace) | Already built — inline expansion. Keep as-is. |
+
+All three layers open as overlays or slide-over panels — the Sprint Board remains visible and navigable in the background. No new routes are created.
+
+---
+
+## 2. Design Principle — View First, Edit by Choice
+
+Every workspace opens in **read mode** by default. The founder sees what's there before they can change anything. Edit mode is activated deliberately — either by clicking an edit icon or an "Edit" label on a specific field. This distinction matters because:
+
+- Founders will open these workspaces frequently just to review progress
+- Accidental edits to locked or active sprint content should not happen passively
+- The historical record (change log) should only capture intentional changes, not scroll-past hovers or misclicks
+
+**Read mode:** All content visible, clean, no input fields. Fields display as styled text.  
+**Edit mode:** Specific field or section becomes an editable input. Save and Cancel controls appear inline. The rest of the workspace remains in read mode.
+
+---
+
+## 3. Layer 1 — Capability Workspace
+
+### 3.1 Trigger
+
+Clicking anywhere on a capability card in the **By Capability view** that is not the `+ Create Initiative` or `+ Add Initiative` CTA. The CTA itself still opens the tiered creation form directly.
+
+### 3.2 Layout
+
+A right-side slide-over panel occupying approximately 50-60% of the viewport width. The Sprint Board remains visible and partially interactive behind it. An overlay scrim dims the board slightly but does not block it entirely.
+
+**Panel Header:**
+- Capability name (large)
+- Dimension tag
+- Maturity score and stage status badge
+- 3P column assignment: `Prioritize / Plant / Progressively Iterate` — displayed as a colored tag matching the column color
+- Close control (×) top right
+
+**Initiative List (body of panel):**
+
+A scrollable list of all initiatives associated with this capability. Each initiative row shows:
+- Initiative name
+- Tier label (inherits from capability column — Prioritize / Plant / Iterate — but displayed as a subtle tag)
+- Owner avatar(s)
+- Milestone count (Prioritize only: `3 of 5 milestones complete`)
+- Status indicator: `Not Started` / `In Progress` / `Complete` / `At Risk` / `Blocked`
+- A right-facing chevron indicating the row is clickable
+
+Clicking any initiative row opens the **Initiative Workspace** (Layer 2) — either sliding the capability panel further left or replacing it with the initiative panel. Preferred: slide-left so the user can see they've gone one level deeper and can navigate back.
+
+**Empty state (no initiatives yet):**
+A centered message: *"No initiatives added for this capability yet."* with a `+ Add Initiative` button below it. Clicking opens the appropriate tiered form for this capability's tier.
+
+**Footer of panel:**
+`+ Add Initiative` button — always present at the bottom of the initiative list regardless of existing count. Tapping opens the tiered creation form.
+
+---
+
+## 4. Layer 2 — Initiative Workspace
+
+### 4.1 Trigger
+
+- Clicking an initiative row inside the Capability Workspace
+- Clicking an initiative card in the **By Initiative view** on the Sprint Board
+
+### 4.2 Layout
+
+The Initiative Workspace is the existing Initiative Detail modal (Image 5 from the build review). This is already well-built. The changes in this spec are:
+
+1. It must be reachable from the Capability Workspace as a drill-down, not just as a standalone modal
+2. It opens in **read mode** by default — not in an editable state
+3. Edit mode is activatable on a field-by-field basis
+4. The change log panel is added to the right-side metadata column
+
+**Left panel (initiative content):**
+- Initiative name — read mode default. Edit icon inline to activate edit mode for this field.
+- Description / outcome statement — read mode. Edit icon.
+- Sprint connection (why this sprint) — read mode. Edit icon. Prioritize only.
+- Milestones section — existing implementation. Keep as-is.
+- `+ Add Milestone` — always available at bottom of milestones section.
+
+**Right panel (metadata):**
+- Owner — read mode. Edit to change.
+- Labels / capability links — read mode.
+- Target Completion — read mode. Edit to change.
+- Status selector (At Risk / On Track / Blocked) — this remains directly interactive. Status changes do not require entering edit mode — they are lightweight, frequent, and intentional by nature.
+- **Change Log section** (new — see Section 6)
+- Comments & Activity thread — existing implementation. Keep as-is.
+
+### 4.3 Back Navigation
+
+When reached from the Capability Workspace: a `← Back to [Capability Name]` link at the top of the panel. Returns to the Capability Workspace without closing it.
+
+When reached directly from the By Initiative view: a `← Back to Sprint Board` link.
+
+---
+
+## 5. Edit Behavior Rules
+
+### 5.1 Field-Level Edit Mode
+
+Each editable field has an edit icon (pencil) that appears on hover in read mode. Clicking it converts that field to an input. All other fields remain in read mode.
+
+When a field is in edit mode:
+- The field becomes an input (text, textarea, dropdown — matching the original creation form input type)
+- Two inline controls appear below the field: `Save` and `Cancel`
+- `Save` commits the change, exits edit mode, writes the update, and logs the change
+- `Cancel` discards the change and returns to read mode — no log entry
+
+### 5.2 Which Fields Are Editable
+
+**Always editable (any time after creation):**
+- Initiative name
+- Owner
+- Target Completion
+- Status
+- Labels
+- Known Constraints (Prioritize)
+- Binary Done Definition (Plant)
+- Signal to Watch (Iterate)
+- Time Box (Iterate)
+
+**Editable with change prompt (see Section 5.3):**
+- Outcome statement (Prioritize)
+- Sprint connection — why this sprint (Prioritize)
+- What this unlocks (Plant)
+- What already exists (Iterate)
+- Adjustment definition (Iterate)
+
+**Not editable after creation:**
+- Capability link — the initiative is bound to its capability. Moving an initiative to a different capability is a deliberate structural decision handled separately via a `Move to [column]` action, not a field edit.
+- Tier assignment — same logic. Tier changes are structural, not field edits.
+
+### 5.3 Change Prompt for Outcome-Level Edits
+
+When a founder saves a change to any field in the "editable with change prompt" category, a lightweight inline prompt appears immediately after save:
+
+*"What prompted this change? (Optional)"*
+
+A single short text input. Two actions: `Add context` (saves the note alongside the change log entry) and `Skip` (dismisses — the change is still logged, just without a note).
+
+This is dismissable. It should never feel like a required step. It surfaces once per save event, then disappears. The founder can skip it every time if they choose.
+
+---
+
+## 6. Change Log
+
+### 6.1 Purpose
+
+A running record of every intentional edit to an initiative after creation. Lives inside the Initiative Workspace in the right panel, below the Status selector and above Comments & Activity.
+
+### 6.2 Display
+
+**Section label:** `CHANGE HISTORY`
+
+A scrollable list of change entries in reverse chronological order (newest first). Each entry shows:
+- What changed: field name + old value → new value
+  Example: *"Outcome Statement updated"*
+- Who changed it: owner avatar + name
+- When: relative timestamp (e.g., "3 days ago") with full date on hover
+- Optional context note if one was provided: displayed in a muted indented line below the entry
+
+**Collapsed by default:** The section shows a count indicator — `3 changes` — and expands on click. This keeps the right panel clean for frequent viewers.
+
+**Empty state:** If no changes have been made since creation, the section shows: *"No changes recorded yet."* Do not hide the section entirely — its presence signals to the founder that the platform is tracking evolution.
+
+### 6.3 Data Table — `initiative_changes`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | |
+| `initiative_id` | UUID | FK to `sprint_initiatives` |
+| `user_id` | UUID | Who made the change |
+| `field_name` | Text | e.g., `outcome_statement` |
+| `old_value` | Text | Previous field value |
+| `new_value` | Text | Updated field value |
+| `change_note` | Text | Optional — from change prompt |
+| `created_at` | Timestamp | |
+
+One row per field per save event. If a founder edits three fields in one session and saves each individually, three rows are created. If they edit and cancel, no row is created.
+
+This table is append-only. No updates, no deletes. Historical record is permanent within the sprint record.
+
+---
+
+## 7. Synthesis Staleness Flag
+
+When a founder edits any outcome-level field on any initiative (outcome statement, sprint connection, what this unlocks, adjustment definition), the sprint posture synthesis — generated at sprint lock — may no longer accurately reflect the plan.
+
+### 7.1 Flag Behavior
+
+On save of any outcome-level field edit:
+- Check whether a sprint posture synthesis exists for this quarter (`sprint_syntheses` table or equivalent)
+- If yes: mark the synthesis record with `is_stale: true`
+- Surface a non-blocking notice at the top of the Sprint Board (not inside the workspace): a slim banner reading *"Your sprint synthesis may no longer reflect your current plan. Regenerate?"* with a `Regenerate` link and a `Dismiss` link
+
+**The banner:**
+- Does not block any action
+- Persists until the founder either regenerates or dismisses
+- If dismissed, does not reappear unless another outcome-level edit is made
+- If regenerated: triggers the synthesis generation flow again (same n8n webhook, same payload structure as original lock), replaces the synthesis content, sets `is_stale: false`
+
+### 7.2 What Does Not Trigger the Flag
+
+- Status changes
+- Owner changes
+- Target Completion changes
+- Comments added
+- Milestone status updates
+- Labels changed
+- Non-outcome field changes (constraints, time box, signal to watch)
+
+These are operational updates. They do not change the strategic intent of the initiative and should not invalidate the synthesis.
+
+---
+
+## 8. By Initiative View — Drill-Down Behavior
+
+In the By Initiative view, capability cards are not present — the user is looking at a flat list of all initiatives organized by column. The drill-down behavior is simpler:
+
+Clicking any initiative card (collapsed or expanded) opens the **Initiative Workspace** directly. No Capability Workspace layer in between — the user is already past that level.
+
+The Initiative Workspace opened from By Initiative view has `← Back to Sprint Board` navigation rather than `← Back to [Capability Name]`.
+
+Everything else — read mode, edit mode, change log, staleness flag — behaves identically.
+
+---
+
+## 9. Capability Workspace — Additional States
+
+### 9.1 Capability with No Initiatives
+
+Empty state as described in Section 3.2. The panel still opens — it just shows the empty state rather than a list.
+
+### 9.2 Capability at Volume Guardrail
+
+If a Prioritize capability already has two initiatives and the volume guardrail has been surfaced, the `+ Add Initiative` button in the Capability Workspace footer shows the soft notice inline rather than opening the form immediately: *"You have 2 initiatives for this capability. Adding more may stretch your sprint capacity."* with `Add Anyway` and `Cancel` options.
+
+### 9.3 Post-Lock Editing
+
+After the sprint is locked, all edit icons remain present but fields carry a subtle indicator: `Locked Sprint — editing will be versioned`. This is not a barrier — it's a notice. Editing still works. The change log captures all post-lock edits. The staleness flag applies as above.
+
+---
+
+## 10. Component Summary
+
+| Component | Status | Notes |
+|---|---|---|
+| `CapabilityWorkspace` | New | Right slide-over panel. Initiative list with status and chevron. |
+| `InitiativeWorkspace` | Extend existing | Add read mode default, field-level edit mode, change log section. |
+| `FieldEditor` | New | Inline edit/save/cancel pattern. Reusable across all editable fields. |
+| `ChangePrompt` | New | Post-save optional context capture. Single text input, Add/Skip actions. |
+| `ChangeLog` | New | Collapsed section in right panel. Reverse chrono list of change entries. |
+| `StalenessFlag` | New | Slim banner on Sprint Board. Non-blocking. Regenerate / Dismiss actions. |
+| `initiative_changes` | New table | Append-only change log. One row per field per save. |
+
+---
+
+## 11. Out of Scope for This Build
+
+- Bulk initiative upload — Phase 3
+- Comparing two sprint versions side by side — future
+- Change log export — future
+- Team-level views showing changes by team member — future (depends on multi-user)
+- Reverting a field to a previous value — future consideration

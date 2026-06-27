@@ -1,0 +1,387 @@
+# WF-MR-03 | M+R Audit PDF Assembly & Delivery
+## Handoff Guide
+
+---
+
+## 01 — Purpose
+
+WF-MR-03 is the final workflow in the M+R Audit pipeline. Its sole responsibility is assembling the populated PDF report and making it available for download. It does not generate any GPT content — that work is complete when this workflow fires. WF-MR-03 reads, assembles, stores, and delivers.
+
+**Inputs:** A completed `assessment_id` with WF-MR-01 and WF-MR-02 both confirmed complete.
+
+**Output:** A populated PDF file stored in Supabase Storage with a signed URL written to `gm_report_artifacts`, accessible from the dashboard "Download Full Report" button.
+
+---
+
+## 02 — Dependencies (All Must Be True Before This Workflow Fires)
+
+| Dependency | Verified By |
+|---|---|
+| WF-MR-01 complete (`run_status = 'complete'` in `gm_gpt_runs`) | Workflow validation node |
+| WF-MR-02 complete (`run_status = 'complete'` in `gm_gpt_runs`) | Workflow validation node |
+| `vw_mr_report_payload` view exists and returns a full row | Pre-build verification |
+| Google Docs API credential configured in n8n | Pre-build verification |
+| Google Drive API credential configured in n8n | Pre-build verification |
+| Master template Google Doc ID confirmed and shared with service account | Pre-build verification |
+| Google Drive folder ID for report copies confirmed | Pre-build verification |
+| Supabase Storage bucket configured with correct access policy | Pre-build verification |
+
+---
+
+## 03 — Pre-Build Checklist for Antigravity
+
+Complete all of the following before building a single node.
+
+### 3.1 View Verification
+- [ ] `vw_mr_report_payload` exists in Supabase
+- [ ] Query with a test `assessment_id` returns exactly one row with all 130 columns populated and no NULLs
+- [ ] Confirm column names exactly match the `{{MERGE_FIELD}}` token names in the Google Doc template (case-sensitive)
+
+### 3.2 Google Configuration
+- [ ] Google service account credential is added to n8n with name `google_docs_api` (or confirm the exact name used in your n8n instance)
+- [ ] Service account has Editor access to the master template Google Doc
+- [ ] Service account has write access to the designated report output folder in Google Drive
+- [ ] Master template Google Doc ID is confirmed and noted (extract from the doc URL: `docs.google.com/document/d/[DOC_ID]/edit`)
+- [ ] Report output folder ID is confirmed and noted (extract from Drive folder URL)
+
+### 3.3 Supabase Storage
+- [ ] Bucket for PDF storage is confirmed (name and path prefix, e.g. `reports/mr/`)
+- [ ] Bucket RLS policy allows the service role to insert and generate signed URLs
+- [ ] Signed URL expiry duration is decided (recommended: 7 days, renewable on re-trigger)
+
+### 3.4 Report Template Record
+- [ ] `gm_report_templates` has a row for the M+R PDF template with:
+  - `template_id`: e.g. `mr_pdf_v1`
+  - `template_type`: `pdf`
+  - `template_version`: `1`
+  - `storage_bucket`: the Google Doc ID or a reference identifier
+  - `is_active`: `true`
+
+---
+
+## 04 — Workflow Architecture
+
+### Trigger
+POST webhook receiving `{ "assessment_id": "uuid" }` — fired by the frontend "Download Full Report" button action or manually.
+
+### Node Sequence
+
+```
+01  Webhook
+02  Code — Validate Input
+03  Respond to Webhook (202)
+04  Supabase — Check WF-MR-01 Complete
+05  Supabase — Check WF-MR-02 Complete
+06  Code — Validate Dependencies
+07  Supabase — Fetch Report Payload (vw_mr_report_payload)
+08  Code — Build Merge Map
+09  Google Drive — Copy Template Doc
+10  Code — Build Find-Replace Operations
+11  Google Docs — Batch Update (Find & Replace)
+12  Google Drive — Export as PDF
+13  Code — Validate PDF Binary
+14  Supabase Storage — Upload PDF
+15  Code — Build Artifact Record
+16  Supabase — Insert gm_report_artifacts
+17  Code — Generate Signed URL
+18  Supabase — Update gm_assessments reported_at
+19  [Error Handler] Code — Error Handler
+20  [Error Handler] Supabase — Write Failed Artifact Record
+```
+
+### Node Standards
+Follow WF-MR-01 and WF-MR-02 standards exactly:
+- **Supabase reads/writes:** Supabase nodes only, credential `Supabase account`
+- **Google operations:** Google Docs node and Google Drive node only, credential `google_docs_api`
+- **Logic and data transformation:** Code nodes only
+- **No Function nodes, no HTTP Request nodes for Google APIs**
+
+---
+
+## 05 — Node Specifications
+
+### Node 01 — Webhook
+- Method: POST
+- Path: `wf-mr-03`
+- Response mode: `responseNode`
+
+### Node 02 — Code: Validate Input
+```javascript
+const body = $input.first().json;
+if (!body.assessment_id || typeof body.assessment_id !== 'string') {
+  throw new Error('Missing or invalid assessment_id');
+}
+return [{ json: { assessment_id: body.assessment_id.trim() } }];
+```
+
+### Node 03 — Respond to Webhook
+- HTTP 202
+- Body: `{ "status": "accepted", "message": "Report generation initiated", "assessment_id": "..." }`
+
+### Node 04 — Supabase: Check WF-MR-01 Complete
+- Operation: `getAll`
+- Table: `gm_gpt_runs`
+- Filter: `assessment_id = [assessment_id]` AND `slot_id = 'mr_hero_headline'` AND `run_status = 'complete'`
+- Limit: 1
+
+### Node 05 — Supabase: Check WF-MR-02 Complete
+- Operation: `getAll`
+- Table: `gm_gpt_runs`
+- Filter: `assessment_id = [assessment_id]` AND `slot_id = 'mr_pdf_tldr_headline'` AND `run_status = 'complete'`
+- Limit: 1
+
+### Node 06 — Code: Validate Dependencies
+```javascript
+const mr01 = $('Supabase — Check WF-MR-01 Complete').all();
+const mr02 = $('Supabase — Check WF-MR-02 Complete').all();
+const assessmentId = $('Code — Validate Input').first().json.assessment_id;
+
+if (mr01.length === 0) {
+  throw new Error('WF-MR-01 not complete for assessment_id: ' + assessmentId + '. Cannot generate PDF until GPT synthesis is finished.');
+}
+if (mr02.length === 0) {
+  throw new Error('WF-MR-02 not complete for assessment_id: ' + assessmentId + '. Cannot generate PDF until PDF synthesis is finished.');
+}
+return [{ json: { assessment_id: assessmentId } }];
+```
+
+### Node 07 — Supabase: Fetch Report Payload
+- Operation: `getAll`
+- Table: `vw_mr_report_payload`
+- Filter: `assessment_id = [assessment_id]`
+- Limit: 1
+
+### Node 08 — Code: Build Merge Map
+Converts the flat view row into an array of `{ token, value }` pairs ready for the Google Docs batch update.
+
+```javascript
+const payload = $('Supabase — Fetch Report Payload').first().json;
+const assessmentId = $('Code — Validate Dependencies').first().json.assessment_id;
+
+if (!payload) {
+  throw new Error('No report payload found for assessment_id: ' + assessmentId);
+}
+
+// Build find-replace pairs from all payload columns
+// Each key in the view row becomes a {{KEY}} token
+const mergeMap = Object.entries(payload)
+  .filter(([key]) => key !== 'assessment_id') // exclude the ID itself
+  .map(([key, value]) => ({
+    find: '{{' + key + '}}',
+    replace: value !== null && value !== undefined ? String(value) : ''
+  }));
+
+return [{ json: { assessment_id: assessmentId, merge_map: mergeMap, payload } }];
+```
+
+### Node 09 — Google Drive: Copy Template Doc
+- Operation: Copy file
+- File ID: `[MASTER_TEMPLATE_DOC_ID]` (hardcoded — confirmed in pre-build checklist)
+- Destination folder: `[REPORT_OUTPUT_FOLDER_ID]` (hardcoded)
+- New file name: `MR_Report_{{ payload.RESPONDENT_NAME }}_{{ payload.ASSESSMENT_DATE }}`
+
+> Antigravity: The Google Drive node copy operation returns the new file's ID. Pass this as `copied_doc_id` to subsequent nodes.
+
+### Node 10 — Code: Build Find-Replace Operations
+Transforms the merge map into the Google Docs API `batchUpdate` request body format.
+
+```javascript
+const data = $input.first().json;
+const mergeMap = data.merge_map;
+const copiedDocId = $('Google Drive — Copy Template Doc').first().json.id;
+
+// Build Google Docs batchUpdate replaceAllText operations
+const requests = mergeMap.map(item => ({
+  replaceAllText: {
+    containsText: {
+      text: item.find,
+      matchCase: true
+    },
+    replaceText: item.replace
+  }
+}));
+
+return [{ json: {
+  ...data,
+  copied_doc_id: copiedDocId,
+  batch_update_body: { requests }
+}}];
+```
+
+### Node 11 — Google Docs: Batch Update (Find & Replace)
+- Operation: Update document (batchUpdate)
+- Document ID: `={{ $json.copied_doc_id }}`
+- Request body: `={{ $json.batch_update_body }}`
+
+> This single node executes all find-and-replace operations across the entire document in one API call. All `{{TOKEN}}` placeholders are replaced with their resolved values.
+
+### Node 12 — Google Drive: Export as PDF
+- Operation: Download/Export file
+- File ID: `={{ $json.copied_doc_id }}`
+- Export MIME type: `application/pdf`
+
+> Returns binary PDF data. Pass to Node 13 for validation before upload.
+
+### Node 13 — Code: Validate PDF Binary
+```javascript
+const binaryData = $input.first().binary;
+if (!binaryData || !binaryData.data) {
+  throw new Error('PDF export failed — no binary data returned from Google Drive export.');
+}
+const sizeBytes = Buffer.from(binaryData.data, 'base64').length;
+if (sizeBytes < 10000) {
+  throw new Error('PDF export appears incomplete — file size too small: ' + sizeBytes + ' bytes.');
+}
+return [{ 
+  json: { 
+    ...$input.first().json,
+    pdf_size_bytes: sizeBytes 
+  }, 
+  binary: binaryData 
+}];
+```
+
+### Node 14 — Supabase Storage: Upload PDF
+- Operation: Upload
+- Bucket: `[STORAGE_BUCKET_NAME]`
+- File path: `mr_reports/{{ assessment_id }}/mr_report_{{ assessment_id }}.pdf`
+- Binary property: PDF binary from Node 12/13
+- Upsert: true (allows re-generation to overwrite)
+
+> Returns the storage path. Use for signed URL generation and artifact record.
+
+### Node 15 — Code: Build Artifact Record
+```javascript
+const data = $('Code — Validate PDF Binary').first().json;
+const uploadResult = $('Supabase Storage — Upload PDF').first().json;
+const now = new Date().toISOString();
+const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
+return [{ json: {
+  assessment_id: data.assessment_id,
+  template_id: 'mr_pdf_v1',
+  artifact_type: 'pdf',
+  artifact_status: 'complete',
+  storage_bucket: '[STORAGE_BUCKET_NAME]',
+  storage_path: uploadResult.path || uploadResult.Key || '',
+  file_name: 'mr_report_' + data.assessment_id + '.pdf',
+  mime_type: 'application/pdf',
+  file_size_bytes: data.pdf_size_bytes,
+  generated_at: now,
+  expires_at: expiresAt,
+  copied_doc_id: data.copied_doc_id
+}}];
+```
+
+### Node 16 — Supabase: Insert gm_report_artifacts
+- Operation: create (INSERT)
+- Table: `gm_report_artifacts`
+- Fields: all fields from Node 15 output
+- Note: If a prior artifact row exists for this `assessment_id` + `template_id`, set prior row `artifact_status = 'superseded'` first, or use an update pattern. Antigravity to confirm preferred approach.
+
+### Node 17 — Code: Generate Signed URL
+```javascript
+// The signed URL is generated via Supabase Storage API
+// This node prepares the request parameters
+const artifact = $input.first().json;
+return [{ json: {
+  ...artifact,
+  artifact_id: $('Supabase — Insert gm_report_artifacts').first().json.artifact_id
+}}];
+```
+
+> Antigravity: Supabase signed URL generation requires a call to the Supabase Storage API: `POST /storage/v1/object/sign/[bucket]/[path]` with `{ "expiresIn": 604800 }`. This can be done via an HTTP Request node pointing to your Supabase project URL with the service role key, or via a Supabase function. Confirm the approach with the existing credential setup and add the signed URL to `gm_report_artifacts.public_url` via an update node.
+
+### Node 18 — Supabase: Update gm_assessments reported_at
+- Operation: update
+- Table: `gm_assessments`
+- Filter: `assessment_id = [assessment_id]`
+- Fields: `reported_at = now()`
+
+### Node 19 — Code: Error Handler
+```javascript
+const error = $input.first();
+const errorMsg = error.json ? (error.json.error || error.json.message || 'Unknown error') : 'Unknown error';
+
+let assessment_id = null;
+let copied_doc_id = null;
+try { assessment_id = $('Code — Validate Input').first().json.assessment_id; } catch(e) {}
+try { copied_doc_id = $('Code — Build Find-Replace Operations').first().json.copied_doc_id; } catch(e) {}
+
+return [{ json: { error_message: errorMsg, assessment_id, copied_doc_id } }];
+```
+
+### Node 20 — Supabase: Write Failed Artifact Record
+- Operation: create (INSERT) into `gm_report_artifacts`
+- Fields: `assessment_id`, `template_id = 'mr_pdf_v1'`, `artifact_type = 'pdf'`, `artifact_status = 'failed'`, `error_message`, `storage_bucket = ''`, `storage_path = ''`, `generated_at = now()`
+
+> Error handler nodes must be connected as error outputs from Nodes 07, 09, 11, 12, 13, and 14.
+
+---
+
+## 06 — Post-Generation Cleanup (Optional but Recommended)
+
+After the PDF is uploaded and the signed URL is written, the populated copy of the Google Doc in Drive is no longer needed. A cleanup node can delete it:
+
+- **Google Drive: Delete File** — File ID: `copied_doc_id`
+
+This keeps the Drive folder clean and prevents accumulation of populated report copies. Add this as the final node in the success path, after Node 18.
+
+---
+
+## 07 — Frontend Integration Notes
+
+The "Download Full Report" button on the M+R dashboard should:
+
+1. POST `{ "assessment_id": "[id]" }` to the WF-MR-03 webhook endpoint
+2. Show a loading/generating state while polling
+3. Poll `gm_report_artifacts` for `artifact_status = 'complete'` and a non-null `public_url`
+4. On confirmation, either redirect to the `public_url` directly or trigger a browser download
+
+Alternatively, if a valid unexpired artifact already exists for this `assessment_id`, the frontend can skip triggering the workflow and use the existing `public_url` directly. Check `expires_at > now()` before triggering re-generation.
+
+---
+
+## 08 — Definition of Done
+
+The session is complete when all of the following are true:
+
+- [ ] Pre-build checklist (Section 03) fully verified
+- [ ] `vw_mr_report_payload` confirmed returning complete rows
+- [ ] Google credentials configured and tested in n8n
+- [ ] Master template Doc ID and output folder ID confirmed
+- [ ] All 20 nodes built, connected, and error outputs wired
+- [ ] Cleanup node connected (optional)
+- [ ] Test run completed with a real `assessment_id` that has WF-MR-01 and WF-MR-02 outputs present
+- [ ] PDF file appears in Supabase Storage at the expected path
+- [ ] `gm_report_artifacts` row written with `artifact_status = 'complete'` and non-null `public_url`
+- [ ] `gm_assessments.reported_at` updated
+- [ ] Downloaded PDF is readable and all merge tokens replaced with correct content
+
+---
+
+## 09 — Guardrails
+
+**Do NOT:**
+- Modify `vw_mr_gpt_inputs`, WF-MR-01, or WF-MR-02 in any way
+- Store the PDF binary in `gm_report_artifacts` — store only the storage path and signed URL
+- Leave the populated Google Doc copy in Drive after successful PDF upload
+- Skip the WF-MR-01 and WF-MR-02 completion checks — generating a report before synthesis is complete will produce a document full of empty merge tokens
+
+**Must:**
+- Verify all column names in `vw_mr_report_payload` match template tokens exactly before building Node 10
+- Use `upsert: true` on the Storage upload to allow clean re-generation
+- Handle the signed URL expiry case — either re-generate on demand or set a sufficiently long expiry window
+- Connect error outputs from all Google API nodes — these are the most likely failure points
+
+---
+
+## 10 — Key Reference Values (Confirm Before Building)
+
+| Reference | Value | Status |
+|---|---|---|
+| Master template Google Doc ID | `[TO CONFIRM]` | Confirm from Doc URL |
+| Report output folder ID | `[TO CONFIRM]` | Confirm from Drive |
+| Supabase storage bucket name | `[TO CONFIRM]` | Confirm with Antigravity |
+| n8n Google credential name | `[TO CONFIRM]` | Confirm after credential setup |
+| `gm_report_templates` row for `mr_pdf_v1` | `[TO INSERT]` | Insert before testing |

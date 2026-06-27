@@ -1,0 +1,326 @@
+# PRD — Strategic Roadmap: Horizon Declaration & Executive Synthesis
+**Status:** Ready for Build  
+**Last Updated:** February 2026  
+**Feature Area:** Architect OS Pro Suite — Planning  
+**Route:** `/pro/planning/roadmap`  
+**Depends On:** Clarity Compass (min. 3 horizons defined), M&R Audit (completed)  
+
+---
+
+## 1. Overview
+
+The Strategic Roadmap is the first meaningful landing point inside the Pro Suite for a user who has completed their foundational and diagnostic work. It is not a planning form. It is a guided experience that bridges everything the platform knows about the user — their vision, their growth model, their stage, and their capability gaps — into a coherent narrative that orients them toward their current quarter's focus.
+
+The experience consists of three sequential moments:
+
+1. **Horizon Declaration** — the user confirms their stated vision before synthesis fires
+2. **Executive Synthesis** — the platform generates a progressive narrative across three horizons
+3. **Bridge to Quarter Map** — a synthesized transition statement that leads directly into 3P capability selection
+
+These three moments are a single flow, not three separate pages. The routing stays at `/pro/planning/roadmap` throughout, with internal state managing the progression.
+
+---
+
+## 2. Prerequisites & Dependency Gating
+
+Before any element of this flow is interactive, the platform must verify the following:
+
+| Dependency | Requirement | Gate Behavior |
+|---|---|---|
+| M&R Audit | Fully completed | Hard gate — synthesis cannot fire without this. Declaration screen is visible but confirm action is disabled. |
+| Clarity Compass | Minimum 3 horizons defined (12, 24, 36-month) | Hard gate — same behavior as above. |
+| AE Ladder | Stage placement completed | Required for synthesis calibration. Gate if missing. |
+| GV Simulator | At least one scenario saved | Soft dependency — synthesis is richer with this data but can proceed without it. |
+| Agency Snapshot | Profile saved | Soft dependency — same as above. |
+
+### Empty State Behavior
+
+If hard dependencies are not met, the declaration screen renders in a locked state:
+
+- The horizon cards are visible but display a neutral placeholder state ("Complete your Clarity Compass to see your horizons here")
+- The confirm button is disabled and visually muted
+- A dependency notice appears above the confirm button listing exactly what is missing with a direct CTA link to each incomplete tool
+- Language example: *"Your strategic synthesis requires your Maturity & Readiness results. Complete the audit to unlock this feature."*
+- Each missing item is a tappable link that routes directly to the relevant tool
+
+---
+
+## 3. Screen 1 — Horizon Declaration
+
+### 3.1 Purpose
+
+This screen presents a clean readback of everything the user defined in their Clarity Compass. The user reads it, confirms it is still accurate, and locks it in as the foundation for synthesis. It should feel like a declaration document — not a form, not a wizard step.
+
+### 3.2 Layout Structure
+
+**Page Header**
+- Title: `Your Strategic Direction`
+- Subtitle: `Review your stated vision across all horizons. Confirm to generate your strategic synthesis.`
+- No back button. No tabs. Full-width single-column layout, centered, max-width ~720px for readability.
+
+---
+
+**Ultimate Vision Block**
+
+Positioned at the top of the declaration, above the horizon cards. Visually distinct — styled as a pull quote or framed statement block.
+
+Contents:
+- Label: `ULTIMATE VISION`
+- The user's ultimate vision statement from the Clarity Compass, displayed in full
+- No editing. Read-only.
+
+Visual treatment: light background fill (brand-consistent), left border accent, slightly larger text than body. This is the north star — it should feel weightier than the horizon cards below it.
+
+---
+
+**Horizon Cards**
+
+Three cards displayed in vertical stack, full width. All three visible simultaneously on page load — no hiding, no collapse, no pagination.
+
+Each card contains:
+
+| Element | Content |
+|---|---|
+| Horizon label | `12-Month Horizon`, `24-Month Horizon`, `36-Month Horizon` |
+| Target date | e.g., `Target: Q1 2027` — pulled from Clarity Compass |
+| Vision statement | The user's qualitative goal for this horizon — full text, read-only |
+| Growth scenario | The GV Simulator scenario attached to this horizon (name + key financial target) |
+| One-line synthesis | A single platform-generated sentence summarizing what this horizon represents in plain language. Example: *"A foundation-building year focused on systematizing delivery and stabilizing financial infrastructure."* |
+
+Card styling:
+- Clean white card with subtle border
+- Horizon label and target date in header row
+- Vision statement in body — readable font size, no truncation
+- Growth scenario displayed as a small tag or inline label
+- One-line synthesis displayed in a muted style beneath the vision statement — visually distinct to signal it is platform-generated, not user-authored
+
+---
+
+**Refinement Link**
+
+Below the three horizon cards, before the confirm button:
+
+`Not what you intended? Refine your vision in the Clarity Compass →`
+
+This is a secondary text link, not a button. It routes to `/foundations/clarity-compass`. It should not feel like a default path — it is a deliberate detour for users who want to update their vision before proceeding.
+
+---
+
+**Confirm Action**
+
+A single primary button, full width or prominently centered:
+
+Button label: `Confirm My Direction & Generate Synthesis`
+
+On click:
+- Validates that all hard dependencies are met (final check)
+- If not met: surfaces dependency notice (see Section 2)
+- If met: triggers synthesis generation (see Section 4) and transitions to the synthesis screen
+
+Below the button, a single line of supporting copy:
+`This locks your horizon vision as the foundation for your strategic synthesis. You can return to refine at any time.`
+
+---
+
+### 3.3 Interaction States
+
+| State | Behavior |
+|---|---|
+| Default (dependencies met) | All cards populated, confirm button active |
+| Locked (dependencies missing) | Cards show placeholder content, confirm button disabled, dependency notice visible |
+| Hovered (confirm button) | Standard hover state — no special behavior |
+| Clicked (confirm button) | Button enters loading state, transition to synthesis loading experience begins |
+
+---
+
+## 4. Synthesis Generation & Loading State
+
+On confirmation, the platform fires the synthesis generation request using the following data inputs assembled at trigger time:
+
+**Data Inputs for Synthesis:**
+- Confirmed Clarity Compass horizon visions and growth scenarios (12, 24, 36-month and ultimate)
+- AE Ladder stage placement and stage label
+- M&R Audit overall score, five dimension scores, and top-ranked capability areas by stage-calibrated priority
+- GV Simulator pressure family profile (if available)
+- Agency Snapshot — agency size, revenue range, service model (if available)
+
+**Loading State:**
+Use the existing `LoadingOverlay` component pattern — the same component used in the Clarity Compass synthesis flow and the GV Simulator. Reference that implementation directly. No new loading component needed. Brief message should be consistent with platform tone — something like: *"Building your strategic synthesis..."*
+
+The synthesis result is written to Supabase. The frontend listens via Supabase Realtime for the completion signal, then transitions to the synthesis view. This is the established pattern — follow it.
+
+---
+
+## 5. Screen 2 — Executive Synthesis
+
+### 5.1 Purpose
+
+This is the platform's most intelligent moment. The user receives a progressive narrative — structured across three horizon sections — that translates everything the platform knows into strategic implication. It should feel like receiving a prepared brief from a strategic advisor who has studied their situation.
+
+This is not a dashboard. No charts, no score displays, no data tables. Pure narrative with intentional visual structure.
+
+### 5.2 Layout Structure
+
+**Page Header**
+- Title: `Your Strategic Synthesis`
+- Subtitle: `Based on your vision, your stage, and your capability profile — here is what your path requires.`
+- A download link in the header right: `Download Full Brief (PDF)` — generates a more detailed version of this synthesis as a downloadable artifact. Build the on-platform experience first; the PDF export can follow.
+
+---
+
+**Ultimate Vision Anchor**
+
+Positioned at the top of the synthesis, mirroring its position in the declaration screen. Same visual treatment — pull quote style, framed block.
+
+This is not repeated verbatim from the declaration. It is a single synthesized sentence that reflects back the ultimate vision in the platform's voice. Example: *"At its fullest expression, you are building an agency that operates independently of your direct involvement — a business that scales through systems, not heroics."*
+
+This anchors everything that follows.
+
+---
+
+**Horizon Sections — Accordion Reveal**
+
+Three accordion sections presented in sequence: 36-Month, 24-Month, 12-Month. Each is collapsed by default on page load. The user expands each section deliberately — either by clicking the section header or by scrolling into it (implementation preference: click to expand).
+
+The 36-month section should be open by default on first load, so the user immediately sees content rather than a collapsed list.
+
+**Accordion Header (each section):**
+- Horizon label: `36-Month Horizon`, `24-Month Horizon`, `12-Month Horizon`
+- Target date: `Target: Q1 2029`
+- A one-line preview of the section's primary theme — visible even when collapsed
+- Expand/collapse indicator (chevron)
+
+**Accordion Body (each section):**
+
+Narrative prose, structured in short paragraphs. No bullet lists within the synthesis body — this is intentional. Lists invite scanning; paragraphs require reading.
+
+Each section contains one **Callout Block** — a visually distinct highlighted element that surfaces the single most important insight from that section. This is for the founder who is moving quickly — they will stop at the callout even if they skim the prose. Style: light background fill, left border accent, slightly bold or larger text.
+
+---
+
+### 5.3 Content Specification Per Section
+
+**Section: 36-Month Horizon**
+
+Narrative addresses:
+- The structural arc — what kind of agency does this founder need to build between now and this horizon?
+- Stage-level transition themes — what the AE Ladder implies about the evolution required (e.g., moving from founder-led to systems-led delivery)
+- Primary pressure families most likely to intensify along this trajectory
+- Broad structural shifts required (not tactical steps)
+
+Callout block: The single most important structural shift required over this horizon. One to two sentences.
+
+Closing line (final sentence of section, styled as a transition): *"To reach this state, the next 24 months are where the structural foundation gets built."*
+
+---
+
+**Section: 24-Month Horizon**
+
+Narrative addresses:
+- What needs to be true about the business architecture at the midpoint for the 36-month vision to remain reachable
+- Dimension-level analysis — which of the five dimensions (Financial Health, Client Portfolio, Operations, Team Structure, Strategic Stewardship) carry the most weight at this horizon
+- What the user's current maturity profile says about where the development work is most needed at this level
+- Dimension-level strengths that can be leveraged and gaps that represent genuine risk
+
+Language remains observational, not prescriptive. The platform reveals implications, does not dictate tactics.
+
+Callout block: The dimension most critical to develop at this horizon and why. One to two sentences.
+
+Closing line: *"Which means the next 12 months are where the most critical foundational work happens."*
+
+---
+
+**Section: 12-Month Horizon**
+
+This is the most specific and most consequential section. It operates at the capability area level.
+
+Narrative addresses:
+- **Load-bearing capability areas** — 2 to 3 capability areas across the five dimensions that carry the most structural weight for this founder at this stage given the 12-month goals. Named specifically, with a brief explanation of why each matters at this horizon.
+- **The sequencing insight** — what needs to happen before other things can happen. Which capability area, if addressed first, unlocks or accelerates progress in others. This is surfaced as a clear, named observation.
+- **The primary constraint** — the single thing most likely to slow or derail progress at this horizon given the current capability profile. Named directly, framed constructively — this is something to plan around, not a verdict.
+
+Callout block: The sequencing insight. The one dependency chain the founder needs to understand before they plan their quarter. Two to three sentences maximum.
+
+Closing line — this is the bridge statement and it is styled differently from the rest of the narrative. Slightly larger, centered, visually separated:
+
+*"With this in mind, the question for this quarter is where to direct your focused energy to build the most important foundation for everything that follows."*
+
+---
+
+## 6. Screen 3 — The Bridge
+
+### 6.1 Purpose
+
+After the 12-month section closes, the user reaches the bridge — a single synthesized block that distills the entire synthesis into a current-quarter strategic posture. This is the transition point between synthesis and action.
+
+### 6.2 Layout
+
+Visually distinct from the accordion sections above. Full-width card or panel — styled to signal a shift in mode. This is no longer reflection; this is the beginning of planning.
+
+**Contents:**
+
+Label (small caps or muted label style): `YOUR QUARTER FOCUS`
+
+A single paragraph — two to four sentences — that expresses the current-quarter strategic posture in plain language. This is not a list of capabilities. It is a statement of intent. Example:
+
+*"For this quarter, the most structurally important work centers on financial visibility and role clarity across your delivery team. These aren't the only things that matter — but they're the ones where progress now creates the most leverage for everything that follows. Your quarter should be organized around these foundations."*
+
+The specific theme areas referenced in this paragraph are drawn from the 12-month synthesis and expressed at the capability area or dimension level — not as specific checkpoints.
+
+**CTA Button:**
+
+Primary button, prominent, centered:
+
+`Build My Quarter Map →`
+
+Routes to: `/pro/planning/quarter-map`
+
+Below the button, a secondary line:
+`You'll select your 9 focus capability areas using the 3P Framework — Prioritize, Plant, and Progressively Iterate.`
+
+This prepares the user for what they are about to do without requiring them to read separate instructions on the next screen.
+
+---
+
+## 7. Navigation & State Management
+
+- The user can return to the declaration screen at any time via a secondary back link at the top of the synthesis screen: `← Back to Horizon Declaration`
+- Returning to the declaration screen does not clear the synthesis — it preserves it unless the user explicitly confirms a change and re-triggers generation
+- If the user updates their Clarity Compass and returns to the roadmap, the synthesis is marked stale and the confirm button reflects this: `Vision Updated — Regenerate Synthesis`
+- Synthesis results are stored in Supabase against the user record and associated with the planning session quarter
+- Quarter is determined by the current calendar quarter at the time of synthesis generation
+
+---
+
+## 8. Component Reference
+
+| Component | Source | Notes |
+|---|---|---|
+| LoadingOverlay | Existing — Clarity Compass implementation | Use as-is. Brief message: "Building your strategic synthesis..." |
+| Accordion sections | New component | Expand/collapse on click. Default: first section open. |
+| Callout block | New component | Light fill, left border accent. Reusable across synthesis sections. |
+| Horizon card | New component | Read-only. Used on declaration screen. |
+| Ultimate vision block | New component | Pull quote style. Used on both declaration and synthesis screens. |
+| Dependency notice | New component | Inline notice listing missing tools with CTA links. |
+| Bridge panel | New component | Full-width card. Signals mode shift from synthesis to action. |
+
+---
+
+## 9. Tone & Language Principles
+
+All platform-generated synthesis copy must follow these principles without exception:
+
+- **Observational, not prescriptive** — the platform reveals what the situation implies; it does not tell the founder what to do
+- **Stage-calibrated** — every insight references the user's specific AE Ladder stage; nothing should read as generic advice
+- **Specific, not templated** — every paragraph should feel like it could only have been written for this person; generic language that applies to any agency is a failure state
+- **No gap recitation** — M&R Audit scores and capability rankings are not listed or repeated; they are translated into implications
+- **Peer-level voice** — the platform speaks as a strategic advisor who understands the business, not as a coach or an educator
+
+---
+
+## 10. Open Items / Future Considerations
+
+- **PDF export** — the downloadable brief is referenced in the UI but the export implementation can follow the on-platform build
+- **Synthesis versioning** — future consideration: track synthesis versions per quarter so founders can see how their strategic picture evolves over time
+- **Team sharing** — future consideration: allow the bridge statement and quarter focus to be shared with team members as a one-page brief
+- **Re-generation** — if the user retakes the M&R Audit or updates their Clarity Compass mid-quarter, the synthesis should support re-generation with a clear prompt

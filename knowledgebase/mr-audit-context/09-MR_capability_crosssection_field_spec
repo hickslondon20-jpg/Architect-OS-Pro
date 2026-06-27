@@ -1,0 +1,372 @@
+# M+R Capability Cross-Section Field Spec
+**Document Type:** Schema & Scoring Logic Specification
+**Feature Area:** Maturity & Readiness Audit — Capability Ranking & Display
+**Status:** Locked — Ready for Implementation
+**Intended Recipient:** Antigravity (Supabase + Scoring Logic)
+**Reference Session:** Cross-section grouping logic, 9-tier capability classification system
+
+---
+
+## 1. Purpose & Context
+
+This document specifies two related additions to the Architect OS Supabase database:
+
+1. A new reference table — `gm_cross_sections` — that defines the 9 valid cross-section groupings, their display labels, rank order, and the two input values that produce each one
+2. A new foreign key field — `cross_section_id` — on `gm_assessment_capability_scores` that stores the pre-computed grouping for each capability row, referencing the new reference table
+
+### Why This Field Exists
+
+The platform encodes capability priority using two separate fields:
+- `stage_fit_id` — how the respondent performed relative to their stage (Below / At / Ahead)
+- `three_p_id` — how important that capability is to establish at their current stage (Prioritize / Plant / Progressively Iterate)
+
+These two fields together produce 9 meaningful combinations, each representing a distinct strategic signal for the founder. Rather than requiring the frontend or PDF generation layer to join and interpret these two fields at runtime, `cross_section_id` stores the pre-computed combination as a single, human-readable grouping key.
+
+### Why a Reference Table (Not Just a Check Constraint)
+
+This pattern is consistent with how `stage_fit_id` and `three_p_id` are already handled — both have their own reference tables (`gm_stage_fit_factors` and `gm_3p_weights`) that store display labels, definitions, ordering, and weighting factors. `gm_cross_sections` follows the same pattern for the same reasons:
+
+- Display labels, definitions, and rank order live in one place and can be updated without touching application code
+- The rank order of the 9 sections is stored in the database, not hardcoded in the frontend or documentation
+- The foreign key relationship enforces referential integrity more meaningfully than a raw check constraint
+- The `stage_fit_id` and `three_p_id` inputs that map to each cross-section are explicitly documented in the database itself, not just in external specs
+
+`cross_section_id` is the grouping and filtering backbone for:
+- The Capability Priority Table on the M+R Dashboard (Chapter 3)
+- The Consolidated Capability Reference page in the PDF output
+- Any future feature that needs to surface or sort capabilities by strategic urgency tier
+
+---
+
+## 2. New Reference Table — `gm_cross_sections`
+
+### Table Definition
+
+```sql
+CREATE TABLE public.gm_cross_sections (
+  cross_section_id       text        NOT NULL,
+  cross_section_label    text        NOT NULL,
+  cross_section_order    integer     NOT NULL,
+  stage_fit_id           text        NOT NULL,
+  three_p_id             text        NOT NULL,
+  definition             text        NULL,
+  is_active              boolean     NOT NULL DEFAULT true,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NULL,
+
+  CONSTRAINT gm_cross_sections_pkey
+    PRIMARY KEY (cross_section_id),
+
+  CONSTRAINT gm_cross_sections_stage_fit_fkey
+    FOREIGN KEY (stage_fit_id)
+    REFERENCES gm_stage_fit_factors (stage_fit_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+
+  CONSTRAINT gm_cross_sections_three_p_fkey
+    FOREIGN KEY (three_p_id)
+    REFERENCES gm_3p_weights (three_p_id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS gm_cross_sections_order_uq
+  ON public.gm_cross_sections USING btree (cross_section_order);
+
+CREATE UNIQUE INDEX IF NOT EXISTS gm_cross_sections_inputs_uq
+  ON public.gm_cross_sections USING btree (stage_fit_id, three_p_id);
+
+CREATE INDEX IF NOT EXISTS gm_cross_sections_is_active_idx
+  ON public.gm_cross_sections USING btree (is_active);
+```
+
+### Seed Data — All 9 Rows
+
+Execute this insert immediately after creating the table. The `stage_fit_id` and `three_p_id` values must exactly match the existing primary key values in `gm_stage_fit_factors` and `gm_3p_weights`. Verify those values against the live database before running — do not assume the casing or slug format below is correct without checking.
+
+```sql
+INSERT INTO public.gm_cross_sections
+  (cross_section_id, cross_section_label, cross_section_order, stage_fit_id, three_p_id, definition)
+VALUES
+  (
+    'critical_gaps',
+    'Critical Gaps',
+    1,
+    'below',
+    'prioritize',
+    'Foundational deficit at current stage. Highest urgency signal the table can produce.'
+  ),
+  (
+    'developing_gaps',
+    'Developing Gaps',
+    2,
+    'below',
+    'plant',
+    'Gap in a secondary capability. On the horizon, not an emergency, but not ignorable.'
+  ),
+  (
+    'low_priority_gaps',
+    'Low-Priority Gaps',
+    3,
+    'below',
+    'progressively_iterate',
+    'Deficit in a low-urgency area. Aware of the gap but not pressing at this stage.'
+  ),
+  (
+    'core_strengths',
+    'Core Strengths',
+    4,
+    'at',
+    'prioritize',
+    'Meeting expectations on a foundational capability. Load-bearing — protect and maintain.'
+  ),
+  (
+    'emerging_capabilities',
+    'Emerging Capabilities',
+    5,
+    'at',
+    'plant',
+    'On track in a secondary area. Developing appropriately and on schedule with stage.'
+  ),
+  (
+    'baseline_capabilities',
+    'Baseline Capabilities',
+    6,
+    'at',
+    'progressively_iterate',
+    'Meeting a low-urgency bar. Stable, no action required.'
+  ),
+  (
+    'competitive_advantages',
+    'Competitive Advantages',
+    7,
+    'ahead',
+    'prioritize',
+    'Exceeding expectations on a foundational capability. Genuine strategic asset with leverage potential.'
+  ),
+  (
+    'advanced_capabilities',
+    'Advanced Capabilities',
+    8,
+    'ahead',
+    'plant',
+    'Ahead of the curve on a secondary capability. Positive signal, lower strategic significance.'
+  ),
+  (
+    'nice_to_have_strengths',
+    'Nice-to-Have Strengths',
+    9,
+    'ahead',
+    'progressively_iterate',
+    'Exceeding on a low-urgency area. Least strategically significant combination.'
+  );
+```
+
+**Important:** Before running the seed insert, query `gm_stage_fit_factors` and `gm_3p_weights` to confirm the exact primary key values used in the live database. Update the seed data if the casing or format of the slugs above differs from the live values.
+
+---
+
+## 3. Updated Field Definition — `gm_assessment_capability_scores`
+
+**Field Name:** `cross_section_id`
+
+**Data Type:** `text`
+
+**Nullable:** Yes at column creation. Populated at scoring time for every capability row on scored assessments.
+
+**Constraint:** Foreign key to `gm_cross_sections.cross_section_id` — replaces the need for a raw check constraint
+
+**Populated By:** Scoring engine / n8n workflow at the time `gm_assessment_capability_scores` is written
+
+**Dependencies:** Requires `stage_fit_id` and `three_p_id` to be resolved before `cross_section_id` is derived. Requires `gm_cross_sections` table to exist and be seeded before the foreign key is added.
+
+---
+
+## 4. The 9 Cross-Sections — Reference
+
+| cross_section_id | stage_fit_id | three_p_id | Display Label | cross_section_order |
+|---|---|---|---|---|
+| `critical_gaps` | Below | Prioritize | Critical Gaps | 1 |
+| `developing_gaps` | Below | Plant | Developing Gaps | 2 |
+| `low_priority_gaps` | Below | Progressively Iterate | Low-Priority Gaps | 3 |
+| `core_strengths` | At | Prioritize | Core Strengths | 4 |
+| `emerging_capabilities` | At | Plant | Emerging Capabilities | 5 |
+| `baseline_capabilities` | At | Progressively Iterate | Baseline Capabilities | 6 |
+| `competitive_advantages` | Ahead | Prioritize | Competitive Advantages | 7 |
+| `advanced_capabilities` | Ahead | Plant | Advanced Capabilities | 8 |
+| `nice_to_have_strengths` | Ahead | Progressively Iterate | Nice-to-Have Strengths | 9 |
+
+When the UI or PDF renders the grouped capability table, sections appear ordered by `cross_section_order` ASC. Empty sections (no capabilities assigned for this respondent) are suppressed and do not render.
+
+---
+
+## 5. Derivation Logic
+
+`cross_section_id` is a deterministic derivation. No AI or dynamic computation is involved. It is derived at scoring time by looking up the matching row in `gm_cross_sections` where `stage_fit_id` and `three_p_id` match the resolved values for the capability being scored.
+
+**Preferred approach — lookup from reference table:**
+
+```sql
+SELECT cross_section_id
+FROM gm_cross_sections
+WHERE stage_fit_id = <resolved_stage_fit_id>
+  AND three_p_id   = <resolved_three_p_id>
+LIMIT 1
+```
+
+This is preferred because it reads directly from `gm_cross_sections` and remains correct if slugs are ever updated.
+
+**Alternative — inline CASE statement** (use only if scoring function operates in a closed SQL context and live slug values have been confirmed):
+
+```sql
+CASE
+  WHEN stage_fit_id = 'below'  AND three_p_id = 'prioritize'            THEN 'critical_gaps'
+  WHEN stage_fit_id = 'below'  AND three_p_id = 'plant'                 THEN 'developing_gaps'
+  WHEN stage_fit_id = 'below'  AND three_p_id = 'progressively_iterate' THEN 'low_priority_gaps'
+  WHEN stage_fit_id = 'at'     AND three_p_id = 'prioritize'            THEN 'core_strengths'
+  WHEN stage_fit_id = 'at'     AND three_p_id = 'plant'                 THEN 'emerging_capabilities'
+  WHEN stage_fit_id = 'at'     AND three_p_id = 'progressively_iterate' THEN 'baseline_capabilities'
+  WHEN stage_fit_id = 'ahead'  AND three_p_id = 'prioritize'            THEN 'competitive_advantages'
+  WHEN stage_fit_id = 'ahead'  AND three_p_id = 'plant'                 THEN 'advanced_capabilities'
+  WHEN stage_fit_id = 'ahead'  AND three_p_id = 'progressively_iterate' THEN 'nice_to_have_strengths'
+END
+```
+
+**Important:** Both `stage_fit_id` and `three_p_id` must be resolved before `cross_section_id` is written. If either is null at scoring time, do not write `cross_section_id`. Do not write a partial or fallback value.
+
+---
+
+## 6. Supabase Migration Instructions
+
+Execute all steps in order. Do not proceed to a later step until the prior step is verified.
+
+### Step 1 — Create the `gm_cross_sections` reference table
+
+Run the full `CREATE TABLE` statement from Section 2, including all three indexes.
+
+### Step 2 — Seed the reference table
+
+Before running, query `gm_stage_fit_factors` and `gm_3p_weights` to confirm the exact primary key values in the live database. Update slug values in the seed data if they differ from those in this document.
+
+Run the `INSERT` statement from Section 2.
+
+Verify: `SELECT * FROM gm_cross_sections ORDER BY cross_section_order;` must return exactly 9 rows before proceeding.
+
+### Step 3 — Add `cross_section_id` column to `gm_assessment_capability_scores`
+
+```sql
+ALTER TABLE gm_assessment_capability_scores
+ADD COLUMN cross_section_id text NULL;
+```
+
+### Step 4 — Add foreign key constraint
+
+```sql
+ALTER TABLE gm_assessment_capability_scores
+ADD CONSTRAINT gm_cap_scores_cross_section_fkey
+  FOREIGN KEY (cross_section_id)
+  REFERENCES gm_cross_sections (cross_section_id)
+  ON UPDATE CASCADE ON DELETE RESTRICT;
+```
+
+### Step 5 — Add index for query performance
+
+```sql
+CREATE INDEX IF NOT EXISTS gm_cap_scores_cross_section_idx
+ON gm_assessment_capability_scores
+USING btree (assessment_id, cross_section_id);
+```
+
+### Step 6 — Backfill existing rows (if any scored assessments exist)
+
+```sql
+UPDATE gm_assessment_capability_scores AS cap
+SET cross_section_id = cs.cross_section_id
+FROM gm_cross_sections cs
+WHERE cs.stage_fit_id = cap.stage_fit_id
+  AND cs.three_p_id   = cap.three_p_id
+  AND cap.stage_fit_id IS NOT NULL
+  AND cap.three_p_id   IS NOT NULL;
+```
+
+Verify: After the backfill, confirm no rows exist where `stage_fit_id` and `three_p_id` are both non-null but `cross_section_id` is still null.
+
+---
+
+## 7. Scoring Engine / n8n Update Instructions
+
+The workflow that populates `gm_assessment_capability_scores` must be updated to derive and write `cross_section_id` as part of the same write operation that sets `stage_fit_id` and `three_p_id`.
+
+**Timing:** `cross_section_id` must be written in the same Supabase upsert that finalizes `stage_fit_id` and `three_p_id`. It must not be written in a separate pass.
+
+**Preferred approach:** Inside the scoring function, after `stage_fit_id` and `three_p_id` are resolved for a capability, perform a lookup against `gm_cross_sections` to retrieve the matching `cross_section_id` and include it in the upsert payload.
+
+**Alternative:** If the scoring function operates entirely within a single SQL context, embed the lookup as a subquery or join within the upsert statement rather than a separate round-trip.
+
+**Verification checkpoint:** After a test assessment is scored end-to-end, query `gm_assessment_capability_scores` for that `assessment_id` and confirm all 25 capability rows have a non-null `cross_section_id` value that matches a valid row in `gm_cross_sections`.
+
+---
+
+## 8. Within-Section Sort Order
+
+Within each cross-section group, capabilities are sorted by dimension order first, then by capability order within that dimension. This produces a stable, predictable layout consistent across all respondents.
+
+```sql
+ORDER BY gm_dimensions.dimension_order ASC, gm_capabilities.capability_order ASC
+```
+
+These values are pulled from `gm_dimensions.dimension_order` and `gm_capabilities.capability_order` via join. No additional rank field is needed for within-section ordering.
+
+---
+
+## 9. Downstream Display Usage
+
+### Dashboard UI (Chapter 3 — Capability Priority Table)
+
+The UI groups all 25 capabilities by `cross_section_id` and renders them as collapsible sections ordered by `gm_cross_sections.cross_section_order` ASC. Empty sections are suppressed. Each capability row displays four columns:
+
+| Column | Source |
+|---|---|
+| Capability Name | `gm_capabilities.capability_name` |
+| Dimension | `gm_dimensions.dimension_name` |
+| Cross-Section Label | `gm_cross_sections.cross_section_label` joined via `cross_section_id` |
+| What Good Looks Like | `gm_capability_stage_meaning.wgl_headline` for respondent's stage |
+
+`stage_fit_id` and `three_p_id` are not displayed as independent columns. They are encoded in and communicated by the cross-section label. Both fields remain stored and available for scoring, filtering, and GPT synthesis.
+
+**Filter controls:** Two independent filters sit above the table.
+- Filter by Score Tag: All / Below / At / Ahead (maps to `stage_fit_id` on the score row)
+- Filter by Priority Level: All / Prioritize / Plant / Progressively Iterate (maps to `three_p_id` on the score row)
+
+Applying both filters simultaneously narrows the visible table to a single cross-section group.
+
+### PDF Output (Consolidated Capability Reference Page)
+
+A dedicated page in the PDF report presents the same 9-section grouped table using identical column structure and section order. Empty sections are suppressed. This page is positioned after the Executive Summary and before the Dimension Deep Dives.
+
+The same four columns apply. The Action Tier language previously used in the PDF checkpoint tables (`Focus / Build / Maintain`) is replaced globally with Priority Level language (`Prioritize / Plant / Progressively Iterate`) to align with platform terminology.
+
+---
+
+## 10. What Does NOT Change
+
+- `stage_fit_id` — remains on `gm_assessment_capability_scores`, continues to be used in scoring, filtering, and GPT synthesis
+- `three_p_id` — remains on `gm_assessment_capability_scores`, continues to be used in scoring, filtering, and GPT synthesis
+- `rank_overall` — remains on `gm_assessment_capability_scores`, continues to serve other platform ranking functions
+- All existing scoring logic, formulas, and workflow patterns — no changes required beyond adding the derivation step for `cross_section_id`
+
+---
+
+## 11. Implementation Sequence
+
+Execute in this order. Do not proceed to a later step until the prior step is verified.
+
+1. Create the `gm_cross_sections` reference table (Section 6, Step 1)
+2. Seed all 9 rows — verify exactly 9 rows returned before proceeding (Section 6, Step 2)
+3. Add `cross_section_id` column to `gm_assessment_capability_scores` (Section 6, Step 3)
+4. Add foreign key constraint referencing `gm_cross_sections` (Section 6, Step 4)
+5. Add index on `(assessment_id, cross_section_id)` (Section 6, Step 5)
+6. Backfill existing scored rows if applicable — verify no orphaned nulls remain (Section 6, Step 6)
+7. Update the scoring engine / n8n workflow to write `cross_section_id` on new assessments (Section 7)
+8. Verify with a test assessment that all 25 capability rows have a non-null `cross_section_id` matching a valid `gm_cross_sections` row
+9. Confirm to London that schema and scoring logic are complete before any dashboard or PDF work begins
+
+Steps 8 and 9 are verification gates. Dashboard UI and PDF changes are out of scope for this document and will be specified separately once this implementation is confirmed complete.

@@ -35,3 +35,19 @@ export const Referrals: React.FC = () => (
     <PlaceholderContent text="Referral link, tracking, rewards" />
   </Card>
 );
+
+export const AIUsageSettings: React.FC = () => (
+  <Card className="p-6 min-h-[400px]">
+    <div className="mb-6">
+      <div className="aos-eyebrow mb-2" style={{ color: 'var(--aos-brass)' }}>
+        Settings
+      </div>
+      <h2 className="aos-h2">AI Usage</h2>
+      <p className="aos-small mt-2 max-w-2xl">
+        Stub target for global AI usage reporting across OS Engine, Virtual CSO, and Domain Agents.
+        Domain Agents links here, but the reporting surface is owned by Settings.
+      </p>
+    </div>
+    <PlaceholderContent text="AI usage reporting stub" />
+  </Card>
+);

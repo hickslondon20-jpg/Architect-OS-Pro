@@ -1,0 +1,1189 @@
+Virtual CSO Implementation Guide — Step-by-Step n8n Build-Out  
+Let me walk you through exactly how to implement this system, phase by phase, with specific n8n workflow structures and validation steps.
+
+Implementation Philosophy  
+Build Order Principle: Test Early, Test Often  
+We're going to build in this sequence:
+
+Simplest piece first (Agent 1 as standalone)  
+Validate it works (unit test with real queries)  
+Add next piece (Agent 2\)  
+Validate integration (test Agent 1 → Agent 2\)  
+Continue until full system is operational
+
+Why this matters: If you build all 4 workflows and then test, debugging becomes a nightmare. Building incrementally means when something breaks, you know exactly where.
+
+Phase 0: Prerequisites & Setup  
+Checklist Before You Start
+
+ Supabase project ready
+
+kb\_platform\_knowledge table exists with embeddings  
+virtual\_cso\_sessions table created  
+virtual\_cso\_messages table created  
+pgvector extension enabled  
+All indexes created
+
+ n8n instance configured
+
+OpenAI credentials added (for embeddings \+ GPT-4o-mini)  
+Anthropic credentials added (for Claude Sonnet 4\)  
+Supabase credentials added (for SQL queries)
+
+ Knowledge base populated
+
+At least 100+ chunks ingested and embedded  
+Metadata properly tagged (stage, domain, content\_type, etc.)  
+Test query: SELECT COUNT(\*) FROM kb\_platform\_knowledge returns \>100
+
+ Test user account setup
+
+Create test user in Supabase  
+User has agency\_profiles entry with stage set  
+User has assessment scores (or mock scores for testing)
+
+Phase 1: Build Agent 1 (Router) — Standalone  
+Goal: Get Agent 1 correctly classifying queries and prescribing context.  
+Step 1.1: Create Workflow A  
+n8n Workflow Name: Agent-1-Router  
+Workflow Structure:  
+\[1\] Webhook Trigger  
+    ↓  
+\[2\] Function Node: Prepare Input  
+    ↓  
+\[3\] OpenAI Chat Node: GPT-4o-mini  
+    ↓  
+\[4\] Function Node: Parse & Validate JSON  
+    ↓  
+\[5\] IF Node: Is JSON Valid?  
+    ├─ YES → \[6\] Webhook Response (return JSON)  
+    └─ NO → \[7\] Retry Logic or Error Response  
+Step 1.2: Configure Each Node  
+Node 1: Webhook Trigger  
+javascript// Method: POST  
+// Path: /agent-1-router  
+// Authentication: None (for testing; add later)
+
+// Expected body:  
+{  
+  "user\_message": "string",  
+  "session\_history": \[{"role": "user|assistant", "content": "string"}\],  
+  "user\_stage": "rising|striving|thriving|driving|arriving",  
+  "thinking\_persona": "creative|analytical|strategic"  
+}  
+Node 2: Function Node \- Prepare Input  
+javascript// Node name: Prepare Agent 1 Input
+
+const input \= $input.item.json;
+
+// Build session history string  
+const historyString \= (input.session\_history || \[\])  
+  .map(msg \=\> \`${msg.role}: ${msg.content}\`)  
+  .join('\\n\\n');
+
+return {  
+  json: {  
+    user\_message: input.user\_message,  
+    session\_history\_formatted: historyString,  
+    user\_stage: input.user\_stage || 'thriving', // default for testing  
+    thinking\_persona: input.thinking\_persona || 'strategic',  
+    // Pass through for later nodes  
+    raw\_history: input.session\_history  
+  }  
+};  
+Node 3: OpenAI Chat Node \- GPT-4o-mini  
+javascript// Model: gpt-4o-mini  
+// Temperature: 0.1  
+// Max Tokens: 500  
+// Response Format: JSON Object (enable in settings)
+
+// System Message (this is the critical part):  
+\`\`\`
+
+\*\*Agent 1 System Prompt (abbreviated \- use full version from spec):\*\*  
+\`\`\`  
+You are Agent 1: The Router for Virtual CSO.
+
+Your job is to analyze incoming queries and prescribe exactly what context is needed.
+
+\#\# Inputs  
+\- user\_message: The founder's question  
+\- session\_history: Last 5 conversational turns  
+\- user\_stage: Their AE Ladder stage  
+\- thinking\_persona: Their thinking mode
+
+\#\# Decision Framework
+
+\#\#\# Step 1: Assess Continuity  
+Is this a follow-up or new topic?
+
+Follow-up indicators:  
+\- "What do you mean by..."  
+\- "Can you explain that..."  
+\- "Tell me more about..."  
+\- Direct reference to previous response
+
+If follow-up: Set needs\_new\_context \= false
+
+\#\#\# Step 2: Classify Query Type  
+If new context needed, determine type:
+
+\- conceptual: Framework/concept explanations  
+\- benchmark: KPI thresholds, "is X healthy?"  
+\- diagnostic: "Why am I stuck?", symptom descriptions  
+\- prioritization: "What should I focus on?"  
+\- dependency: "Does X require Y?", relationships  
+\- scenario: "What if...", hypotheticals  
+\- progress: "How am I doing?", historical questions  
+\- clarification: Asking about terminology just used
+
+\#\#\# Step 3: Prescribe Context
+
+For each query type, specify:  
+\- rag\_search requirements (filters, semantic\_query)  
+\- user\_data requirements (minimal/snapshot/comprehensive)  
+\- historical\_data requirements (if needed)
+
+\#\# Output Format (MUST BE VALID JSON):
+
+{  
+  "classification": {  
+    "query\_type": "string",  
+    "confidence": 0.0-1.0,  
+    "detected\_signals": \["array of reasons"\]  
+  },  
+  "continuity": {  
+    "new\_topic": true|false,  
+    "builds\_on\_previous": true|false,  
+    "reasoning": "string"  
+  },  
+  "context\_prescription": {  
+    "needs\_new\_context": true|false,  
+    "rag\_search": {  
+      "required": true|false,  
+      "filters": {  
+        "content\_type": \["array"\],  
+        "stage": "string",  
+        "domain": "string or array",  
+        "kpi\_family": "string or null"  
+      },  
+      "semantic\_query": "string",  
+      "max\_chunks": 3-8  
+    },  
+    "user\_data": {  
+      "required": true|false,  
+      "scope": "minimal|snapshot|comprehensive"  
+    },  
+    "historical\_data": {  
+      "required": true|false,  
+      "scope": "recent|deep",  
+      "time\_range": "string"  
+    }  
+  }  
+}
+
+\#\# Examples:
+
+\[Include 3-5 example input/output pairs from the spec\]  
+\`\`\`
+
+\*\*User Message Template:\*\*  
+\`\`\`  
+User Stage: {{ $json.user\_stage }}  
+Thinking Persona: {{ $json.thinking\_persona }}
+
+Session History:  
+{{ $json.session\_history\_formatted }}
+
+Current Message:  
+{{ $json.user\_message }}
+
+Analyze this query and provide context prescription as JSON.  
+Node 4: Function Node \- Parse & Validate JSON  
+javascript// Node name: Parse and Validate
+
+try {  
+  const response \= $input.item.json.choices\[0\].message.content;  
+    
+  // Parse JSON  
+  const parsed \= JSON.parse(response);  
+    
+  // Validate required fields exist  
+  const required \= \[  
+    'classification',  
+    'continuity',  
+    'context\_prescription'  
+  \];  
+    
+  const isValid \= required.every(field \=\> parsed\[field\] \!== undefined);  
+    
+  return {  
+    json: {  
+      is\_valid: isValid,  
+      parsed\_response: parsed,  
+      raw\_response: response,  
+      validation\_error: isValid ? null : 'Missing required fields'  
+    }  
+  };  
+    
+} catch (error) {  
+  return {  
+    json: {  
+      is\_valid: false,  
+      parsed\_response: null,  
+      raw\_response: $input.item.json.choices\[0\].message.content,  
+      validation\_error: error.message  
+    }  
+  };  
+}  
+Node 5: IF Node \- Is JSON Valid?  
+javascript// Condition: {{ $json.is\_valid }} equals true  
+Node 6: Webhook Response (Success)  
+javascript// Return the parsed context prescription  
+return {  
+  json: $json.parsed\_response  
+};  
+Node 7: Error Handler  
+javascript// If validation failed  
+return {  
+  json: {  
+    error: "Agent 1 routing failed",  
+    details: $json.validation\_error,  
+    raw\_response: $json.raw\_response  
+  },  
+  statusCode: 500  
+};  
+Step 1.3: Test Agent 1 Standalone  
+Create test queries file: agent-1-test-cases.json  
+json\[  
+  {  
+    "name": "Conceptual \- 3P Framework",  
+    "input": {  
+      "user\_message": "What is the 3P Framework?",  
+      "session\_history": \[\],  
+      "user\_stage": "thriving"  
+    },  
+    "expected": {  
+      "query\_type": "conceptual",  
+      "needs\_new\_context": true,  
+      "rag\_required": true  
+    }  
+  },  
+  {  
+    "name": "Follow-up \- Clarification",  
+    "input": {  
+      "user\_message": "What do you mean by Treadmill Pressure?",  
+      "session\_history": \[  
+        {"role": "assistant", "content": "You're experiencing Treadmill Pressure..."}  
+      \],  
+      "user\_stage": "thriving"  
+    },  
+    "expected": {  
+      "query\_type": "clarification",  
+      "needs\_new\_context": false  
+    }  
+  },  
+  {  
+    "name": "Prioritization \- Quarterly Planning",  
+    "input": {  
+      "user\_message": "What should I focus on this quarter?",  
+      "session\_history": \[\],  
+      "user\_stage": "thriving"  
+    },  
+    "expected": {  
+      "query\_type": "prioritization",  
+      "needs\_new\_context": true,  
+      "user\_data\_scope": "comprehensive"  
+    }  
+  },  
+  {  
+    "name": "Benchmark \- Margin Question",  
+    "input": {  
+      "user\_message": "Is 18% margin healthy for my stage?",  
+      "session\_history": \[\],  
+      "user\_stage": "thriving"  
+    },  
+    "expected": {  
+      "query\_type": "benchmark",  
+      "kpi\_family": "margin"  
+    }  
+  }  
+  // Add more test cases covering all 7 query types  
+\]  
+Testing procedure:
+
+Manual testing via n8n UI:
+
+Click "Execute Workflow" on Webhook node  
+Use "Test URL" to get webhook endpoint  
+Send POST requests using Postman or curl
+
+bashcurl \-X POST https://your-n8n.app.n8n.cloud/webhook/agent-1-router \\  
+  \-H "Content-Type: application/json" \\  
+  \-d '{  
+    "user\_message": "What is the 3P Framework?",  
+    "session\_history": \[\],  
+    "user\_stage": "thriving"  
+  }'  
+\`\`\`
+
+2\. \*\*Validate responses:\*\*  
+   \- Check JSON is valid  
+   \- Check query\_type classification is correct  
+   \- Check filters make sense for query type  
+   \- Check needs\_new\_context flag is appropriate
+
+3\. \*\*Success criteria:\*\*  
+   \- 10/10 test cases return valid JSON  
+   \- 9/10 test cases classify correctly (90% accuracy)  
+   \- 0 crashes or timeouts
+
+\#\#\# \*\*Step 1.4: Iteration & Refinement\*\*
+
+\*\*If classification is wrong:\*\*  
+\- Review Agent 1's detected\_signals field  
+\- Add more examples to system prompt for that query type  
+\- Adjust decision logic language
+
+\*\*If JSON is malformed:\*\*  
+\- Add more explicit JSON format instructions  
+\- Include JSON schema in system prompt  
+\- Add retry logic with simplified prompt
+
+\*\*Checkpoint:\*\* Don't proceed to Phase 2 until Agent 1 is reliably routing correctly.
+
+\---
+
+\#\# Phase 2: Build Agent 2 (Context Assembler) — With Tools
+
+\*\*Goal:\*\* Get Agent 2 retrieving the right context based on Agent 1's prescription.
+
+\#\#\# \*\*Step 2.1: Build Tool Functions First\*\*
+
+Before building Agent 2's workflow, create the individual tool workflows that Agent 2 will call.
+
+\#\#\#\# \*\*Tool 1: Vector Search\*\*
+
+\*\*Workflow Name:\*\* \`Tool-Vector-Search\`  
+\`\`\`  
+\[1\] Webhook Trigger  
+    ↓  
+\[2\] Function: Extract Parameters  
+    ↓  
+\[3\] OpenAI Embeddings: Embed Query  
+    ↓  
+\[4\] Supabase: Hybrid Search Query  
+    ↓  
+\[5\] Function: Format Results  
+    ↓  
+\[6\] Webhook Response  
+Node 2: Extract Parameters  
+javascriptconst { semantic\_query, filters, max\_chunks } \= $input.item.json;
+
+return {  
+  json: {  
+    semantic\_query,  
+    stage\_filter: filters.stage || 'all',  
+    content\_type\_filter: filters.content\_type || null,  
+    domain\_filter: filters.domain || null,  
+    kpi\_family\_filter: filters.kpi\_family || null,  
+    max\_chunks: max\_chunks || 5  
+  }  
+};  
+Node 3: OpenAI Embeddings  
+javascript// OpenAI API call  
+// Model: text-embedding-3-small  
+// Input: {{ $json.semantic\_query }}  
+// Output field: embedding (array of 1536 numbers)  
+Node 4: Supabase Query  
+sqlSELECT   
+    chunk\_id,  
+    content,  
+    stage,  
+    domain,  
+    content\_type,  
+    kpi\_family,  
+    source\_doc,  
+    chunk\_summary,  
+    1 \- (embedding \<=\> CAST($1 AS vector)) AS similarity\_score  
+FROM kb\_platform\_knowledge  
+WHERE   
+    \-- Stage filter  
+    (stage \= $2 OR stage \= 'all')  
+      
+    \-- Content type filter (if provided)  
+    AND (  
+        $3::text\[\] IS NULL   
+        OR content\_type \= ANY($3::text\[\])  
+    )  
+      
+    \-- Domain filter (if provided)  
+    AND (  
+        $4::text\[\] IS NULL   
+        OR domain \= ANY($4::text\[\])  
+        OR domain \= 'cross\_domain'  
+    )  
+      
+    \-- KPI family filter (if provided)  
+    AND (  
+        $5 IS NULL   
+        OR kpi\_family \= $5  
+    )
+
+ORDER BY embedding \<=\> CAST($1 AS vector)  
+LIMIT $6;  
+Parameters:
+
+$1: {{ $json.embedding }} (from OpenAI node)  
+$2: {{ $json.stage\_filter }}  
+$3: {{ $json.content\_type\_filter }} (convert to PostgreSQL array format: {benchmark,framework\_definition})  
+$4: {{ $json.domain\_filter }}  
+$5: {{ $json.kpi\_family\_filter }}  
+$6: {{ $json.max\_chunks }}
+
+Node 5: Format Results  
+javascriptconst results \= $input.item.json;
+
+return {  
+  json: {  
+    chunks: results.map(row \=\> ({  
+      chunk\_id: row.chunk\_id,  
+      content: row.content,  
+      stage: row.stage,  
+      domain: row.domain,  
+      content\_type: row.content\_type,  
+      similarity\_score: row.similarity\_score,  
+      source\_doc: row.source\_doc  
+    })),  
+    retrieval\_metadata: {  
+      query: $node\["Extract Parameters"\].json.semantic\_query,  
+      filters\_applied: {  
+        stage: $node\["Extract Parameters"\].json.stage\_filter,  
+        content\_type: $node\["Extract Parameters"\].json.content\_type\_filter,  
+        domain: $node\["Extract Parameters"\].json.domain\_filter,  
+        kpi\_family: $node\["Extract Parameters"\].json.kpi\_family\_filter  
+      },  
+      chunks\_returned: results.length  
+    }  
+  }  
+};  
+Test this tool:  
+bashcurl \-X POST https://n8n.../webhook/tool-vector-search \\  
+  \-H "Content-Type: application/json" \\  
+  \-d '{  
+    "semantic\_query": "healthy margin thriving stage",  
+    "filters": {  
+      "stage": "thriving",  
+      "content\_type": \["benchmark"\],  
+      "kpi\_family": "margin"  
+    },  
+    "max\_chunks": 5  
+  }'  
+\`\`\`
+
+\*\*Expected:\*\* Returns 5 chunks, all with stage=thriving or all, all content\_type=benchmark, all kpi\_family=margin.
+
+\---
+
+\#\#\#\# \*\*Tool 2-6: User Data Queries\*\*
+
+Create similar standalone workflows for:  
+\- \`Tool-Query-User-Stage\`  
+\- \`Tool-Query-Maturity-Scores\`  
+\- \`Tool-Query-User-Goals\`  
+\- \`Tool-Query-Current-Initiatives\`  
+\- \`Tool-Query-Historical-Trends\`
+
+\*\*Each follows the pattern:\*\*  
+\`\`\`  
+\[1\] Webhook Trigger (receive user\_id \+ parameters)  
+\[2\] Supabase SQL Query  
+\[3\] Format Results  
+\[4\] Webhook Response  
+I won't detail all 5, but here's one example:  
+Tool: Query Maturity Scores  
+sql-- Get latest assessment scores  
+WITH latest\_assessment AS (  
+  SELECT assessment\_id   
+  FROM gm\_assessments   
+  WHERE user\_id \= $1   
+  ORDER BY created\_at DESC   
+  LIMIT 1  
+)  
+SELECT   
+  c.capability\_id,  
+  c.capability\_name,  
+  p.pillar\_name,  
+  acs.capability\_score\_pct,  
+  acs.capability\_band,  
+  acs.three\_p\_level,  
+  acs.urgency\_rank  
+FROM gm\_capabilities c  
+LEFT JOIN gm\_pillars p ON c.pillar\_id \= p.pillar\_id  
+LEFT JOIN gm\_assessment\_capability\_scores acs   
+  ON c.capability\_id \= acs.capability\_id  
+WHERE acs.assessment\_id \= (SELECT assessment\_id FROM latest\_assessment)  
+ORDER BY acs.urgency\_rank ASC;  
+\`\`\`
+
+\*\*Test each tool independently before proceeding.\*\*
+
+\---
+
+\#\#\# \*\*Step 2.2: Build Agent 2 Main Workflow\*\*
+
+\*\*Workflow Name:\*\* \`Agent-2-Context-Assembler\`  
+\`\`\`  
+\[1\] Webhook Trigger  
+    ↓  
+\[2\] Function: Parse Context Prescription  
+    ↓  
+\[3\] IF: RAG Search Required?  
+    ├─ YES → \[4\] HTTP: Call Tool-Vector-Search  
+    └─ NO → Skip  
+    ↓  
+\[5\] IF: User Data Required?  
+    ├─ YES → \[6\] Switch: By Scope  
+    │         ├─ minimal → \[7a\] HTTP: Query Stage Only  
+    │         ├─ snapshot → \[7b\] HTTP: Query Stage \+ Scores \+ Goals  
+    │         └─ comprehensive → \[7c\] HTTP: Query All User Tools  
+    └─ NO → Skip  
+    ↓  
+\[8\] IF: Historical Data Required?  
+    ├─ YES → \[9\] HTTP: Call Tool-Query-Historical-Trends  
+    └─ NO → Skip  
+    ↓  
+\[10\] Function: Assemble Context Package  
+    ↓  
+\[11\] Webhook Response  
+Key implementation note: Use n8n's HTTP Request nodes to call your tool webhooks. This keeps Agent 2's workflow clean and each tool independently testable.  
+Node 2: Parse Context Prescription  
+javascriptconst prescription \= $input.item.json.context\_prescription;  
+const user\_id \= $input.item.json.user\_id;
+
+return {  
+  json: {  
+    user\_id,  
+    rag\_required: prescription.rag\_search?.required || false,  
+    rag\_params: prescription.rag\_search || null,  
+    user\_data\_required: prescription.user\_data?.required || false,  
+    user\_data\_scope: prescription.user\_data?.scope || 'minimal',  
+    historical\_required: prescription.historical\_data?.required || false,  
+    historical\_params: prescription.historical\_data || null  
+  }  
+};  
+Node 4: Call Vector Search Tool  
+javascript// HTTP Request Node  
+// Method: POST  
+// URL: https://your-n8n.../webhook/tool-vector-search  
+// Body:  
+{  
+  "semantic\_query": "{{ $json.rag\_params.semantic\_query }}",  
+  "filters": {{ $json.rag\_params.filters }},  
+  "max\_chunks": {{ $json.rag\_params.max\_chunks }}  
+}  
+Node 10: Assemble Context Package  
+javascript// Merge all retrieved data into final package
+
+const ragResults \= $node\["HTTP Request \- Vector Search"\]?.json || null;  
+const userData \= $node\["HTTP Request \- User Data"\]?.json || null;  
+const historicalData \= $node\["HTTP Request \- Historical"\]?.json || null;
+
+return {  
+  json: {  
+    retrieval\_metadata: {  
+      timestamp: new Date().toISOString(),  
+      tools\_called: \[  
+        ragResults ? 'vector\_search' : null,  
+        userData ? 'user\_data' : null,  
+        historicalData ? 'historical\_trends' : null  
+      \].filter(Boolean),  
+      context\_scope: determineScope() // light/medium/heavy  
+    },  
+    rag\_results: ragResults,  
+    user\_data: userData,  
+    historical\_data: historicalData  
+  }  
+};
+
+function determineScope() {  
+  if (ragResults && userData && historicalData) return 'heavy';  
+  if (ragResults && userData) return 'medium';  
+  return 'light';  
+}  
+Step 2.3: Test Agent 2 Standalone  
+Test with Agent 1's output:
+
+Run Agent 1 with a prioritization query  
+Copy Agent 1's context\_prescription output  
+Call Agent 2 directly with that prescription \+ a test user\_id
+
+bashcurl \-X POST https://n8n.../webhook/agent-2-context-assembler \\  
+  \-H "Content-Type: application/json" \\  
+  \-d '{  
+    "user\_id": "test-user-123",  
+    "context\_prescription": {  
+      "needs\_new\_context": true,  
+      "rag\_search": {  
+        "required": true,  
+        "filters": {  
+          "content\_type": \["framework\_definition"\],  
+          "stage": "thriving"  
+        },  
+        "semantic\_query": "3P framework quarterly planning",  
+        "max\_chunks": 5  
+      },  
+      "user\_data": {  
+        "required": true,  
+        "scope": "comprehensive"  
+      },  
+      "historical\_data": {  
+        "required": false  
+      }  
+    }  
+  }'  
+\`\`\`
+
+\*\*Validate:\*\*  
+\- Returns valid context\_package  
+\- RAG results contain 5 chunks matching filters  
+\- User data is complete  
+\- No crashes or empty results
+
+\---
+
+\#\# Phase 3: Build Agent 3 (Strategic Responder)
+
+\*\*Goal:\*\* Synthesize context into natural strategic guidance.
+
+\#\#\# \*\*Step 3.1: Create Workflow C\*\*
+
+\*\*Workflow Name:\*\* \`Agent-3-Strategic-Responder\`  
+\`\`\`  
+\[1\] Webhook Trigger  
+    ↓  
+\[2\] Function: Assemble Final Prompt  
+    ↓  
+\[3\] Anthropic Chat: Claude Sonnet 4  
+    ↓  
+\[4\] Function: Format Response  
+    ↓  
+\[5\] Webhook Response  
+Node 2: Assemble Final Prompt  
+javascriptconst input \= $input.item.json;
+
+// Format session history  
+const history \= (input.session\_history || \[\])  
+  .map(msg \=\> \`${msg.role \=== 'user' ? 'Human' : 'Assistant'}: ${msg.content}\`)  
+  .join('\\n\\n');
+
+// Format context package  
+const context \= input.context\_package;  
+let contextBlock \= '';
+
+if (context?.rag\_results?.chunks) {  
+  contextBlock \+= '\\n\#\# Platform Knowledge:\\n\\n';  
+  context.rag\_results.chunks.forEach((chunk, i) \=\> {  
+    contextBlock \+= \`\[Chunk ${i+1}\] (${chunk.content\_type}, ${chunk.stage} stage)\\n${chunk.content}\\n\\n\`;  
+  });  
+}
+
+if (context?.user\_data) {  
+  contextBlock \+= '\\n\#\# User Context:\\n\\n';  
+  contextBlock \+= \`Stage: ${context.user\_data.stage?.stage\_label}\\n\`;  
+  if (context.user\_data.scores) {  
+    contextBlock \+= \`\\nCapability Scores (Top Priorities):\\n\`;  
+    context.user\_data.scores.capability\_scores?.slice(0, 10).forEach(cap \=\> {  
+      contextBlock \+= \`- ${cap.capability\_name}: ${(cap.capability\_score\_pct \* 100).toFixed(0)}% (${cap.capability\_band})\\n\`;  
+    });  
+  }  
+  if (context.user\_data.goals) {  
+    contextBlock \+= \`\\n12-Month Goal: $${context.user\_data.goals.horizon\_12mo?.revenue\_target?.toLocaleString()}\\n\`;  
+  }  
+}
+
+if (context?.historical\_data) {  
+  contextBlock \+= '\\n\#\# Recent Progress:\\n\\n';  
+  if (context.historical\_data.score\_deltas) {  
+    contextBlock \+= 'Score Changes:\\n';  
+    context.historical\_data.score\_deltas.forEach(delta \=\> {  
+      contextBlock \+= \`- ${delta.capability\_name}: ${delta.direction} (${delta.delta \> 0 ? '+' : ''}${(delta.delta \* 100).toFixed(0)}%)\\n\`;  
+    });  
+  }  
+}
+
+return {  
+  json: {  
+    system\_prompt: getAgent3SystemPrompt(), // Full system prompt from spec  
+    context\_block: contextBlock,  
+    history\_block: history,  
+    user\_message: input.user\_message,  
+    thinking\_persona: input.thinking\_persona || 'strategic'  
+  }  
+};
+
+function getAgent3SystemPrompt() {  
+  return \`\[Full Agent 3 system prompt from specification \- behavioral principles, stage calibration, etc.\]\`;  
+}  
+Node 3: Anthropic Chat  
+javascript// Model: claude-sonnet-4-20250514  
+// Temperature: 0.7  
+// Max Tokens: 2000
+
+// System Message:  
+{{ $json.system\_prompt }}
+
+// User Message Template:  
+\<context\>  
+{{ $json.context\_block }}  
+\</context\>
+
+\<conversation\_history\>  
+{{ $json.history\_block }}  
+\</conversation\_history\>
+
+\<current\_question\>  
+{{ $json.user\_message }}  
+\</current\_question\>
+
+Please respond to the founder's question using the context provided. Remember your core principles: observational over judgmental, implications over prescriptions, stage-calibrated language.  
+Node 4: Format Response  
+javascriptreturn {  
+  json: {  
+    response: $input.item.json.content\[0\].text,  
+    tokens\_used: $input.item.json.usage.input\_tokens \+ $input.item.json.usage.output\_tokens,  
+    model: 'claude-sonnet-4'  
+  }  
+};  
+Step 3.2: Test Agent 3 Standalone  
+Create mock context packages for different scenarios:  
+json{  
+  "user\_message": "What should I focus on this quarter?",  
+  "session\_history": \[\],  
+  "thinking\_persona": "strategic",  
+  "context\_package": {  
+    "rag\_results": {  
+      "chunks": \[  
+        {  
+          "content": "\[Real chunk content about 3P Framework from your knowledge base\]",  
+          "content\_type": "framework\_definition",  
+          "stage": "thriving"  
+        }  
+      \]  
+    },  
+    "user\_data": {  
+      "stage": {"stage": "thriving", "stage\_label": "Thriving"},  
+      "scores": {  
+        "capability\_scores": \[  
+          {"capability\_name": "Client Concentration", "capability\_score\_pct": 0.64, "capability\_band": "emerging"},  
+          {"capability\_name": "Margin Management", "capability\_score\_pct": 0.68, "capability\_band": "emerging"}  
+        \]  
+      },  
+      "goals": {  
+        "horizon\_12mo": {"revenue\_target": 5000000}  
+      }  
+    }  
+  }  
+}  
+\`\`\`
+
+\*\*Test scenarios:\*\*  
+1\. Full context (RAG \+ user data \+ historical)  
+2\. Partial context (RAG only)  
+3\. Missing context (minimal data)  
+4\. Follow-up conversation (session history present)
+
+\*\*Validate:\*\*  
+\- Responses feel natural, conversational  
+\- No hallucinations (doesn't claim data not in context)  
+\- Stage-appropriate language  
+\- Observational tone (not prescriptive)  
+\- Integrates context seamlessly (doesn't say "according to your data")
+
+\---
+
+\#\# Phase 4: Orchestration — Connect Everything
+
+\*\*Goal:\*\* Create the main handler that coordinates all 3 agents.
+
+\#\#\# \*\*Step 4.1: Create Main Workflow\*\*
+
+\*\*Workflow Name:\*\* \`Virtual-CSO-Main-Handler\`  
+\`\`\`  
+\[1\] Webhook Trigger (User's message arrives)  
+    ↓  
+\[2\] Function: Validate Input  
+    ↓  
+\[3\] Supabase: Get User Stage (lightweight query)  
+    ↓  
+\[4\] Supabase: Get Session History (last 5 messages)  
+    ↓  
+\[5\] HTTP Request: Call Agent 1  
+    ↓  
+\[6\] IF: needs\_new\_context?  
+    ├─ YES → \[7\] HTTP Request: Call Agent 2  
+    │         ↓  
+    │        \[8\] HTTP Request: Call Agent 3 (with context)  
+    └─ NO → \[9\] HTTP Request: Call Agent 3 (session memory only)  
+    ↓  
+\[10\] Supabase: Save User Message  
+    ↓  
+\[11\] Supabase: Save Assistant Response  
+    ↓  
+\[12\] Webhook Response (return to frontend)  
+Node 3: Get User Stage  
+sqlSELECT   
+  ae\_stage as stage,  
+  ae\_stage\_label as stage\_label  
+FROM agency\_profiles  
+WHERE user\_id \= $1  
+LIMIT 1;  
+Node 4: Get Session History  
+sqlSELECT   
+  role,  
+  content,  
+  created\_at  
+FROM virtual\_cso\_messages  
+WHERE session\_id \= $1  
+ORDER BY created\_at DESC  
+LIMIT 5;  
+Node 5: Call Agent 1  
+javascript// HTTP Request  
+// POST to Agent-1-Router webhook  
+{  
+  "user\_message": "{{ $json.user\_message }}",  
+  "session\_history": {{ $node\["Get Session History"\].json }},  
+  "user\_stage": "{{ $node\["Get User Stage"\].json\[0\].stage }}",  
+  "thinking\_persona": "{{ $json.thinking\_persona }}"  
+}  
+Node 6: Conditional Branch  
+javascript// IF condition  
+{{ $node\["Call Agent 1"\].json.context\_prescription.needs\_new\_context }} equals true  
+Node 7: Call Agent 2  
+javascript// HTTP Request  
+// POST to Agent-2-Context-Assembler webhook  
+{  
+  "user\_id": "{{ $json.user\_id }}",  
+  "context\_prescription": {{ $node\["Call Agent 1"\].json.context\_prescription }}  
+}  
+Node 8: Call Agent 3 (with full context)  
+javascript// HTTP Request  
+// POST to Agent-3-Strategic-Responder webhook  
+{  
+  "user\_message": "{{ $json.user\_message }}",  
+  "session\_history": {{ $node\["Get Session History"\].json }},  
+  "thinking\_persona": "{{ $json.thinking\_persona }}",  
+  "context\_package": {{ $node\["Call Agent 2"\].json }}  
+}  
+Node 9: Call Agent 3 (session memory only)  
+javascript// Same as Node 8 but context\_package \= null  
+{  
+  "user\_message": "{{ $json.user\_message }}",  
+  "session\_history": {{ $node\["Get Session History"\].json }},  
+  "thinking\_persona": "{{ $json.thinking\_persona }}",  
+  "context\_package": null  
+}  
+Node 10-11: Save Messages  
+sql-- Save user message  
+INSERT INTO virtual\_cso\_messages (  
+  session\_id,   
+  role,   
+  content,   
+  created\_at  
+) VALUES (  
+  $1,   
+  'user',   
+  $2,   
+  NOW()  
+);
+
+\-- Save assistant response  
+INSERT INTO virtual\_cso\_messages (  
+  session\_id,   
+  role,   
+  content,  
+  agent\_1\_decision,  
+  context\_package,  
+  created\_at  
+) VALUES (  
+  $1,  
+  'assistant',  
+  $2,  
+  $3,  \-- Agent 1's routing decision (for debugging)  
+  $4,  \-- Agent 2's context package (for debugging)  
+  NOW()  
+);  
+Step 4.2: End-to-End Testing  
+Test Scenarios:  
+Scenario 1: New conversation, prioritization query  
+bashcurl \-X POST https://n8n.../webhook/virtual-cso \\  
+  \-H "Content-Type: application/json" \\  
+  \-d '{  
+    "user\_id": "test-user-123",  
+    "session\_id": "session-abc",  
+    "user\_message": "What should I focus on this quarter?",  
+    "thinking\_persona": "strategic"  
+  }'  
+Expected flow:
+
+Main Handler → Agent 1  
+Agent 1 classifies as "prioritization", needs\_new\_context=true  
+Main Handler → Agent 2 (full context retrieval)  
+Main Handler → Agent 3 (with full context)  
+Agent 3 responds with stage-calibrated prioritization guidance  
+Messages saved to database  
+Response returned
+
+Scenario 2: Follow-up question (session memory only)  
+bash\# First message (same as above)  
+\# Then send follow-up:
+
+curl \-X POST https://n8n.../webhook/virtual-cso \\  
+  \-H "Content-Type: application/json" \\  
+  \-d '{  
+    "user\_id": "test-user-123",  
+    "session\_id": "session-abc",  
+    "user\_message": "Why Client Concentration over Delivery Capacity?",  
+    "thinking\_persona": "strategic"  
+  }'  
+\`\`\`
+
+\*\*Expected flow:\*\*  
+1\. Main Handler → Agent 1  
+2\. Agent 1 detects follow-up, needs\_new\_context=false  
+3\. Main Handler skips Agent 2  
+4\. Main Handler → Agent 3 (session memory only)  
+5\. Agent 3 responds using previous context  
+6\. Response returned
+
+\*\*Validation checklist:\*\*  
+\- \[ \] Full flow executes without errors  
+\- \[ \] Agent 1 routes correctly (new context vs. follow-up)  
+\- \[ \] Agent 2 retrieves appropriate context  
+\- \[ \] Agent 3 synthesizes naturally  
+\- \[ \] Messages saved to database correctly  
+\- \[ \] Response time \< 5 seconds  
+\- \[ \] Conversation continuity works (follow-ups reference previous turns)
+
+\---
+
+\#\# Phase 5: Error Handling & Logging
+
+\#\#\# \*\*Step 5.1: Add Error Nodes\*\*
+
+\*\*In each workflow, add:\*\*  
+\`\`\`  
+\[Error Trigger Node\]  
+    ↓  
+\[Function: Format Error\]  
+    ↓  
+\[Supabase: Log Error\]  
+    ↓  
+\[Webhook Response: Error Message\]  
+Example Error Handler:  
+javascript// Function: Format Error  
+const error \= $input.item.json.error;  
+const workflow \= 'Agent-1-Router'; // Change per workflow
+
+return {  
+  json: {  
+    workflow\_name: workflow,  
+    error\_message: error.message,  
+    error\_stack: error.stack,  
+    input\_data: $node\["Webhook Trigger"\].json,  
+    timestamp: new Date().toISOString()  
+  }  
+};  
+sql-- Log to Supabase  
+INSERT INTO virtual\_cso\_errors (  
+  session\_id,  
+  agent,  
+  error\_type,  
+  error\_message,  
+  stack\_trace,  
+  created\_at  
+) VALUES (  
+  $1, $2, $3, $4, $5, NOW()  
+);  
+Step 5.2: Add Logging Nodes  
+In Agent 1 workflow:  
+After successful routing, add a node to log the decision:  
+sqlINSERT INTO virtual\_cso\_routing\_log (  
+  session\_id,  
+  user\_message,  
+  query\_type,  
+  confidence,  
+  context\_prescription,  
+  created\_at  
+) VALUES (  
+  $1, $2, $3, $4, $5, NOW()  
+);  
+In Agent 2 workflow:  
+After each tool call, log performance:  
+sqlINSERT INTO virtual\_cso\_retrieval\_log (  
+  session\_id,  
+  tool\_name,  
+  success,  
+  latency\_ms,  
+  created\_at  
+) VALUES (  
+  $1, $2, $3, $4, NOW()  
+);
+
+Phase 6: Frontend Integration  
+Step 6.1: Create Session Management  
+Before first message:  
+javascript// Frontend: Create new session  
+const response \= await fetch('/api/virtual-cso/session', {  
+  method: 'POST',  
+  body: JSON.stringify({  
+    user\_id: currentUser.id,  
+    thinking\_persona: 'strategic', // from UI selector  
+    session\_goal: 'Q3 planning' // optional  
+  })  
+});
+
+const { session\_id } \= await response.json();  
+// Store session\_id in component state  
+For each message:  
+javascript// Frontend: Send message  
+const response \= await fetch('https://n8n.../webhook/virtual-cso', {  
+  method: 'POST',  
+  headers: { 'Content-Type': 'application/json' },  
+  body: JSON.stringify({  
+    user\_id: currentUser.id,  
+    session\_id: currentSessionId,  
+    user\_message: userInput,  
+    thinking\_persona: selectedPersona  
+  })  
+});
+
+const { response: assistantMessage } \= await response.json();  
+// Display in chat UI  
+\`\`\`
+
+\---
+
+\#\# Phase 7: Alpha Testing
+
+\#\#\# \*\*Step 7.1: Testing Protocol\*\*
+
+\*\*Recruit 5-10 alpha users:\*\*  
+\- Mix of stages (Rising, Thriving, Driving)  
+\- Give them specific prompts to test  
+\- Collect qualitative feedback
+
+\*\*Test prompts:\*\*  
+1\. "What should I prioritize this quarter?"  
+2\. "Why do I feel stuck at $2M?"  
+3\. "Is 60% client concentration too high?"  
+4\. "What if I raise prices 15%?"  
+5\. "How am I doing on my Q2 goals?"
+
+\*\*Feedback form:\*\*  
+\- Did responses feel relevant to YOUR business? (1-5)  
+\- Did the system understand follow-up questions? (Y/N)  
+\- Any responses that felt "off" or wrong? (Open text)  
+\- What would make this more useful? (Open text)
+
+\*\*Monitor during testing:\*\*  
+\- Error logs (check daily)  
+\- Routing decisions (are classifications correct?)  
+\- Retrieval quality (are relevant chunks surfacing?)  
+\- Response times (\>5s is problem)
+
+\#\#\# \*\*Step 7.2: Iteration Based on Feedback\*\*
+
+\*\*Common issues and fixes:\*\*
+
+\*\*Issue: Generic responses\*\*  
+\- Fix: Improve Agent 2's user data queries (pulling wrong context)  
+\- Fix: Add more specific chunks to knowledge base
+
+\*\*Issue: Wrong stage advice\*\*  
+\- Fix: Agent 1 not passing stage correctly  
+\- Fix: RAG results not filtering by stage properly
+
+\*\*Issue: Doesn't remember conversation\*\*  
+\- Fix: Session history not being passed correctly  
+\- Fix: Agent 1 incorrectly flagging follow-ups as new topics
+
+\*\*Issue: Slow responses\*\*  
+\- Fix: Optimize SQL queries (add indexes)  
+\- Fix: Reduce max\_chunks in Agent 1 prescriptions  
+\- Fix: Consider caching user\_stage (it rarely changes)
+
+\---
+
+\#\# Implementation Timeline
+
+\*\*Realistic timeline for one developer:\*\*
+
+\- \*\*Phase 0\*\* (Prerequisites): 1-2 days  
+\- \*\*Phase 1\*\* (Agent 1): 2-3 days  
+\- \*\*Phase 2\*\* (Agent 2 \+ Tools): 3-4 days  
+\- \*\*Phase 3\*\* (Agent 3): 2-3 days  
+\- \*\*Phase 4\*\* (Orchestration): 2 days  
+\- \*\*Phase 5\*\* (Error Handling): 1 day  
+\- \*\*Phase 6\*\* (Frontend): 2-3 days  
+\- \*\*Phase 7\*\* (Alpha Testing): 1-2 weeks
+
+\*\*Total: 3-4 weeks from start to alpha launch\*\*
+
+\---
+
+\#\# Critical Success Factors
+
+1\. \*\*Test each agent standalone before connecting them\*\*  
+   \- Debugging 3 connected workflows is 10x harder than debugging 1
+
+2\. \*\*Use real data for testing\*\*  
+   \- Don't test with "lorem ipsum" \- use actual chunks from your knowledge base
+
+3\. \*\*Log everything initially\*\*  
+   \- You'll need logs to understand why routing/retrieval isn't working
+
+4\. \*\*Start with simple queries\*\*  
+   \- Don't test with "explain the relationship between positioning, margins, and client concentration across 5 dimensions" on day 1  
+   \- Start with "what is the 3P framework"
+
+5\. \*\*Review Agent 3 responses manually\*\*  
+   \- First 50-100 conversations should be reviewed by you  
+   \- Look for hallucinations, wrong tone, irrelevant chunks being used
+
+\---
+
+\#\# Quick Reference: Workflow URLs
+
+Once built, you'll have these webhook endpoints:  
+\`\`\`  
+Main Entry Point:  
+POST https://n8n.../webhook/virtual-cso
+
+Agent Workflows (internal):  
+POST https://n8n.../webhook/agent-1-router  
+POST https://n8n.../webhook/agent-2-context-assembler  
+POST https://n8n.../webhook/agent-3-strategic-responder
+
+Tool Workflows (internal):  
+POST https://n8n.../webhook/tool-vector-search  
+POST https://n8n.../webhook/tool-query-user-stage  
+POST https://n8n.../webhook/tool-query-maturity-scores  
+POST https://n8n.../webhook/tool-query-user-goals  
+POST https://n8n.../webhook/tool-query-current-initiatives  
+POST https://n8n.../webhook/tool-query-historical-trends
+
+Next Steps  
+Immediate action:
+
+Create a new n8n project/folder: "Virtual CSO"  
+Start with Phase 1: Build Agent 1  
+Test with 10 queries before moving to Phase 2  
+Document any deviations from this spec as you go
+
+When you hit blockers:
+
+Check n8n execution logs (shows exactly where workflow failed)  
+Test SQL queries directly in Supabase SQL editor  
+Call webhooks directly with curl to isolate issues  
+Review Agent 1's routing decisions (are filters making sense?)

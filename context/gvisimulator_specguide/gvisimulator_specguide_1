@@ -1,0 +1,1746 @@
+# **DOCUMENT 1: Product Vision & Evolution**
+
+## **Growth Velocity Calculator V2 — Strategic Scenario Planning System**
+
+---
+
+## **Context: Evolution from V1**
+
+The Growth Velocity Calculator already exists in the platform at `/vision-identity/growth-velocity`. This document outlines the **conceptual evolution** and **feature enhancements** for V2, which transforms the tool from a simple calculator into a strategic scenario planning system.
+
+**What V1 Does:**
+
+* Takes current state \+ target inputs  
+* Calculates basic implications (headcount, sales velocity)  
+* Shows results in right panel  
+* Non-prescriptive tone ("this implies..." not "you should...")
+
+**What V2 Adds:**
+
+* **6 Pressure Families framework** for structured insight delivery  
+* **Interactive Scenario Builder** with presets and sliders  
+* **Real-time impact cards** that update as user adjusts parameters  
+* **Visual comparison system** (3 charts \+ scorecard)  
+* **GPT synthesis layer** with context from Agency Snapshot  
+* **Scenario save/compare** functionality
+
+---
+
+## **Product Vision: What We're Building**
+
+### **The Core Insight**
+
+Founders often set growth targets without understanding the **structural implications** those targets create. A goal of "$3M in 18 months" might sound reasonable, but could require:
+
+* Tripling sales velocity  
+* Hiring faster than culture can absorb  
+* Maintaining impossibly high retention  
+* Compressing margins to unprofitable levels
+
+**The tool's job:** Surface these implications early, enable strategic trade-off thinking, and help founders choose growth paths with eyes wide open.
+
+---
+
+## **The Strategic Shift: From Calculator to Scenario Planner**
+
+### **V1 Philosophy:**
+
+"Enter your target, see what it requires"
+
+* Single scenario analysis  
+* Static calculations  
+* Results displayed as text
+
+### **V2 Philosophy:**
+
+"Model different paths, compare trade-offs, understand pressure points"
+
+* Multi-scenario exploration  
+* Interactive parameter adjustment  
+* Visual comparison before synthesis  
+* AI-powered contextual analysis
+
+---
+
+## **The 6 Pressure Families Framework (NEW)**
+
+V2 organizes all insights around **6 strategic pressure families** that represent different ways growth targets can strain the business:
+
+### **1\. 🏃 The Treadmill (Retention Pressure)**
+
+**Concept:** Growth is mostly replacement, not expansion
+
+**Key Insights:**
+
+* "40% of your sales effort just replaces churned revenue"  
+* "Improving retention from 80% to 90% eliminates need for 2 deals/month"  
+* "At this growth rate, churn becomes the dominant constraint before sales does"
+
+**Calculated Trigger:**
+
+* If `(Churn Replacement Revenue / Total Sales Revenue Needed) > 50%` → RED alert  
+* If between 30-50% → YELLOW caution  
+* If \< 30% → GREEN healthy
+
+---
+
+### **2\. 🚀 New Capability (Sales/Pipeline Pressure)**
+
+**Concept:** Client acquisition pace becomes a qualitatively different engine
+
+**Key Insights:**
+
+* "This goal requires 3x your current monthly deal velocity"  
+* "This isn't incremental improvement—it's a new operating tempo"  
+* "Small changes in ACV dramatically alter required deal volume"
+
+**Calculated Trigger:**
+
+* If `(Required Deals/Month) > (3x Current Pace)` → RED "system break"  
+* If between 2-3x → YELLOW "significant ramp"  
+* If \< 2x → GREEN "achievable acceleration"
+
+---
+
+### **3\. 👥 Capacity Wall (Operational Pressure)**
+
+**Concept:** Capacity and team scaling strain
+
+**Key Insights:**
+
+* "You're hiring 3 people per quarter—faster than culture can absorb"  
+* "This assumes AGI per FTE of $260K (vs. $180K benchmark) \= burnout zone"  
+* "You cross the 'span of control' threshold at 15 people—requires first manager"
+
+**Calculated Trigger:**
+
+* If `(Hires Per Quarter / Current Team Size) > 10%` → RED "culture risk"  
+* If `(Implied AGI/FTE) > $240K` → RED "burnout risk"  
+* If both within healthy ranges → GREEN
+
+---
+
+### **4\. 💰 Profit Trap (Economic Pressure)**
+
+**Concept:** Economic and profitability tension
+
+**Key Insights:**
+
+* "Scenario A generates $3M revenue but only $50K more profit than Scenario B's $2.5M"  
+* "The cost of 8 new hires ($360K/year) exceeds your current annual profit"  
+* "Margin must hold at 30%+ to fund this growth—compression is not an option"
+
+**Calculated Trigger:**
+
+* If `(Target Profit) < (Baseline Profit + New Payroll Cost)` → RED "funding gap"  
+* If margins compress below baseline → YELLOW "profit erosion"  
+* If profit grows proportionally → GREEN
+
+---
+
+### **5\. 🐋 Whale Trap (Structural Risk)**
+
+**Concept:** Structural and concentration risk
+
+**Key Insights:**
+
+* "Reaching $3M with 4 clients means your largest client is 25% of revenue"  
+* "This path trades sales pressure for concentration risk"  
+* "Scenario B requires managing 30 client relationships (3x current complexity)"
+
+**Calculated Trigger:**
+
+* If `(Avg Client Value / Target Revenue) > 15%` → RED "concentration risk"  
+* If `(Client Count at Target) > (3x Current Count)` → YELLOW "complexity risk"
+
+---
+
+### **6\. Positioning Pressure**
+
+## **Framing First: What a “Primary Positioning Signal” Must Do**
+
+To qualify, a positioning-pressure signal must:
+
+1. Be **derived**, not an input
+
+2. Activate even in **single-scenario modeling**
+
+3. Be sensitive to **constraints elsewhere** (client count, time, growth magnitude)
+
+4. Reveal **structural dependency**, not preference
+
+5. Scale with **pace**, not just magnitude
+
+With that in mind, here are **three candidates** that *each* earn their place — for different reasons.
+
+---
+
+## **Candidate 1: ACV Delta (Magnitude Gap)**
+
+### **What it is**
+
+The absolute and relative change between:
+
+* **Current ACV**
+
+* **Implied or required target ACV**
+
+This can be expressed as:
+
+* $ increase
+
+* % increase
+
+* Multiple of current ACV
+
+---
+
+### **What it reveals**
+
+This signal answers:
+
+*How much more value must be extracted per client for this plan to work?*
+
+This is the **baseline reality check**.
+
+It surfaces:
+
+* When growth is being carried primarily by value density, not volume
+
+* When client growth is constrained (explicitly or implicitly)
+
+* When “same clients, more revenue” is doing the heavy lifting
+
+---
+
+### **Why it earns its place**
+
+* It’s unavoidable — revenue math forces it
+
+* It is legible to users and consultants
+
+* It’s the **entry condition** for positioning pressure
+
+Importantly:
+
+* ACV delta alone does **not** imply impossibility
+
+* But **large deltas** imply:
+
+  * Different services
+
+  * Different pricing logic
+
+  * Different buying behavior
+
+This is the *what must change* signal.
+
+---
+
+### **Why it’s insufficient alone**
+
+* A 30% ACV increase over 36 months ≠ 30% over 9 months
+
+* Magnitude without time hides strain
+
+Which leads directly to the next signal.
+
+---
+
+## **Candidate 2: ACV Rate of Change (Pace Signal)**
+
+### **What it is**
+
+The **speed** at which ACV must increase to hit the target:
+
+* Annualized ACV growth rate
+
+* Implied quarter-over-quarter increase
+
+* Compared to current historical ACV stability (even if inferred)
+
+---
+
+### **What it reveals**
+
+This signal answers:
+
+*How fast does the agency need to reprice, repackage, or upsell its clients?*
+
+This is the **strain detector**.
+
+It surfaces:
+
+* When pricing and service evolution must happen *during* execution
+
+* When positioning work cannot be deferred
+
+* When “we’ll figure it out later” isn’t viable
+
+---
+
+### **Why it earns its place**
+
+* This mirrors how sales velocity and hiring velocity behave
+
+* It converts a strategic shift into a **tempo requirement**
+
+* It explains why:
+
+  * A plan can look reasonable on paper
+
+  * But feel impossible in motion
+
+A slow ACV lift:
+
+* Suggests evolutionary positioning
+
+A fast ACV lift:
+
+* Implies disruptive repositioning
+
+* Or aggressive monetization changes
+
+This is the *when it must change* signal.
+
+---
+
+### **Why it’s distinct from ACV delta**
+
+Two scenarios can have:
+
+* Identical target ACV
+
+* Radically different feasibility
+
+The difference is **time compression**.
+
+This signal catches that.
+
+---
+
+## **Candidate 3: ACV Dependency Ratio (Structural Reliance Signal)**
+
+### **What it is**
+
+The proportion of total revenue growth that is dependent on:
+
+* **ACV expansion**  
+   versus:
+
+* Client volume growth
+
+Conceptually:
+
+*How much of the growth plan collapses if ACV doesn’t increase as assumed?*
+
+---
+
+### **What it reveals**
+
+This signal answers:
+
+*Is ACV growth optional leverage — or a structural requirement?*
+
+This is the **fragility detector**.
+
+It surfaces:
+
+* When the plan has no viable volume-based fallback
+
+* When sales pressure becomes extreme without ACV lift
+
+* When positioning silently underwrites the entire strategy
+
+---
+
+### **Why it earns its place**
+
+* It distinguishes **leverage** from **dependency**
+
+* It explains why:
+
+  * Sales pressure spikes
+
+  * Capacity pressure eases *only if* ACV changes
+
+* It exposes plans that are brittle to market resistance
+
+A low dependency:
+
+* ACV helps, but isn’t required
+
+A high dependency:
+
+* The plan fails without repositioning
+
+This is the *how much the plan relies on it* signal.
+
+---
+
+## **Why All Three Belong (Together)**
+
+These three signals form a **complete positioning-pressure picture**:
+
+| Signal | What it Detects |
+| ----- | ----- |
+| ACV Delta | **Magnitude** of required value density change |
+| ACV Rate of Change | **Speed** of monetization evolution |
+| ACV Dependency Ratio | **Structural reliance** on repositioning |
+
+None of them overlap.  
+ None of them are inputs.  
+ Each activates positioning pressure from a different angle.
+
+Together, they allow you to say:
+
+“This plan requires meaningfully higher value per client, achieved quickly, and without viable alternatives — which means positioning is not a nice-to-have; it’s the constraint.”
+
+That’s parity with the other pressures.
+
+**6 Pressure Families** and my thoughts on how we operationalize the new entrant.
+
+### **1\. Readback: The New "6 Families" Taxonomy**
+
+We are shifting from a generic "Trade-off" bucket to a specific "Value" bucket.
+
+1. **Retention Pressure (The Bucket):** Can you keep what you kill? (Measures: Churn / Repurchase Rate).  
+2. **Sales Pressure (The Engine):** Can you acquire fast enough? (Measures: Pipeline Gap / Deal Velocity).  
+3. **Capacity Pressure (The Machine):** Can you deliver without breaking? (Measures: Utilization / Hiring Velocity).  
+4. **Economic Pressure (The Fuel):** Is it profitable? (Measures: Margins / Reinvestment Drag).  
+5. **Structural Pressure (The Stability):** Is it safe? (Measures: Client Concentration / Whale Traps).  
+6. **Positioning Pressure (The Leverage):** **\[NEW\]** Is the offer calibrated correctly? (Measures: Pricing Power / Service Mix).
+
+### **2\. My Assessment: Why this works**
+
+Adding **Positioning Pressure** solves a missing link in our "Physics" model.
+
+* *Before:* If a user had low margins and high churn, we knew *where* they were hurting, but not necessarily *why*.  
+* *Now:* "Positioning Pressure" often explains *why* margins are low (underpricing) or why churn is high (wrong service fit). It identifies if the agency is trying to swim upstream by selling low-value work.
+
+### **3\. Brainstorming: Operationalizing "Positioning Pressure"**
+
+Since we don't want to add 10 new questions, we need to derive "Positioning" from the data we already have.
+
+Here is how we can measure **Positioning Pressure** using your existing inputs:
+
+#### **A. The "Commodity Trap" Signal (ACV vs. Revenue)**
+
+* *The Logic:* If you are trying to build a $5M agency with a $5k ACV, your positioning is fighting your ambition. You are positioned as a "Volume Shop" trying to hit "Enterprise Numbers."  
+* *The Calc:* **Target Revenue ÷ Target ACV.**  
+* *The Flag:* If the **Client Count** required to hit the goal is massive (e.g., \>100 active clients for a small team), this triggers **High Positioning Pressure**. It says: *"Your price point is too low for your revenue goal."*
+
+#### **B. The "Value Capture" Signal (AGI/FTE)**
+
+* *The Logic:* Revenue per employee is the ultimate proxy for market value. If you can't generate \>$150k/FTE, the market isn't valuing your "Positioning" highly enough. You are likely selling "Hands" (Labor) instead of "Heads" (Strategy).  
+* *The Calc:* **Target AGI ÷ Target FTEs.**  
+* *The Flag:* If **AGI/FTE \< $150k**, triggers **High Positioning Pressure**. It says: *"You are underpriced relative to the effort required to deliver."*
+
+#### **C. The "Service Mix" Signal (From Snapshot)**
+
+* *The Logic:* If you have "Project-Based" revenue but "Low Margins," your positioning is off. Project work should command a premium (30%+ margin) to account for the lack of recurring security.  
+* *The Flag:* **High Project % \+ Low Margin %** \= **Positioning Mismatch.**
+
+### **Summary of Impact on GVI**
+
+"Positioning" acts as a **Leverage Multiplier** in your Index.
+
+* **Strong Positioning (High ACV, High AGI/FTE):** *Reduces* Sales Pressure (fewer deals needed) and *Reduces* Capacity Pressure (fewer bodies needed).  
+* **Weak Positioning (Low ACV, Low AGI/FTE):** *Increases* the drag on everything else.
+
+## **First: A Framing Principle (Important)**
+
+Each pressure should meet three criteria:
+
+1. **It exists even with a single scenario**
+
+2. **It emerges from deltas, not absolutes** (from → to, pace, or imbalance)
+
+3. **It reflects a system constraint, not an outcome**
+
+If a pressure only appears when comparing two scenarios, or only after interpretation, it’s not a pressure — it’s a *lens*.
+
+With that in mind, here’s how I’d flesh out each one.
+
+---
+
+## **1\. Retention Pressure**
+
+**“Can the value we create actually stick?”**
+
+### **What this pressure *really* represents**
+
+Retention pressure is about **value durability**, not sales or delivery.
+
+It answers:
+
+*How much effort is required just to avoid backsliding?*
+
+This pressure shows up when growth math quietly assumes that **existing value remains stable**, but the system leaks.
+
+### **How we detect it (with simple inputs)**
+
+**Primary signals (derived):**
+
+* Churn replacement revenue vs. net growth revenue
+
+* % of total sales effort spent replacing lost revenue
+
+* Client replacement volume vs. net-new client volume
+
+**From-to dynamics that matter:**
+
+* Current retention → implied retention at scale
+
+* Growth rate × churn interaction (the treadmill effect)
+
+**Pressure emerges when:**
+
+* A large portion of required “new” revenue is actually replacement
+
+* Small retention changes produce large reductions in required sales pace
+
+📌 *Key insight:*  
+ Retention pressure is not “your churn is bad.”  
+ It’s “your ambition amplifies churn into a dominant constraint.”
+
+---
+
+## **2\. Sales Pressure**
+
+**“Can demand be generated and converted at the required pace?”**
+
+### **What this pressure *really* represents**
+
+Sales pressure is about **tempo mismatch**, not sales quality.
+
+It answers:
+
+*Does this goal require a different acquisition machine than the one you currently run?*
+
+This is distinct from retention: it’s about **attraction velocity**, not continuation.
+
+### **How we detect it**
+
+**Primary signals (derived):**
+
+* Required deals per month vs. implied current pace
+
+* Required sales velocity relative to current client base size
+
+* Sensitivity of required velocity to ACV changes
+
+**From-to dynamics that matter:**
+
+* Revenue target → required gross sales
+
+* Timeframe compression
+
+* ACV leverage (or lack thereof)
+
+**Pressure emerges when:**
+
+* Required acquisition pace is a multiple of current reality
+
+* Small timeline changes dramatically alter feasibility
+
+* The math assumes consistent conversion at a scale not previously demonstrated
+
+📌 *Key insight:*  
+ Sales pressure doesn’t say “you can’t sell.”  
+ It says “this goal assumes a new rhythm, not more effort.”
+
+---
+
+## **3\. Capacity Pressure**
+
+**“Can the organization absorb and deliver the work?”**
+
+### **What this pressure *really* represents**
+
+Capacity pressure is about **absorption limits** — people, process, and quality.
+
+It answers:
+
+*What breaks first if revenue arrives faster than the system can metabolize it?*
+
+This is where delivery strain, utilization, and client experience live.
+
+### **How we detect it**
+
+**Primary signals (derived):**
+
+* Target revenue per FTE vs. current revenue per FTE
+
+* Headcount delta required vs. timeframe
+
+* Hiring velocity (hires per quarter as % of team)
+
+**From-to dynamics that matter:**
+
+* Revenue growth vs. team growth sequencing
+
+* Efficiency assumptions embedded in the target
+
+* “Ghost scenarios” where hiring lags revenue
+
+**Pressure emerges when:**
+
+* Target efficiency exceeds healthy benchmarks
+
+* Hiring velocity exceeds cultural absorption thresholds
+
+* Missing hires push implied utilization into burnout territory
+
+📌 *Key insight:*  
+ Capacity pressure isn’t “you need more people.”  
+ It’s “this plan quietly assumes a different operating intensity.”
+
+---
+
+## **4\. Economic Pressure**
+
+**“Is there enough financial fuel to survive the journey?”**
+
+### **What this pressure *really* represents**
+
+Economic pressure is about **error tolerance**, not profitability vanity.
+
+It answers:
+
+*Can this growth path survive mistakes, delays, and sequencing friction?*
+
+This is about *funding growth*, not just ending bigger.
+
+### **How we detect it**
+
+**Primary signals (derived):**
+
+* Incremental payroll implied by growth
+
+* Implied reinvestment load vs. current profit
+
+* Margin sensitivity to small changes in efficiency or timing
+
+**From-to dynamics that matter:**
+
+* Profit today vs. investment required before revenue catches up
+
+* Margin stability under headcount expansion
+
+**Pressure emerges when:**
+
+* Growth requires front-loaded cost without sufficient buffer
+
+* Margins leave no room for hiring missteps
+
+* “Bigger” scenarios produce thinner or more fragile economics
+
+📌 *Key insight:*  
+ Economic pressure doesn’t say “growth isn’t worth it.”  
+ It says “this path has a narrow margin for error.”
+
+---
+
+## **5\. Structural Pressure**
+
+**“Does this path increase fragility?”**
+
+### **What this pressure *really* represents**
+
+Structural pressure is about **concentration and dependency**, not size.
+
+It answers:
+
+*How catastrophic is failure of a single component?*
+
+This is where the whale trap, org-chart breaks, and dependency risks live.
+
+### **How we detect it**
+
+**Primary signals (derived):**
+
+* Implied client concentration at target ACV
+
+* Revenue share of top X clients (inferred)
+
+* Team size crossing structural thresholds (span of control)
+
+**From-to dynamics that matter:**
+
+* Fewer/larger clients vs. many/smaller ones
+
+* Growth paths that rely on a small number of wins
+
+**Pressure emerges when:**
+
+* A single client becomes materially dominant
+
+* Growth crosses organizational complexity thresholds without structural adaptation
+
+* Simplicity is achieved by trading away resilience
+
+📌 *Key insight:*  
+ Structural pressure isn’t “this is risky.”  
+ It’s “this path narrows your margin of safety.”
+
+---
+
+## **6\. Positioning Pressure**
+
+**“Does the market actually support the assumptions?”**
+
+### **What this pressure *really* represents**
+
+Positioning pressure is about **pricing power and offer legitimacy**, not tactics.
+
+It answers:
+
+*Is this plan assuming we are a different kind of agency than we currently are?*
+
+This is the bridge between strategy and math.
+
+### **How we detect it (without new inputs)**
+
+**Primary signals (inferred):**
+
+* Required ACV lift relative to current ACV
+
+* Degree to which ACV must change to relieve sales/capacity pressure
+
+* Revenue growth that is only achievable via pricing, not volume
+
+**From-to dynamics that matter:**
+
+* ACV sensitivity vs. sales velocity
+
+* Growth paths that “only work if prices change”
+
+**Pressure emerges when:**
+
+* Small ACV improvements unlock massive feasibility
+
+* Volume-based paths become extreme without price movement
+
+* The math implicitly assumes a repositioning that hasn’t happened yet
+
+📌 *Key insight:*  
+ Positioning pressure doesn’t say “raise prices.”  
+ It says “this goal assumes market leverage you may not yet own.”
+
+**Sensitivity & Interaction Logic for Positioning Pressure**, staying tightly scoped to *derived mechanics* and *pressure behavior* — not recommendations, not UI, not GVI math yet.
+
+The goal of this step is very specific:
+
+**Define how positioning pressure behaves as a force inside the system — especially how ACV assumptions relieve or intensify other pressures when they change.**
+
+---
+
+## **Framing: What Sensitivity Logic Must Accomplish**
+
+For positioning pressure to be on par with the other five, it must:
+
+1. **Respond predictably when assumptions change**
+
+2. **Interact with other pressures in explainable ways**
+
+3. **Reveal hidden dependencies and brittleness**
+
+4. **Behave non-linearly when pace or magnitude crosses thresholds**
+
+In other words:
+
+* If ACV changes → something else *must* move
+
+* If ACV doesn’t change → something else *must* absorb the load
+
+That’s the physics we’re defining here.
+
+---
+
+## **The Core Insight (Before the Mechanics)**
+
+Positioning pressure is unique because:
+
+* It **does not create growth**
+
+* It **redistributes growth load**
+
+ACV is a *load-bearing lever*:
+
+* Pulling it reduces sales volume pressure
+
+* Pulling it can reduce capacity strain
+
+* Pulling it can increase economic and structural risk
+
+* Not pulling it forces sales and hiring to compensate
+
+So positioning pressure shows up **through interaction**, not isolation.
+
+---
+
+## **Sensitivity Axis \#1: ACV ↔ Sales Pressure**
+
+### **Primary Interaction**
+
+**As required ACV increases, required deal volume decreases.**
+
+This interaction answers:
+
+*How much does pricing / value density need to change to make sales velocity survivable?*
+
+---
+
+### **Derived Sensitivity Signal**
+
+**Sales Relief Elasticity**
+
+Conceptually:
+
+* Δ Required Deals ÷ Δ ACV
+
+Interpretation:
+
+* High elasticity → small ACV changes dramatically reduce sales pressure
+
+* Low elasticity → ACV changes barely help; volume still dominates
+
+---
+
+### **Pressure Behavior**
+
+**Low Positioning Pressure**
+
+* Modest ACV lift meaningfully reduces sales pace
+
+* Multiple viable paths exist (price, volume, mix)
+
+**High Positioning Pressure**
+
+* Sales pressure becomes extreme unless ACV increases
+
+* The model effectively says:
+
+   “Without repositioning, the sales engine breaks.”
+
+This is where positioning shifts from *optional leverage* → *structural dependency*.
+
+---
+
+## **Sensitivity Axis \#2: ACV ↔ Capacity Pressure**
+
+### **Primary Interaction**
+
+**Higher ACV reduces client count pressure but increases per-client load.**
+
+This interaction answers:
+
+*Are we increasing value density — or just concentrating delivery risk?*
+
+---
+
+### **Derived Sensitivity Signal**
+
+**Delivery Density Shift**
+
+Conceptually:
+
+* Δ Revenue per Client ÷ Δ Clients Served
+
+Interpretation:
+
+* Are we earning more by:
+
+  * Serving fewer clients better?
+
+  * Or over-loading a similar delivery model?
+
+---
+
+### **Pressure Behavior**
+
+**Healthy Positioning**
+
+* ACV increases are aligned with:
+
+  * Higher leverage services
+
+  * Better margin per unit of effort
+
+* Capacity pressure eases or remains stable
+
+**Unhealthy Positioning**
+
+* ACV increases rely on:
+
+  * More scope
+
+  * More customization
+
+  * More labor per client
+
+* Capacity pressure spikes *despite fewer clients*
+
+This is a key diagnostic distinction:
+
+Same ACV, radically different operational realities.
+
+---
+
+## **Sensitivity Axis \#3: ACV ↔ Economic Pressure**
+
+### **Primary Interaction**
+
+**ACV growth only relieves pressure if it improves margin faster than cost.**
+
+This interaction answers:
+
+*Does monetization evolution actually improve error tolerance — or just raise stakes?*
+
+---
+
+### **Derived Sensitivity Signal**
+
+**Margin Amplification Ratio**
+
+Conceptually:
+
+* Δ Gross Margin ÷ Δ ACV
+
+Interpretation:
+
+* Are we capturing more *economic value* per client?
+
+* Or just moving revenue around?
+
+---
+
+### **Pressure Behavior**
+
+**Low Positioning Pressure**
+
+* ACV increases widen margins
+
+* Growth becomes more self-funding
+
+* Economic pressure softens
+
+**High Positioning Pressure**
+
+* ACV increases are margin-neutral or margin-negative
+
+* Payroll and delivery costs rise with revenue
+
+* Economic pressure intensifies even as revenue grows
+
+This exposes:
+
+“We’re charging more, but not earning more.”
+
+---
+
+## **Sensitivity Axis \#4: ACV ↔ Structural Pressure**
+
+### **Primary Interaction**
+
+**Higher ACV concentrates risk unless offset by diversification.**
+
+This interaction answers:
+
+*Are we simplifying responsibly — or increasing blast radius?*
+
+---
+
+### **Derived Sensitivity Signal**
+
+**Revenue Concentration Drift**
+
+Conceptually:
+
+* Δ Top-Client Revenue Share ÷ Δ ACV
+
+Interpretation:
+
+* Are larger clients becoming disproportionately important?
+
+* Is success becoming fragile?
+
+---
+
+### **Pressure Behavior**
+
+**Manageable Positioning Pressure**
+
+* ACV increases spread across:
+
+  * Many clients
+
+  * Modular services
+
+* Structural risk grows slowly
+
+**Elevated Positioning Pressure**
+
+* ACV increases driven by:
+
+  * Fewer, larger accounts
+
+  * Custom enterprise work
+
+* Structural pressure rises sharply
+
+This matters because:
+
+A “successful” growth path can quietly reduce resilience.
+
+---
+
+## **The Key Insight: When Positioning Pressure Turns Dominant**
+
+Positioning pressure becomes **dominant** when:
+
+* ACV dependency is high **and**
+
+* ACV rate of change is fast **and**
+
+* Relief of other pressures depends almost entirely on ACV movement
+
+In that state:
+
+* Sales pressure can’t be solved with volume
+
+* Capacity pressure can’t be solved with hiring
+
+* Economic pressure can’t be solved with efficiency
+
+Only **monetization evolution** changes the outcome.
+
+That’s exactly the moment this pressure exists to detect.
+
+## **Framing First: What “Severity” Means Here**
+
+Severity is **not** about how “bad” the agency is.
+
+Severity answers one question only:
+
+**How much does the success of this growth plan depend on monetization change that has not yet occurred?**
+
+Positioning pressure severity therefore measures **dependency \+ pace**, not quality.
+
+---
+
+## **The Three Inputs That Drive Severity (Recap)**
+
+Severity is a *composite behavior* of the three primary signals you already approved:
+
+1. **ACV Delta** – magnitude of value density change required
+
+2. **ACV Rate of Change** – speed of monetization evolution required
+
+3. **ACV Dependency Ratio** – how much the plan relies on ACV vs volume
+
+Severity is not determined by any single one alone.
+
+---
+
+## **Severity States (Clean, Discrete, Defensible)**
+
+Positioning pressure should move through **three states**, just like the other pressures — but with a distinct character.
+
+---
+
+### **🟢 Level 1: Latent Positioning Pressure**
+
+*(Background / Non-binding)*
+
+**What’s happening structurally**
+
+* ACV growth helps, but is not required
+
+* Client volume growth can still carry the plan
+
+* ACV increases are modest and gradual
+
+**Signal pattern**
+
+* Small ACV delta
+
+* Slow ACV rate of change
+
+* Low to moderate ACV dependency
+
+**Interpretation**
+
+“The current positioning can likely stretch to support this plan.”
+
+**Behavior in the model**
+
+* No gating
+
+* No constraint
+
+* Positioning appears as optional leverage
+
+This is where many *healthy, evolutionary* growth paths live.
+
+---
+
+### **🟡 Level 2: Active Positioning Pressure**
+
+*(Constraining / Influential)*
+
+**What’s happening structurally**
+
+* ACV growth is doing meaningful work
+
+* Volume-only paths are becoming strained
+
+* Monetization changes must occur *during execution*
+
+**Signal pattern**
+
+* Moderate to large ACV delta
+
+* Noticeable ACV rate of change
+
+* Medium to high ACV dependency
+
+**Interpretation**
+
+“This plan assumes monetization evolution, not just execution.”
+
+**Behavior in the model**
+
+* Positioning pressure begins to:
+
+  * Explain relief of sales pressure
+
+  * Explain containment of capacity pressure
+
+* Scenario comparisons highlight:
+
+  * How much positioning work is underwriting success
+
+This is the **inflection zone**:
+
+* Still viable
+
+* But no longer passive
+
+---
+
+### **🔴 Level 3: Dominant Positioning Pressure**
+
+*(Gating / Non-negotiable)*
+
+**What’s happening structurally**
+
+* The plan collapses without ACV expansion
+
+* Sales velocity becomes implausible without it
+
+* Capacity and economics only “work” on paper
+
+**Signal pattern**
+
+* Large ACV delta
+
+* Fast ACV rate of change
+
+* High ACV dependency
+
+**Interpretation**
+
+“This growth plan only works if the agency becomes a different kind of business.”
+
+**Behavior in the model**
+
+* Positioning pressure becomes a **gating condition**
+
+* Other pressures are subordinate to it
+
+* The simulator should surface this explicitly:
+
+  * Not as a penalty
+
+  * But as a structural requirement
+
+This is not a warning.  
+ It’s a **truth disclosure**.
+
+---
+
+## **How Escalation Actually Triggers (Important)**
+
+Severity should **not** escalate on raw thresholds alone.
+
+It should escalate when **two conditions are met simultaneously**:
+
+### **Condition A: Magnitude or Pace is High**
+
+* ACV delta is meaningful **or**
+
+* ACV rate of change is aggressive
+
+### **Condition B: Alternatives Are Exhausted**
+
+* Client volume is constrained
+
+* Timeframe is compressed
+
+* Sales or hiring velocity already exceeds tolerance
+
+This is key:
+
+Positioning pressure becomes severe **only when the system has nowhere else to absorb the load**.
+
+That’s what differentiates it from sales or capacity pressure.
+
+---
+
+## **Why This Escalation Model Is Different (and Correct)**
+
+Unlike other pressures:
+
+* Positioning pressure:
+
+  * Does **not** degrade performance directly
+
+  * Does **not** create friction on its own
+
+Instead, it:
+
+* **Determines which other pressures can be relieved**
+
+* **Defines the structural assumptions of the plan**
+
+That’s why:
+
+* It should escalate *later*
+
+* But dominate *more completely* when it does
+
+## **Formal Role of Positioning Pressure in the GVI Stack**
+
+### **First, the Governing Principle (Non-Negotiable)**
+
+**Positioning pressure does not measure effort.**  
+ **It measures assumption integrity.**
+
+Because of that, it **must not**:
+
+* Act like friction
+
+* Act like drag
+
+* Act like a performance penalty
+
+Instead, it determines **whether the GVI score is interpretable as execution difficulty** or **conditional on a structural shift**.
+
+That’s a fundamentally different job.
+
+---
+
+## **What the GVI Is (Re-anchoring)**
+
+The Growth Velocity Index is answering:
+
+*How much effort and strain does it take to move from here to there, given the current system?*
+
+The key phrase is **“given the current system.”**
+
+Positioning pressure exists to answer:
+
+*Is the “current system” assumption still valid for this plan?*
+
+That’s why it cannot live as a normal subtraction.
+
+---
+
+## **The Correct Posture: Positioning as a Gate \+ Modifier, Not a Penalty**
+
+Positioning pressure should have **three formal roles** in the GVI stack:
+
+1. **Validity Gate**
+
+2. **Interpretive Modifier**
+
+3. **Scenario Comparator Lens**
+
+Let’s define each precisely.
+
+---
+
+## **1️⃣ Positioning as a Validity Gate**
+
+### **What this means**
+
+When positioning pressure reaches **Dominant (Level 3\)** severity:
+
+* The GVI score is still calculated
+
+* But it is **no longer a standalone truth**
+
+Instead, it becomes:
+
+**“This GVI score is conditional on successful monetization evolution.”**
+
+In other words:
+
+* The physics assume a different offer architecture than the current one
+
+* Execution difficulty is real *only if* that assumption holds
+
+---
+
+### **Why this matters**
+
+Without this gate:
+
+* A high GVI score can look “manageable”
+
+* Even though the plan silently requires:
+
+  * Repricing
+
+  * Service mix change
+
+  * Value expansion that has not occurred
+
+The gate prevents false confidence.
+
+---
+
+### **Practical behavior (conceptual)**
+
+* **Low / Latent positioning pressure**
+
+  * GVI score \= fully valid
+
+* **Active positioning pressure**
+
+  * GVI score \= valid, but with assumptions flagged
+
+* **Dominant positioning pressure**
+
+  * GVI score \= *conditionally valid*
+
+  * Interpretation must explicitly reference positioning dependency
+
+This keeps the index honest without distorting it.
+
+---
+
+## **2️⃣ Positioning as an Interpretive Modifier**
+
+Positioning pressure should **reshape how other pressures are explained**, not how they’re scored.
+
+### **Specifically:**
+
+* **Sales Pressure**
+
+  * Interpreted as:
+
+    * “High unless ACV increases as assumed”
+
+* **Capacity Pressure**
+
+  * Interpreted as:
+
+    * “Eases only if value density improves without proportional scope creep”
+
+* **Economic Pressure**
+
+  * Interpreted as:
+
+    * “Improves only if margin capture outpaces delivery cost”
+
+So positioning pressure answers:
+
+*Which pressures are real, and which are contingent?*
+
+---
+
+### **What this avoids**
+
+It avoids the two classic modeling failures:
+
+* “Just sell harder”
+
+* “Just hire more people”
+
+Instead, the model can say:
+
+“Those levers only work if monetization evolves first.”
+
+That’s exactly the consulting-grade insight you’re aiming for.
+
+---
+
+## **3️⃣ Positioning as a Scenario Comparator Lens**
+
+Positioning pressure should **not** distort a single-scenario score—but it becomes extremely powerful when comparing scenarios.
+
+### **In scenario mode:**
+
+* Two scenarios can have:
+
+  * Similar GVI scores
+
+  * Very different positioning severity
+
+This allows the system to surface:
+
+* “Scenario A is execution-heavy”
+
+* “Scenario B is positioning-heavy”
+
+Both might be “hard.”  
+ Only one might require becoming a different business.
+
+That’s not a trade-off metric—that’s **identity disclosure**.
+
+---
+
+## **What Positioning Pressure Explicitly Does *Not* Do**
+
+To be clear and disciplined, positioning pressure should **not**:
+
+* ❌ Subtract points from GVI
+
+* ❌ Inflate operational pace
+
+* ❌ Penalize ambition
+
+* ❌ Encode strategic judgment (“good” or “bad” positioning)
+
+Those are all category errors.
+
+---
+
+## **The Final Mental Model (This Is the Lock)**
+
+Here’s the clean stack:
+
+* **GVI Core**
+
+  * Measures ambition × pace × friction
+
+* **Five Pressures (Retention, Sales, Capacity, Economic, Structural)**
+
+  * Add friction or pace strain
+
+* **Positioning Pressure**
+
+  * Determines whether the model’s assumptions match reality
+
+  * Governs interpretation, not effort
+
+Or more simply:
+
+**GVI tells you how hard the climb is.**  
+ **Positioning tells you whether you’re climbing the mountain you think you are.**
+
+---
+
+## **What This Unlocks for the Simulator**
+
+With this severity logic in place, the simulator can now:
+
+* Explain *why* some scenarios feel “tight” even when math works
+
+* Show how:
+
+  * A slower timeline reduces positioning pressure
+
+  * A higher client count shifts burden off ACV
+
+* Surface moments where:
+
+  * Growth ambition implies identity shift, not optimization
+
+And it does all of that **without prescribing solutions**.
+
+---
+
+## **How This Sets You Up (Strategically)**
+
+With this structure:
+
+* Each pressure has **1–2 dominant signals**
+
+* Each can be detected with **existing inputs \+ simple derivations**
+
+* Each maps cleanly to:
+
+  * GVI physics (where appropriate)
+
+  * Scenario interpretation
+
+  * Consulting language
+
+Most importantly:
+
+These pressures describe *what will show up on the journey*, not *what the user should do*.
+
+That’s exactly the posture you articulated.
+
+### **⚖️ Trade-Offs (Path Comparison)**
+
+**Concept:** Path dependency and strategic exchange rates
+
+**Key Insights:**
+
+* "Scenario A trades efficiency for volume (high headcount, low ACV)"  
+* "Scenario B trades volume for value (low headcount, high ACV)"  
+* "The 'easiest' short-term path may create harder long-term constraints"
+
+**This family only activates when comparing 2+ scenarios**
+
+![][image1]
+
+---
+
+## **User Journey: How The Experience Flows**
+
+### **Entry Point:**
+
+User arrives after completing:
+
+1. ✅ Agency Snapshot (current state data captured)  
+2. ✅ Clarity Compass (12-month vision defined)
+
+### **The V2 Experience:**
+
+**Step 1: Baseline Pre-Population**
+
+* System auto-fills current state from Agency Snapshot  
+* Shows: "📊 Your current metrics have been loaded from Agency Snapshot"  
+* User can override any field for scenario exploration
+
+**Step 2: Target Definition**
+
+* User sets target revenue (or picks from Clarity Compass)  
+* Selects timeframe (12/18/24/36 months)  
+* Sees initial calculation results
+
+**Step 3: Scenario Exploration (NEW)**
+
+* User clicks "Build Scenario" or selects preset ("Rocket Ship", "Efficiency Play", etc.)  
+* Five sliders appear:  
+  * Growth Target (+/- %)  
+  * Pricing Power (ACV adjustment)  
+  * Team Efficiency (AGI/FTE adjustment)  
+  * Retention Health (churn reduction)  
+  * Profit Margin (target margin %)
+
+**Step 4: Real-Time Feedback (NEW)**
+
+* As sliders move, 5 impact cards update instantly:  
+  * 💰 Target Revenue  
+  * 👥 Implied Team Size  
+  * 📈 Implied Profit Pool  
+  * 🎯 Client Operational Volume  
+  * 🚀 Sales Velocity Required
+
+**Step 5: Save & Name Scenario**
+
+* User clicks "Save Scenario"  
+* Names it (e.g., "Conservative Path", "Aggressive Growth")  
+* Can build multiple scenarios
+
+**Step 6: Visual Comparison (NEW)**
+
+* Select 2-3 saved scenarios  
+* See 3 core charts:  
+  * **Treadmill Chart** (stacked bar: growth vs. churn replacement)  
+  * **Profit Efficiency Chart** (grouped bar: revenue vs. profit)  
+  * **Machine Strain Chart** (dot plot: headcount and sales pace)  
+* See **Comparison Scorecard** (table showing key metrics side-by-side)  
+* Green/red highlighting shows best/worst values
+
+**Step 7: GPT Synthesis (NEW)**
+
+* AI analyzes scenarios using:  
+  * Calculated pressure signals  
+  * Agency Snapshot context (acquisition model, founder role, etc.)  
+  * Industry benchmarks  
+* Produces structured output:  
+  * **Reality Check:** "You need 5 deals/month but rely 100% on referrals..."  
+  * **Capacity Warning:** "Your hiring pace will strain onboarding..."  
+  * **One Big Lever:** "Improving retention is highest leverage..."  
+  * **Pressure Dashboard:** 6 cards showing pressure family status  
+  * **Watch-Outs:** Specific alerts for active pressure families
+
+**Step 8: Iteration**
+
+* User can adjust scenarios, create new ones, compare different combinations  
+* System remembers all saved scenarios  
+* Can revisit and update as business evolves
+
+---
+
+## **Key Design Principles**
+
+### **1\. Non-Prescriptive Language**
+
+Never say: ❌ "This is unrealistic" / "You should..." / "This won't work"
+
+Always say: ✅ "This implies..." / "This requires..." / "This creates pressure on..."
+
+### **2\. Exploration Before Judgment**
+
+Let users model scenarios freely. The tool shows implications, not feasibility judgments.
+
+### **3\. Visual Before Verbal**
+
+Charts should communicate the "aha moment" before text. Users should see the trade-off visually, then read synthesis for depth.
+
+### **4\. Contextual Intelligence**
+
+The GPT layer combines hard math with soft context from Snapshot. Example: "You need 50 leads/month, but your Snapshot shows 100% referral acquisition. Referrals don't scale to this volume."
+
+### **5\. Progressive Disclosure**
+
+* Simple inputs → Immediate feedback  
+* Save scenario → Visual comparison unlocks  
+* Multiple scenarios → GPT synthesis deepens  
+* User controls pace of complexity
+
+---
+
+## **Success Metrics: What Good Looks Like**
+
+**User successfully uses the tool when they:**
+
+1. ✅ Build 2-3 distinct scenarios to compare  
+2. ✅ Discover a pressure point they hadn't considered (e.g., "I didn't realize retention was eating 40% of growth")  
+3. ✅ Make a strategic choice based on trade-offs (e.g., "I'll pursue Scenario B because I can't hire that fast")  
+4. ✅ Return monthly to update scenarios as business evolves
+
+**User is confused when they:**
+
+1. ❌ Don't understand what sliders do or how they interact  
+2. ❌ Can't tell which scenario is "better" (charts don't clarify)  
+3. ❌ Feel overwhelmed by too many metrics at once  
+4. ❌ Don't know what to do with the insights (no clear next action)
+
+---
+
+## **Where This Fits in Platform Journey**
+
+User Flow:  
+1\. Profile/Identity → "Who we are"  
+2\. Agency Snapshot → "Where we are today"  
+3\. Clarity Compass → "Where we're going"  
+4\. Growth Velocity Calculator → "What getting there requires" ⭐ YOU ARE HERE  
+5\. AE Ladder Assessment → "Are we strategically ready?"
+
+6\. Architect OS Pro → "How do we execute?"
+
+**The Calculator's Role:** Bridge between vision (Clarity Compass) and execution (Architect OS). It translates ambition into operational requirements and surfaces strategic trade-offs before the founder commits to a path.
+
+---
+
+## **Technical Philosophy: How to Think About This Build**
+
+### **Surface Layer: Playful Exploration**
+
+* Sliders, presets, instant feedback  
+* Feels like playing with scenarios  
+* Low friction, high engagement
+
+### **Middle Layer: Calculated Intelligence**
+
+* \~25 formulas running behind the scenes  
+* 6 pressure families with trigger logic  
+* Real-time computation, no lag
+
+### **Deep Layer: Strategic Synthesis**
+
+* GPT combines math \+ context  
+* Produces business-aware insights  
+* Feels like advisor, not just tool
+
+### **The Architecture:**
+
+User adjusts slider  
+    ↓  
+Calculation engine fires (instant)  
+    ↓  
+Impact cards update (real-time)  
+    ↓  
+User saves scenario  
+    ↓  
+Visual comparison renders  
+    ↓  
+GPT synthesis triggers  
+    ↓
+
+Insights display
+
+---
+
+## **What Makes This Different from Other Growth Calculators**
+
+**Most growth calculators:**
+
+* Single scenario, static results  
+* "Can you afford this?" judgment  
+* Generic benchmarks with no context  
+* Text-heavy output
+
+**This calculator:**
+
+* Multi-scenario comparison with visual trade-offs  
+* "What does this require?" implications  
+* Context-aware analysis from user's actual data  
+* Visual-first, synthesis-deepens approach  
+* Interactive exploration, not one-time calculation
+
+---
+
+## **V2 Success Criteria**
+
+**We'll know V2 is successful when:**
+
+1. ✅ Users build multiple scenarios (not just one calculation)  
+2. ✅ Visual comparison charts create "aha moments" before synthesis  
+3. ✅ GPT synthesis feels relevant (references their actual Snapshot data)  
+4. ✅ Pressure family alerts feel accurate (triggers fire at right thresholds)  
+5. ✅ Users change their growth strategy based on tool insights  
+6. ✅ Tool becomes return-use (monthly scenario updates, not one-time)
+
+---
+
+## **Tone & Voice: How The Tool "Speaks"**
+
+**Empowering, not limiting:**
+
+"This path requires adding 8 people in 12 months—that's 2 per quarter. Your current team is 5, so you're growing 40% every 3 months. This is achievable but requires disciplined hiring and onboarding systems."
+
+NOT:
+
+"This is too aggressive. You can't hire that fast."
+
+**Observant, not prescriptive:**
+
+"Scenario A trades sales complexity for operational simplicity. Scenario B trades operational complexity for sales simplicity. The choice depends on where your current strengths lie."
+
+NOT:
+
+"You should choose Scenario B because it's better."
+
+**Contextual, not generic:**
+
+"You need 5 new clients per month. Your Snapshot indicates 100% referral acquisition. Referrals rarely scale to this velocity—you may need to build outbound or paid channels."
+
+NOT:
+
+"You need better marketing."
+
+---
+
+**END OF DOCUMENT 1**
+

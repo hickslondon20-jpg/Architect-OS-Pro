@@ -1,0 +1,232 @@
+# Architect OS — Sprint Planning
+## Entry Form Spec: Initiative & Milestone Overlays
+
+**Reference Document:** `ArchitectOS_Sprint_Planning_PRD_V1.md`
+**Feature Area:** Sprint Planning — Initiative & Milestone Entry Forms
+**Status:** Ready for Development
+**Applies To:** All 3P types (Prioritize, Plant, Progressively Iterate)
+
+---
+
+## Overview
+
+This spec defines the entry form experience for creating new initiatives and milestones within the Sprint Planning module. Both forms follow the same design pattern: a focused overlay modal that temporarily replaces the current workspace, giving the founder a clean, distraction-free creation moment.
+
+These are deliberate creation experiences — not quick-capture widgets. Founders may arrive having workshopped their initiatives offline and ready to input, or they may think through them in the moment. The form accommodates both without requiring either.
+
+---
+
+## Shared Design Principles
+
+- **Overlay pattern:** Both forms open as a centered modal overlay on top of the current workspace (capability card modal or initiative card modal). The background workspace is dimmed but not closed.
+- **All fields visible at once:** No progressive disclosure, no tabs, no "next" buttons.
+- **Same structure across all 3P types:** Prioritize, Plant, and Progressively Iterate all use the identical form. Differentiation lives only in placeholder language — not in layout or field set.
+- **Auto-inherited context:** The capability area and 3P classification are automatically assigned based on which "Add Initiative" or "Add Milestone" button was clicked. These appear as read-only tags at the top of the form — not as fields to fill in.
+- **Save at any stage:** The form can be saved with any number of fields populated. Incomplete initiatives and milestones are flagged with the subtle amber indicator post-save. Nothing is blocked.
+- **Cancel without consequence:** Dismissing the form discards all input without saving. A confirmation prompt appears only if at least one field has been filled.
+
+---
+
+## Initiative Entry Form
+
+### Trigger
+
+Opened by clicking "+ Add Initiative" from:
+- A capability card on the Sprint Board (By Capability view)
+- The "Add Initiative" button inside a Capability Card Modal
+- The "+ Add Initiative" button in the By Initiative view column
+
+### Auto-Inherited Context (Displayed as Read-Only Tags, Not Input Fields)
+
+These are assigned automatically and shown at the top of the form as non-editable context tags:
+
+| Tag | Source |
+|---|---|
+| 3P Classification | Which column the button was clicked from (Prioritize / Plant / Progressively Iterate) |
+| Capability Area | Which capability card the button belongs to (e.g., "Cash Flow Forecasting") |
+
+The founder can remove and replace the capability tag if needed — for example, if they realize the initiative belongs under a different capability area. The 3P classification tag is not editable from the entry form (that can be changed from the initiative card modal post-creation).
+
+---
+
+### Form Fields
+
+**Field 1 — Initiative Name**
+- Input type: Single-line text
+- Label: `Initiative Name`
+- Placeholder: `e.g. "Build Financial Dashboard" or "Define ICP v2"`
+- Required for save with incomplete flag if empty: Yes
+
+---
+
+**Field 2 — What We Are Addressing**
+- Input type: Multi-line text (3 rows)
+- Label: `What We Are Addressing`
+- Supporting label: `The current gap or challenge this initiative responds to`
+- Placeholder varies by 3P type:
+  - **Prioritize:** `"What critical gap or capability failure is this initiative directly closing?"`
+  - **Plant:** `"What foundation are we intentionally laying now for a future priority?"`
+  - **Progressively Iterate:** `"What existing area needs ongoing refinement as the business evolves?"`
+
+---
+
+**Field 3 — What Success Looks Like**
+- Input type: Multi-line text (3 rows)
+- Label: `What Success Looks Like`
+- Supporting label: `The definition of done at the initiative level — what will be true when this is complete?`
+- Placeholder: `"Describe the end state, not the activity. What will have changed in the business?"`
+- Note: This field displays as a unified narrative block in the initiative card view alongside Field 2. On the entry form they are kept separate to ensure both are completed independently.
+
+---
+
+**Field 4 — Sprint Goal Connection**
+- Input type: Single-line text or short multi-line (2 rows)
+- Label: `Sprint Goal Connection`
+- Supporting label: `How does this initiative advance your sprint goal?`
+- Placeholder: `"This enables our goal of [X] by [Y]."`
+- The sprint goal statement is shown as a read-only reference banner directly above this field so the founder can see the goal while writing the connection. Format: subtle callout block reading `Your Sprint Goal: "[goal text]"`
+
+---
+
+**Field 5 — Known Constraints or Risks**
+- Input type: Multi-line text (2 rows)
+- Label: `Known Constraints or Risks`
+- Supporting label (styled as optional indicator): `Optional`
+- Placeholder: `"Anything that might slow this down, require outside resources, or create dependencies?"`
+
+---
+
+### Form Actions
+
+| Action | Behavior |
+|---|---|
+| `Save Initiative` (primary CTA) | Saves the initiative record with whatever fields are populated. If Name is empty, prompts: "Please add a name before saving." Closes overlay. Initiative appears in the list with incomplete indicator if any of the 5 fields are empty. |
+| `Cancel` | Dismisses overlay without saving. If any field has content, shows confirmation: "Discard this initiative?" with Discard / Keep Editing options. |
+
+---
+
+### Post-Save Behavior
+
+- The new initiative card appears immediately in the initiative list of the parent capability card modal (or in the By Initiative view column if triggered from the board)
+- If any fields are empty, the amber incomplete indicator is shown on the card
+- The initiative card is immediately clickable to open the full initiative card modal for further editing
+- No navigation redirect — the founder stays in their current workspace context
+
+---
+
+## Milestone Entry Form
+
+### Trigger
+
+Opened by clicking "+ Add Milestone" from:
+- The "Add Milestone" button inside an Initiative Card Modal
+- The Quick Add row (for name-only entry — see Quick Add note below)
+
+### Auto-Inherited Context (Read-Only Tags)
+
+| Tag | Source |
+|---|---|
+| Initiative | Which initiative the milestone belongs to (e.g., "Build Financial Dashboard") |
+| Capability Area | Inherited from the initiative's parent capability |
+| 3P Classification | Inherited from the initiative's 3P classification |
+
+These are displayed as a context tag group at the top of the form. None are editable from the entry form.
+
+---
+
+### Form Fields
+
+**Field 1 — Milestone Name**
+- Input type: Single-line text
+- Label: `Milestone Name`
+- Supporting label: `Name this as a progress marker — something that will be visibly true when complete`
+- Placeholder: `e.g. "Audit current data sources" or "Design dashboard structure"`
+
+---
+
+**Field 2 — Outcome**
+- Input type: Multi-line text (3 rows)
+- Label: `Outcome`
+- Supporting label: `What is the end state when this milestone is complete?`
+- Placeholder: `"Describe what will exist or be true — not what we'll do, but what we'll have."`
+
+---
+
+**Field 3 — Measure**
+- Input type: Multi-line text (2 rows)
+- Label: `Measure`
+- Supporting label: `How will we know this is genuinely done?`
+- Placeholder: `"What is the proof? What can someone point to and confirm this is complete?"`
+- Note: This is the most important field for making milestones real and verifiable. Consider a brief coaching note beneath the placeholder: `"If you can't describe how to verify it, the milestone may not be specific enough yet."`
+
+---
+
+**Field 4 — Owner**
+- Input type: Dropdown or typeahead name input
+- Label: `Owner`
+- Supporting label: `Who is accountable for this milestone?`
+- Placeholder: `Select or type a name or role`
+- Note: Single owner only — not a multi-select. One person is accountable.
+
+---
+
+**Field 5 — Timeline**
+- Input type: Dropdown
+- Label: `Timeline`
+- Supporting label (styled as optional): `Optional — which month does this target?`
+- Options: `Month 1` / `Month 2` / `Month 3` (or calendar month equivalents if sprint start date is known: e.g., January / February / March)
+- Defaults to empty / unset if not selected
+
+---
+
+**Field 6 — Dependencies**
+- Input type: Multi-select from existing milestones within the same initiative
+- Label: `Dependencies`
+- Supporting label (styled as optional): `Optional — what must be complete before this can begin?`
+- Visibility rule: **Only render this field if at least one other milestone already exists under this initiative.** If this is the first milestone being created, hide this field entirely — there is nothing to depend on yet.
+- Placeholder when visible: `Select milestones that must be complete first`
+
+---
+
+### Form Actions
+
+| Action | Behavior |
+|---|---|
+| `Save Milestone` (primary CTA) | Saves the milestone record. If Name is empty, prompts: "Please add a name before saving." Closes overlay. Milestone appears in initiative's milestone list. |
+| `Cancel` | Dismisses overlay. Confirmation prompt if any field has content. |
+
+---
+
+### Post-Save Behavior
+
+- The new milestone appears immediately in the milestone list of the parent initiative card modal
+- Milestone rows display in collapsed state: name, owner avatar, timeline month
+- If outcome or measure are empty, the amber incomplete indicator appears on the milestone row
+- The milestone row is immediately clickable to expand inline or open the full milestone card modal
+
+---
+
+## Quick Add Behavior (Both Levels)
+
+The Quick Add row (the inline `+ Quick Add Initiative` or `+ Quick Add Milestone` input at the bottom of each list) is a separate, lighter entry path.
+
+- **What it captures:** Name only (single-line input, press Enter to save)
+- **What it creates:** A new record with only the name populated — all other fields empty
+- **Indicator:** Incomplete indicator appears immediately on the created card/row
+- **Purpose:** For founders who want to capture a working list of initiative or milestone names first, then circle back to fill in detail — this is a deliberate workflow accommodation, not a shortcut that bypasses the entry form
+- **The full entry form is still the primary creation path** — Quick Add is an alternative for list-building mode
+
+---
+
+## Consistency Notes for Antigravity
+
+- Both forms use the same overlay container component — same border radius, same backdrop dimming, same close/cancel behavior
+- Both forms use the same input field styling as the rest of the platform's form components
+- Supporting labels beneath field labels use a smaller, muted text style — they are coaching prompts, not form labels
+- The sprint goal reference banner in the Initiative form (above Field 4) uses the same read-only display block style as the "What Good Looks Like" block in the Capability Card Modal
+- Field order must not be changed — the sequence is intentional and guides the founder through a logical thinking progression
+- On mobile / narrow viewports: fields stack vertically, auto-inherited tags remain visible at top, form actions (Save / Cancel) are sticky at the bottom
+
+---
+
+*Architect OS Sprint Planning — Initiative & Milestone Entry Form Spec V1.0*

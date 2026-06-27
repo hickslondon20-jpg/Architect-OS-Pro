@@ -1,0 +1,294 @@
+
+**ARCHITECT OS**
+
+**WF-MR-01 — Node Configuration Handoff**
+
+Structural Correction Specification for Antigravity
+
+| Workflow | WF-MR-01 — M+R Audit GPT Synthesis |
+| :---- | :---- |
+| **Session Type** | Structural correction — no prompt content changes |
+| **Prepared for** | Antigravity |
+| **Scope** | 9 nodes modified; 17 nodes unchanged |
+| **Prerequisites** | Live Supabase schema access required before Group 4 |
+| **Do Not** | Touch prompt content, scoring logic, or any unchanged nodes |
+
+# **1\. Context and Purpose**
+
+This document specifies all node-level changes required to correctly structure WF-MR-01 ahead of a prompt engineering workstream. The workflow currently has three critical structural gaps that must be resolved before prompt content is written:
+
+| CRITICAL GAP 1 — All three OpenAI nodes have zero message configuration. No system message, no user message, no expressions. As currently built, these three GPT calls fire with no prompt content at all. |
+| :---- |
+
+| CRITICAL GAP 2 — System prompts are embedded inside JavaScript code nodes as template literal strings. This is the wrong architectural layer. Behavioral instructions belong in the OpenAI node; data assembly belongs in code. |
+| :---- |
+
+| CRITICAL GAP 3 — The three Supabase write nodes (Write Call 1/2/3 Outputs) have only 'operation: upsert' configured. No table ID, no field mapping, no conflict key, no credentials. These nodes cannot execute as built. |
+| :---- |
+
+This session resolves all three gaps. No prompt content is written or changed — the system prompt fields in each OpenAI node will receive placeholder text only, ready for the upcoming prompt engineering session.
+
+# **2\. Full Node Change Map**
+
+All 26 nodes classified by required action. Do not modify any node marked DO NOT TOUCH.
+
+| Node Name | Type | Action Required |
+| :---- | :---- | :---- |
+| Webhook: Receive Assessment ID | webhook | DO NOT TOUCH |
+| Code: Validate & Extract | code | DO NOT TOUCH |
+| Supabase: Fetch GPT Inputs | supabase | DO NOT TOUCH |
+| Code: Build Hash | code | DO NOT TOUCH |
+| Supabase: Check Existing Run | supabase | DO NOT TOUCH |
+| Code: Evaluate Idempotency | code | DO NOT TOUCH |
+| IF: Should Proceed | if | DO NOT TOUCH |
+| Respond: 200 Already Processed | respondToWebhook | DO NOT TOUCH |
+| Respond: 202 Processing | respondToWebhook | DO NOT TOUCH |
+| Supabase: Create GPT Run | supabase | DO NOT TOUCH |
+| Code: Build Call 1 Prompt | code | MODIFY — Group 3 |
+| OpenAI: Call 1 – Characterisation | openAi | MODIFY — Group 4 |
+| Code: Parse Call 1 \+ Build Rows | code | DO NOT TOUCH |
+| Supabase: Write Call 1 Outputs | supabase | VERIFY THEN MODIFY — Group 5 |
+| Supabase: Partial Write Run — After Call 1 | supabase | DO NOT TOUCH |
+| Code: Build Call 2 Prompt | code | MODIFY — Group 3 |
+| OpenAI: Call 2 – Synthesis | openAi | MODIFY — Group 4 |
+| Code: Parse Call 2 \+ Build Rows | code | DO NOT TOUCH |
+| Supabase: Write Call 2 Outputs | supabase | VERIFY THEN MODIFY — Group 5 |
+| Supabase: Partial Write Run — After Call 2 | supabase | DO NOT TOUCH |
+| Code: Build Call 3 Prompt | code | MODIFY — Group 3 |
+| OpenAI: Call 3 – Capability Rationale | openAi | MODIFY — Group 4 |
+| Code: Parse Call 3 \+ Build Rows | code | DO NOT TOUCH |
+| Supabase: Write Call 3 Outputs | supabase | VERIFY THEN MODIFY — Group 5 |
+| Supabase: Finalize GPT Run | supabase | DO NOT TOUCH |
+| Supabase: Update Assessment Synthesis Status | supabase | DO NOT TOUCH |
+
+# **3\. Execution Sequence**
+
+Execute changes in this order. Do not proceed to Group 5 without completing the schema verification step first.
+
+| Step | Action | Notes |
+| :---- | :---- | :---- |
+| **1** | **Group 3 — Clean up 3 code nodes** | Remove system prompts and stale return fields |
+| **2** | **Group 4 — Wire 3 OpenAI nodes** | Add system \+ user message fields |
+| **3** | **Group 5 — Verify Supabase write nodes** | Schema check required first — see Group 5 instructions |
+| **4** | **Group 5 — Configure 3 write nodes** | Only after verification questions answered |
+| **5** | **End-to-end test run** | Confirm 202 response, all three GPT calls fire, rows written |
+
+# **4\. Group 3 — Code Node Changes (3 Nodes)**
+
+The three Build Call code nodes currently embed system prompt content inside JavaScript template literals. This is architecturally incorrect — system prompts are behavioral instructions, not data logic, and must live in the OpenAI node. The code node's role is data assembly only.
+
+## **4.1 Why This Change Is Required**
+
+When a full multi-section system prompt (voice rules, field definitions, guardrails, examples, output contract) is embedded in a JS template literal, every editorial change to the prompt requires opening a code node, navigating template syntax, managing escape characters, and risking breakage to surrounding data logic. That is the wrong tool for that job.
+
+Once system prompts live in the OpenAI node's System Message field, prompt refinement is a pure text edit — open the node, update the copy, save. No code risk, no escaping, no logic to break.
+
+## **4.2 Changes Required — All Three Nodes**
+
+Apply identically to: Code: Build Call 1 Prompt, Code: Build Call 2 Prompt, Code: Build Call 3 Prompt
+
+| REMOVE: The entire 'const systemPrompt \= \`...\`' block from each node. Delete from the opening backtick to the closing backtick and semicolon. |
+| :---- |
+
+| REMOVE: The callN\_system\_prompt key from each node's return object. The return should no longer include this field. |
+| :---- |
+
+| KEEP: Everything else. The data assembly logic, the user prompt construction, all input references, all passthrough fields. Only the system prompt variable and its return key are removed. |
+| :---- |
+
+## **4.3 Return Object Specification — Before and After**
+
+**Code: Build Call 1 Prompt**
+
+**Before:**
+
+| return \[{ json: { ...d, gpt\_run\_id, call1\_system\_prompt: systemPrompt, call1\_user\_prompt: userPrompt } }\]; |
+| :---- |
+
+**After:**
+
+| return \[{ json: { ...d, gpt\_run\_id, call1\_user\_prompt: userPrompt } }\]; |
+| :---- |
+
+**Code: Build Call 2 Prompt**
+
+**Before:**
+
+| return \[{ json: { assessment\_id, gpt\_run\_id, call2\_system\_prompt: systemPrompt, call2\_user\_prompt: userPrompt } }\]; |
+| :---- |
+
+**After:**
+
+| return \[{ json: { assessment\_id, gpt\_run\_id, call2\_user\_prompt: userPrompt } }\]; |
+| :---- |
+
+**Code: Build Call 3 Prompt**
+
+**Before:**
+
+| return \[{ json: { assessment\_id, gpt\_run\_id, capability\_count: allCaps.length, call3\_system\_prompt: systemPrompt, call3\_user\_prompt: userPrompt } }\]; |
+| :---- |
+
+**After:**
+
+| return \[{ json: { assessment\_id, gpt\_run\_id, capability\_count: allCaps.length, call3\_user\_prompt: userPrompt } }\]; |
+| :---- |
+
+## **4.4 Call 3 — Dynamic Interpolation Issue**
+
+The Call 3 system prompt contains two runtime variable interpolations that cannot move to a static OpenAI node System Message field as-is. These must be replaced with static equivalents before the system prompt is relocated.
+
+| Current (dynamic) | Replace with (static) | Why no information is lost |
+| :---- | :---- | :---- |
+| ${inputData.calibration\_stage\_label || 'marketing agency'}-stage founder | the founder's specific AE Ladder stage, as identified in the user message | Stage label is already passed in the user prompt header. GPT has full context. |
+| exactly ${allCaps.length} objects (appears twice) | one object per capability listed in the user message | Count is already in the user prompt header and implicit in the capability list itself. |
+
+These static replacements will be applied when the full system prompt content is written during the prompt engineering session. Antigravity does not need to implement these now — just be aware they exist and must be resolved before that session produces the final system message text.
+
+# **5\. Group 4 — OpenAI Node Changes (3 Nodes)**
+
+All three OpenAI nodes currently have no message fields configured at all. They contain only resource type, maxTokens, temperature, and requestOptions. This means the GPT calls would fire with no input. Both a system message field and a user message field must be added to each node.
+
+## **5.1 OpenAI: Call 1 – Characterisation**
+
+| Node name | OpenAI: Call 1 – Characterisation |
+| :---- | :---- |
+| **Field 1** | System Message — type: text (static) |
+| **System Message content** | \[PLACEHOLDER — Call 1 system prompt. To be populated in prompt engineering session. Do not run this workflow until this field contains the full system prompt.\] |
+| **Field 2** | User Message — type: expression |
+| **User Message expression** | \={{ $('Code: Build Call 1 Prompt').first().json.call1\_user\_prompt }} |
+| **maxTokens** | 3000 — confirm unchanged |
+| **temperature** | 0.3 — confirm unchanged |
+| **model** | gpt-4o — confirm set |
+| **credential** | openai\_api — confirm attached |
+
+## **5.2 OpenAI: Call 2 – Synthesis**
+
+| Node name | OpenAI: Call 2 – Synthesis |
+| :---- | :---- |
+| **Field 1** | System Message — type: text (static) |
+| **System Message content** | \[PLACEHOLDER — Call 2 system prompt. To be populated in prompt engineering session. Do not run this workflow until this field contains the full system prompt.\] |
+| **Field 2** | User Message — type: expression |
+| **User Message expression** | \={{ $('Code: Build Call 2 Prompt').first().json.call2\_user\_prompt }} |
+| **maxTokens** | 2000 — confirm unchanged |
+| **temperature** | 0.3 — confirm unchanged |
+| **model** | gpt-4o — confirm set |
+| **credential** | openai\_api — confirm attached |
+
+## **5.3 OpenAI: Call 3 – Capability Rationale**
+
+| Node name | OpenAI: Call 3 – Capability Rationale |
+| :---- | :---- |
+| **Field 1** | System Message — type: text (static) |
+| **System Message content** | \[PLACEHOLDER — Call 3 system prompt. To be populated in prompt engineering session. Do not run this workflow until this field contains the full system prompt.\] |
+| **Field 2** | User Message — type: expression |
+| **User Message expression** | \={{ $('Code: Build Call 3 Prompt').first().json.call3\_user\_prompt }} |
+| **maxTokens** | 6000 — confirm unchanged |
+| **temperature** | 0.3 — confirm unchanged |
+| **model** | gpt-4o — confirm set |
+| **credential** | openai\_api — confirm attached |
+
+| IMPORTANT: Do not run the workflow after this step until the system prompt placeholders have been replaced with real content. A GPT call with a placeholder system prompt and real user data will produce unusable output and consume tokens. |
+| :---- |
+
+# **6\. Group 5 — Supabase Write Node Verification and Configuration**
+
+The three Supabase write nodes — Write Call 1 Outputs, Write Call 2 Outputs, Write Call 3 Outputs — each have only 'operation: upsert' set. Table ID, field mapping, conflict key, and credentials are all absent. These nodes cannot execute as built.
+
+This group requires Antigravity to verify four items against the live schema before any configuration is applied. Do not guess values — confirm each one before building.
+
+## **6.1 Verification Checklist — Answer Before Configuring**
+
+| Complete ALL four verification items and share answers with London before making any changes to these three nodes. |
+| :---- |
+
+| \# | Verification Item | Expected / Likely | Confirmed Value |
+| :---- | :---- | :---- | :---- |
+| **1** | Target table — confirm the table name all three write nodes should write to | *gm\_assessment\_gpt\_outputs* | \[ to confirm \] |
+| **2** | Field mapping — confirm whether the Supabase node uses auto-mapping from item JSON keys, or requires explicit field-by-field configuration in the node UI | *Auto-mapping from item keys* | \[ to confirm \] |
+| **3** | Upsert conflict key — confirm the unique constraint column(s) that define what constitutes a matching row for upsert. This determines whether a row is inserted or updated. | *assessment\_id \+ slot\_id \+ entity\_id (or similar)* | \[ to confirm \] |
+| **4** | Credentials — confirm supabase\_main credential is available and should be attached to all three write nodes. The exported JSON shows no credential on these nodes. | *supabase\_main* | \[ to confirm \] |
+
+## **6.2 Configuration — Apply After Verification**
+
+Once the four verification items above are confirmed, apply the following configuration to all three write nodes identically. The only difference between the three nodes is their name — the configuration is the same for each.
+
+| Operation | upsert — already set, confirm unchanged |
+| :---- | :---- |
+| **Table ID** | gm\_assessment\_gpt\_outputs — confirm with verification item 1 |
+| **Credential** | supabase\_main — confirm with verification item 4 |
+| **Field mapping** | Set per verification item 2 answer |
+| **Conflict columns** | Set per verification item 3 answer — defines upsert matching |
+| **Applies to** | Write Call 1 Outputs, Write Call 2 Outputs, Write Call 3 Outputs — identical configuration on all three |
+
+## **6.3 What Each Write Node Receives**
+
+Each parse code node builds an array of row objects and returns them as multiple items. The Supabase write node processes all items in the batch. Confirming this is the correct understanding:
+
+| Write Node | Row Count | Fields Per Row |
+| :---- | :---- | :---- |
+| **Write Call 1 Outputs** | 12 rows | assessment\_id, slot\_id, entity\_type, entity\_id, content\_text, gpt\_run\_id, is\_current, updated\_at |
+| **Write Call 2 Outputs** | 5 rows | assessment\_id, slot\_id, entity\_type, entity\_id, content\_text, gpt\_run\_id, is\_current, updated\_at |
+| **Write Call 3 Outputs** | 25 rows | assessment\_id, slot\_id, entity\_type, entity\_id, content\_text, gpt\_run\_id, is\_current, updated\_at |
+
+Note: Call 1 parse node also attaches \_call1\_parsed and \_input\_data metadata to rows\[0\] for downstream use. These are internal passthrough fields and should not be written to the database. Confirm the write node ignores unknown keys or does not attempt to map these fields.
+
+# **7\. Chain Integrity — Confirmed, No Changes Required**
+
+The sequential dependency chain across all three GPT calls is structurally sound. No modifications needed. This section documents the confirmed patterns for reference.
+
+## **7.1 How Call 2 Accesses Call 1 Output**
+
+Code: Build Call 2 Prompt references two upstream nodes:
+
+* $('Code: Build Call 1 Prompt').first().json — retrieves the full input data payload (scores, stage, capabilities) assembled before Call 1 fired
+
+* $('Code: Parse Call 1 \+ Build Rows').all() — retrieves the parsed Call 1 GPT outputs, specifically call1Items\[0\].json.\_call1\_parsed
+
+This pattern is correct. n8n retains all node outputs in memory for the duration of a workflow run. The cross-reference to the parse node is valid regardless of what the Supabase write node does with the data downstream.
+
+## **7.2 How Call 3 Accesses Input Data**
+
+Code: Build Call 3 Prompt references only $('Code: Build Call 1 Prompt').first().json for its full input data — including all\_capabilities (the 25-item array), top\_leverage\_capabilities, top\_strengths\_capabilities, and stage context. This is correct. Call 3 does not need Call 2's outputs to do its job.
+
+## **7.3 Partial Write Run Nodes**
+
+Supabase: Partial Write Run — After Call 1 and After Call 2 update the gm\_gpt\_runs record with run status progression (running\_call\_2, running\_call\_3). These nodes reference gpt\_run\_id via $('Code: Build Call 1 Prompt') and $('Code: Build Call 2 Prompt') respectively. Both references are correct and will continue to work after the code node changes in Group 3\.
+
+| The gpt\_run\_id passthrough is maintained in the updated return objects for Build Call 1 and Build Call 2\. Partial write nodes referencing these fields will continue to resolve correctly after Group 3 changes. |
+| :---- |
+
+# **8\. Post-Implementation Test Verification**
+
+After all changes are applied (and system prompt placeholders are in place), run a test using a known assessment\_id. Do not run the live workflow with real data until the test confirms correct structure.
+
+| REMINDER: Placeholders in the system message fields mean GPT will receive no real instructions. The test run will confirm structural plumbing only — not output quality. That is expected and acceptable at this stage. |
+| :---- |
+
+## **8.1 Test Checklist**
+
+| \# | Check | Pass Condition |
+| :---- | :---- | :---- |
+| **1** | Webhook receives POST with valid assessment\_id and returns 202 | *HTTP 202 response* |
+| **2** | Code: Build Call 1 Prompt executes without error and its return object contains call1\_user\_prompt (not call1\_system\_prompt) | *Node succeeds; call1\_system\_prompt absent from output* |
+| **3** | OpenAI: Call 1 fires and receives the user prompt content from the expression reference | *Call 1 GPT response received (content may be poor due to placeholder system prompt — that is expected)* |
+| **4** | Code: Parse Call 1 \+ Build Rows executes and produces 12 items | *12 output items with correct slot\_id values* |
+| **5** | Supabase: Write Call 1 Outputs executes and writes all 12 rows to correct table | *12 rows present in gm\_assessment\_gpt\_outputs for this assessment\_id* |
+| **6** | Supabase: Partial Write Run — After Call 1 updates run status to running\_call\_2 | *gm\_gpt\_runs record shows run\_status \= running\_call\_2* |
+| **7** | Call 2 and Call 3 chains fire and complete with equivalent success criteria | *17 additional rows written; final run\_status \= complete* |
+| **8** | gm\_assessments record shows gpt\_synthesis\_status \= complete | *Status field updated on target assessment* |
+
+# **9\. What Comes Next**
+
+Once this session is complete and the test run confirms correct structure, the workflow is ready for the prompt engineering workstream. That is a separate session with London — Antigravity does not need to be involved in writing prompt content.
+
+| Phase | Description |
+| :---- | :---- |
+| **This session** | Structural corrections — Groups 3, 4, 5\. All 9 nodes corrected. Test run completed. |
+| **Next session (London \+ Claude)** | Prompt engineering for all three calls. Full system prompt content produced for Call 1, Call 2, Call 3 at AE Ladder depth. |
+| **Following session (Antigravity)** | System prompt content pasted into the three OpenAI node System Message fields. Placeholder text replaced. Full quality test run executed. |
+| **Subsequent workstream** | Same prompt architecture review applied to GVS-01, WF-CC-01, and other synthesis workflows. |
+
+ARCHITECT OS — CONFIDENTIAL BUILD DOCUMENTATION
+
+WF-MR-01 Node Configuration Handoff — Prepared for Antigravity

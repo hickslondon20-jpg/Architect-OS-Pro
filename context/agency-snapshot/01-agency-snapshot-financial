@@ -1,0 +1,1021 @@
+# **✅ FINANCIAL TAB — STORY, BENCHMARKS & INSIGHTS**
+
+## **My Understanding of the Financial Story**
+
+The Financial tab is the **foundation stone** that establishes:
+
+**"How big is your agency, how efficiently do you capture revenue, how profitable are you, and how financially stable/complex is your operation?"**
+
+This is the **business size and financial health dimension** — completely isolated from team efficiency, growth dynamics, or market positioning.
+
+---
+
+## **THE CORE STORY WE'RE TELLING**
+
+### **The Narrative Arc:**
+
+**1\. Scale & Complexity**
+
+* "You're operating at \[revenue scale\]"  
+* Different complexity bands: \<$1.5M, $1.5M-$3M, $3M-$5M, $5M-$10M, $10M+  
+* Each band implies different operational complexity, infrastructure needs, founder role
+
+**2\. Revenue Quality**
+
+* "Of your top-line revenue, you retain \[AGI %\]"  
+* Benchmark: Healthy range is 85-95% depending on service mix  
+* Shows how much revenue is actual agency income vs. pass-through costs  
+* Indicates service model implications (high pass-through \= media buying, low pass-through \= pure labor)
+
+**3\. Profitability**
+
+* "Your profit margin is \[X%\], positioning you in the \[strong/healthy/struggling\] range"  
+* Benchmark: Healthy range is 20-35% for agencies, 15-20% acceptable, \<15% concerning  
+* Shows financial discipline and pricing power  
+* Indicates runway for reinvestment
+
+**4\. Financial Stability**
+
+* "You have \[cash position\] available for reinvestment or runway"  
+* Context: How many months of operating expenses does this cover?  
+* Shows cushion for growth investments, hiring, downturns
+
+**5\. Financial Maturity**
+
+* Combination of scale \+ efficiency \+ stability  
+* "Your financial profile suggests a \[early-stage/growing/established/mature\] operation"
+
+---
+
+## **THE "AHA MOMENTS" THIS TAB CREATES**
+
+### **Insight 1: Revenue Quality**
+
+💡 What This Tells Us
+
+Your AGI of 88% means you retain $880K of every $3M in revenue. This positions you in the healthy range for agencies with balanced service mixes.
+
+A lower AGI (70-80%) often indicates heavy media buying or platform fees. A higher AGI (90-95%) suggests pure labor-based services. Your 88% shows you're capturing most revenue as true agency income rather than pass-through.
+
+**Why it matters:** Many founders don't distinguish between top-line and retained revenue. This helps them understand their actual business size.
+
+---
+
+### **Insight 2: Profit Margin & Health**
+
+💡 What This Tells Us
+
+Your 32% operating profit margin exceeds healthy benchmarks for agencies at your scale. Most agencies in the $1-2M range operate at 20-28% margins.
+
+This margin suggests strong cost discipline and pricing power. You're retaining roughly $1 of every $3 in AGI as profit, providing meaningful runway for reinvestment or founder compensation.
+
+**Why it matters:** Gives them context about whether their profitability is healthy or concerning without needing to compare to team size yet.
+
+---
+
+### **Insight 3: Scale & Complexity**
+
+💡 What This Tells Us
+
+At $1.2M in annual revenue, you're operating in the "established small agency" band. This scale typically requires:  
+\- More formalized processes than sub-$1.5M shops  
+\- Some level of specialization (not generalist anymore)  
+\- At least basic management structure (not just founder doing everything)
+
+Your revenue scale suggests you've crossed the threshold from "freelancer with a team" to "small business operator."
+
+**Why it matters:** Helps them understand the operational complexity their revenue level implies, even without knowing team structure yet.
+
+---
+
+### **Insight 4: Financial Runway**
+
+💡 What This Tells Us
+
+With $85K in available cash and monthly operating expenses around $65K (based on your AGI and typical cost ratios), you have approximately 1.3 months of runway.
+
+Industry standard is 3-6 months for healthy cushion. Your current position suggests limited buffer for downturns or growth investments, which may influence strategic timing and risk appetite.
+
+**Why it matters:** Helps them understand their financial vulnerability and capacity for strategic moves.
+
+---
+
+## **BENCHMARKS THAT MATTER (FINANCIAL DIMENSION ONLY)**
+
+### **AGI % Benchmarks:**
+
+* **90-95%:** Pure labor services (consulting, design, strategy)  
+* **85-90%:** Balanced mix (some media, mostly labor)  
+* **75-85%:** Media-heavy or platform-fee models  
+* **\<75%:** Very high pass-through (media buying, platform reseller)
+
+### **Profit Margin Benchmarks:**
+
+* **30%+:** Excellent (strong discipline, pricing power)  
+* **20-30%:** Healthy (sustainable, reinvestment capacity)  
+* **15-20%:** Acceptable (tight but viable)  
+* **10-15%:** Concerning (limited runway, vulnerable)  
+* **\<10%:** Critical (unsustainable without changes)
+
+### **Revenue Scale Complexity Bands:**
+
+* **\<$1.5M:** Solo/micro (founder-led, minimal infrastructure)  
+* **$1.5M-$3M:** Small (emerging systems, early specialization)  
+* **$3M-$10M:** Established small (formalized processes, management layer)  
+* **$10M-$10M:** Mid-size (departmentalization, significant infrastructure)  
+* **$10M+:** Large (full executive team, complex operations)
+
+### **Cash Runway Benchmarks:**
+
+* **6+ months:** Very healthy (strategic flexibility)  
+* **3-6 months:** Healthy (standard cushion)  
+* **1-3 months:** Tight (limited flexibility)  
+* **\<1 month:** Critical (vulnerable)
+
+---
+
+## **WHAT THIS STORY DOESN'T INCLUDE (YET)**
+
+❌ **Revenue per employee** — Requires team data ❌ **Payroll efficiency** — Requires team data ❌ **Client concentration** — Requires growth data ❌ **Growth rate** — Requires historical or pipeline data ❌ **Team utilization** — Requires team data ❌ **Service positioning** — Requires identity data
+
+**The financial tab stands alone as:** "Here's how big you are, how efficiently you capture revenue, how profitable you are, and how financially stable your operation is."
+
+---
+
+## **TECHNICAL IMPLEMENTATION NOTES**
+
+### **Data Entry:**
+
+✅ **Actual dollar amounts** (not dropdowns)
+
+* Why: Feeds Growth Velocity Calculator  
+* Why: Enables precise calculations  
+* Why: Minimizes re-entry across tools
+
+### **Progressive Insights:**
+
+❌ **NOT real-time** (requires GPT synthesis)
+
+* Insights panel remains empty/placeholder until "Save Financial Data" clicked  
+* Save triggers GPT call with financial data \+ benchmark context  
+* Response populates insights panel  
+* Some calculated metrics CAN be real-time (AGI %, Profit Margin %) if we want  
+* But contextual narrative requires GPT
+
+### **Possible Hybrid Approach:**
+
+* **Immediate:** Show calculated numbers (AGI %, Profit %, etc.)  
+* **After Save:** Show GPT-generated contextual insights and benchmark comparisons
+
+---
+
+## **THE KEY DESIGN QUESTION**
+
+**What baseline fields do we need to tell this financial story?**
+
+**My initial hypothesis (to pressure test):**
+
+### **Baseline Fields (Required for meaningful insights):**
+
+1. **Monthly Revenue** — Top-line scale  
+2. **Monthly AGI** — What you retain (or we calculate from Revenue \+ AGI %)  
+3. **Monthly Payroll (Unburdened)** — Labor costs  
+4. **Typical Profit Margin** — Or we calculate from Revenue \- AGI \- Payroll \- estimated overhead  
+5. **Cash Available for Reinvestment** — Runway indicator
+
+**Why these 5:**
+
+* Revenue \+ AGI \= revenue quality story  
+* Payroll \+ Revenue/AGI \= rough profitability context  
+* Margin \= health benchmark  
+* Cash \= stability/runway
+
+### **Enhanced Fields (Optional, deepens insights):**
+
+6. **Pass-Through Costs** — If they know them separately  
+7. **SG\&A/Overhead** — More precise profit calculation  
+8. **Owner Compensation** — Separates profit from founder pay  
+9. **Annual Revenue Run Rate** — For annual planning context  
+10. **Financial Health Status** — Their self-assessment (stressed/stable/growing/thriving)
+
+---
+
+## **MUTUAL EXCLUSIVITY — BOUNDARIES**
+
+**Financial Tab OWNS:**
+
+* Revenue scale  
+* AGI efficiency  
+* Profit margins  
+* Cash position  
+* Financial complexity level
+
+**Financial Tab DOESN'T TOUCH:**
+
+* Team efficiency (that requires Team tab data)  
+* Growth health (that requires Growth tab data)  
+* Positioning strength (that requires Identity tab data)
+
+**Combined Insights (Dashboard only):**
+
+* Revenue per FTE (Financial \+ Team)  
+* Payroll efficiency (Financial \+ Team)  
+* Client concentration (Financial \+ Growth)  
+* Burn rate vs. pipeline (Financial \+ Growth)
+
+# **✅ FINANCIAL TAB — FIELD STRUCTURE & APPROACH CONFIRMED**
+
+## **My Understanding — Aligned**
+
+Perfect, this clarifies the approach significantly. Let me confirm what I'm hearing:
+
+---
+
+## **DATA ENTRY PHILOSOPHY**
+
+### **Monthly Input, Annual Calculated:**
+
+✅ Ask for: **Monthly Revenue, Monthly AGI, Monthly Payroll** ✅ Calculate & display: **Annual run rates** (multiply by 12\) ✅ Why: Easier to think about current operations monthly
+
+### **Dollar Amounts, Percentages Calculated:**
+
+✅ Ask for: **Revenue (dollars), AGI (dollars)** ✅ Calculate & display: **AGI %** (AGI ÷ Revenue × 100\) ✅ Why: Actual numbers feed other tools (GV Calculator), percentages are derived
+
+### **Percentages Input, Dollar Amounts Calculated:**
+
+✅ Ask for: **Profit Margin %, Gross Margin %** (if relevant) ✅ Calculate & display: **Operating Profit $, Gross Profit $** ✅ Why: Founders know their margins more readily than exact profit dollars
+
+### **Ballpark Guidance:**
+
+✅ Prominent message on page:
+
+💡 Ballpark figures are fine  
+These numbers can be as exact or approximate as you prefer. Rounded estimates work well for directional insights. More precision enables deeper analysis, but isn't required.  
+---
+
+## **TOGGLE COMPLEXITY DECISION**
+
+You mentioned the GV Calculator has a **percentage vs. dollar toggle**. Here's my take:
+
+**Option A: Simple (No Toggle)**
+
+* Ask for dollars where they're concrete (Revenue, AGI, Payroll)  
+* Ask for percentages where they're easier (Margins)  
+* Calculate everything else  
+* **Pros:** Simpler UX, faster completion, less cognitive load  
+* **Cons:** Less flexible if someone only knows percentages
+
+**Option B: Toggle (Like GV Calculator)**
+
+* Let users switch between "dollar input" and "percentage input" for certain fields  
+* Store both in backend, calculate missing values  
+* **Pros:** Maximum flexibility, accommodates different knowledge levels  
+* **Cons:** Adds UI complexity, might slow down completion
+
+**My recommendation:** Start with **Option A (Simple)** for baseline fields. If we find users struggling with dollar amounts, we can add toggle in enhanced version or future iteration.
+
+**Does this align with your thinking, or do you want the toggle from the start?**
+
+---
+
+## **BASELINE VS. ENHANCED SPLIT**
+
+### **Baseline Fields (10-15 min completion):**
+
+**Financial Inputs:**
+
+1. **Monthly Revenue** (dollars)  
+2. **Monthly AGI** (dollars)  
+3. **Monthly Payroll (Unburdened)** (dollars)  
+4. **Typical Profit Margin** (percentage)  
+5. **Cash Available** (dollars) — Simple: "How much cash do you have available for operations/reinvestment?"  
+6. **Financial Health Status** (self-assessment dropdown) — "How would you describe your current financial health?"  
+   * Options: Stressed, Tight, Stable, Healthy, Thriving
+
+**Why these 6:**
+
+* Revenue \+ AGI \= scale and efficiency story  
+* Payroll \= rough cost structure (even without team data)  
+* Margin \= profitability health  
+* Cash \= runway/stability  
+* Self-assessment \= founder's subjective experience
+
+### **Calculated & Displayed (Right Side):**
+
+* **AGI %** (AGI ÷ Revenue)  
+* **Annual Revenue Run Rate** (Monthly Revenue × 12\)  
+* **Annual AGI Run Rate** (Monthly AGI × 12\)  
+* **Operating Profit (dollars)** (Derived from AGI × Margin %)  
+* **Monthly Operating Expenses** (AGI \- Operating Profit)  
+* **Cash Runway** (Cash ÷ Monthly Operating Expenses \= months)
+
+### **Enhanced Fields (Accordion, 30-45 min total):**
+
+**Deeper Financial Context:** 
+
+7\. **Pass-Through Costs** (dollars) — "Monthly costs you pass directly to clients (media spend, platform fees, etc.)" 
+
+8\. **SG\&A/Overhead** (dollars or %) — "Monthly operational overhead (office, software, admin, etc.)" 
+
+9\. **Owner/Founder Compensation** (dollars) — "How much do you pay yourself monthly?" 
+
+10\. **Gross Margin %** (percentage) — "Margin before overhead costs" 
+
+11\. **Monthly Recurring Revenue (MRR)** — "How much of your revenue is recurring vs. project-based?" (This might belong in Growth tab actually) 
+
+12\. **Accounts Receivable** (dollars) — "Outstanding invoices not yet collected" 
+
+13\. **Accounts Payable** (dollars) — "Outstanding bills not yet paid" 
+
+14\. **Cash Flow Health** (self-assessment) — "How would you describe your cash flow timing?"
+
+* Options: Always tight, Occasionally strained, Generally smooth, Very predictable
+
+**Why these enhance:**
+
+* Pass-through \= more precise AGI calculation  
+* SG\&A \= more precise profit calculation  
+* Owner comp \= separates profit from founder pay  
+* Gross margin \= additional profitability layer  
+* AR/AP \= cash flow timing insights  
+* Cash flow health \= liquidity vs. profitability distinction
+
+---
+
+## **CALCULATED METRICS — WHAT SHOWS WHERE**
+
+### **Immediate Calculation (Right Side, As They Type):**
+
+These can calculate in real-time with JavaScript:
+
+* ✅ **AGI %** (AGI ÷ Revenue × 100\)  
+* ✅ **Annual Revenue Run Rate** (Monthly Revenue × 12\)  
+* ✅ **Annual AGI Run Rate** (Monthly AGI × 12\)  
+* ✅ **Operating Profit $** (AGI × Profit Margin %)  
+* ✅ **Cash Runway (months)** (Cash ÷ Operating Expenses)
+
+### **After Save (GPT Synthesis):**
+
+These require contextual interpretation:
+
+* ✅ **Benchmark comparisons** ("Your AGI % of 88% positions you in the healthy range...")  
+* ✅ **Scale complexity narrative** ("At $1.2M annual run rate, you're in the 'established small' band...")  
+* ✅ **Profitability health** ("Your 32% margin exceeds benchmarks for your scale...")  
+* ✅ **Runway implications** ("1.3 months of runway suggests limited buffer for strategic moves...")  
+* ✅ **Service model insights** ("Your 88% AGI suggests balanced service mix rather than media-heavy...")
+
+---
+
+## **PROGRESSIVE INSIGHTS PANEL — TWO LAYERS**
+
+### **Layer 1: Calculated Metrics (Immediate)**
+
+📊 Calculated Metrics
+
+AGI Percentage: 88%  
+Annual Revenue Run Rate: $1,440,000  
+Annual AGI Run Rate: $1,267,200  
+Operating Profit: $405,504 (32% margin)  
+Cash Runway: 1.3 months
+
+### **Layer 2: Contextual Insights (After Save)**
+
+💡 What This Tells Us
+
+\[GPT-generated synthesis appears here after clicking "Save Financial Data"\]
+
+Your AGI of 88% means you retain $880K of every $3M in revenue...  
+\[Rest of narrative as outlined earlier\]
+
+**Why this hybrid approach:**
+
+* Users get immediate feedback (metrics calculating as they type)  
+* But deep insights require save (sets expectation, reduces API costs)  
+* Creates mini "aha moment" when metrics calculate, bigger moment after save
+
+---
+
+## **FIELD STRUCTURE VISUAL**
+
+### **Baseline Section (Always Visible):**
+
+💰 Financial Snapshot  
+All fields are optional. Ballpark figures work great — more precision enables deeper insights.
+
+Monthly Revenue                      \[$ 0.00        \]  
+Monthly AGI (Agency Gross Income)    \[$ 0.00        \]  
+Monthly Payroll (Unburdened)         \[$ 0.00        \]  
+Typical Profit Margin                \[    % \]  
+Cash Available for Operations        \[$ 0.00        \]  
+Financial Health Status              \[Select status... ▾\]
+
+\[Save Financial Data\]
+
+### **Enhanced Section (Accordion, Initially Collapsed):**
+
+▶ Enhanced Metrics (Optional)  
+  Provide additional context for deeper financial insights
+
+  \[When expanded:\]  
+    
+  Pass-Through Costs (Monthly)       \[$ 0.00        \]  
+  SG\&A / Overhead (Monthly)          \[$ 0.00        \]  
+  Owner/Founder Compensation         \[$ 0.00        \]  
+  Gross Margin (%)                   \[    % \]  
+  Accounts Receivable                \[$ 0.00        \]  
+  Accounts Payable                   \[$ 0.00        \]  
+  Cash Flow Health                   \[Select... ▾\]
+
+### **Right Side Panel:**
+
+📊 Calculated Metrics  
+\[Real-time calculations\]
+
+AGI Percentage: \---%  
+Annual Revenue Run Rate: $---  
+Annual AGI Run Rate: $---  
+Operating Profit: $---  
+Cash Runway: \--- months
+
+─────────────────────
+
+💡 What This Tells Us  
+\[Placeholder until save\]
+
+Click "Save Financial Data" to generate   
+contextual insights and benchmark   
+comparisons for your financial profile.
+
+\[After save: GPT synthesis appears here\]  
+---
+
+## **MUTUALLY EXCLUSIVE BOUNDARIES — CONFIRMED**
+
+**Financial Tab Tells This Story:**
+
+* ✅ How big is your agency (revenue scale)  
+* ✅ How efficiently do you capture revenue (AGI %)  
+* ✅ How profitable are you (margin %)  
+* ✅ How much cash runway do you have  
+* ✅ What complexity band are you in
+
+**Financial Tab Does NOT Tell:**
+
+* ❌ Team efficiency (Revenue per FTE) — needs Team data  
+* ❌ Payroll efficiency (Payroll as % of revenue) — needs Team data  
+* ❌ Growth health (MRR growth, churn) — needs Growth data  
+* ❌ Client concentration — needs Growth data  
+* ❌ Market positioning — needs Identity data
+
+**These combined insights appear ONLY on Dashboard after all tabs complete.**
+
+---
+
+## **QUESTIONS TO FINALIZE**
+
+### **1\. Toggle for Percentage vs. Dollar Input?**
+
+* Start simple (no toggle), or implement from the start?  
+* My recommendation: Simple first, can add toggle later if needed
+
+### **2\. MRR in Financial or Growth Tab?**
+
+* I listed "Monthly Recurring Revenue" in enhanced Financial  
+* But this might belong in Growth & Pipeline instead  
+* **Where should MRR live?** (I'm leaning Growth tab)
+
+### **3\. Financial Health Status Options?**
+
+* Baseline: Stressed, Tight, Stable, Healthy, Thriving  
+* Are these the right descriptors, or different language?
+
+### **4\. Immediate Calculations — Show All or Hide Until Save?**
+
+* Option A: Show calculated metrics immediately (AGI %, run rate, etc.)  
+* Option B: Hide everything until save (all insights come at once)  
+* My recommendation: Option A (immediate metrics, contextual insights after save)
+
+### **5\. Gross Margin vs. Operating Margin?**
+
+* Do we need both, or is Operating/Net Margin sufficient for baseline story?  
+* Gross Margin might be enhanced-only
+
+✅ FINANCIAL TAB — COMPLETE FIELD SPECIFICATION  
+BASELINE FIELDS (Required for Meaningful Insights)  
+Field 1: Monthly Revenue
+
+Field Name: monthly\_revenue  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: $10,000,000 (reasonable upper bound)  
+Optional field (can be left blank)
+
+Placeholder: $0.00  
+Helper Text: "Your approximate monthly top-line revenue (all sources)"  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 2: Monthly AGI (Agency Gross Income)
+
+Field Name: monthly\_agi  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: monthly\_revenue (cannot exceed revenue)  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "Revenue minus pass-through costs (what you actually retain)"  
+Info Icon/Tooltip: "AGI \= Revenue \- Pass-Through Costs. This is your true agency income before operating expenses."  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 3: Monthly Payroll (Unburdened)
+
+Field Name: monthly\_payroll  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: $5,000,000  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "Total monthly salaries/wages before taxes and benefits"  
+Info Icon/Tooltip: "Unburdened \= Base salaries only, not including taxes, benefits, or contractor costs"  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 4: Typical Profit Margin
+
+Field Name: profit\_margin\_percentage  
+Data Type: Decimal (percentage)  
+Input Type: Text field with percentage formatting  
+Validation:
+
+Minimum: \-100% (allows for negative margins)  
+Maximum: 100%  
+Optional field
+
+Placeholder: 0%  
+Helper Text: "Your typical operating profit margin (net profit as % of revenue)"  
+Info Icon/Tooltip: "Operating Profit Margin \= (AGI \- All Operating Costs) / AGI × 100\. If unsure, estimate based on what you typically retain after all expenses."  
+Auto-formatting: Add percentage symbol
+
+Field 5: Cash Available for Operations
+
+Field Name: cash\_available  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: $10,000,000  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "Cash currently available for operations, reinvestment, or runway"  
+Info Icon/Tooltip: "This is your liquid cash that can be used for operating expenses, hiring, or strategic investments. Don't include restricted funds or personal savings."  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 6: Financial Health Status
+
+Field Name: financial\_health\_status  
+Data Type: String (enum)  
+Input Type: Dropdown select  
+Options:
+
+stressed — "Stressed (struggling with cash flow, unprofitable)"  
+tight — "Tight (breaking even, limited flexibility)"  
+stable — "Stable (profitable, manageable cash flow)"  
+healthy — "Healthy (strong margins, good runway)"  
+excellent — "Excellent (highly profitable, significant reserves)"
+
+Validation: Optional field  
+Placeholder: "Select status..."  
+Helper Text: "How would you describe your current financial health?"
+
+ENHANCED FIELDS (Optional Depth)  
+Field 7: Pass-Through Costs (Monthly)
+
+Field Name: monthly\_passthrough\_costs  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: monthly\_revenue  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "Monthly costs passed directly to clients (media spend, platform fees, etc.)"  
+Info Icon/Tooltip: "Costs that you bill to clients but don't retain as agency income. If you already provided AGI, this helps verify accuracy."  
+Auto-formatting: Add commas, dollar sign, 2 decimal places  
+Note: If provided, system can validate: monthly\_agi \= monthly\_revenue \- monthly\_passthrough\_costs
+
+Field 8: SG\&A / Overhead (Monthly)
+
+Field Name: monthly\_overhead  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: $1,000,000  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "Monthly operational overhead (office, software, admin, marketing, etc.)"  
+Info Icon/Tooltip: "SG\&A \= Selling, General & Administrative expenses. This includes rent, software, insurance, admin staff, marketing costs — everything except direct labor."  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 9: Owner/Founder Compensation
+
+Field Name: owner\_compensation  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: $500,000  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "How much do you pay yourself monthly (salary \+ distributions)?"  
+Info Icon/Tooltip: "This separates true business profit from founder compensation. Helps clarify what the business generates vs. what you take home."  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 10: Gross Margin (%)
+
+Field Name: gross\_margin\_percentage  
+Data Type: Decimal (percentage)  
+Input Type: Text field with percentage formatting  
+Validation:
+
+Minimum: \-100%  
+Maximum: 100%  
+Optional field
+
+Placeholder: 0%  
+Helper Text: "Margin before overhead costs (AGI \- Direct Costs) / AGI"  
+Info Icon/Tooltip: "Gross Margin \= (AGI \- Direct Labor Costs) / AGI × 100\. This shows profitability before overhead like rent, software, admin."  
+Auto-formatting: Add percentage symbol
+
+Field 11: Accounts Receivable
+
+Field Name: accounts\_receivable  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: $5,000,000  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "Outstanding invoices not yet collected"  
+Info Icon/Tooltip: "Total amount clients owe you for work already invoiced but not yet paid. Helps understand cash flow timing vs. profitability."  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 12: Accounts Payable
+
+Field Name: accounts\_payable  
+Data Type: Decimal (currency)  
+Input Type: Text field with currency formatting  
+Validation:
+
+Minimum: $0  
+Maximum: $2,000,000  
+Optional field
+
+Placeholder: $0.00  
+Helper Text: "Outstanding bills not yet paid"  
+Info Icon/Tooltip: "Total amount you owe to vendors, contractors, or service providers for expenses already incurred but not yet paid."  
+Auto-formatting: Add commas, dollar sign, 2 decimal places
+
+Field 13: Cash Flow Health
+
+Field Name: cash\_flow\_health  
+Data Type: String (enum)  
+Input Type: Dropdown select  
+Options:
+
+always\_tight — "Always tight (frequently struggling to cover expenses)"  
+occasionally\_strained — "Occasionally strained (some months are tight)"  
+generally\_smooth — "Generally smooth (most months flow well)"  
+very\_predictable — "Very predictable (consistent, no surprises)"
+
+Validation: Optional field  
+Placeholder: "Select cash flow status..."  
+Helper Text: "How would you describe your cash flow timing?"
+
+CALCULATED METRICS (IMMEDIATE, CLIENT-SIDE)  
+These calculate in real-time as users enter data:  
+Calculation 1: AGI Percentage
+
+Field Name: agi\_percentage\_calculated  
+Formula: (monthly\_agi / monthly\_revenue) × 100  
+Display Format: XX.X% (one decimal place)  
+Conditional Display: Only show if both monthly\_revenue AND monthly\_agi are provided  
+Label: "AGI Percentage"
+
+Calculation 2: Annual Revenue Run Rate
+
+Field Name: annual\_revenue\_run\_rate  
+Formula: monthly\_revenue × 12  
+Display Format: $XXX,XXX (currency with commas)  
+Conditional Display: Only show if monthly\_revenue is provided  
+Label: "Annual Revenue Run Rate"
+
+Calculation 3: Annual AGI Run Rate
+
+Field Name: annual\_agi\_run\_rate  
+Formula: monthly\_agi × 12  
+Display Format: $XXX,XXX (currency with commas)  
+Conditional Display: Only show if monthly\_agi is provided  
+Label: "Annual AGI Run Rate"
+
+Calculation 4: Operating Profit (Monthly)
+
+Field Name: operating\_profit\_monthly  
+Formula: monthly\_agi × (profit\_margin\_percentage / 100\)  
+Display Format: $XXX,XXX (currency with commas)  
+Conditional Display: Only show if both monthly\_agi AND profit\_margin\_percentage are provided  
+Label: "Monthly Operating Profit"
+
+Calculation 5: Monthly Operating Expenses
+
+Field Name: monthly\_operating\_expenses  
+Formula: monthly\_agi \- operating\_profit\_monthly  
+Display Format: $XXX,XXX (currency with commas)  
+Conditional Display: Only show if calculation 4 is available  
+Label: "Monthly Operating Expenses (Estimated)"
+
+Calculation 6: Cash Runway (Months)
+
+Field Name: cash\_runway\_months  
+Formula: cash\_available / monthly\_operating\_expenses  
+Display Format: X.X months (one decimal place)  
+Conditional Display: Only show if both cash\_available AND monthly\_operating\_expenses are available  
+Label: "Cash Runway"  
+Special Case: If monthly\_operating\_expenses is $0 or negative, show "N/A" or "Infinite"
+
+Calculation 7: Pass-Through Validation (Enhanced Only)
+
+Field Name: passthrough\_validation  
+Formula: monthly\_revenue \- monthly\_agi  
+Purpose: Compare to monthly\_passthrough\_costs if provided  
+Display: Only show if discrepancy exists  
+Label: "Calculated Pass-Through" (for validation)  
+Note: If monthly\_passthrough\_costs is provided and doesn't match, show gentle warning: "Your entered pass-through costs (X)differfromcalculated(X) differ from calculated (  
+X)differfromcalculated(Y). Either is fine — use whichever is most accurate."
+
+RIGHT-SIDE PANEL STRUCTURE  
+Section 1: Calculated Metrics (Immediate)  
+📊 Calculated Metrics
+
+\[Shows immediately as data is entered\]
+
+AGI Percentage: 88.0%  
+Annual Revenue Run Rate: $1,440,000  
+Annual AGI Run Rate: $1,267,200  
+Monthly Operating Profit: $405,504  
+Monthly Operating Expenses: $861,696  
+Cash Runway: 1.3 months
+
+\[Gray text below\]  
+These metrics calculate automatically based on your inputs.
+
+Section 2: Contextual Insights (After Save)  
+Before Save:  
+💡 What This Tells Us
+
+\[Empty state with icon\]
+
+Click "Save Financial Data" below to generate   
+contextual insights and benchmark comparisons   
+for your financial profile.  
+After Save:  
+💡 What This Tells Us
+
+\[GPT-generated content appears here\]
+
+Your AGI of 88% means you retain $880K of every $1M in revenue. This positions you in the healthy range for agencies with balanced service mixes...
+
+\[Full synthesis continues\]
+
+GPT SYNTHESIS PROMPT STRUCTURE  
+When user clicks "Save Financial Data", send this payload to GPT:  
+System Prompt:  
+You are a financial analyst specializing in marketing agency economics. Analyze the provided financial snapshot and generate contextual insights using observational language (not prescriptive). Focus on:
+
+1\. Revenue scale and complexity implications  
+2\. AGI efficiency and service model indicators  
+3\. Profitability health vs. industry benchmarks  
+4\. Cash runway and financial stability  
+5\. Overall financial maturity assessment
+
+Use benchmark ranges:  
+\- AGI%: 90-95% (pure labor), 85-90% (balanced), 75-85% (media-heavy), \<75% (high pass-through)  
+\- Profit Margin: 30%+ (excellent), 20-30% (healthy), 15-20% (acceptable), 10-15% (concerning), \<10% (critical)  
+\- Cash Runway: 6+ months (very healthy), 3-6 months (healthy), 1-3 months (tight), \<1 month (critical)  
+\- Revenue Scale: \<$1.5M (micro), $1.5M-$3M (small), $3M-$5M (established small), $5M-$10M (mid-size), $10M+ (large)
+
+Keep tone observational ("indicates," "suggests," "positions you"), not directive ("you should"). Length: 200-300 words.  
+User Prompt Payload:  
+json{  
+  "monthly\_revenue": 120000,  
+  "monthly\_agi": 105600,  
+  "monthly\_payroll": 48000,  
+  "profit\_margin\_percentage": 32,  
+  "cash\_available": 85000,  
+  "financial\_health\_status": "healthy",  
+  "enhanced\_fields\_provided": {  
+    "monthly\_passthrough\_costs": 14400,  
+    "monthly\_overhead": 18000,  
+    "owner\_compensation": 12000,  
+    "gross\_margin\_percentage": 55,  
+    "accounts\_receivable": 140000,  
+    "accounts\_payable": 32000,  
+    "cash\_flow\_health": "generally\_smooth"  
+  },  
+  "calculated\_metrics": {  
+    "agi\_percentage": 88.0,  
+    "annual\_revenue\_run\_rate": 1440000,  
+    "annual\_agi\_run\_rate": 1267200,  
+    "monthly\_operating\_profit": 33792,  
+    "monthly\_operating\_expenses": 71808,  
+    "cash\_runway\_months": 1.18  
+  }  
+}  
+\`\`\`
+
+\*\*Note:\*\* Only include enhanced fields that were actually filled out. Don't send empty/null values.
+
+\---
+
+\#\#\# \*\*Expected GPT Response Format:\*\*  
+\`\`\`  
+Your AGI of 88% means you retain $88 of every $100 in revenue. This positions you in the healthy range for agencies with balanced service mixes — above the 85% threshold that indicates pass-through cost discipline.
+
+At $1.44M in annual revenue run rate, you're operating in the "established small agency" band. This scale typically requires formalized processes, some specialization, and basic management structure beyond just the founder doing everything.
+
+Your 32% operating profit margin exceeds healthy benchmarks for agencies at your scale. Most agencies in the $1-2M range operate at 20-28% margins, so your performance suggests strong cost discipline and pricing power. You're retaining roughly $1 of every $3 in AGI as profit.
+
+However, with $85K in cash available and $71.8K in monthly operating expenses, you have approximately 1.2 months of runway. Industry standard is 3-6 months for healthy cushion. Your current position suggests limited buffer for downturns or growth investments, despite strong profitability. The $140K in accounts receivable exceeds your cash position, indicating potential cash flow timing challenges even with strong margins.
+
+Your self-assessment of "healthy" financial status aligns with your profitability metrics, though the tight cash runway suggests that while the business is profitable, liquidity management may be a focus area.
+
+Overall Financial Profile: Profitable and efficient operation with tight liquidity. Strong margins provide reinvestment capacity, but limited cash reserves may constrain strategic timing.  
+\`\`\`
+
+\---
+
+\#\# \*\*BALLPARK GUIDANCE MESSAGING\*\*
+
+Place this at the top of the Financial tab:  
+\`\`\`  
+💡 Ballpark figures are perfectly fine
+
+These numbers can be as exact or approximate as you prefer. Rounded estimates (like "$120K" instead of "$119,847.23") work great for directional insights. 
+
+More precision enables deeper analysis, but ballpark figures are sufficient for meaningful benchmarking.  
+\`\`\`
+
+\---
+
+\#\# \*\*UI/UX IMPLEMENTATION NOTES\*\*
+
+\#\#\# \*\*Page Layout:\*\*  
+\`\`\`  
+┌─────────────────────────────────────────────────────────────┐  
+│  Financial Tab                                              │  
+│  \[Ballpark guidance message\]                                │  
+├────────────────────────────────┬────────────────────────────┤  
+│                                │                            │  
+│  BASELINE FIELDS               │  📊 Calculated Metrics     │  
+│  (Always visible)              │  \[Real-time calculations\]  │  
+│                                │                            │  
+│  \[6 baseline fields\]           │  AGI %: XX%                │  
+│                                │  Annual Run Rate: $XXX     │  
+│  ▶ Enhanced Metrics (Optional) │  Operating Profit: $XXX    │  
+│    \[Initially collapsed\]       │  Cash Runway: X.X months   │  
+│                                │                            │  
+│    \[7 enhanced fields when     │  ─────────────────────     │  
+│     expanded\]                  │                            │  
+│                                │  💡 What This Tells Us     │  
+│  \[Save Financial Data button\]  │  \[GPT synthesis after save\]│  
+│                                │                            │  
+└────────────────────────────────┴────────────────────────────┘  
+Field Behavior:
+
+All fields optional (no required validation)  
+Tab order follows logical flow (Revenue → AGI → Payroll → Margin → Cash → Status)  
+Currency fields auto-format with commas and dollar signs  
+Percentage fields auto-format with % symbol  
+Info icons next to field labels trigger tooltips on hover  
+Helper text appears below each field (gray, smaller font)
+
+Calculated Metrics Behavior:
+
+Start with placeholder "---" for all metrics  
+Update immediately as relevant fields change  
+Show smooth transition animation when values populate  
+If required fields are empty, show "---" instead of $0
+
+Save Button Behavior:
+
+Label: "Save Financial Data"  
+Position: Bottom of left column  
+Disabled state if no data entered (gray, not clickable)  
+Active state once any field has data (blue, clickable)  
+On click:
+
+Show loading spinner  
+Send data to GPT synthesis endpoint  
+Update right panel with insights  
+Change button to "Update Financial Data"
+
+Enhanced Accordion:
+
+Label: "▶ Enhanced Metrics (Optional)"  
+Subtext: "Provide additional context for deeper financial insights"  
+On click: Expand to show 7 additional fields  
+Icon changes to "▼" when expanded  
+Smooth height transition animation
+
+DATABASE SCHEMA NOTES  
+Table: agency\_snapshots  
+All financial fields should be stored in this table with these columns:  
+sql-- Baseline fields  
+monthly\_revenue DECIMAL(12,2)  
+monthly\_agi DECIMAL(12,2)  
+monthly\_payroll DECIMAL(12,2)  
+profit\_margin\_percentage DECIMAL(5,2)  
+cash\_available DECIMAL(12,2)  
+financial\_health\_status VARCHAR(50)
+
+\-- Enhanced fields  
+monthly\_passthrough\_costs DECIMAL(12,2)  
+monthly\_overhead DECIMAL(12,2)  
+owner\_compensation DECIMAL(12,2)  
+gross\_margin\_percentage DECIMAL(5,2)  
+accounts\_receivable DECIMAL(12,2)  
+accounts\_payable DECIMAL(12,2)  
+cash\_flow\_health VARCHAR(50)
+
+\-- Calculated fields (store for historical reference)  
+agi\_percentage\_calculated DECIMAL(5,2)  
+annual\_revenue\_run\_rate DECIMAL(12,2)  
+annual\_agi\_run\_rate DECIMAL(12,2)  
+monthly\_operating\_profit DECIMAL(12,2)  
+monthly\_operating\_expenses DECIMAL(12,2)  
+cash\_runway\_months DECIMAL(5,2)
+
+\-- GPT synthesis output  
+financial\_synthesis TEXT  
+financial\_synthesis\_generated\_at TIMESTAMP
+
+\-- Metadata  
+created\_at TIMESTAMP  
+updated\_at TIMESTAMP  
+user\_id UUID (foreign key to users table)
+
+SUMMARY — READY FOR IMPLEMENTATION  
+Baseline Fields: 6 fields (\~5-10 min completion)
+
+Monthly Revenue ($)  
+Monthly AGI ($)  
+Monthly Payroll ($)  
+Typical Profit Margin (%)  
+Cash Available ($)  
+Financial Health Status (dropdown)
+
+Enhanced Fields: 7 fields (optional depth)
+
+Pass-Through Costs ($)  
+SG\&A/Overhead ($)  
+Owner Compensation ($)  
+Gross Margin (%)  
+Accounts Receivable ($)  
+Accounts Payable ($)  
+Cash Flow Health (dropdown)
+
+Calculated Metrics: 6 immediate calculations
+
+AGI Percentage  
+Annual Revenue Run Rate  
+Annual AGI Run Rate  
+Monthly Operating Profit  
+Monthly Operating Expenses  
+Cash Runway (months)
+
+GPT Synthesis: After save
+
+Contextual insights (200-300 words)  
+Benchmark comparisons  
+Financial maturity assessment  
+Observational language (no prescriptions)

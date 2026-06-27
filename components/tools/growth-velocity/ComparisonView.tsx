@@ -1,145 +1,384 @@
-import React, { useState } from 'react';
-import { Card, Tabs, TabsList, TabsTrigger, TabsContent, Badge, Button } from '../../ui';
+import React, { useState, useMemo } from 'react';
+import { Card, Tabs, TabsList, TabsTrigger, TabsContent, Badge, Button, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../ui';
+import {
+   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+   LineChart, Line, ScatterChart, Scatter, ReferenceLine
+} from 'recharts';
 import { ScenarioModifiers } from './ScenarioControls';
-import { Check, X } from 'lucide-react';
+import { SavedScenarioSelector, SavedScenario } from './SavedScenarioSelector';
+import { PressureDashboard, ComparisonScenario } from './PressureDashboard';
+import { runGrowthSimulation } from '../../../lib/growthCalculations';
+import { TrendingUp, Users, Target, Activity, Circle } from 'lucide-react';
 
 interface ComparisonViewProps {
-  baselineRevenue: number;
-  modifiers: ScenarioModifiers;
+   baselineData: {
+      revenue: number;
+      team: number;
+      clients: number;
+      retention: number;
+      margin: number;
+      acv?: number;
+   };
+   modifiers: ScenarioModifiers; // Active scenario modifiers
 }
 
-export const ComparisonView: React.FC<ComparisonViewProps> = ({ baselineRevenue, modifiers }) => {
-  // Mock Saved Scenarios
-  const savedScenarios = [
-     { id: '1', name: 'Conservative', revenueTarget: 15, margin: 25 },
-     { id: '2', name: 'Moonshot', revenueTarget: 80, margin: 10 },
-  ];
+// Mock Saved Scenarios (Move to context/db later)
+const MOCK_SAVED_SCENARIOS: SavedScenario[] = [
+   { id: '1', name: 'Steady Climb', date: 'Jan 15' },
+   { id: '2', name: 'Rocket Ship', date: 'Jan 12' },
+   { id: '3', name: 'Conservative Path', date: 'Jan 10' }
+];
 
-  const targetRevenue = baselineRevenue * (1 + modifiers.revenueTarget / 100);
-  const baselineProfit = baselineRevenue * 0.2;
-  const targetProfit = targetRevenue * 0.25; // simplified
+// Mock modifiers for saved scenarios (since we don't have DB yet)
+const MOCK_SAVED_MODIFIERS: Record<string, ScenarioModifiers> = {
+   '1': { revenueTarget: 20, efficiency: 5, retention: 2, acv: 5, margin: 2, clientCount: 15, timeframe: 18 },
+   '2': { revenueTarget: 60, efficiency: -10, retention: 0, acv: 0, margin: -5, clientCount: 60, timeframe: 24 },
+   '3': { revenueTarget: 10, efficiency: 10, retention: 5, acv: 0, margin: 5, clientCount: 10, timeframe: 12 }
+};
 
-  // Simple CSS Chart components since we can't use Recharts
-  const SimpleBar = ({ height, color, label, value }: any) => (
-    <div className="flex flex-col items-center gap-2 group">
-       <span className="text-xs font-bold text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">{value}</span>
-       <div className={`w-12 rounded-t-sm transition-all duration-500 ${color}`} style={{ height }} />
-       <span className="text-xs text-slate-500 font-medium">{label}</span>
-    </div>
-  );
+// --- Custom Legend Component ---
+const ChartLegend = ({ items }: { items: { label: string; color: string; type?: 'line' | 'rect' | 'circle' }[] }) => (
+   <div className="flex flex-wrap items-center gap-4 mb-2 text-xs text-slate-600">
+      {items.map((item, i) => (
+         <div key={i} className="flex items-center gap-1.5">
+            <span
+               className="inline-block"
+               style={{
+                  width: item.type === 'line' ? 12 : 8,
+                  height: item.type === 'line' ? 2 : 8,
+                  backgroundColor: item.color,
+                  borderRadius: item.type === 'line' ? 0 : '2px'
+               }}
+            />
+            <span>{item.label}</span>
+         </div>
+      ))}
+   </div>
+);
 
-  return (
-    <div className="space-y-6">
-       <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-900">Scenario Analysis</h3>
-          <div className="flex gap-2">
-             <Button variant="outline" className="px-3 py-1 text-xs">Save Scenario</Button>
-          </div>
-       </div>
+export const ComparisonView: React.FC<ComparisonViewProps> = ({ baselineData, modifiers }) => {
+   const [selectedScenarioIds, setSelectedScenarioIds] = useState<string[]>(['1']);
+   const [activeTab, setActiveTab] = useState('visual');
 
-       <Tabs defaultValue="visual">
-          <div className="flex justify-between items-center mb-6">
-             <TabsList>
-                <TabsTrigger value="visual">Visual Analysis</TabsTrigger>
-                <TabsTrigger value="grid">Data Grid</TabsTrigger>
-             </TabsList>
-          </div>
+   const handleToggleScenario = (id: string) => {
+      setSelectedScenarioIds(prev =>
+         prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id].slice(0, 3)
+      );
+   };
 
-          <TabsContent value="visual" className="space-y-6">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Revenue & Profit Chart */}
-                <Card className="p-6">
-                   <h4 className="text-sm font-semibold text-slate-900 mb-6">Revenue & Profit Impact</h4>
-                   <div className="h-64 flex items-end justify-center gap-8 border-b border-slate-100 pb-2">
-                      <div className="flex gap-1 items-end">
-                         <SimpleBar height="40%" color="bg-slate-300" label="Base Rev" value="$2M" />
-                         <SimpleBar height="15%" color="bg-slate-400" label="Base Profit" value="$400k" />
-                      </div>
-                      
-                      <div className="flex gap-1 items-end relative">
-                         {/* Dynamic Heights */}
-                         <SimpleBar 
-                            height={`${Math.min(100, 40 * (1 + modifiers.revenueTarget/100))}%`} 
-                            color="bg-brand-600" 
-                            label="Target Rev" 
-                            value={`$${(targetRevenue/1000000).toFixed(1)}M`} 
-                         />
-                         <SimpleBar 
-                            height={`${Math.min(100, 15 * (1 + modifiers.revenueTarget/100) * (1 + modifiers.margin/100))}%`} 
-                            color="bg-emerald-500" 
-                            label="Target Profit" 
-                            value={`$${(targetProfit/1000000).toFixed(2)}M`} 
-                         />
-                         <div className="absolute -top-8 left-1/2 -translate-x-1/2">
-                            <Badge color="blue">Active</Badge>
-                         </div>
-                      </div>
+   // --- Simulation Engine ---
+   const comparisonData: ComparisonScenario[] = useMemo(() => {
+      const baselineMods: ScenarioModifiers = { revenueTarget: 0, efficiency: 0, retention: 0, acv: 0, margin: 0, clientCount: 0, timeframe: 12 };
+      const baselineResult = runGrowthSimulation(baselineData, baselineMods);
+      const activeResult = runGrowthSimulation(baselineData, modifiers);
+      const savedResults = selectedScenarioIds.map(id => {
+         const mods = MOCK_SAVED_MODIFIERS[id] || baselineMods;
+         const result = runGrowthSimulation(baselineData, mods);
+         const name = MOCK_SAVED_SCENARIOS.find(s => s.id === id)?.name || 'Unknown';
+         return { id, name, isBaseline: false, result, mods };
+      });
 
-                      {savedScenarios.map(s => (
-                         <div key={s.id} className="flex gap-1 items-end opacity-50">
-                            <SimpleBar height={`${40 * (1 + s.revenueTarget/100)}%`} color="bg-slate-300" label={s.name} value="" />
-                         </div>
-                      ))}
-                   </div>
-                </Card>
+      return [
+         { id: 'baseline', name: 'Baseline', isBaseline: true, result: baselineResult, mods: baselineMods },
+         { id: 'active', name: 'Active Scenario', isBaseline: false, result: activeResult, mods: modifiers },
+         ...savedResults
+      ];
+   }, [baselineData, modifiers, selectedScenarioIds]);
 
-                {/* Treadmill Chart (Mock) */}
-                <Card className="p-6">
-                   <h4 className="text-sm font-semibold text-slate-900 mb-6">The "Treadmill" (Churn vs. Net Growth)</h4>
-                   <div className="h-64 flex flex-col justify-center items-center text-center p-8 bg-slate-50 rounded border border-dashed border-slate-200">
-                      <p className="text-slate-500 text-sm mb-2">Churn Replacement Load</p>
-                      <div className="w-full max-w-xs h-8 bg-slate-200 rounded-full overflow-hidden flex mb-2">
-                         <div className="bg-red-400 h-full" style={{ width: `${Math.max(10, 30 - modifiers.retention)}%` }} title="Churn Replacement" />
-                         <div className="bg-emerald-500 h-full flex-1" title="Net Growth" />
-                      </div>
-                      <div className="flex justify-between w-full max-w-xs text-xs text-slate-500 px-1">
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-red-400 rounded-full" /> Churn</span>
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-emerald-500 rounded-full" /> Net Growth</span>
-                      </div>
-                   </div>
-                </Card>
-             </div>
-          </TabsContent>
+   // --- Generators ---
+   const trajectoryData = useMemo(() => {
+      const maxMonths = Math.max(...comparisonData.map(s => (s as any).mods?.timeframe || 12), 36);
+      const data = [];
+      for (let m = 0; m <= maxMonths; m++) {
+         const point: any = { month: m };
+         comparisonData.forEach(s => {
+            const tf = (s as any).mods?.timeframe || 12;
+            const startVal = baselineData.revenue;
+            const endVal = s.result?.metrics.targetRevenue || startVal;
+            if (m <= tf) point[s.name] = startVal + (endVal - startVal) * (m / tf);
+            else point[s.name] = endVal;
+         });
+         data.push(point);
+      }
+      return data;
+   }, [comparisonData, baselineData.revenue]);
 
-          <TabsContent value="grid">
-             <Card className="overflow-hidden">
-                <table className="w-full text-sm text-left">
-                   <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-                      <tr>
-                         <th className="px-6 py-3">Metric</th>
-                         <th className="px-6 py-3">Baseline</th>
-                         <th className="px-6 py-3 bg-blue-50/50 text-brand-700 border-x border-blue-100">Active Scenario</th>
-                         {savedScenarios.map(s => <th key={s.id} className="px-6 py-3">{s.name}</th>)}
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-100">
-                      <tr>
-                         <td className="px-6 py-4 font-medium text-slate-900">Revenue</td>
-                         <td className="px-6 py-4 text-slate-500">$2.0M</td>
-                         <td className="px-6 py-4 font-bold text-brand-700 bg-blue-50/30 border-x border-blue-50">
-                            ${(targetRevenue/1000000).toFixed(2)}M
-                         </td>
-                         {savedScenarios.map(s => (
-                            <td key={s.id} className="px-6 py-4 text-slate-500">
-                               ${(2 * (1 + s.revenueTarget/100)).toFixed(1)}M
-                            </td>
-                         ))}
-                      </tr>
-                      <tr>
-                         <td className="px-6 py-4 font-medium text-slate-900">Profit Margin</td>
-                         <td className="px-6 py-4 text-slate-500">20%</td>
-                         <td className="px-6 py-4 font-bold text-brand-700 bg-blue-50/30 border-x border-blue-50">
-                            {(20 + modifiers.margin).toFixed(0)}%
-                         </td>
-                         {savedScenarios.map(s => (
-                            <td key={s.id} className="px-6 py-4 text-slate-500">{s.margin}%</td>
-                         ))}
-                      </tr>
-                   </tbody>
-                </table>
-             </Card>
-          </TabsContent>
-       </Tabs>
-    </div>
-  );
+   const scatterData = comparisonData.map(s => ({
+      name: s.name,
+      growth: ((s.result?.metrics.targetRevenue || baselineData.revenue) - baselineData.revenue) / baselineData.revenue * 100,
+      margin: (s.result?.metrics.targetMargin || 0) * 100,
+      fill: s.id === 'active' ? '#0f172a' : s.isBaseline ? '#94a3b8' : '#3b82f6',
+      radius: s.id === 'active' ? 8 : 6
+   }));
+
+   const hiringPulseData = comparisonData.filter(s => !s.isBaseline).map(s => ({
+      name: s.name.split('(')[0], // Simplified Name
+      'Avg Hires/Qtr': s.result?.metrics.hiringPace || 0
+   }));
+
+   const bridgeData = comparisonData.filter(s => !s.isBaseline).map(s => {
+      const totalRev = s.result?.metrics.targetRevenue || 0;
+      const tfYears = ((s as any).mods?.timeframe || 12) / 12;
+      const retentionRate = (baselineData.retention || 85) / 100 + ((s as any).mods?.retention || 0) / 100;
+      const churnRate = Math.max(0, 1 - retentionRate);
+      const churnVol = baselineData.revenue * churnRate * tfYears;
+      const netRef = Math.max(0, totalRev - baselineData.revenue);
+
+      return {
+         name: s.name.split('(')[0],
+         'Retained Revenue': baselineData.revenue,
+         'Churn Replacement': churnVol,
+         'Net Growth': netRef
+      };
+   });
+
+   const formatMoney = (val: number) => `$${(val / 1000000).toFixed(1)}M`;
+   const formatNum = (val: number) => val.toLocaleString();
+
+   // Palette for consistent colors
+   const COLORS = {
+      active: '#0f172a',
+      baseline: '#94a3b8',
+      saved: ['#3b82f6', '#8b5cf6', '#f59e0b']
+   };
+
+   const getScenarioColor = (id: string, index: number) => {
+      if (id === 'active') return COLORS.active;
+      if (id === 'baseline') return COLORS.baseline;
+      return COLORS.saved[(index - 2) % 3] || COLORS.saved[0]; // -2 because baseline+active are first
+   };
+
+   // Legend Data Builders
+   const trajectoryLegend = comparisonData.map((s, i) => ({
+      label: s.name, color: getScenarioColor(s.id, i), type: 'line' as const
+   }));
+
+   const bridgeLegend = [
+      { label: 'Retained Revenue', color: '#e2e8f0', type: 'rect' as const },
+      { label: 'Churn Replacement', color: '#f87171', type: 'rect' as const },
+      { label: 'Net Growth', color: '#22c55e', type: 'rect' as const },
+   ];
+
+   return (
+      <div className="space-y-6">
+         {/* Selector */}
+         <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-4">
+               <span className="text-sm font-semibold text-slate-700">Compare:</span>
+               <SavedScenarioSelector
+                  scenarios={MOCK_SAVED_SCENARIOS}
+                  selectedIds={selectedScenarioIds}
+                  onToggleScenario={handleToggleScenario}
+               />
+            </div>
+            <Button size="sm" onClick={() => setActiveTab('visual')}>Update Views</Button>
+         </div>
+
+         <Card className="p-6 bg-white border-slate-200 shadow-sm">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+               <TabsList className="grid w-[400px] grid-cols-2 mb-8">
+                  <TabsTrigger value="visual">Visual Analysis</TabsTrigger>
+                  <TabsTrigger value="grid">Data Grid</TabsTrigger>
+               </TabsList>
+
+               <TabsContent value="visual" className="space-y-16">
+
+                  {/* Top Row: Strategic Trajectory & Tradeoffs */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+                     {/* Chart 1: Trajectory */}
+                     <div className="h-[450px] flex flex-col">
+                        <div className="mb-6">
+                           <div className="flex items-center gap-2 mb-2">
+                              <TrendingUp className="h-5 w-5 text-brand-600" />
+                              <h4 className="text-base font-bold text-slate-900">Revenue Trajectory (The Climb)</h4>
+                           </div>
+                           <p className="text-sm text-slate-500">Projected growth path over time. Steeper slopes require higher velocity.</p>
+                        </div>
+
+                        <ChartLegend items={trajectoryLegend} />
+
+                        <div className="flex-1 min-h-0">
+                           <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={trajectoryData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                 <XAxis dataKey="month" label={{ value: 'Months', position: 'insideBottomRight', offset: -10 }} fontSize={12} stroke="#94a3b8" dy={10} />
+                                 <YAxis tickFormatter={formatMoney} fontSize={12} stroke="#94a3b8" width={60} />
+                                 <Tooltip formatter={(value: number) => formatMoney(value)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                 {comparisonData.map((s, i) => (
+                                    <Line
+                                       key={s.id}
+                                       type="monotone"
+                                       dataKey={s.name}
+                                       stroke={getScenarioColor(s.id, i)}
+                                       activeDot={{ r: 6 }}
+                                       strokeWidth={s.id === 'active' ? 3 : 2}
+                                       strokeDasharray={s.id === 'baseline' ? "5 5" : ""}
+                                       dot={false}
+                                    />
+                                 ))}
+                              </LineChart>
+                           </ResponsiveContainer>
+                        </div>
+                     </div>
+
+                     {/* Chart 2: Efficiency Map */}
+                     <div className="h-[450px] flex flex-col">
+                        <div className="mb-6">
+                           <div className="flex items-center gap-2 mb-2">
+                              <Target className="h-5 w-5 text-brand-600" />
+                              <h4 className="text-base font-bold text-slate-900">Efficiency Map (Growth vs. Margin)</h4>
+                           </div>
+                           <p className="text-sm text-slate-500">Strategic positioning. Right-Up is ideal (Unicorn). Right-Down is 'Burn to Grow'.</p>
+                        </div>
+
+                        <ChartLegend items={[{ label: 'Scenario Positioning', color: '#8884d8', type: 'circle' }]} />
+
+                        <div className="flex-1 min-h-0">
+                           <ResponsiveContainer width="100%" height="100%">
+                              <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 20 }}>
+                                 <CartesianGrid />
+                                 <XAxis type="number" dataKey="growth" name="Revenue Growth" unit="%" label={{ value: 'Revenue Growth (%)', position: 'insideBottom', offset: -30, fill: '#64748b' }} />
+                                 <YAxis type="number" dataKey="margin" name="Profit Margin" unit="%" label={{ value: 'Profit Margin (%)', angle: -90, position: 'insideLeft', offset: 0, fill: '#64748b' }} width={60} />
+                                 <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: '8px' }} />
+
+                                 <ReferenceLine x={0} stroke="#cbd5e1" />
+                                 <ReferenceLine y={baselineData.margin * 100} stroke="#cbd5e1" label={{ value: "Base Margin", position: 'insideTopLeft', fill: '#94a3b8', fontSize: 12 }} strokeDasharray="3 3" />
+
+                                 <Scatter name="Scenarios" data={scatterData} fill="#8884d8" />
+                              </ScatterChart>
+                           </ResponsiveContainer>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Bottom Row: Operational & Source Breakdown */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+                     {/* Chart 3: Hiring Pulse */}
+                     <div className="h-[400px] flex flex-col">
+                        <div className="mb-6">
+                           <div className="flex items-center gap-2 mb-2">
+                              <Users className="h-5 w-5 text-brand-600" />
+                              <h4 className="text-base font-bold text-slate-900">Operational Pulse (Hiring Intensity)</h4>
+                           </div>
+                           <p className="text-sm text-slate-500">Average net new hires required <strong>per quarter</strong> to sustain growth.</p>
+                        </div>
+
+                        <div className="flex-1 min-h-0">
+                           <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={hiringPulseData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
+                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                 <XAxis dataKey="name" fontSize={12} stroke="#94a3b8" tick={{ fontSize: 11 }} interval={0} />
+                                 <YAxis fontSize={12} stroke="#94a3b8" width={40} />
+                                 <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px' }} />
+                                 <Bar dataKey="Avg Hires/Qtr" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={50} />
+                              </BarChart>
+                           </ResponsiveContainer>
+                        </div>
+                     </div>
+
+                     {/* Chart 4: Growth Bridge */}
+                     <div className="h-[400px] flex flex-col">
+                        <div className="mb-6">
+                           <div className="flex items-center gap-2 mb-2">
+                              <Activity className="h-5 w-5 text-brand-600" />
+                              <h4 className="text-base font-bold text-slate-900">Growth Bridge (The Treadmill)</h4>
+                           </div>
+                           <p className="text-sm text-slate-500">Breakdown of revenue composition. Red is replacing churn (maintenance).</p>
+                        </div>
+
+                        <ChartLegend items={bridgeLegend} />
+
+                        <div className="flex-1 min-h-0">
+                           <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={bridgeData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
+                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                 <XAxis dataKey="name" fontSize={12} stroke="#94a3b8" tick={{ fontSize: 11 }} interval={0} />
+                                 <YAxis tickFormatter={formatMoney} fontSize={12} width={60} stroke="#94a3b8" />
+                                 <Tooltip formatter={(value: number) => formatMoney(value)} contentStyle={{ borderRadius: '8px' }} />
+
+                                 <Bar dataKey="Retained Revenue" stackId="a" fill="#e2e8f0" radius={[0, 0, 4, 4]} />
+                                 <Bar dataKey="Churn Replacement" stackId="a" fill="#f87171" />
+                                 <Bar dataKey="Net Growth" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
+
+                                 <ReferenceLine y={baselineData.revenue} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: "Baseline", position: 'right', fill: '#94a3b8', fontSize: 11 }} />
+                              </BarChart>
+                           </ResponsiveContainer>
+                        </div>
+                     </div>
+                  </div>
+
+               </TabsContent>
+
+               <TabsContent value="grid">
+                  <Table>
+                     <TableHeader>
+                        <TableRow>
+                           <TableHead className="w-[200px]">Metric</TableHead>
+                           {comparisonData.map(s => (
+                              <TableHead key={s.id} className={s.id === 'active' ? 'bg-blue-50 text-blue-900' : ''}>
+                                 {s.name}
+                                 {s.id === 'active' && <Badge className="ml-2 bg-blue-100 text-blue-700 hover:bg-blue-100">Primary</Badge>}
+                              </TableHead>
+                           ))}
+                        </TableRow>
+                     </TableHeader>
+                     <TableBody>
+                        <TableRow>
+                           <TableCell className="font-medium">Timeframe</TableCell>
+                           {comparisonData.map(s => {
+                              const months = (s.id === 'active' ? modifiers.timeframe :
+                                 s.id === 'baseline' ? 0 :
+                                    (s as any).mods?.timeframe || 12);
+                              return (
+                                 <TableCell key={s.id} className={s.id === 'active' ? 'bg-blue-50/50' : ''}>
+                                    {s.id === 'baseline' ? '--' : `${months} Months`}
+                                 </TableCell>
+                              );
+                           })}
+                        </TableRow>
+
+                        {[
+                           { label: 'Revenue (AGI)', fmt: formatMoney, key: 'targetRevenue' },
+                           { label: 'Profit Pool ($)', fmt: formatMoney, key: 'targetProfit' },
+                           { label: 'Margin (%)', fmt: (v: number) => (v * 100).toFixed(1) + '%', key: 'targetMargin' },
+                           { label: 'Team Size (FTEs)', fmt: formatNum, key: 'targetTeamSize' },
+                           { label: 'Client Count', fmt: formatNum, key: (r: any) => Math.ceil(r.targetRevenue / r.targetACV) },
+                           { label: 'Target ACV', fmt: (v: number) => `$${(v / 1000).toFixed(1)}k`, key: 'targetACV' },
+                           { label: 'Net New Clients', fmt: formatNum, key: 'netNewClients' },
+                           { label: 'Sales Velocity (mo)', fmt: (v: number) => v.toFixed(1), key: 'monthlyVelocity' },
+                           { label: 'Velocity Multiplier', fmt: (v: number) => v.toFixed(1) + 'x', key: 'velocityMultiplier' },
+                           { label: 'Hiring Pace (/qtr)', fmt: (v: number) => v.toFixed(1), key: 'hiringPace' }
+                        ].map((row, i) => (
+                           <TableRow key={i}>
+                              <TableCell className="font-medium">{row.label}</TableCell>
+                              {comparisonData.map(s => {
+                                 const val = typeof row.key === 'function' ? row.key(s.result?.metrics) : (s.result?.metrics as any)?.[row.key];
+                                 return (
+                                    <TableCell key={s.id} className={s.id === 'active' ? 'bg-blue-50/50' : ''}>
+                                       {val !== undefined ? row.fmt(val) : '--'}
+                                    </TableCell>
+                                 );
+                              })}
+                           </TableRow>
+                        ))}
+
+                        <TableRow>
+                           <TableCell className="font-medium">Action</TableCell>
+                           {comparisonData.map(s => (
+                              <TableCell key={s.id} className={s.id === 'active' ? 'bg-blue-50/50' : ''}>
+                                 {!s.isBaseline && s.id !== 'active' && (
+                                    <Button variant="ghost" size="sm" className="text-xs text-brand-600 hover:bg-brand-50">Set Primary</Button>
+                                 )}
+                              </TableCell>
+                           ))}
+                        </TableRow>
+                     </TableBody>
+                  </Table>
+               </TabsContent>
+            </Tabs>
+         </Card>
+
+         <PressureDashboard scenarios={comparisonData} />
+      </div>
+   );
 };

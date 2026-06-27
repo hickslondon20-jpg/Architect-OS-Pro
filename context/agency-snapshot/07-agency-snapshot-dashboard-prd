@@ -1,0 +1,758 @@
+# Agency Snapshot Dashboard — Product Requirements Document
+
+**Feature:** Agency Snapshot Dashboard (Revised)
+**Version:** 1.0
+**Status:** Ready for Build
+**Prepared for:** Antigravity
+
+---
+
+## Overview
+
+This document is the authoritative build specification for the revised Agency Snapshot Dashboard. It defines every content element, its data source, its component behavior, its layout position, and its design requirements. Build against this document incrementally, section by section, confirming each element before proceeding to the next.
+
+The dashboard is the fifth and final layer of the Agency Snapshot product. It is the first moment the founder sees their business as a complete, interconnected system rather than four separate portraits. It must feel earned — consultant-grade, specific to this founder's data, and structured as a progressive narrative that builds from orientation to insight to implication to close.
+
+---
+
+## Data Source
+
+All dashboard content is served from a single view query:
+
+```
+VIEW: agency_snapshot_dashboard_view
+FILTER: user_id = [current user] AND dashboard_status = 'complete'
+```
+
+This view joins the dashboard synthesis record with the four frozen sub-tab records captured at snapshot generation time. The frontend never queries sub-tab tables directly. All deterministic fields and all GPT return fields are available from this single view row.
+
+For loading state management, poll the base table:
+
+```
+TABLE: agency_snapshot_dashboard
+FILTER: user_id = [current user] AND is_current = true
+FIELD: status
+```
+
+Status values: `pending` | `processing` | `complete` | `failed`
+
+---
+
+## Dashboard Status Lifecycle
+
+The dashboard has four states that must be handled in the UI before any content is rendered.
+
+### State 1 — Not Yet Generated
+
+The founder has not yet clicked Generate Report. No dashboard record exists for this user. Show a prompt to complete all four sub-tabs and generate their snapshot. The Generate Report button is enabled only when all four sub-tabs have `is_complete = true` and `is_current = true` records.
+
+### State 2 — Pending or Processing
+
+A dashboard record exists with `status = 'pending'` or `status = 'processing'`. Show a full-page loading state with a message that the synthesis is being generated. Poll the status field every three seconds until status transitions to `complete` or `failed`.
+
+### State 3 — Complete
+
+`status = 'complete'`. Render the full dashboard from the view. This is the primary state.
+
+### State 4 — Failed
+
+`status = 'failed'`. Show an error state with the content of `error_message` if populated, and a Regenerate button that re-triggers the workflow.
+
+---
+
+## Navigation
+
+The dashboard is the first tab in the Agency Snapshot navigation. Tab order is:
+
+1. Dashboard (this feature)
+2. Market Footprint
+3. Economic Foundation
+4. Revenue Model
+5. Delivery Architecture
+
+The dashboard tab is the landing destination after the founder clicks Generate Report from the final sub-tab flow.
+
+---
+
+## Design System Constraints
+
+Follow these constraints for every component on this dashboard. Consistency with the existing platform is required.
+
+- No emojis anywhere on the dashboard
+- No decorative iconography — functional icons only where they already exist in the platform design system
+- Card containers use subtle borders and light background fills consistent with existing insight cards
+- Typography hierarchy follows existing platform patterns — section labels in small uppercase tracking, headlines in medium weight, body text in regular weight
+- Color palette is restrained — no new colors introduced. Use existing palette for status indicators, card borders, and backgrounds
+- Section dividers use subtle horizontal rules consistent with existing tab layouts
+- Metric values in the vitals strip use the same numeral formatting and label style as the existing version
+- Accordion expand and collapse behavior follows existing platform patterns if they exist, otherwise use a clean chevron toggle
+- Three-column card layout on Operating Realities collapses to single column on mobile
+- All cards and sections have consistent internal padding and margin rhythm with the rest of the platform
+
+---
+
+# Agency Snapshot Dashboard — Product Requirements Document
+
+**Feature:** Agency Snapshot Dashboard (Revised v2)
+**Version:** 2.0
+**Status:** Ready for Build
+**Prepared for:** Antigravity
+**Workflow:** Agency Snapshot — Dashboard Synthesis v3
+
+---
+
+## Purpose and Philosophy
+
+This PRD is the authoritative build specification for the revised Agency Snapshot Dashboard. It defines every content element, its position in the narrative, its data source, its component behavior, and the design rationale behind each decision. Build against this document incrementally, section by section, confirming structure before wiring data.
+
+### What this dashboard is
+
+The Agency Snapshot Dashboard is the fifth and final layer of the Agency Snapshot product. The founder has just completed four sequential diagnostic tabs — Market Footprint, Economic Foundation, Revenue Model, and Delivery Architecture — each producing its own self-contained synthesis. The dashboard is the first moment where all four dimensions are read simultaneously as a single integrated system.
+
+This is not a summary. It is not a recap. It is a synthesis of syntheses — surfacing observations that could only emerge from reading all four dimensions together. Tensions between positioning and delivery capacity. Synergies between revenue structure and team efficiency. Structural conditions that no single tab could reveal on its own.
+
+### The emotional register this must achieve
+
+When a founder lands on this dashboard after completing their snapshot, the first thing they see needs to validate the investment of time and vulnerability they just made. They shared real numbers about their real business. The dashboard must respond to that with something that feels curated, specific, and intelligent — not a Cosmo quiz result or a generic scorecard. It should feel like a senior advisor read everything they shared, absorbed it fully, and is now reading it back to them in a way they couldn't have written themselves.
+
+The word that describes the target experience is *recognition*. Not information. Recognition. The founder should read it and feel accurately seen.
+
+### Voice and tone
+
+All synthesis content on this dashboard is observational, never prescriptive. The voice is peer-level — a McKinsey senior advisor conducting a week-two readout with a sophisticated client. No good/bad framing. No deficit language. No assumed intent behind any data point. Every observation characterizes what the data reveals structurally, not what the founder should do about it. The founder retains full interpretive authority throughout.
+
+---
+
+## Narrative Architecture
+
+The dashboard is structured as a progressive disclosure experience. Each section earns the next. The pacing matters as much as the content.
+
+```
+WHAT        → Executive Headline + Executive Summary + Business Vitals
+              Here is what we understand your business to be.
+
+WHAT UNPACKED → Agency At-a-Glance (four dimension cards)
+              Here is what each dimension said individually.
+
+SO WHAT     → Cross-Dimensional Signals (five insight cards)
+              Here is what those dimensions reveal when read against each other.
+
+NOW WHAT    → Operating Realities (three implication cards)
+              Here is what those signals mean for how this business operates.
+
+CLOSE       → Synthesis Statement
+              The single most resonant structural truth.
+
+DOOR        → Next Steps and CTA
+              What comes next in the journey.
+```
+
+This arc is intentional and must be preserved in the layout. Sections should not be reordered. Each section is designed to prime the founder for the next one — reading the dimensions individually in At-a-Glance makes the cross-dimensional signals hit harder. Reading the signals before Operating Realities makes the implications feel like confirmation rather than new information.
+
+---
+
+## Data Architecture
+
+### Primary data source
+
+All dashboard content is served from a single Supabase view:
+
+```
+VIEW: agency_snapshot_dashboard_view
+FILTER: user_id = [current user] AND dashboard_status = 'complete'
+```
+
+This view joins the `agency_snapshot_dashboard` table with the four frozen sub-tab records captured at snapshot generation time via the `agency_snapshots` parent record. The frontend never queries sub-tab tables directly. All deterministic fields and all GPT return fields are available from this single view row.
+
+### Status polling source
+
+For loading state management, poll the base table directly:
+
+```
+TABLE: agency_snapshot_dashboard
+FILTER: user_id = [current user] AND is_current = true
+FIELD: status
+```
+
+Status lifecycle (v3 workflow):
+
+- `processing_call_1` — first GPT call in progress (portrait and signals)
+- `processing_call_2` — second GPT call in progress (implications and synthesis)
+- `complete` — all fields written, dashboard ready to render
+- `failed_call_1` — first GPT call failed, retry will restart from Call 1
+- `failed_call_2` — second GPT call failed, retry will restart from Call 2 only (Call 1 fields are durably written)
+
+Poll every three seconds while status begins with `processing_`. Stop polling when status is `complete` or begins with `failed_`.
+
+### Key view field naming conventions
+
+Deterministic fields from tab tables are prefixed by dimension:
+
+- `mf_` — Market Footprint fields
+- `ef_` — Economic Foundation fields
+- `rm_` — Revenue Model fields
+- `da_` — Delivery Architecture fields
+
+GPT return fields are unprefixed and map directly to dashboard table columns.
+
+---
+
+## Dashboard Status Lifecycle
+
+Handle these four states before rendering any content. The states must be handled in UI — do not let loading or error states fall through to blank content areas.
+
+### State 1 — Not Yet Generated
+
+No dashboard record exists for this user, or no record with `is_current = true`. Show a prompt state explaining that the founder needs to complete all four sub-tabs and generate their snapshot. The Generate Report button on the final sub-tab (Delivery Architecture) is the trigger. Optionally surface which sub-tabs are incomplete by checking `is_complete = true` and `is_current = true` on each sub-tab table for this user.
+
+### State 2 — Processing
+
+A dashboard record exists with `status` of `processing_call_1` or `processing_call_2`. Show a full-page loading state. The two-call architecture means there is a natural progress indicator opportunity — if the status is `processing_call_2`, Call 1 has already succeeded and approximately half of the synthesis is complete. Consider surfacing this as a two-stage progress indicator rather than a generic spinner if it fits the platform's existing loading patterns.
+
+Suggested loading copy:
+- `processing_call_1`: "Analyzing your business profile across all four dimensions..."
+- `processing_call_2`: "Synthesizing your strategic portrait..."
+
+### State 3 — Complete
+
+`status = 'complete'`. Render the full dashboard from the view. This is the primary state. All GPT fields should be populated.
+
+### State 4 — Failed
+
+`status` of `failed_call_1` or `failed_call_2`. Show an error state. If `error_message` is populated on the dashboard record, surface it in muted text below the error heading. Show a Regenerate button that re-fires the webhook.
+
+For `failed_call_2`, note that Call 1 fields (`executive_headline`, `executive_summary`, all five signals) are durably written to the record. A retry will restart from Call 2 only and will not re-run Call 1. The Regenerate button behavior is identical regardless of which call failed — the workflow handles the retry logic internally.
+
+---
+
+## Navigation
+
+The dashboard is the first tab in the Agency Snapshot tab navigation. Tab order:
+
+1. Dashboard ← this feature, landing destination after Generate Report
+2. Market Footprint
+3. Economic Foundation
+4. Revenue Model
+5. Delivery Architecture
+
+The dashboard tab should always be accessible regardless of whether a synthesis has been generated, but should surface the appropriate state (not yet generated, loading, complete, or error) rather than blank content.
+
+---
+
+## Design System Constraints
+
+These constraints apply to every component on this dashboard. Consistency with the existing platform visual language is non-negotiable.
+
+### General rules
+
+- No emojis anywhere on the dashboard — not in headers, cards, buttons, or loading states
+- No decorative iconography — functional icons only where they already exist in the platform design system
+- No new colors — use the existing platform palette exclusively for backgrounds, borders, text, and status indicators
+- No bold evaluative language in UI chrome — section labels and affordance text are neutral and descriptive
+
+### Typography
+
+- Section labels: small uppercase with increased letter-spacing, muted color — consistent with existing tab section labels
+- Card headlines: medium weight, readable at a glance
+- Body text: regular weight, standard line height — the synthesis content needs to breathe
+- Metric values in the vitals strip: larger numeral weight — the same treatment as the existing vitals strip
+
+### Cards and containers
+
+- Subtle border and light background fill — consistent with the existing insight card style throughout the platform
+- Consistent internal padding across all card types
+- No heavy shadow or dramatic elevation — this is a professional information-dense dashboard, not a consumer card interface
+
+### Layout rhythm
+
+- Standard horizontal page padding applied consistently across all sections
+- Section spacing should create clear visual separation between narrative beats without feeling sparse
+- The three-column Operating Realities layout is the most structurally distinct section — keep its internal card spacing consistent with the two-column At-a-Glance grid above it
+- Sections that are full-width prose (Executive Headline, Executive Summary, Synthesis Statement) should have a slightly narrower max-width than card-grid sections to improve line length readability
+
+### Responsive behavior
+
+- Business Vitals Strip: 6-column on desktop, 3x2 grid on tablet, 2x3 grid on mobile
+- Agency At-a-Glance: 2x2 grid on desktop, 2x2 on tablet, 1x4 stacked on mobile
+- Cross-Dimensional Signals: single column at all breakpoints — these are already full-width cards
+- Operating Realities: 3-column on desktop, single column on tablet and mobile
+- CTA section: single column at all breakpoints
+
+---
+
+## Page Header Zone
+
+### Rationale
+
+The header zone serves a dual purpose: it gives the dashboard a named identity (this is *their* snapshot, not a generic report) and it surfaces the two utility actions — download and version history — without competing for attention with the analytical content below. Positioning these controls in the header keeps them always accessible without interrupting the narrative scroll.
+
+### Snapshot identity display
+
+Show the snapshot label in the page title position. Pull `snapshot_label` from the view. If null, auto-generate a label formatted as `[Month] [Year] Snapshot` derived from `snapshot_created_at`.
+
+Show `generated_at` formatted as `Last updated: [Month Day, Year]` in muted text directly below or adjacent to the snapshot label.
+
+### Element 9 — Report Actions
+
+**Position:** Top-right of the header zone, adjacent to the snapshot label
+
+**Controls:**
+
+**Download Report**
+- Primary action button in the header zone
+- Links to `pdf_url` from the view
+- If `pdf_url` is null and `pdf_generated_at` is null: clicking the button triggers PDF generation (fires the PDF generation workflow), button enters loading state during generation
+- If `pdf_generated_at` is populated but `pdf_url` is null: show error state on the button — "PDF unavailable, try again"
+- Label: `Download Report`
+
+**View Previous Snapshots**
+- Secondary control — text link or ghost button
+- Opens a modal or dropdown listing prior snapshot runs for this user
+- Queries `agency_snapshot_dashboard` table directly: `user_id = [current user]`, ordered by `generated_at DESC`, limit 10
+- Each entry in the list shows: snapshot label, generated_at date, and two actions — View (loads that run in a read-only preview) and Download (links to that run's `pdf_url`)
+- V1: no side-by-side comparison. List view and individual download only.
+- V2 enhancement (do not build now): delta analysis and side-by-side comparison across runs
+
+---
+
+## Element 1 — Executive Headline
+
+### Rationale
+
+This is the single most important element on the dashboard. It is the first thing the founder reads after what may be thirty to sixty minutes of completing four diagnostic tabs. It must immediately signal that the platform understood what they shared — not with a generic opener, but with a declarative sentence specific enough to feel earned.
+
+The McKinsey framing is precise here: this is the headline that would appear on the first slide of a senior advisor's readout. It names the so-what of the entire portrait in one statement. It is not a greeting, not a label, not a section title. It is an insight stated as a fact.
+
+**Section label:** None — this element has no section label. It sits at the very top of the content area without framing copy around it. The lack of a label is intentional — labeling it would reduce it to a section header. It is not a section. It is a statement.
+
+**Layout:** Full width, immediately below the page header zone
+
+**Component:** Single text element, no card container
+
+**Data source:** `executive_headline` from view — GPT return field
+
+**Behavior:**
+- Renders only when `dashboard_status = 'complete'`
+- No prefix, no suffix, no framing copy around it
+- Stands alone as the opening statement
+
+**Design:**
+- Largest text weight on the page — this should read as the opening line of a document, not a subheading
+- No card container, no background fill — sits directly on the page
+- Full width with standard horizontal page padding
+- Generous bottom margin before the Executive Summary section below
+
+---
+
+## Element 2 — Executive Summary Block
+
+### Rationale
+
+The executive summary unpacks the headline. While the headline is the so-what stated as a single declaration, the summary gives the integrated portrait: what kind of business this is structurally, what the logic is connecting the four dimensions, and what the dominant pattern looks like across the whole. It is not a sequential recap of the four tabs — it reads the business as a system.
+
+Two to four sentences is the right constraint. Any shorter and it cannot carry the weight of the integrated portrait. Any longer and it starts to feel like a report introduction rather than an executive read. The founders reading this are sophisticated — they don't need explanation. They need characterization.
+
+**Section label:** `YOUR BUSINESS MODEL` — small uppercase, muted, consistent with existing section label treatment
+
+**Layout:** Full width, immediately below the executive headline
+
+**Component:** Paragraph text block, no card container
+
+**Data source:** `executive_summary` from view — GPT return field
+
+**Behavior:**
+- Two to four sentences rendered as prose — no bullet points
+- No card container — sits as body text on the page with the section label above
+
+**Design:**
+- Body text weight and size consistent with existing prose blocks in the platform
+- Standard line height for readability — this is a paragraph, not a data display
+- Constrained max-width (approximately 70–75 characters per line) for optimal reading comfort — wider than this and comprehension degrades
+- A subtle horizontal divider or increased bottom margin separates this from the Business Vitals Strip below, signaling the transition from narrative to data
+
+---
+
+## Element 3 — Business Vitals Strip
+
+### Rationale
+
+After two GPT-generated narrative elements, the vitals strip provides the data anchor. It tells the founder: the synthesis you just read is grounded in these specific numbers from your actual business. This is not opinion — this is what we computed from your inputs. The six metrics are chosen to collectively answer the five fundamental questions a sophisticated reader asks when scanning a business at a glance: how big, how efficient, how profitable, how structured, and how sticky.
+
+Six was a deliberate choice. The prior version had eight and felt cluttered. At six, each metric has spatial room to breathe and the strip reads as a quick-scan data layer rather than a table. Cash runway was excluded because it is highly variable month to month and not always populated — anchoring a vitals strip on a metric that may be absent or misleading creates more risk than value. ACV was excluded in favor of churn rate because churn tells a more dynamic story about the business's ability to retain what it builds.
+
+**Section label:** `BUSINESS VITALS` — small uppercase, muted
+
+**Layout:** Full width, six cards in a horizontal strip
+
+**Component:** Six metric cards
+
+**Data sources — all deterministic from view:**
+
+| Card | View Column | Display Format | Label |
+|------|-------------|----------------|-------|
+| 1 | `annual_revenue_run_rate` | $X.XM/yr | REVENUE |
+| 2 | `annual_agi_run_rate` | $X.XM/yr | AGI |
+| 3 | `profit_margin_percentage` | XX% | MARGIN |
+| 4 | `total_team_size_fte` | X FTE | TEAM |
+| 5 | `active_client_count` | Integer | CLIENTS |
+| 6 | `monthly_churn_rate` | X.X%/mo | CHURN |
+
+**Number formatting rules:**
+- Revenue and AGI: if value is >= 1,000,000 display as $X.XM — if < 1,000,000 display as $XXXk — always one decimal place
+- Margin and Churn: always one decimal place followed by %
+- Team FTE: integer, no decimals
+- Clients: integer, no decimals
+- Null values: display `—` in place of the value, label remains visible
+
+**Behavior:**
+- All six cards render simultaneously when dashboard is complete
+- No click behavior — display only
+- No evaluative indicators — no color coding by performance threshold, no up/down arrows, no "healthy" or "concerning" labels
+
+**Design:**
+- Horizontal strip with equal-width cards
+- Subtle vertical dividers between cards
+- Value in larger numeral weight, label in small uppercase directly below
+- No card borders on individual metrics — the strip reads as a single unified element
+- Light background fill on the entire strip to visually separate it from the prose sections above and below
+
+---
+
+## Element 4 — Agency At-a-Glance
+
+### Rationale
+
+This section is the bridge between the system-level executive summary and the cross-dimensional signals. Before the founder reads what the dimensions reveal in relationship to each other, they benefit from a quick reorientation to what each dimension said on its own terms. This is especially valuable for founders who moved quickly through the sub-tabs and may not have fully absorbed each synthesis.
+
+The critical design decision here is what *not* to include. The previous version of this section had directional status indicators — labels like Aligned, Pressure, Watch, Healthy — that applied evaluative judgment to each dimension. These have been removed intentionally. The At-a-Glance section is not an evaluation layer. It is a navigable portrait layer. The cards exist so the founder can re-read the synthesis signals and optionally go deeper into the three beats for each dimension. Adding status labels would tip the section from observational to evaluative, which contradicts the platform's core voice principle.
+
+The pop-out behavior is the right interaction model here because the beat content is supplementary depth, not primary content. A founder who already remembers what their delivery architecture synthesis said doesn't need to expand that card. A founder who wants to revisit it before reading the cross-dimensional signals can. Optional depth, not mandatory reading.
+
+**Section label:** `AGENCY AT-A-GLANCE` — small uppercase, muted
+
+**Layout:** Two-by-two grid — Market Footprint and Economic Foundation in the top row, Revenue Model and Delivery Architecture in the bottom row
+
+**Component:** Four dimension cards, each expandable into a pop-out modal or side drawer
+
+**Data sources — all deterministic from view:**
+
+Each card uses fields prefixed by its dimension identifier:
+
+Market Footprint (`mf_`):
+- `mf_synthesis_signal` — card body text
+- `mf_beat_1_headline`, `mf_beat_1` — pop-out content
+- `mf_beat_2_headline`, `mf_beat_2` — pop-out content
+- `mf_beat_3_headline`, `mf_beat_3` — pop-out content
+
+Economic Foundation (`ef_`):
+- `ef_synthesis_signal`, `ef_beat_1_headline`, `ef_beat_1`, `ef_beat_2_headline`, `ef_beat_2`, `ef_beat_3_headline`, `ef_beat_3`
+
+Revenue Model (`rm_`):
+- `rm_synthesis_signal`, `rm_beat_1_headline`, `rm_beat_1`, `rm_beat_2_headline`, `rm_beat_2`, `rm_beat_3_headline`, `rm_beat_3`
+
+Delivery Architecture (`da_`):
+- `da_synthesis_signal`, `da_beat_1_headline`, `da_beat_1`, `da_beat_2_headline`, `da_beat_2`, `da_beat_3_headline`, `da_beat_3`
+
+**Closed card state:**
+- Dimension name as the card title (Market Footprint, Economic Foundation, Revenue Model, Delivery Architecture)
+- `synthesis_signal` as the card body text
+- "View Full Analysis" as a subtle text link or expand affordance at the bottom of the card
+- No status indicators, no color-coded badges, no directional labels
+
+**Pop-out expanded state:**
+- Modal or side drawer — side drawer preferred if it fits platform patterns, as it keeps the dashboard visible in the background
+- Modal title: dimension name
+- Three beats in sequence: beat headline in medium weight followed by beat body text in regular weight
+- Close control (X or Done) to return to dashboard
+- Dismissible by clicking outside the modal area
+
+**Behavior:**
+- All four cards render simultaneously on dashboard complete
+- If `synthesis_signal` is null for any card, show a soft prompt in the card body: "Complete and synthesize your [dimension name] tab to see this analysis"
+- Only one pop-out open at a time
+- Pop-out state does not persist on page refresh
+
+**Design:**
+- Subtle border and light background fill consistent with existing insight card style
+- Card internal padding consistent with other card components on the platform
+- Equal height cards within each row — content should not cause individual cards to be taller than their row partner
+- Two-column grid on desktop and tablet, single column on mobile (stacked in the order: Market Footprint, Economic Foundation, Revenue Model, Delivery Architecture)
+- No emojis or decorative icons in card headers
+
+---
+
+## Element 5 — Cross-Dimensional Signals
+
+### Rationale
+
+This is the analytical core of the dashboard. The five signals are the observations that could only emerge from reading all four dimensions simultaneously — the insights that none of the individual tab syntheses could produce alone. A tension between the agency's niche positioning and its delivery capacity is invisible until you read Market Footprint and Delivery Architecture together. A synergy between high retention and low contractor dependency is invisible until you read Revenue Model and Delivery Architecture together.
+
+Five signals is the right count for this architecture. Four dimensions produce six possible pairwise relationships plus the possibility of higher-order signals involving three or four dimensions. Five gives enough coverage to feel comprehensive without creating a list so long that the founder loses the thread. The fifth signal is typically the most compounding observation — either a second-order pattern that only emerges from reading three or more dimensions together, or the most significant single-dimension observation that warranted additional attention.
+
+The naming change from the previous version is important: signals no longer carry framework label names like "Growth Treadmill" or "Cash-Margin Disconnect." Those labels were memorable but they were also generic — they could fit many agencies and therefore felt templated. The McKinsey-style descriptive headline standard produces headlines that could only have been written about *this* business, based on *this* data. That specificity is what makes the section feel like genuine analysis rather than an assessment result.
+
+The ordering of signals is handled by the GPT call, not the frontend. Tensions surface first, the most compounding observation closes the section. The frontend renders signals in the order they come back from the synthesis — do not reorder on the client side.
+
+**Section label:** `CRITICAL INSIGHTS` — small uppercase, muted
+
+**Layout:** Full width, five insight cards stacked vertically
+
+**Component:** Five insight cards — each with headline, body, and so-what callout
+
+**Data sources — all GPT return fields from view:**
+
+- Signal 1: `signal_1_headline`, `signal_1_body`, `signal_1_so_what`
+- Signal 2: `signal_2_headline`, `signal_2_body`, `signal_2_so_what`
+- Signal 3: `signal_3_headline`, `signal_3_body`, `signal_3_so_what`
+- Signal 4: `signal_4_headline`, `signal_4_body`, `signal_4_so_what`
+- Signal 5: `signal_5_headline`, `signal_5_body`, `signal_5_so_what`
+
+**Component structure per card:**
+
+Each card has three layers rendered in this sequence:
+
+1. **Headline** — medium weight. This is the McKinsey-style descriptive headline. It is specific to this business. It is not a framework label or category title. It reads as a declarative analytical statement.
+
+2. **Body paragraph** — regular weight. One analytical paragraph characterizing the cross-dimensional relationship. What the intersection of these dimensions reveals structurally. Observational throughout — no recommendations, no prescriptions.
+
+3. **So-what callout** — visually distinguished from the body paragraph. Prefixed with `→ So what:` in a lightly shaded callout block beneath the body text. Contains the structural significance statement — why this particular pattern is worth the founder's attention. Forward momentum without resolution. Not a recommendation.
+
+**Behavior:**
+- Five cards render in the order returned from the GPT synthesis — do not reorder on the frontend
+- Display only — no expand, no pop-out, no click behavior
+- If any signal field set is null (all three of headline, body, and so-what are null), do not render that card — the section contracts to however many complete signals are present
+- If only some fields within a signal are null (e.g. headline present but so-what null), render the card without the null component
+
+**Design:**
+- Card style consistent with existing critical insights cards in the current platform version
+- So-what callout uses a lightly shaded background treatment — the same visual language as existing `→ So what:` blocks if they exist in the platform design system
+- Subtle numbered indicator — 01, 02, 03, 04, 05 — positioned in muted text at the top-left or top-right of each card header area. This gives the section a sense of sequence without implying hierarchy or ranking
+- No framework label badges, no color-coded category tags
+- Consistent card spacing between all five cards — the section should read as a unified analytical list, not a collection of disparate items
+- Consider a subtle left border accent on each card for visual cohesion if it fits the existing design system
+
+**Design recommendation:** The so-what callout is the element that gives each card its forward momentum — it is where the observation converts from analytical to structurally significant. If the existing platform doesn't have an established `→ So what:` pattern, introduce it here as a consistent component. A soft background fill (lighter than the card background), slightly smaller font size, and the arrow prefix is enough to create the visual distinction. This pattern should be reusable across the platform wherever forward-momentum observations need to be distinguished from analytical body text.
+
+---
+
+## Element 6 — Operating Realities
+
+### Rationale
+
+Operating Realities are where the signals layer converts into lived experience. If the signals say "here is what we observe structurally," the operating realities say "here is what those structural conditions feel like to run." The distinction between observation and implication is what keeps this section from feeling like a repeat of the signals above — they are operating at a different level of abstraction.
+
+Three is the right number. Three forces GPT to synthesize across all five signals into the most significant higher-order conditions, rather than simply extending the signal list. Three also works spatially — three equal-width columns across the page creates a sense of parallel, equivalent conditions rather than a ranked list. There is no implication that implication 1 is more important than implication 3. They coexist as conditions of the same operating model.
+
+The accordion interaction is correct for this content. The headline states the implication cleanly — a founder can skim all three in seconds and get the shape of the operating conditions. The expansion provides elaboration for founders who want to understand the mechanism behind what the headline names. Nothing in the expanded content should introduce new observations — it should only unpack what the headline already said.
+
+**Section label:** `OPERATING REALITIES` — small uppercase, muted
+
+**Layout:** Three equal-width cards in a horizontal row
+
+**Component:** Three implication cards with accordion expand behavior
+
+**Data sources — all GPT return fields from view:**
+
+- Implication 1: `implication_1_headline`, `implication_1_body`
+- Implication 2: `implication_2_headline`, `implication_2_body`
+- Implication 3: `implication_3_headline`, `implication_3_body`
+
+**Closed card state:**
+- Implication headline in medium weight — this is the complete statement, not a teaser
+- Subtle expand affordance — chevron icon pointing down — indicating elaboration is available
+- Card height is uniform across all three cards in closed state
+
+**Expanded card state:**
+- Card expands in place using an accordion pattern
+- Headline remains visible at the top
+- `implication_body` — one paragraph — appears below the headline
+- Expand affordance rotates to indicate collapse
+- A "Collapse" affordance or second click on the chevron returns to closed state
+
+**Behavior:**
+- All three cards render simultaneously when dashboard is complete
+- Cards expand and collapse independently — expanding one does not collapse the others
+- All three can be expanded simultaneously
+- If any implication field is null, do not render that card — the row contracts
+- Accordion animation should be subtle — 200ms ease — no aggressive bounce or spring
+- Three-column layout on desktop, single column on tablet and mobile (stacked vertically in order: 1, 2, 3)
+
+**Design:**
+- Card style consistent with other card components on the dashboard
+- In three-column layout: expanded card increases height within its column — does not affect the height of adjacent cards in the same row
+- In single-column mobile layout: expanded card pushes content below it as expected
+- The three-column layout should feel like a peer group — equal visual weight on all three cards — avoid any treatment that implies hierarchy or prioritization
+
+**Design recommendation:** This section is visually the most distinct on the dashboard because it is the only place where a horizontal three-column card grid appears. The visual contrast with the full-width sections above and below it gives the operating realities their own visual identity. Lean into this distinctiveness by using a slightly different background fill on this section's container — still within the platform's existing palette, but enough to signal "this section is doing something structurally different." This reinforces the narrative transition from analytical signals to lived implications.
+
+---
+
+## Element 7 — Synthesis Statement
+
+### Rationale
+
+The synthesis statement is the emotional and intellectual close of the analytical journey. The executive headline at the top was the TLDR — before the detail. The synthesis statement is the crystallization — after the detail. The founder has now absorbed the dimensional portraits, the cross-dimensional signals, and the structural implications. They have earned the right to receive the single most resonant structural truth that emerges from all of it, stated cleanly.
+
+The contrast with the executive headline is important. The headline was a so-what before the founder had the full picture. The synthesis statement is the same quality of observation, but it lands differently because the founder has just spent time with everything that supports it. It should feel like arrival — the moment when everything they read clicks into a single coherent understanding of their own business.
+
+Two to four sentences is the right constraint. Longer and it starts to feel like a conclusion section rather than a closing statement. The empowerment comes from clarity, not from volume. A founder should finish reading it and feel like they understand something about their business they couldn't quite articulate before this moment.
+
+**Section label:** `SYNTHESIS` — small uppercase, muted
+
+**Layout:** Full width
+
+**Component:** Prose text block — no card container
+
+**Data source:** `synthesis_statement` from view — GPT return field
+
+**Behavior:**
+- Renders as standalone text — no card container, no background fill
+- Prose only — no bullet points, no subheadings within the block
+- Positioned after Operating Realities and before the Next Steps CTA
+
+**Design:**
+- Typographic treatment slightly elevated relative to body text — this is the closing statement of the dashboard and should feel like it carries more weight than the executive summary above it
+- Consider a subtle top border above this section — a thin full-width rule that signals "here is the close" — or simply increased top margin to give it visual breathing room from the Operating Realities section
+- Constrained max-width consistent with the Executive Summary above — these two prose elements should share the same visual container width for cohesion
+- Bottom margin before the CTA section should be generous — this statement needs to land before the founder is directed anywhere else
+
+**Design recommendation:** The synthesis statement and the executive headline are bookends — they frame the entire experience. Consider a subtle visual treatment that echoes them to each other — the same type size, the same max-width, the same absence of a card container. A founder scrolling the page should feel the structural symmetry between the opening and the close.
+
+---
+
+## Element 8 — Next Steps and CTA
+
+### Rationale
+
+The founder has just completed the most comprehensive portrait of their business they have likely ever seen in one place. The psychological state at the end of that experience is a combination of clarity and momentum. The CTA section exists to receive that momentum and direct it forward — not to sell them on the next step, but to name it clearly as the obvious continuation.
+
+The section is intentionally lighter in visual weight than everything that precedes it. The synthesis statement is the emotional close. This is the door. It should feel like a natural handoff, not an upsell.
+
+**Section label:** `NEXT STEPS` — small uppercase, muted
+
+**Layout:** Full width
+
+**Component:** Static boilerplate — no GPT involvement
+
+**Content (fixed copy — does not change per user):**
+
+```
+This snapshot establishes your current operational baseline. To understand your growth
+potential and model what your next stage looks like from here, explore the Growth
+Velocity Calculator.
+```
+
+**Primary CTA button:**
+- Label: `Explore Growth Velocity Calculator`
+- Style: existing primary button style
+- Link: Growth Velocity Calculator feature route
+
+**Secondary link:**
+- Label: `Review Your Analysis`
+- Style: existing text link style
+- Behavior: scrolls page back to the Agency At-a-Glance section
+
+**Optional V1 personalization:**
+If `annual_revenue_run_rate` is available and non-null in the view, the framing line may reference it:
+
+```
+This snapshot establishes your current operational baseline at $[X.XM] in annual revenue.
+To understand your growth potential and model what your next stage looks like from here,
+explore the Growth Velocity Calculator.
+```
+
+This is a light deterministic pull. It is optional — the static version is acceptable for V1 and should be the default. The personalized version is a small enhancement if implementation time allows.
+
+**Design:**
+- Visually lighter than all preceding sections — reduced section container height, no card borders
+- No background fill — sits on the page background
+- Primary button and secondary link aligned left or centered, consistent with existing button placement patterns in the platform
+- No card container — the CTA should feel like an exit, not a feature
+
+---
+
+## Null State Handling
+
+Every GPT return field is nullable by design. The dashboard record is INSERTed immediately when generation is triggered, and GPT fields are written back only when the synthesis calls resolve. Handle null states as follows:
+
+**During processing (status begins with `processing_`):**
+Show full-page loading state. Do not attempt to render any content areas. Do not show card skeletons that contain null fields — a loading spinner is cleaner than empty card containers.
+
+**On complete (status = `complete`):**
+All GPT fields should be populated. If any individual field is unexpectedly null:
+- For headline and summary fields: show a soft inline error — "This section couldn't be generated. Try regenerating your snapshot."
+- For individual signal cards where all three fields are null: do not render that card
+- For implication cards where fields are null: do not render that card
+
+**On failed (status begins with `failed_`):**
+Show full-page error state with Regenerate button. Do not show partial content even if some GPT fields were written (e.g. on `failed_call_2`, Call 1 fields exist but display them would show an incomplete dashboard). Regenerate from a clean error state.
+
+**For deterministic fields (vitals, at-a-glance):**
+- Null numeric values in the vitals strip: show `—`
+- Null `synthesis_signal` on At-a-Glance cards: show prompt to complete that sub-tab
+- Null beat content in pop-out: hide the null beat rather than showing an empty content block
+
+---
+
+## Build Sequence
+
+Build in this order. Do not wire live data until the skeleton structure is confirmed for each element. Confirm each step before proceeding to the next.
+
+1. **Page header zone and navigation tab order** — snapshot label display, generated_at timestamp, Report Actions controls (static structure only, no data binding yet), tab order
+2. **Dashboard status lifecycle** — loading state, error state, complete state routing, polling logic
+3. **Business Vitals Strip** — deterministic fields, simplest data binding, confirm formatting rules
+4. **Agency At-a-Glance cards** — deterministic fields, closed state first, then pop-out modal behavior
+5. **Executive Headline** — single GPT field, requires `status = 'complete'`
+6. **Executive Summary Block** — single GPT field
+7. **Cross-Dimensional Signals** — five signal sets, numbered indicator, so-what callout treatment
+8. **Operating Realities** — three implication cards, accordion expand/collapse
+9. **Synthesis Statement** — single GPT field, closing typography treatment
+10. **Next Steps CTA** — static content, primary button, secondary link, optional personalization
+11. **Report Actions** — Download Report button with PDF generation trigger, View Previous Snapshots modal
+12. **Full null state and error state pass** — verify all null handling, confirm loading and error states at page level and component level
+13. **Mobile responsive pass** — verify all layout collapses, confirm accordion behavior on mobile, confirm pop-out behavior on mobile
+
+---
+
+## What This Document Does Not Cover
+
+The following are out of scope for this PRD and are handled in separate build passes or documents:
+
+- **GPT prompt engineering** — the system prompts and user prompts that drive the two-call synthesis workflow are handled in a separate prompt engineering pass after the workflow is confirmed operational
+- **n8n workflow construction** — the workflow `Agency Snapshot - Dashboard Synthesis v3` is a separate build artifact. It is complete and importable as of the time of this PRD.
+- **PDF generation workflow** — the PDF assembly and signing workflow is a separate feature specification
+- **V2 snapshot comparison and delta analysis** — side-by-side comparison across snapshot runs is a V2 enhancement; the data architecture supports it but the UI is not in scope here
+- **Sub-tab UI changes** — this PRD covers the dashboard tab only; sub-tab layouts and flows are separate specifications
+- **Agency Snapshots parent table management UI** — the creation and management of `agency_snapshots` records is handled by the existing sub-tab completion flows, not by this dashboard
+
+---
+
+## Appendix — Full Element Reference
+
+| Position | Element | Section Label | Type | Primary Data Source | Component |
+|----------|---------|---------------|------|---------------------|-----------|
+| Header | Report Actions | None | Static + Deterministic | `pdf_url`, base table | Button + secondary link |
+| 1 | Executive Headline | None | GPT | `executive_headline` | Full-width text |
+| 2 | Executive Summary | `YOUR BUSINESS MODEL` | GPT | `executive_summary` | Prose block |
+| 3 | Business Vitals Strip | `BUSINESS VITALS` | Deterministic | 6 metric columns from view | Horizontal metric strip |
+| 4 | Agency At-a-Glance | `AGENCY AT-A-GLANCE` | Deterministic | 4 × synthesis signal + 3 beats each | 2×2 card grid + pop-out |
+| 5 | Cross-Dimensional Signals | `CRITICAL INSIGHTS` | GPT | 5 × (headline + body + so_what) | 5 stacked insight cards |
+| 6 | Operating Realities | `OPERATING REALITIES` | GPT | 3 × (headline + body) | 3-column accordion cards |
+| 7 | Synthesis Statement | `SYNTHESIS` | GPT | `synthesis_statement` | Prose block |
+| 8 | Next Steps and CTA | `NEXT STEPS` | Static | Fixed copy + GVC link | Text + button |
+
+**GPT return fields total: 24**
+- executive_headline, executive_summary (2)
+- signal_1–5 × headline + body + so_what (15)
+- implication_1–3 × headline + body (6)
+- synthesis_statement (1)
+
+**Deterministic fields rendered from view: 34**
+- 6 business vitals metrics
+- 4 synthesis signals (one per dimension)
+- 4 × 3 beat headlines = 12 beat headlines
+- 4 × 3 beat content blocks = 12 beat content blocks
+
+**Static elements: 2**
+- Next Steps framing copy and CTA
+- Page header snapshot label and timestamp display
