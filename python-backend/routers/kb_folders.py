@@ -208,7 +208,7 @@ def move_folder(
     return _folder_response(rows[0])
 
 
-@router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_folder(folder_id: UUID, user_id: Annotated[UUID, Depends(get_current_user_id)]) -> None:
     client = _get_supabase_client(get_settings())
     if not _find_owned_folder(client, folder_id, user_id):

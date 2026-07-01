@@ -87,7 +87,7 @@ def update_skill(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not update skill: {exc}") from exc
 
 
-@router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_skill(skill_id: UUID, user_id: Annotated[UUID, Depends(get_current_user_id)]) -> None:
     try:
         _service().delete(user_id, skill_id)
