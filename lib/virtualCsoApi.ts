@@ -11,6 +11,7 @@ import {
   type SourceKind,
   type SourcePage,
   type SourceRef,
+  type AgentStep,
 } from './virtualCsoMockData';
 
 export { INSIGHT_STARTERS, MOCK_SOURCE_REFS, SOURCE_KIND_LABELS };
@@ -44,7 +45,7 @@ export interface SendUserMessageOptions {
   projectId?: string | null;
   onUserMessage?: (message: Message) => void;
   onToken?: (text: string) => void;
-  onReady?: (meta: { threadId: string; route: Ws5RouteMeta; assembledContext: Ws5AssembledContextMeta }) => void;
+  onReady?: (meta: { threadId: string; route: Ws5RouteMeta; assembledContext: Ws5AssembledContextMeta; agentSteps?: AgentStep[] }) => void;
 }
 
 export interface SendUserMessageResult {
@@ -92,12 +93,42 @@ const toChat = (row: any): Chat => ({
   lastMessageAt: formatDate(row.last_message_at),
 });
 
-const toMessage = (row: any): Message => ({
+type AgentDelegationStepRow = {
+  step_index?: number | null;
+  tool_name?: string | null;
+  title?: string | null;
+  step_type?: string | null;
+  status?: string | null;
+  input_summary?: Record<string, unknown> | null;
+  output_summary?: unknown;
+  summary?: string | null;
+};
+
+type AgentDelegationRunWithSteps = {
+  assistant_message_id?: string | null;
+  agent_delegation_steps?: AgentDelegationStepRow[] | null;
+};
+
+const outputToString = (output: unknown): string => {
+  if (typeof output === 'string') return output;
+  if (output === null || output === undefined) return '';
+  return JSON.stringify(output);
+};
+
+const toAgentStep = (step: AgentDelegationStepRow): AgentStep => ({
+  tool: String(step.tool_name ?? step.title ?? step.step_type ?? ''),
+  input: step.input_summary ?? {},
+  output: outputToString(step.output_summary ?? step.summary ?? ''),
+  status: step.status ?? undefined,
+});
+
+const toMessage = (row: any, agentSteps?: AgentStep[]): Message => ({
   id: row.id,
   chatId: row.thread_id ?? row.chatId,
   role: row.role,
   content: row.content,
   createdAt: row.created_at ?? row.createdAt,
+  agentSteps,
 });
 
 const rememberSources = (chatId: string, sources: SourceRef[] = [], pages: SourcePage[] = []) => {
@@ -161,13 +192,41 @@ export const getRecentChats = (chats: Chat[]): Chat[] =>
   [...chats].sort((a, b) => (a.lastMessageAt < b.lastMessageAt ? 1 : -1));
 
 export const getMessagesForChat = async (chatId: string): Promise<Message[]> => {
+  const userId = await requireUserId();
   const result = await supabase
     .from('vcso_chat_messages')
     .select('*')
     .eq('thread_id', chatId)
     .order('created_at', { ascending: true });
   if (result.error) throw result.error;
-  return (result.data ?? []).map(toMessage);
+
+  const messageRows = result.data ?? [];
+  const assistantMessageIds = messageRows
+    .filter((row) => row.role === 'assistant')
+    .map((row) => row.id);
+  const stepsByMessageId = new Map<string, AgentStep[]>();
+
+  if (assistantMessageIds.length > 0) {
+    const runsResult = await supabase
+      .from('agent_delegation_runs')
+      .select('assistant_message_id,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary)')
+      .eq('user_id', userId)
+      .in('assistant_message_id', assistantMessageIds);
+    if (runsResult.error) throw runsResult.error;
+
+    for (const run of (runsResult.data ?? []) as AgentDelegationRunWithSteps[]) {
+      if (!run.assistant_message_id) continue;
+      const existing = stepsByMessageId.get(run.assistant_message_id) ?? [];
+      stepsByMessageId.set(run.assistant_message_id, [
+        ...existing,
+        ...(run.agent_delegation_steps ?? [])
+          .sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0))
+          .map(toAgentStep),
+      ]);
+    }
+  }
+
+  return messageRows.map((row) => toMessage(row, stepsByMessageId.get(row.id)));
 };
 
 export const createProject = async (name: string): Promise<Project> => {
@@ -251,7 +310,12 @@ export const sendUserMessage = async (
         route = payload.route;
         assembledContext = payload.assembledContext;
         options.onUserMessage?.(userMessage);
-        options.onReady?.({ threadId: payload.threadId, route, assembledContext });
+        options.onReady?.({
+          threadId: payload.threadId,
+          route,
+          assembledContext,
+          agentSteps: payload.agentSteps ?? undefined,
+        });
       }
       if (event === 'token') {
         options.onToken?.(payload.text ?? '');

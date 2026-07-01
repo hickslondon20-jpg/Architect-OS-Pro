@@ -2,22 +2,34 @@ import React, { useState } from 'react';
 import { ArrowUp, Paperclip, X } from 'lucide-react';
 
 /**
- * Chat composer — multi-line input + submit, an add-context affordance,
+ * Chat composer: multi-line input + submit, an add-context affordance,
  * and a removable linked-folder chip representing optional retrieval scoping.
- * Non-functional this pass (skeleton only).
  */
 export const Composer: React.FC<{
   onSubmit?: (text: string) => void;
   linkedFolder?: string | null;
   onRemoveLinkedFolder?: () => void;
   placeholder?: string;
-}> = ({ onSubmit, linkedFolder, onRemoveLinkedFolder, placeholder = 'Ask your Virtual CSO…' }) => {
-  const [text, setText] = useState('');
+  value?: string;
+  onChange?: (value: string) => void;
+  textareaRef?: React.Ref<HTMLTextAreaElement>;
+}> = ({
+  onSubmit,
+  linkedFolder,
+  onRemoveLinkedFolder,
+  placeholder = 'Ask your Virtual CSO...',
+  value,
+  onChange,
+  textareaRef,
+}) => {
+  const [localText, setLocalText] = useState('');
+  const text = value ?? localText;
+  const setText = onChange ?? setLocalText;
 
   const submit = () => {
-    const value = text.trim();
-    if (!value) return;
-    onSubmit?.(value);
+    const nextValue = text.trim();
+    if (!nextValue) return;
+    onSubmit?.(nextValue);
     setText('');
   };
 
@@ -56,6 +68,7 @@ export const Composer: React.FC<{
             <Paperclip size={16} />
           </button>
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}

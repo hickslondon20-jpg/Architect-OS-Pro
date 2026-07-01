@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     supabase_url: str | None = Field(default=None, validation_alias="SUPABASE_URL")
     supabase_service_role_key: str | None = Field(default=None, validation_alias="SUPABASE_SERVICE_ROLE_KEY")
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    cohere_api_key: str | None = Field(default=None, validation_alias="COHERE_API_KEY")
+    anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
+    claude_synthesis_model: str = Field(
+        default="claude-sonnet-4-5",
+        validation_alias="ARCHITECTOS_CLAUDE_SYNTHESIS_MODEL",
+    )
 
     raw_document_bucket: str = Field(default="raw-documents", validation_alias="ARCHITECTOS_RAW_DOCUMENT_BUCKET")
     ingest_secret: str | None = Field(default=None, validation_alias="ARCHITECTOS_INGEST_SECRET")
@@ -24,6 +30,15 @@ class Settings(BaseSettings):
     metadata_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_METADATA_MODEL")
     metadata_extraction_enabled: bool = Field(default=True, validation_alias="ARCHITECTOS_METADATA_EXTRACTION_ENABLED")
     metadata_max_input_chars: int = Field(default=24000, validation_alias="ARCHITECTOS_METADATA_MAX_INPUT_CHARS")
+    cohere_rerank_model: str = Field(default="rerank-v4.0-pro", validation_alias="COHERE_RERANK_MODEL")
+    rerank_enabled: bool = Field(default=False, validation_alias="ARCHITECTOS_RERANK_ENABLED")
+    rerank_top_n: int = Field(default=8, validation_alias="ARCHITECTOS_RERANK_TOP_N")
+    retrieval_candidate_count: int = Field(default=40, validation_alias="ARCHITECTOS_RETRIEVAL_CANDIDATE_COUNT")
+    rrf_k: int = Field(default=60, validation_alias="ARCHITECTOS_RRF_K")
+    rerank_timeout_seconds: float = Field(default=6.0, validation_alias="ARCHITECTOS_RERANK_TIMEOUT_SECONDS")
+    web_search_enabled: bool = Field(default=False, validation_alias="ARCHITECTOS_WEB_SEARCH_ENABLED")
+    web_search_provider: str | None = Field(default=None, validation_alias="ARCHITECTOS_WEB_SEARCH_PROVIDER")
+    web_search_api_key: str | None = Field(default=None, validation_alias="ARCHITECTOS_WEB_SEARCH_API_KEY")
     embedding_batch_size: int = Field(default=64, validation_alias="ARCHITECTOS_EMBEDDING_BATCH_SIZE")
     chunk_size_tokens: int = Field(default=1000, validation_alias="ARCHITECTOS_CHUNK_SIZE_TOKENS")
     chunk_overlap_tokens: int = Field(default=200, validation_alias="ARCHITECTOS_CHUNK_OVERLAP_TOKENS")

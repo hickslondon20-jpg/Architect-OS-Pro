@@ -48,6 +48,7 @@ import { CurrentQuarterFocusTab } from './pages/pro-suite/quarter-map/CurrentQua
 import { PlaceholderContent } from './components/ui';
 import { OSEngineLocked } from './components/pro-suite/os-engine/OSEngineLocked';
 import { VirtualCSOLocked } from './components/pro-suite/virtual-cso/VirtualCSOLocked';
+import { SkillsLibraryLocked } from './components/pro-suite/skills/SkillsLibraryLocked';
 
 const App: React.FC = () => {
   const gated = (featureKey: FeatureKey, element: React.ReactNode) => (
@@ -256,6 +257,14 @@ const App: React.FC = () => {
                         element={
                           <FeatureGate featureKey="os_engine" lockedElement={<OSEngineLocked />}>
                             <Pro.OSEngineWorkspace />
+                          </FeatureGate>
+                        }
+                      />
+                      <Route
+                        path="skills"
+                        element={
+                          <FeatureGate featureKey="skills_library" lockedElement={<SkillsLibraryLocked />}>
+                            <Pro.SkillsWorkspace />
                           </FeatureGate>
                         }
                       />

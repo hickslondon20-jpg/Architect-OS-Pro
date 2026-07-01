@@ -19,6 +19,7 @@ export type FeatureKey =
   | 'architect_evolution_dashboard'
   | 'os_engine'
   | 'virtual_cso'
+  | 'skills_library'
   | 'post_beta';
 
 export interface FeatureGateDefinition {
@@ -57,6 +58,7 @@ export const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
   },
   os_engine: { key: 'os_engine', label: 'OS Engine', unlockWeek: 6 },
   virtual_cso: { key: 'virtual_cso', label: 'Virtual CSO', unlockWeek: 6 },
+  skills_library: { key: 'skills_library', label: 'Skills & Plugins', unlockWeek: 6 },
   post_beta: { key: 'post_beta', label: 'Post-beta feature', unlockWeek: null, postBeta: true },
 };
 
@@ -87,6 +89,9 @@ const PATH_FEATURE_GATES: Array<{ path: string; featureKey: FeatureKey }> = [
   { path: '/diagnostics', featureKey: 'ae_ladder' },
   { path: '/pro/os-engine', featureKey: 'os_engine' },
   { path: '/pro/virtual-cso', featureKey: 'virtual_cso' },
+  { path: '/pro/intelligence/skills', featureKey: 'skills_library' },
+  { path: '/pro/intelligence/os-engine', featureKey: 'os_engine' },
+  { path: '/pro/intelligence/virtual-cso', featureKey: 'virtual_cso' },
   { path: '/pro/planning/roadmap', featureKey: 'quarter_map' },
   { path: '/pro/planning/sprint-planning', featureKey: 'sprint_planning' },
   { path: '/pro/planning', featureKey: 'quarter_map' },

@@ -38,6 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body ?? {};
     const threadId = String(body.threadId ?? '');
     if (!threadId) throw new Error('threadId is required.');
+    const candidateInsights = Array.isArray(body.candidateInsights) ? body.candidateInsights : [];
 
     const update = await supabase
       .from('vcso_chat_threads')
@@ -68,7 +69,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    res.status(200).json({ thread: update.data, webhookPosted });
+    let wikiFlush: unknown = null;
+    const backendUrl = process.env.ARCHITECTOS_PYTHON_BACKEND_URL;
+    if (candidateInsights.length && backendUrl) {
+      const flush = await fetch(`${backendUrl.replace(/\/$/, '')}/api/wiki/writeback/flush-candidates`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(process.env.ARCHITECTOS_INGEST_SECRET ? { 'x-ingest-secret': process.env.ARCHITECTOS_INGEST_SECRET } : {}),
+        },
+        body: JSON.stringify({
+          user_id: userData.user.id,
+          actor: 'domain_agent',
+          candidates: candidateInsights,
+        }),
+      });
+      wikiFlush = await flush.json().catch(() => ({ ok: flush.ok }));
+      if (!flush.ok) {
+        res.status(502).json({ thread: update.data, webhookPosted, wikiFlush });
+        return;
+      }
+    }
+
+    res.status(200).json({ thread: update.data, webhookPosted, wikiFlush });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown WS5 writeback error.' });
   }

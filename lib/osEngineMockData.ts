@@ -18,6 +18,8 @@ export interface RawDocument {
   sizeLabel?: string;
   storagePath?: string;
   userId?: string;
+  folderId?: string | null;
+  folder_id?: string | null;
   recordState?: 'active' | 'duplicate' | 'superseded' | 'deleted';
   contentHash?: string | null;
   duplicateOfDocumentId?: string | null;
@@ -29,6 +31,25 @@ export interface RawDocument {
   metadataSummary?: string | null;
   metadataTopics?: string[];
   metadataConfidence?: number | null;
+  parserStatus?: 'pending' | 'processing' | 'complete' | 'failed' | 'skipped';
+  parserName?: string | null;
+  parserVersion?: string | null;
+  parserFormat?: string | null;
+  parserWarnings?: string[];
+  extractionQuality?: string | null;
+  sourceFormatMetadata?: Record<string, unknown>;
+}
+
+export interface KbFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FolderTreeNode extends KbFolder {
+  children: FolderTreeNode[];
 }
 
 export type PageType =
@@ -336,4 +357,5 @@ export const getStarterPages = () =>
   STARTER_PAGE_TYPES.map((t) => MOCK_KNOWLEDGE_PAGES.find((p) => p.pageType === t)).filter(
     (p): p is KnowledgePage => Boolean(p),
   );
+
 

@@ -5,13 +5,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from hashlib import sha256
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from openai import OpenAI, OpenAIError
 from supabase import Client, create_client
 
 from core.config import Settings, get_settings
-from services.doc_processor import DocumentChunk
+
+if TYPE_CHECKING:
+    from services.doc_processor import DocumentChunk
 
 T = TypeVar('T')
 
@@ -93,6 +95,70 @@ class VectorStore:
             },
         )
 
+    def mark_parser_processing(self, document_id: str, user_id: str) -> None:
+        self._update_document(
+            document_id,
+            user_id,
+            {
+                "parser_status": "processing",
+                "parser_warnings": [],
+            },
+        )
+
+    def mark_parser_complete(self, document_id: str, user_id: str, metadata: dict[str, Any]) -> None:
+        warnings = _string_list(metadata.get("warnings"))
+        self._update_document(
+            document_id,
+            user_id,
+            {
+                "parser_status": "complete",
+                "parser_name": metadata.get("parser"),
+                "parser_version": metadata.get("parser_version"),
+                "parser_format": metadata.get("parser_format") or metadata.get("file_type"),
+                "parser_warnings": warnings,
+                "extraction_quality": metadata.get("extraction_quality"),
+                "source_format_metadata": _source_format_metadata(metadata),
+            },
+        )
+
+    def store_full_markdown(self, document_id: str, user_id: str, text: str) -> None:
+        """Persist the full extracted markdown text for grep/read tool access."""
+        self._update_document(
+            document_id,
+            user_id,
+            {"full_markdown": text or ""},
+        )
+
+    def mark_parser_failed(self, document_id: str, user_id: str, message: str, metadata: dict[str, Any] | None = None) -> None:
+        parser_metadata = metadata or {}
+        warnings = _string_list(parser_metadata.get("warnings"))
+        warnings.append(message[:1000])
+        self._update_document(
+            document_id,
+            user_id,
+            {
+                "parser_status": "failed",
+                "parser_name": parser_metadata.get("parser"),
+                "parser_version": parser_metadata.get("parser_version"),
+                "parser_format": parser_metadata.get("parser_format") or parser_metadata.get("file_type"),
+                "parser_warnings": warnings,
+                "extraction_quality": "failed",
+                "source_format_metadata": _source_format_metadata(parser_metadata),
+                "ingestion_error": message[:1000],
+            },
+        )
+
+    def mark_parser_skipped(self, document_id: str, user_id: str, reason: str) -> None:
+        self._update_document(
+            document_id,
+            user_id,
+            {
+                "parser_status": "skipped",
+                "parser_warnings": [reason[:1000]],
+                "extraction_quality": "skipped",
+            },
+        )
+
     def mark_metadata_processing(self, document_id: str, user_id: str) -> None:
         self._update_document(
             document_id,
@@ -160,6 +226,12 @@ class VectorStore:
             },
         )
 
+    def clear_document_chunks(self, document_id: str, user_id: str) -> None:
+        try:
+            self.client.table("document_chunks").delete().eq("document_id", document_id).eq("user_id", user_id).execute()
+        except Exception as exc:
+            raise VectorStoreError(f"Could not clear document chunks: {exc}") from exc
+
     def replace_document_chunks(
         self,
         document_id: str,
@@ -173,10 +245,7 @@ class VectorStore:
         embeddings = self._embed_texts(texts) if texts else []
         inherited_metadata = document_metadata or {}
 
-        try:
-            self.client.table("document_chunks").delete().eq("document_id", document_id).eq("user_id", user_id).execute()
-        except Exception as exc:
-            raise VectorStoreError(f"Could not clear previous document chunks: {exc}") from exc
+        self.clear_document_chunks(document_id, user_id)
 
         rows = [
             {
@@ -245,6 +314,46 @@ class VectorStore:
             "model_name": model_row.get("model_name") or setting.get("fallback_model_name") or fallback_model_name,
         }
 
+    def resolve_platform_setting(
+        self,
+        *,
+        setting_key: str,
+        fallback_model_name: str,
+        fallback_provider: str,
+    ) -> dict[str, Any]:
+        try:
+            response = (
+                self.client.table("platform_ai_settings")
+                .select("provider,fallback_model_name,is_enabled,settings,model_id,ai_models(provider,model_name)")
+                .eq("setting_key", setting_key)
+                .limit(1)
+                .execute()
+            )
+        except Exception:
+            return {
+                "provider": fallback_provider,
+                "model_name": fallback_model_name,
+                "is_enabled": True,
+                "settings": {},
+            }
+
+        setting = response.data[0] if response.data else None
+        if not setting:
+            return {
+                "provider": fallback_provider,
+                "model_name": fallback_model_name,
+                "is_enabled": True,
+                "settings": {},
+            }
+
+        model_row = setting.get("ai_models") or {}
+        return {
+            "provider": model_row.get("provider") or setting.get("provider") or fallback_provider,
+            "model_name": model_row.get("model_name") or setting.get("fallback_model_name") or fallback_model_name,
+            "is_enabled": bool(setting.get("is_enabled")),
+            "settings": setting.get("settings") or {},
+        }
+
     def _embed_texts(self, texts: list[str]) -> list[list[float]]:
         if not self.openai_client:
             raise VectorStoreError("OPENAI_API_KEY is required for embedding.")
@@ -282,6 +391,34 @@ def _metadata_scalar(value: Any) -> str | None:
     return text or None
 
 
+def _string_list(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _source_format_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    keys = {
+        "format_family",
+        "file_type",
+        "page_count",
+        "sheet_count",
+        "row_count",
+        "column_count",
+        "table_count",
+        "image_count",
+        "section_count",
+        "section_headings",
+        "preserves_structure",
+        "docling_export_mode",
+        "chunk_count",
+    }
+    return {key: value for key, value in metadata.items() if key in keys and value not in (None, [], {})}
+
+
 def _default_metadata_schema_fields() -> list[dict[str, Any]]:
     return [
         {"field_key": "document_title", "data_type": "text", "description": "Best concise title for the document."},
@@ -296,4 +433,3 @@ def _default_metadata_schema_fields() -> list[dict[str, Any]]:
         {"field_key": "confidence", "data_type": "number", "description": "Extraction confidence from 0 to 1."},
         {"field_key": "extraction_notes", "data_type": "text", "description": "Brief caveats or uncertainty."},
     ]
-

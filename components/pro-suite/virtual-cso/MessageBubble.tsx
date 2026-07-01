@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Message } from '../../../lib/virtualCsoApi';
+import { AgentStepsPanel } from './AgentStepsPanel';
 
 /**
  * One chat message.
  * - user: right-aligned, slate/obsidian family fill, light text.
- * - assistant: left-aligned, cloud surface with hairline border, copy affordance.
+ * - assistant: left-aligned reader text with copy affordance.
  * No edit / regenerate. No create-doc card.
  */
 export const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
@@ -30,11 +31,12 @@ export const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
   }
 
   return (
-    <div className="group flex flex-col items-start">
-      <div className="max-w-[88%] rounded-[var(--radius-sm)] rounded-tl-sm border border-[var(--aos-mist)] bg-[var(--bg-surface)] px-4 py-3 shadow-[var(--shadow-soft-1)]">
-        <div className="os-reader-markdown text-sm">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
-        </div>
+    <div className="group flex w-full flex-col items-start">
+      {message.agentSteps && message.agentSteps.length > 0 && (
+        <AgentStepsPanel steps={message.agentSteps} />
+      )}
+      <div className="os-reader-markdown w-full text-sm">
+        <ReactMarkdown>{message.content}</ReactMarkdown>
       </div>
       <button
         onClick={onCopy}

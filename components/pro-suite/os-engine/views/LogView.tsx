@@ -1,5 +1,6 @@
 import React from 'react';
-import { FileCheck2, RefreshCw, Lightbulb, Loader, Activity } from 'lucide-react';
+import { FileCheck2, RefreshCw, Lightbulb, Loader, Activity,
+         AlertTriangle, XCircle, FileText } from 'lucide-react';
 import { Badge } from '../../../ui';
 import type { LogEntry } from '../../../../lib/osEngineApi';
 
@@ -9,6 +10,9 @@ const ICONS: Record<string, React.ElementType> = {
   Lightbulb,
   Loader,
   Activity,
+  'alert-triangle': AlertTriangle,   // decisions, contradictions, warnings
+  'x-circle': XCircle,               // errors
+  'file-text': FileText,             // routine activity events
 };
 
 const formatTime = (iso: string) => {

@@ -26,13 +26,18 @@
 
 ## Critical Architecture Rules
 
-### 1. AI synthesis routes through N8N — with one documented exception
-All **synthesis / batch / scheduled** Claude AI calls go through N8N webhook workflows — never direct client-side Anthropic API calls, never Supabase Edge Functions for AI.
+### 1. AI synthesis: three lanes, N8N is no longer the default fallback
+**Revised 2026-06-30, Ep4 Phase 4 build.** The original rule ("all synthesis through N8N except Virtual CSO streaming") predates the platform's growth into a more expansive Python/FastAPI backend and no longer reflects reality — it was already being violated by two live services before this revision made it official: `python-backend/services/doc_wiki_synthesis.py` and `python-backend/services/kb_explorer_service.py` both call Anthropic directly today. The rule now has three lanes instead of one default + one exception:
 
-**Exception (decided 2026-06-12, Pro Suite build):** the **Virtual CSO interactive chat** path runs in a **Vercel serverless function** — context assembly (§6.4) + token-by-token streaming from Claude to the browser. n8n cannot stream tokens cleanly, so the real-time chat endpoint is the one place a Claude call lives outside n8n. The API key stays server-side in the function env (users never call Anthropic directly). All other synthesis (WF-PS-01..04) remains in n8n. Supabase Edge Functions are still NOT used for AI.
+- **Synthesis colocated with a Python backend service** (KB Explorer, doc/wiki synthesis, skill authoring/guided-creation, and similar) calls Anthropic directly from that service — the same pattern already proven in the two files above. This is the default for any new synthesis living inside `python-backend/`, not an exception that needs special justification.
+- **Virtual CSO interactive chat** keeps its Vercel serverless streaming exception (decided 2026-06-12, unchanged): context assembly + token-by-token streaming from Claude to the browser, API key server-side in the function env. n8n still cannot stream tokens cleanly, so this stays a dedicated path.
+- **Batch, scheduled, or cron-triggered workflows** — anything that genuinely needs external scheduling, retries, or non-code-owned orchestration (PDF generation via Google Docs merge fields, drip/nurture sequences, etc.) — stay on N8N. N8N remains the right tool here, just not the default for everything else.
+- **Never, in any lane:** direct client-side (browser) Anthropic API calls, or Supabase Edge Functions for AI.
+
+When adding new synthesis, ask: does this live inside a Python service, does it need token-by-token streaming to the browser, or does it need external scheduling/retries? That answers which lane it belongs to — N8N is no longer the fallback answer for "everything else."
 
 ### 2. openai package is dead code — remove it
-The `openai` npm package is a legacy remnant. All synthesis has migrated to Claude via N8N. Remove the package and any import that references it.
+The `openai` npm package is a legacy remnant. All synthesis has migrated to Claude (via N8N, direct Python-backend calls, or the Virtual CSO streaming function — see Rule #1). Remove the package and any import that references it.
 
 ### 3. MRA checkpoint content is in Supabase — not a config file
 125 checkpoints × 5 AE Ladder stages = 500 stage-calibrated definitions live in the `mra_checkpoints` table (or similar) in Supabase. Do not create a config file for this content. Verify the table, don't recreate it.
@@ -187,6 +192,14 @@ See `../ArchitectOS Beta Launch/ArchitectOS Design System/uploads/ArchitectOS-de
 | LLM provider | Claude Sonnet (locked) | Our stack constraint — never swap for OpenAI-compatible |
 | Observability | TBD — evaluate Ep1 | LangSmith vs. N8N execution logs |
 
+### Intelligence Layer Vision
+
+See `.planning/INTELLIGENCE-VISION.md` for the canonical architecture document — four-tier
+retrieval model, the question types the platform must answer, the compiled wiki design, the
+retrieval router, and the beta launch target state. **Read this before scoping any new
+intelligence layer phase or episode.**
+
 ### Progress Tracking
 
 See `Pro-Suite-Progress.md` (repo root) for the live episode-by-episode status tracker.
+See `.planning/ROADMAP.md` for the KB Explorer build phase tracker (Phases 1–9).

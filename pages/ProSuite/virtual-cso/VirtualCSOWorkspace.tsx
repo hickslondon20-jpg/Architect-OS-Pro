@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Folder, MessageSquare, Pin, Pencil, Trash2 } from 'lucide-react';
 import { ChatRail } from '../../../components/pro-suite/virtual-cso/ChatRail';
 import { ChatThread } from '../../../components/pro-suite/virtual-cso/ChatThread';
@@ -110,6 +110,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [composerText, setComposerText] = useState('');
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const refreshLists = async () => {
     if (!user) return;
@@ -233,9 +235,16 @@ export const VirtualCSOWorkspace: React.FC = () => {
             },
           ]);
         },
-        onReady: ({ route, assembledContext }) => {
+        onReady: ({ route, assembledContext, agentSteps }) => {
           const packs = route.rankedPackSlugs.length > 0 ? route.rankedPackSlugs.join(', ') : 'base prompt';
           setNotice(`Routing: ${packs} · loaded ${assembledContext.loadedFounderPageTitles.length} founder pages.`);
+          if (agentSteps && agentSteps.length > 0) {
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === assistantTempId ? { ...message, agentSteps } : message,
+              ),
+            );
+          }
         },
         onToken: (chunk) => {
           setMessages((current) =>
@@ -266,6 +275,21 @@ export const VirtualCSOWorkspace: React.FC = () => {
     }
   };
 
+  const useSkillInComposer = (slug: string) => {
+    const mention = `@${slug} `;
+    setComposerText((current) => {
+      if (!current.trim()) return mention;
+      return current.endsWith(' ') ? `${current}${mention}` : `${current} ${mention}`;
+    });
+    if (view === 'project') {
+      setView('new');
+      setActiveChatId(null);
+      setActiveProjectId(null);
+      setMessages([]);
+      setReaderPageId(null);
+    }
+    window.setTimeout(() => composerRef.current?.focus(), 0);
+  };
   const updateThreadTitle = async () => {
     if (!activeChatId) return;
     const current = getChatById(chats, activeChatId);
@@ -347,6 +371,9 @@ export const VirtualCSOWorkspace: React.FC = () => {
             linkedFolder={linkedFolder}
             onRemoveLinkedFolder={() => setLinkedFolder(null)}
             onSubmit={streaming ? undefined : sendMessage}
+            value={composerText}
+            onChange={setComposerText}
+            textareaRef={composerRef}
           />
           {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
         </div>
@@ -389,7 +416,14 @@ export const VirtualCSOWorkspace: React.FC = () => {
         <div className="flex-1 overflow-hidden">
           <ChatThread crumbs={crumbs} messages={messages} />
         </div>
-        <Composer linkedFolder={linkedFolder} onRemoveLinkedFolder={() => setLinkedFolder(null)} onSubmit={streaming ? undefined : sendMessage} />
+        <Composer
+          linkedFolder={linkedFolder}
+          onRemoveLinkedFolder={() => setLinkedFolder(null)}
+          onSubmit={streaming ? undefined : sendMessage}
+          value={composerText}
+          onChange={setComposerText}
+          textareaRef={composerRef}
+        />
         {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
       </div>
     );
@@ -410,6 +444,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
         onSelectProject={openProject}
         onCreateProject={createProjectAndRefresh}
         onDeleteProject={deleteProjectAndRefresh}
+        onUseSkill={useSkillInComposer}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -434,6 +469,9 @@ export const VirtualCSOWorkspace: React.FC = () => {
     </div>
   );
 };
+
+
+
 
 
 

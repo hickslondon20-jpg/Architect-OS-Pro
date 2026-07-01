@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '../../components/ui';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, Brain, Lightbulb } from 'lucide-react';
+import { ArrowRight, Bot, Brain, Lightbulb, Puzzle } from 'lucide-react';
 
 const intelligenceResources = [
     {
@@ -31,6 +31,15 @@ const intelligenceResources = [
         disabled: false,
         when: 'Reach for this when you know the type of outcome you need produced by a specific discipline.',
     },
+    {
+        label: 'Skills & Plugins',
+        description:
+            'A workspace for reusable Virtual CSO capabilities: browse platform skills, create your own repeatable methods, and import or export SKILL.md packs.',
+        href: '/pro/intelligence/skills',
+        icon: Puzzle,
+        disabled: false,
+        when: 'Reach for this when you want the AI to follow a specific method the same way every time.',
+    },
 ];
 
 export const IntelligenceLanding: React.FC = () => {
@@ -43,7 +52,7 @@ export const IntelligenceLanding: React.FC = () => {
                     <div>
                         <h1 className="aos-h1">Strategy that knows your business.</h1>
                         <p className="aos-body mt-3 max-w-2xl" style={{ color: 'var(--fg-2)' }}>
-                            Three intelligence peers: open strategic reasoning, durable business memory, and specialist production workflows.
+                            Four intelligence peers: open strategic reasoning, durable business memory, specialist production workflows, and reusable skills.
                         </p>
                     </div>
                     <Link
@@ -70,7 +79,7 @@ export const IntelligenceLanding: React.FC = () => {
                             </div>
                             <div>
                                 <div className="aos-eyebrow mb-2">Intelligence Resources</div>
-                                <h2 className="aos-h3">Three tools, always in context</h2>
+                                <h2 className="aos-h3">Four tools, always in context</h2>
                                 <p className="aos-small mt-2 max-w-2xl">
                                     These resources don't follow a sequence — reach for the one that fits the moment. They're designed to work independently and together.
                                 </p>
@@ -83,16 +92,16 @@ export const IntelligenceLanding: React.FC = () => {
                         >
                             <div className="aos-eyebrow mb-1">How to use this</div>
                             <p className="text-sm leading-relaxed" style={{ color: 'var(--fg-2)' }}>
-                                No fixed order. Use Virtual CSO for strategic reasoning, OS Engine for memory, and Domain Agents for finished work from a specialist discipline.
+                                No fixed order. Use Virtual CSO for strategic reasoning, OS Engine for memory, Domain Agents for finished work, and Skills & Plugins for repeatable methods.
                             </p>
                         </div>
                     </div>
 
-                    {/* Peer cards use an asymmetric rhythm to avoid a three-equal-card row. */}
+                    {/* Peer cards use an asymmetric rhythm to avoid equal-card rows. */}
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
                         {intelligenceResources.map((resource, index) => {
                             const Icon = resource.icon;
-                            const spanClass = index === 0 ? 'lg:col-span-5' : index === 1 ? 'lg:col-span-7' : 'lg:col-span-12';
+                            const spanClass = index === 0 || index === 3 ? 'lg:col-span-5' : 'lg:col-span-7';
                             const inner = (
                                 <div
                                     className="group rounded-[var(--radius-xs)] p-5 transition-colors h-full flex flex-col"

@@ -17,6 +17,7 @@ export * from './ReflectionReview';
 export * from './ProDashboard';
 export * from './os-engine/OSEngineWorkspace';
 export * from './virtual-cso/VirtualCSOWorkspace';
+export * from './SkillsWorkspace';
 export * from './domain-agents/DomainAgentsLayout';
 export * from './domain-agents/DomainAgentGallery';
 export * from './domain-agents/DomainAgentProfile';

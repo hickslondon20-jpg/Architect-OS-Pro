@@ -1,0 +1,78 @@
+{
+  "wiki_schema_version": "wiki-1.0",
+  "pages": {
+    "business_context": {
+      "kind": "insight_accreting",
+      "title": "Business Context",
+      "ose_page_type": "business_context",
+      "default_tags": ["operations", "growth"]
+    },
+    "diagnostic_synthesis": {
+      "kind": "compiled_base_only",
+      "title": "Diagnostic Synthesis",
+      "ose_page_type": "assessment_intelligence",
+      "default_tags": ["operations", "growth"]
+    },
+    "current_quarter_sprint": {
+      "kind": "compiled_base_only",
+      "title": "Current Quarter / Sprint",
+      "ose_page_type": "strategic_context",
+      "default_tags": ["operations", "growth"]
+    },
+    "growth_constraints": {
+      "kind": "insight_accreting",
+      "title": "Growth Constraints",
+      "ose_page_type": "strategic_context",
+      "default_tags": ["growth", "operations"]
+    },
+    "financial_context": {
+      "kind": "insight_accreting",
+      "title": "Financial Context",
+      "ose_page_type": "financial_patterns",
+      "default_tags": ["financial"]
+    },
+    "client_market_position": {
+      "kind": "insight_accreting",
+      "title": "Client / Market Position",
+      "ose_page_type": "business_context",
+      "default_tags": ["clients", "positioning"]
+    },
+    "open_questions": {
+      "kind": "insight_accreting",
+      "title": "Open Questions & Unresolved Tensions",
+      "ose_page_type": "conversation_intelligence",
+      "default_tags": ["operations"]
+    }
+  },
+  "confidence_enum": ["high", "medium", "low"],
+  "claim_status_enum": ["active", "quarantined", "trusted", "contested", "retired"],
+  "claim_class_enum": ["compiled", "insight", "override"],
+  "frontmatter_contract": ["page_key", "wiki_version", "last_compiled_at", "tags"],
+  "contradiction_fields": ["contradictions", "contested"],
+  "tag_taxonomy": {
+    "domains": ["financial", "team", "clients", "offer", "operations", "growth", "positioning"],
+    "stages": [
+      { "id": 1, "name": "Rising" },
+      { "id": 2, "name": "Striving" },
+      { "id": 3, "name": "Thriving" },
+      { "id": 4, "name": "Driving" },
+      { "id": 5, "name": "Arriving" }
+    ],
+    "stage_content_note": "Schema models stages 1-5; authored/calibrated content currently covers stages 1-4.",
+    "tiers": ["<1M", "1-3M", "3-6M", "6M+"]
+  },
+  "event_rebuild_targets": {
+    "ae_ladder_run_updated": ["diagnostic_synthesis"],
+    "gm_audit_run_updated": ["diagnostic_synthesis"],
+    "quarter_map_changed": ["current_quarter_sprint", "growth_constraints"],
+    "sprint_planning_changed": ["current_quarter_sprint"],
+    "clarity_compass_changed": ["business_context", "growth_constraints"],
+    "diagnostic_constraint_changed": ["growth_constraints"],
+    "agency_snapshot_financial_changed": ["financial_context"],
+    "structured_upload_changed": ["financial_context"],
+    "agency_snapshot_market_changed": ["client_market_position"],
+    "growth_velocity_changed": ["client_market_position", "growth_constraints"],
+    "wiki_validation_changed": ["open_questions"]
+  },
+  "ose_mapping_note": "The 7 wiki page_keys are canonical for the wiki layer. OSE seed_core_knowledge_pages() uses five adapter page types: business_context, assessment_intelligence, strategic_context, financial_patterns, conversation_intelligence."
+}

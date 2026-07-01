@@ -10,6 +10,7 @@ import { ManifestView } from '../../../components/pro-suite/os-engine/views/Mani
 import { LogView } from '../../../components/pro-suite/os-engine/views/LogView';
 import { Button } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
+import { useKbFolderTree } from '../../../hooks/useKbFolderTree';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   addPageCorrection,
@@ -84,6 +85,18 @@ export const OSEngineWorkspace: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const {
+    tree: folderTree,
+    selectedFolderId,
+    expandedIds,
+    loading: foldersLoading,
+    selectFolder,
+    toggleExpand,
+    loadFolders,
+    createFolderAction,
+    renameFolderAction,
+    deleteFolderAction,
+  } = useKbFolderTree();
 
   const openPage = (page: KnowledgePage) => setReader({ kind: 'page', page });
   const openDoc = (doc: RawDocument) => setReader({ kind: 'doc', doc });
@@ -121,6 +134,11 @@ export const OSEngineWorkspace: React.FC = () => {
   }, [authLoading, user?.id]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+    loadFolders();
+  }, [authLoading, loadFolders, user?.id]);
+
+  useEffect(() => {
     if (!user) return undefined;
 
     const channel = supabase
@@ -139,9 +157,9 @@ export const OSEngineWorkspace: React.FC = () => {
     };
   }, [user?.id]);
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, folderId?: string | null) => {
     setNotice(null);
-    const uploaded = await uploadRawDocument(file);
+    const uploaded = await uploadRawDocument(file, folderId);
     setDocs((current) => [uploaded, ...current]);
     try {
       const queued = await queueDocumentIngestion(uploaded);
@@ -159,6 +177,11 @@ export const OSEngineWorkspace: React.FC = () => {
   const handleDeleteDoc = async (docId: string) => {
     await markRawDocumentDeleted(docId);
     setDocs((current) => current.filter((doc) => doc.id !== docId));
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    await deleteFolderAction(folderId);
+    await refresh(true);
   };
 
   const completeSetup = async (selectedSources: string[], nextSection: OSEngineSection) => {
@@ -197,6 +220,15 @@ export const OSEngineWorkspace: React.FC = () => {
             onOpenDoc={openDoc}
             onUpload={handleUpload}
             onDeleteDoc={handleDeleteDoc}
+            folderTree={folderTree}
+            selectedFolderId={selectedFolderId}
+            expandedIds={expandedIds}
+            foldersLoading={foldersLoading}
+            onSelectFolder={selectFolder}
+            onToggleExpand={toggleExpand}
+            onCreateFolder={createFolderAction}
+            onRenameFolder={renameFolderAction}
+            onDeleteFolder={handleDeleteFolder}
           />
         );
       case 'wiki':

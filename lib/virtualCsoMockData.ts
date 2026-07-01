@@ -26,12 +26,20 @@ export interface Chat {
   lastMessageAt: string;
 }
 
+export interface AgentStep {
+  tool: string;
+  input: Record<string, unknown>;
+  output: string;
+  status?: string;
+}
+
 export interface Message {
   id: string;
   chatId: string;
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
+  agentSteps?: AgentStep[];
 }
 
 export type SourceKind = 'wiki' | 'platform' | 'ip' | 'context';
