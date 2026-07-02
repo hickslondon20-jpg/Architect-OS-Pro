@@ -155,6 +155,22 @@ def _fallback_capabilities() -> list[AgentCapability]:
             can_spawn_agents=False,
         ),
         AgentCapability(
+            capability_key="sandbox_execution_agent",
+            label="Sandbox code execution",
+            description=(
+                "Runs founder/platform-data code and document generation inside a bounded "
+                "sandbox session, with access to attached skill files."
+            ),
+            status="experimental",
+            allowed_surfaces=["virtual_cso"],
+            allowed_tools=["execute_code", "read_skill_file"],
+            allowed_source_kinds=[],
+            model_setting_key="sandbox_execution_agent",
+            output_schema={"version": "agent_result_v1"},
+            default_config={"max_rounds": 6, "timeout_seconds": 90},
+            can_spawn_agents=False,
+        ),
+        AgentCapability(
             capability_key="per_user_wiki",
             label="Per-user wiki",
             description="Reads the founder's compiled wiki pages, claims, evidence, and digest through the frozen wiki contract.",

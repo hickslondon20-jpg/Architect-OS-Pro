@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
 from datetime import date
 from typing import Annotated
 import uuid
@@ -12,13 +14,16 @@ from pydantic import BaseModel, Field, model_validator
 
 from core.config import get_settings
 from routers import kb_documents, kb_folders, skills
+from routers.kb_folders import get_current_user_id
 from services.doc_processor import process_document_bytes
+from services.artifact_service import ArtifactServiceError, get_artifact_service
 from services.folder_navigation import KbNavigationError, KbNavigationService
 from services.folder_navigation import ls_result_to_dict, tree_result_to_dict
 from services.folder_navigation import grep_result_to_dict, glob_result_to_dict
 from services.folder_navigation import read_result_to_dict
 from services.metadata_extractor import MetadataExtractor
 from services.retrieval import RetrievalService
+from services.sandbox_service import SandboxServiceError, get_sandbox_service
 from services.structured_data import (
     DatasetRegistrationInput,
     StructuredColumnInput,
@@ -467,12 +472,64 @@ class WikiCompiledWriteProbeRequest(BaseModel):
     actor: str = Field(..., min_length=1)
 
 
+class SandboxVerifyRequest(BaseModel):
+    thread_id: str = Field(..., min_length=1)
+    step: str = Field(default="two_call", pattern="^(two_call|set|get|imports)$")
+    timeout_seconds: float = Field(default=30.0, ge=1, le=120)
+    close_session: bool = False
+
+
+class SandboxVerifyExecution(BaseModel):
+    pod_name: str
+    stdout: str
+    stderr: str
+    exit_code: int
+
+
+class SandboxVerifyResponse(BaseModel):
+    thread_id: str
+    step: str
+    status: str
+    executions: list[SandboxVerifyExecution]
+
+
+class ArtifactDeliveryResponse(BaseModel):
+    id: str
+    user_id: str
+    source_kind: str
+    source_id: str
+    filename: str
+    mime_type: str
+    size: int
+    storage_path: str
+    renderable: bool
+    description: str | None = None
+    content: str | None = None
+    signed_url: str | None = None
+
+
+class ArtifactVerifyRequest(BaseModel):
+    user_id: str = Field(..., min_length=1)
+    thread_id: str = Field(..., min_length=1)
+    timeout_seconds: float = Field(default=45.0, ge=1, le=120)
+    close_session: bool = False
+
+
+class ArtifactVerifyResponse(BaseModel):
+    thread_id: str
+    status: str
+    execution: SandboxVerifyExecution
+    renderable: ArtifactDeliveryResponse
+    downloadable: ArtifactDeliveryResponse
+
+
 def require_ingest_secret(x_ingest_secret: Annotated[str | None, Header()] = None) -> None:
     if settings.ingest_secret and x_ingest_secret != settings.ingest_secret:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ingestion secret.")
 
 
 app = FastAPI(title="ArchitectOS Ingestion Backend", version="0.2.0")
+_sandbox_sweep_task: asyncio.Task | None = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -490,6 +547,165 @@ app.include_router(skills.router, prefix="/api/skills", tags=["Skills"])
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(ok=True, service="architectos-ingestion")
+
+
+@app.on_event("startup")
+async def start_sandbox_sweeper() -> None:
+    global _sandbox_sweep_task
+    if settings.gke_service_account_key and settings.supabase_url and settings.supabase_service_role_key:
+        _sandbox_sweep_task = asyncio.create_task(_sandbox_sweep_loop())
+
+
+@app.on_event("shutdown")
+async def stop_sandbox_sweeper() -> None:
+    if _sandbox_sweep_task:
+        _sandbox_sweep_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await _sandbox_sweep_task
+
+
+@app.post("/api/sandbox/verify", response_model=SandboxVerifyResponse, dependencies=[Depends(require_ingest_secret)])
+def verify_sandbox(payload: SandboxVerifyRequest) -> SandboxVerifyResponse:
+    service = get_sandbox_service()
+    executions: list[SandboxVerifyExecution] = []
+    try:
+        for code in _sandbox_verify_codes(payload.step):
+            result = service.execute_code(payload.thread_id, code, timeout_seconds=payload.timeout_seconds)
+            executions.append(
+                SandboxVerifyExecution(
+                    pod_name=result.pod_name,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    exit_code=result.exit_code,
+                )
+            )
+    except SandboxServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    finally:
+        if payload.close_session:
+            with suppress(Exception):
+                service.close_session(payload.thread_id)
+
+    return SandboxVerifyResponse(
+        thread_id=payload.thread_id,
+        step=payload.step,
+        status="ok" if all(item.exit_code == 0 for item in executions) else "error",
+        executions=executions,
+    )
+
+
+@app.get("/api/artifacts/{artifact_id}", response_model=ArtifactDeliveryResponse)
+def get_artifact(
+    artifact_id: str,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> ArtifactDeliveryResponse:
+    try:
+        result = get_artifact_service().get_delivery(artifact_id, str(user_id))
+    except ArtifactServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not load artifact: {exc}") from exc
+    return ArtifactDeliveryResponse(**result.to_dict())
+
+
+@app.delete("/api/artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def delete_artifact(
+    artifact_id: str,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> None:
+    try:
+        get_artifact_service().delete_artifact(artifact_id, str(user_id))
+    except ArtifactServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not delete artifact: {exc}") from exc
+    return None
+
+
+@app.post("/api/artifacts/verify", response_model=ArtifactVerifyResponse, dependencies=[Depends(require_ingest_secret)])
+def verify_artifacts(payload: ArtifactVerifyRequest) -> ArtifactVerifyResponse:
+    sandbox_service = get_sandbox_service()
+    artifact_service = get_artifact_service()
+    renderable_path = "/sandbox/phase6-renderable.md"
+    downloadable_path = "/sandbox/phase6-workbook.xlsx"
+    code = f"""
+from openpyxl import Workbook
+
+markdown = "# Phase 6 Artifact\\n\\nThis renderable artifact came from the live sandbox.\\n"
+open({renderable_path!r}, "w", encoding="utf-8").write(markdown)
+
+workbook = Workbook()
+sheet = workbook.active
+sheet.title = "Phase 6"
+sheet["A1"] = "artifact"
+sheet["B1"] = "ok"
+workbook.save({downloadable_path!r})
+print("phase6 artifacts written")
+"""
+    try:
+        result = sandbox_service.execute_code(payload.thread_id, code, timeout_seconds=payload.timeout_seconds)
+        execution = SandboxVerifyExecution(
+            pod_name=result.pod_name,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            exit_code=result.exit_code,
+        )
+        if result.exit_code != 0:
+            return ArtifactVerifyResponse(
+                thread_id=payload.thread_id,
+                status="error",
+                execution=execution,
+                renderable=ArtifactDeliveryResponse(**{
+                    "id": "",
+                    "user_id": payload.user_id,
+                    "source_kind": "vcso_thread",
+                    "source_id": payload.thread_id,
+                    "filename": "phase6-renderable.md",
+                    "mime_type": "text/markdown",
+                    "size": 0,
+                    "storage_path": "",
+                    "renderable": True,
+                }),
+                downloadable=ArtifactDeliveryResponse(**{
+                    "id": "",
+                    "user_id": payload.user_id,
+                    "source_kind": "vcso_thread",
+                    "source_id": payload.thread_id,
+                    "filename": "phase6-workbook.xlsx",
+                    "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "size": 0,
+                    "storage_path": "",
+                    "renderable": False,
+                }),
+            )
+        renderable = artifact_service.deliver_from_sandbox(
+            user_id=payload.user_id,
+            thread_id=payload.thread_id,
+            container_path=renderable_path,
+            filename="phase6-renderable.md",
+            description="Temporary Phase 6 renderable verification artifact.",
+        )
+        downloadable = artifact_service.deliver_from_sandbox(
+            user_id=payload.user_id,
+            thread_id=payload.thread_id,
+            container_path=downloadable_path,
+            filename="phase6-workbook.xlsx",
+            description="Temporary Phase 6 downloadable verification artifact.",
+        )
+    except (SandboxServiceError, ArtifactServiceError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    finally:
+        if payload.close_session:
+            with suppress(Exception):
+                sandbox_service.close_session(payload.thread_id)
+
+    return ArtifactVerifyResponse(
+        thread_id=payload.thread_id,
+        status="ok",
+        execution=execution,
+        renderable=ArtifactDeliveryResponse(**renderable.to_dict()),
+        downloadable=ArtifactDeliveryResponse(**downloadable.to_dict()),
+    )
 
 
 @app.post("/api/ingest", response_model=IngestResponse, dependencies=[Depends(require_ingest_secret)])
@@ -1161,6 +1377,29 @@ def _run_doc_wiki_synthesis(document_id: str, user_id: str, job_id: str) -> None
         )
     except Exception:
         pass
+
+
+async def _sandbox_sweep_loop() -> None:
+    while True:
+        await asyncio.sleep(300)
+        with suppress(Exception):
+            await asyncio.to_thread(get_sandbox_service().sweep_idle_sessions_once)
+
+
+def _sandbox_verify_codes(step: str) -> list[str]:
+    if step == "set":
+        return ["_architectos_phase5_probe = 'phase5-state-ok'\nprint('set ok')"]
+    if step == "get":
+        return ["print(_architectos_phase5_probe)"]
+    if step == "imports":
+        return [
+            "import pandas, numpy, docx, pptx, openpyxl, matplotlib, IPython, ipykernel\n"
+            "print('all imports OK')"
+        ]
+    return [
+        "_architectos_phase5_probe = 'phase5-state-ok'\nprint('set ok')",
+        "print(_architectos_phase5_probe)",
+    ]
 
 
 def _validate_user_scoped_path(user_id: str, storage_path: str) -> None:

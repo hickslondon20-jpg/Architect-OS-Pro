@@ -42,6 +42,21 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=64, validation_alias="ARCHITECTOS_EMBEDDING_BATCH_SIZE")
     chunk_size_tokens: int = Field(default=1000, validation_alias="ARCHITECTOS_CHUNK_SIZE_TOKENS")
     chunk_overlap_tokens: int = Field(default=200, validation_alias="ARCHITECTOS_CHUNK_OVERLAP_TOKENS")
+    gcp_project_id: str | None = Field(default=None, validation_alias="ARCHITECTOS_GCP_PROJECT_ID")
+    gcp_region: str = Field(default="us-west2", validation_alias="ARCHITECTOS_GCP_REGION")
+    gke_cluster_name: str = Field(
+        default="architectos-sandbox-cluster",
+        validation_alias="ARCHITECTOS_GKE_CLUSTER_NAME",
+    )
+    gke_service_account_key: str | None = Field(
+        default=None,
+        validation_alias="ARCHITECTOS_GKE_SERVICE_ACCOUNT_KEY",
+    )
+    sandbox_image: str = Field(
+        default="us-west2-docker.pkg.dev/architectos-sandbox/sandbox-images/sandbox-python:latest",
+        validation_alias="ARCHITECTOS_SANDBOX_IMAGE",
+    )
+    sandbox_idle_ttl_minutes: int = Field(default=20, validation_alias="ARCHITECTOS_SANDBOX_IDLE_TTL_MINUTES")
 
     @property
     def allowed_origins(self) -> list[str]:

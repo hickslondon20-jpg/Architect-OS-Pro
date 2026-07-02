@@ -3,6 +3,7 @@ import { Check, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Message } from '../../../lib/virtualCsoApi';
 import { AgentStepsPanel } from './AgentStepsPanel';
+import { ArtifactDeliveryCard } from './ArtifactDeliveryCard';
 
 /**
  * One chat message.
@@ -10,7 +11,10 @@ import { AgentStepsPanel } from './AgentStepsPanel';
  * - assistant: left-aligned reader text with copy affordance.
  * No edit / regenerate. No create-doc card.
  */
-export const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
+export const MessageBubble: React.FC<{
+  message: Message;
+  onOpenArtifact?: (artifactId: string) => void;
+}> = ({ message, onOpenArtifact }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
 
@@ -35,6 +39,9 @@ export const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
       {message.agentSteps && message.agentSteps.length > 0 && (
         <AgentStepsPanel steps={message.agentSteps} />
       )}
+      {message.artifactDeliveries?.map((artifact) => (
+        <ArtifactDeliveryCard key={artifact.id} artifact={artifact} onOpenArtifact={onOpenArtifact} />
+      ))}
       <div className="os-reader-markdown w-full text-sm">
         <ReactMarkdown>{message.content}</ReactMarkdown>
       </div>

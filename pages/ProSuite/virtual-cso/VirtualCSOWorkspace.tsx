@@ -8,6 +8,7 @@ import { EmptyState } from '../../../components/pro-suite/virtual-cso/EmptyState
 import { Reader } from '../../../components/pro-suite/shared/Reader';
 import { Button } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
+import { getArtifact, type ArtifactDelivery } from '../../../lib/artifactsApi';
 import {
   createProject,
   createThread,
@@ -30,6 +31,7 @@ import {
 } from '../../../lib/virtualCsoApi';
 
 type View = 'chat' | 'project' | 'new';
+const ARTIFACT_READER_PREFIX = 'artifact:';
 
 const ProjectView: React.FC<{
   project: Project;
@@ -101,6 +103,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [readerPageId, setReaderPageId] = useState<string | null>(null);
+  const [readerArtifact, setReaderArtifact] = useState<ArtifactDelivery | null>(null);
   const [linkedFolder, setLinkedFolder] = useState<string | null>('Financial');
   const [projects, setProjects] = useState<Project[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -148,6 +151,17 @@ export const VirtualCSOWorkspace: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Could not load messages.'),
     );
   }, [activeChatId]);
+
+  useEffect(() => {
+    if (!readerPageId?.startsWith(ARTIFACT_READER_PREFIX)) {
+      setReaderArtifact(null);
+      return;
+    }
+    const artifactId = readerPageId.slice(ARTIFACT_READER_PREFIX.length);
+    getArtifact(artifactId)
+      .then(setReaderArtifact)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load artifact.'));
+  }, [readerPageId]);
 
   const openChat = async (chatId: string) => {
     const chat = getChatById(chats, chatId);
@@ -324,13 +338,23 @@ export const VirtualCSOWorkspace: React.FC = () => {
     await refreshLists();
   };
 
+  const openArtifactInReader = (artifactId: string) => {
+    setReaderPageId(`${ARTIFACT_READER_PREFIX}${artifactId}`);
+  };
+
   const activeChat: Chat | undefined = activeChatId ? getChatById(chats, activeChatId) : undefined;
   const activeProject = activeChat?.projectId ? getProjectById(projects, activeChat.projectId) : undefined;
   const activeProjectForView = activeProjectId ? getProjectById(projects, activeProjectId) : undefined;
   const projectChats = activeProjectId ? getChatsForProject(chats, activeProjectId) : [];
   const sources = activeChatId ? sourcesByChat[activeChatId] ?? getSourceRefsForChat(activeChatId) : [];
-  const readerPage = readerPageId ? getSourcePage(readerPageId) : undefined;
-
+  const readerPage = readerPageId && !readerPageId.startsWith(ARTIFACT_READER_PREFIX) ? getSourcePage(readerPageId) : undefined;
+  const activeReader = readerArtifact
+    ? {
+        title: readerArtifact.filename,
+        meta: readerArtifact.description ?? `${readerArtifact.mime_type} · ${readerArtifact.size} bytes`,
+        content: readerArtifact.content ?? '',
+      }
+    : readerPage;
   const crumbs =
     view === 'chat' && activeChat
       ? [
@@ -414,7 +438,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
           </button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <ChatThread crumbs={crumbs} messages={messages} />
+          <ChatThread crumbs={crumbs} messages={messages} onOpenArtifact={openArtifactInReader} />
         </div>
         <Composer
           linkedFolder={linkedFolder}
@@ -459,11 +483,11 @@ export const VirtualCSOWorkspace: React.FC = () => {
         )}
 
         <Reader
-          open={!!readerPage}
+          open={!!activeReader}
           onClose={() => setReaderPageId(null)}
-          title={readerPage?.title}
-          meta={readerPage?.meta}
-          content={readerPage?.content}
+          title={activeReader?.title}
+          meta={activeReader?.meta}
+          content={activeReader?.content}
         />
       </div>
     </div>

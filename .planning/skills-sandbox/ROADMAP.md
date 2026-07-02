@@ -19,9 +19,9 @@ Delivers a founder-facing skills system (global admin-owned + private founder-ow
 - [x] **Phase 2: Persistent Tool Memory** — Shared tool-call-result persistence across all tool-calling surfaces (Done 2026-07-01)
 - [x] **Phase 3: Skill Discovery & Routing** — Extend `classify()` for private + global scoring; add explicit invocation (Done 2026-07-01)
 - [x] **Phase 4: Skill Creation & Skills Library UI** — Manual form, AI-guided flow, ZIP import/export, Skills Library tab (Done 2026-07-01, incl. refinement pass — see phase folder `04-04-PLAN.md`)
-- [ ] **Phase 5: Sandbox Infrastructure** — GKE Autopilot cluster, `llm-sandbox` Kubernetes backend, custom image, session persistence
-- [ ] **Phase 6: Artifacts & Delivery Experience** — Shared `artifacts` bucket/table; renderable vs. non-renderable delivery paths
-- [ ] **Phase 7: Sandbox Tool Integration (Virtual CSO)** — `execute_code` + `read_skill_file` wired end-to-end
+- [x] **Phase 5: Sandbox Infrastructure** — GKE Autopilot cluster, `llm-sandbox` Kubernetes backend, custom image, session persistence (Done 2026-07-01)
+- [x] **Phase 6: Artifacts & Delivery Experience** — Shared `artifacts` bucket/table; renderable vs. non-renderable delivery paths (Done 2026-07-02)
+- [x] **Phase 7: Sandbox Tool Integration (Virtual CSO)** — `execute_code` + `read_skill_file` wired end-to-end (Done 2026-07-02)
 
 ---
 
@@ -142,9 +142,9 @@ actual intent, both traced to stale/incomplete plan inputs rather than execution
 | 2. Persistent Tool Memory | **Done** | 2026-07-01 |
 | 3. Skill Discovery & Routing | **Done** | 2026-07-01 |
 | 4. Skill Creation & Skills Library UI | **Done** | 2026-07-01 |
-| 5. Sandbox Infrastructure | Not Started | — |
-| 6. Artifacts & Delivery Experience | Not Started | — |
-| 7. Sandbox Tool Integration (Virtual CSO) | Not Started | — |
+| 5. Sandbox Infrastructure | **Done** | 2026-07-01 |
+| 6. Artifacts & Delivery Experience | **Done** | 2026-07-02 |
+| 7. Sandbox Tool Integration (Virtual CSO) | **Done** | 2026-07-02 |
 
 ---
 *Roadmap created: 2026-07-01*

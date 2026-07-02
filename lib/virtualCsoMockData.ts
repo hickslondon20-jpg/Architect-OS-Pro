@@ -40,6 +40,7 @@ export interface Message {
   content: string;
   createdAt: string;
   agentSteps?: AgentStep[];
+  artifactDeliveries?: import('./artifactsApi').ArtifactDelivery[];
 }
 
 export type SourceKind = 'wiki' | 'platform' | 'ip' | 'context';

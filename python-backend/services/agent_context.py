@@ -326,5 +326,7 @@ def _safe_scope_snapshot(context_scope: dict[str, Any]) -> dict[str, Any]:
         "wiki_query",
         "page_key",
         "claim_id",
+        "thread_id",
+        "skill_file_ids",
     }
     return {key: value for key, value in context_scope.items() if key in allowed_keys}

@@ -94,9 +94,45 @@ this backend. **Corrective steps:**
    "+ Custom Domain" flow in Networking. This only touches that subdomain's DNS records, not the apex, so
    it won't conflict with Vercel again.
 
-Not yet confirmed: whether steps 1–3 above have been completed. Independent verification (hitting
-`/docs` on the final backend URL, confirming `architectospro.com` still resolves to Vercel) is still
-pending once London finishes these corrections.
+**Resolved and independently verified, 2026-07-01.** All corrections completed and confirmed:
+`architectospro.com`/`www` resolve to Vercel (fetched directly, real app content returned);
+`api.architectospro.com` resolves to this Railway service.
+
+**Two further issues surfaced during this process, both found and fixed:**
+1. **Repo was never pushed.** Git investigation found 407 changed/untracked files that had never been
+   committed — the entire skills sandbox build (Phases 1–4), KB Explorer, doc-wiki, and wiki-system work
+   existed only locally. `origin/main` on GitHub was frozen at an early "pre-launch" snapshot, which is
+   why the deployed backend only exposed 3 routes (`/api/health`, `/api/ingest`, `/api/retrieve`).
+   Resolved: `.gitignore` updated to exclude `__pycache__`/`.pytest_cache`, London committed and pushed
+   everything from her own machine (commit `a186ee4`, confirmed matching on `origin/main` via
+   `git ls-remote`).
+2. **Startup crash on the new deploy.** `routers/skills.py`'s `delete_skill` and
+   `routers/kb_folders.py`'s `delete_folder` were both declared `status_code=204` with a `-> None` return
+   annotation and no explicit `response_model=None` — this FastAPI version infers a response model from
+   the return annotation that conflicts with "204 must have no body," crashing the entire app at startup
+   (every route fails, not just these two, since route registration happens once at import time). Fixed
+   by adding `response_model=None` to both decorators; searched the rest of `python-backend/` for the
+   same 204/304 pattern and found no other instances.
+
+**Final independent verification:** `/api/health` confirmed live in-browser
+(`{"ok":true,"service":"architectos-ingestion"}`); `/openapi.json` (cache-busted, since Cloudflare is
+edge-caching this route — see note below) confirmed the full route set is live: `/api/skills`,
+`/api/skills/guided-draft`, `/api/skills/import`, `/api/skills/{skill_id}/export`, all `/api/tools/*`,
+all `/api/doc-wiki/*`.
+
+**Non-blocking follow-ups noted, not yet actioned:**
+- Cloudflare is edge-caching GET responses on `api.architectospro.com` (confirmed — the plain
+  `/openapi.json` URL served a stale cached copy well after the real deploy went live; a cache-busting
+  query param showed the real, current response). An API backend generally shouldn't be cached at the
+  edge — worth adding a Cloudflare cache-bypass rule for `api.architectospro.com/*`.
+- A stray `temp_superpowers` directory was committed as a git submodule reference (mode `160000`,
+  pointing at a dangling commit hash with no `.gitmodules` entry), and a 0-byte `scratch_delete_test.tmp`
+  file (debris from this session's own troubleshooting) was swept into the same commit. Neither is
+  harmful, both are worth a small cleanup commit.
+- **A hard environment limitation surfaced during this process:** the Orchestration Agent's sandbox
+  cannot delete or rename any file in this connected folder (confirmed via multiple failed `rm` attempts,
+  including on a freshly-created scratch file) — all git/file delete operations in this repo must be run
+  by London directly on her own machine going forward, not delegated to this agent.
 
 ## Sequencing relative to Phase 5
 

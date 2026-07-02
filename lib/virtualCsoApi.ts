@@ -13,6 +13,7 @@ import {
   type SourceRef,
   type AgentStep,
 } from './virtualCsoMockData';
+import { getArtifact, type ArtifactDelivery } from './artifactsApi';
 
 export { INSIGHT_STARTERS, MOCK_SOURCE_REFS, SOURCE_KIND_LABELS };
 export type { Chat, InsightStarter, Message, Project, SourceKind, SourcePage, SourceRef };
@@ -106,6 +107,7 @@ type AgentDelegationStepRow = {
 
 type AgentDelegationRunWithSteps = {
   assistant_message_id?: string | null;
+  structured_result?: { artifact_id?: string | null } | null;
   agent_delegation_steps?: AgentDelegationStepRow[] | null;
 };
 
@@ -122,13 +124,14 @@ const toAgentStep = (step: AgentDelegationStepRow): AgentStep => ({
   status: step.status ?? undefined,
 });
 
-const toMessage = (row: any, agentSteps?: AgentStep[]): Message => ({
+const toMessage = (row: any, agentSteps?: AgentStep[], artifactDeliveries?: ArtifactDelivery[]): Message => ({
   id: row.id,
   chatId: row.thread_id ?? row.chatId,
   role: row.role,
   content: row.content,
   createdAt: row.created_at ?? row.createdAt,
   agentSteps,
+  artifactDeliveries,
 });
 
 const rememberSources = (chatId: string, sources: SourceRef[] = [], pages: SourcePage[] = []) => {
@@ -139,7 +142,7 @@ const rememberSources = (chatId: string, sources: SourceRef[] = [], pages: Sourc
 const parseSseStream = async (
   response: Response,
   handlers: {
-    onEvent: (event: string, payload: any) => void;
+    onEvent: (event: string, payload: any) => void | Promise<void>;
   },
 ) => {
   if (!response.body) throw new Error('WS5 stream did not return a body.');
@@ -157,7 +160,7 @@ const parseSseStream = async (
       const event = rawEvent.split('\n').find((line) => line.startsWith('event: '))?.slice(7) ?? 'message';
       const data = rawEvent.split('\n').find((line) => line.startsWith('data: '))?.slice(6);
       if (!data) continue;
-      handlers.onEvent(event, JSON.parse(data));
+      await handlers.onEvent(event, JSON.parse(data));
     }
   }
 };
@@ -205,11 +208,12 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
     .filter((row) => row.role === 'assistant')
     .map((row) => row.id);
   const stepsByMessageId = new Map<string, AgentStep[]>();
+  const artifactIdsByMessageId = new Map<string, string[]>();
 
   if (assistantMessageIds.length > 0) {
     const runsResult = await supabase
       .from('agent_delegation_runs')
-      .select('assistant_message_id,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary)')
+      .select('assistant_message_id,structured_result,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary)')
       .eq('user_id', userId)
       .in('assistant_message_id', assistantMessageIds);
     if (runsResult.error) throw runsResult.error;
@@ -223,10 +227,29 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
           .sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0))
           .map(toAgentStep),
       ]);
+      const artifactId = run.structured_result?.artifact_id;
+      if (artifactId) {
+        const existingArtifactIds = artifactIdsByMessageId.get(run.assistant_message_id) ?? [];
+        artifactIdsByMessageId.set(run.assistant_message_id, [...existingArtifactIds, artifactId]);
+      }
     }
   }
 
-  return messageRows.map((row) => toMessage(row, stepsByMessageId.get(row.id)));
+  const artifactsByMessageId = new Map<string, ArtifactDelivery[]>();
+  await Promise.all(
+    Array.from(artifactIdsByMessageId.entries()).map(async ([messageId, artifactIds]) => {
+      const artifacts = (
+        await Promise.all(
+          Array.from(new Set(artifactIds)).map((artifactId) =>
+            getArtifact(artifactId).catch(() => null),
+          ),
+        )
+      ).filter((artifact): artifact is ArtifactDelivery => Boolean(artifact));
+      if (artifacts.length > 0) artifactsByMessageId.set(messageId, artifacts);
+    }),
+  );
+
+  return messageRows.map((row) => toMessage(row, stepsByMessageId.get(row.id), artifactsByMessageId.get(row.id)));
 };
 
 export const createProject = async (name: string): Promise<Project> => {
@@ -304,7 +327,7 @@ export const sendUserMessage = async (
   let assembledContext: Ws5AssembledContextMeta | null = null;
 
   await parseSseStream(response, {
-    onEvent: (event, payload) => {
+    onEvent: async (event, payload) => {
       if (event === 'ready') {
         userMessage = toMessage(payload.userMessage);
         route = payload.route;
@@ -322,7 +345,12 @@ export const sendUserMessage = async (
       }
       if (event === 'done') {
         chat = payload.chat;
-        assistantMessage = toMessage(payload.assistantMessage);
+        const artifact = payload.artifactId ? await getArtifact(payload.artifactId).catch(() => null) : null;
+        assistantMessage = toMessage(
+          payload.assistantMessage,
+          payload.assistantMessage?.agentSteps,
+          artifact ? [artifact] : undefined,
+        );
         sources = payload.sources ?? [];
         sourcePages = payload.sourcePages ?? [];
         if (assistantMessage) rememberSources(assistantMessage.chatId, sources, sourcePages);
