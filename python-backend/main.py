@@ -304,11 +304,13 @@ class AgentRunResponse(BaseModel):
 class WikiCompileRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
     page_key: str = Field(..., min_length=1)
+    force: bool = False
 
 
 class WikiCompileEventRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
     event: str = Field(..., min_length=1)
+    force: bool = False
 
 
 class DocWikiSynthesizeRequest(BaseModel):
@@ -352,6 +354,8 @@ class WikiCompileResponse(BaseModel):
     digest_generated_at: str
     rebuilt_pages: list[str]
     validation_counts: dict[str, int]
+    synthesis_used: bool = False
+    skipped: bool = False
 
 
 class WikiEvidencePayload(BaseModel):
@@ -704,7 +708,7 @@ def start_agent_run(payload: AgentRunRequest) -> AgentRunResponse:
 @app.post("/api/wiki/compile-page", response_model=WikiCompileResponse, dependencies=[Depends(require_ingest_secret)])
 def compile_wiki_page(payload: WikiCompileRequest) -> WikiCompileResponse:
     try:
-        result = WikiCompilationService.from_env().compile_page(payload.user_id, payload.page_key)
+        result = WikiCompilationService.from_env().compile_page(payload.user_id, payload.page_key, force=payload.force)
     except WikiCompilationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except VectorStoreError as exc:
@@ -715,7 +719,7 @@ def compile_wiki_page(payload: WikiCompileRequest) -> WikiCompileResponse:
 @app.post("/api/wiki/compile-event", response_model=list[WikiCompileResponse], dependencies=[Depends(require_ingest_secret)])
 def compile_wiki_event(payload: WikiCompileEventRequest) -> list[WikiCompileResponse]:
     try:
-        results = WikiCompilationService.from_env().compile_event(payload.user_id, payload.event)
+        results = WikiCompilationService.from_env().compile_event(payload.user_id, payload.event, force=payload.force)
     except WikiCompilationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except VectorStoreError as exc:
