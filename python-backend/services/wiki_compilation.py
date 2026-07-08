@@ -20,7 +20,12 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import anthropic
-from langsmith.wrappers import wrap_anthropic
+
+try:
+    from langsmith.wrappers import wrap_anthropic
+except Exception:  # pragma: no cover - defensive: never let optional tracing take the app down
+    def wrap_anthropic(client):  # type: ignore[no-redef]
+        return client
 
 from core.config import get_settings
 from core.wiki_schema import event_rebuild_targets, get_wiki_schema, valid_page_key
