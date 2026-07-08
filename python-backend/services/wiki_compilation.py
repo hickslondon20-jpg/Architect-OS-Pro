@@ -383,11 +383,32 @@ class WikiCompilationService:
 
         one_line = _short(narrative, 220) if narrative else _one_line(page_config["title"], all_sources, claims)
 
-        page_embedding = self.store.embed_query(f"{page_config['title']}\n{one_line}")
+        # Resilience: an embedding-provider failure (invalid/expired key, quota, transient
+        # network error) must not take down an otherwise-successful compile - the claims and
+        # narrative above are still real and worth persisting. Confirmed live (2026-07-08): an
+        # unwrapped OpenAI 401 here aborted the entire compile_event loop, including pages that
+        # hadn't even been reached yet. Fall back to a null embedding and let the write proceed;
+        # semantic search on this page just won't pick up the new content until the next
+        # successful compile.
+        try:
+            page_embedding = self.store.embed_query(f"{page_config['title']}\n{one_line}")
+        except Exception as exc:
+            logger.warning(
+                "wiki_compilation: page embedding failed for page_key=%s user=%s: %s", page_key, user_id, exc
+            )
+            page_embedding = None
+
         if claims:
-            claim_embeddings = self.store._embed_texts([claim["text"] for claim in claims])
-            for claim, embedding in zip(claims, claim_embeddings, strict=True):
-                claim["embedding"] = embedding
+            try:
+                claim_embeddings = self.store._embed_texts([claim["text"] for claim in claims])
+                for claim, embedding in zip(claims, claim_embeddings, strict=True):
+                    claim["embedding"] = embedding
+            except Exception as exc:
+                logger.warning(
+                    "wiki_compilation: claim embeddings failed for page_key=%s user=%s: %s", page_key, user_id, exc
+                )
+                for claim in claims:
+                    claim["embedding"] = None
 
         digest = self._build_digest_payload(user_id, page_key, page_config["title"], one_line, claims)
         # Always record whether this compile actually used the LLM synthesis or fell back to
