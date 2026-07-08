@@ -89,9 +89,9 @@ class SubAgentOrchestrator:
             elif capability.capability_key == "structured_data_agent":
                 result = self._handle_structured_data(context)
             elif capability.capability_key == "kb_explorer_agent":
-                result = self._handle_kb_explorer(context)
+                result = self._handle_kb_explorer(context, capability, run_id, request.parent_thread_id)
             elif capability.capability_key == "sandbox_execution_agent":
-                result = self._handle_sandbox_execution(context, capability)
+                result = self._handle_sandbox_execution(context, capability, run_id)
             elif capability.capability_key == "per_user_wiki":
                 result = self._handle_per_user_wiki(context)
             elif capability.capability_key == "per_user_document_wiki":
@@ -319,11 +319,19 @@ class SubAgentOrchestrator:
         result_summary = f"Reviewed {len(context.datasets)} dataset(s)."
         return _handler_result(result_summary, findings, context.sources, confidence=0.7)
 
-    def _handle_kb_explorer(self, context: AgentContextBundle) -> dict[str, Any]:
+    def _handle_kb_explorer(
+        self,
+        context: AgentContextBundle,
+        capability: AgentCapability,
+        run_id: str,
+        parent_thread_id: str | None,
+    ) -> dict[str, Any]:
         """Run the KB Explorer sub-agent tool-use loop."""
-        exploration = KbExplorerService(self.store).run_exploration(
+        exploration = KbExplorerService(self.store, model_setting_key=capability.model_setting_key).run_exploration(
             user_id=context.user_id,
             task_summary=context.task_summary,
+            thread_id=parent_thread_id or context.context_scope.get("thread_id"),
+            run_id=run_id,
             max_rounds=5,
         )
 
@@ -369,6 +377,7 @@ class SubAgentOrchestrator:
         self,
         context: AgentContextBundle,
         capability: AgentCapability,
+        run_id: str,
     ) -> dict[str, Any]:
         """Run the Sandbox Execution sub-agent tool-use loop."""
         thread_id = str(context.context_scope.get("thread_id") or "").strip()
@@ -380,13 +389,15 @@ class SubAgentOrchestrator:
         timeout_seconds = _safe_float(default_config.get("timeout_seconds"), default=90.0, minimum=1.0, maximum=180.0)
         skill_file_ids = _safe_string_list(context.context_scope.get("skill_file_ids"))
 
-        execution = SandboxExecutionService.from_env().run_execution(
+        execution = SandboxExecutionService.from_env(model_setting_key=capability.model_setting_key).run_execution(
             user_id=context.user_id,
             thread_id=thread_id,
             task_summary=context.task_summary,
             skill_file_ids=skill_file_ids,
+            run_id=run_id,
             max_rounds=max_rounds,
             timeout_seconds=timeout_seconds,
+            surface=context.parent_surface,
         )
 
         artifact = None

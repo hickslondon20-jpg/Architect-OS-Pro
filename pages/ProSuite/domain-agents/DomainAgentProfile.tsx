@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Send } from 'lucide-react';
 import {
@@ -6,50 +6,88 @@ import {
   SectionEyebrow,
   StatusChip,
 } from '../../../components/pro-suite/domain-agents/DomainAgentPrimitives';
-import { domainAgents, domainArtifacts, domainTasks, getAgent } from './mockDomainAgents';
+import { getDomainAgentProfile, submitFreeformRequest, type DomainAgentProfilePayload } from '../../../lib/domainAgentsApi';
+import { createTask } from '../../../lib/tasksApi';
 import type { DomainAgentId, RequestCaptureEntry } from './types';
 
 const isDomainAgentId = (value: string | undefined): value is DomainAgentId =>
-  !!value && domainAgents.some((agent) => agent.id === value);
+  value === 'financial' || value === 'client' || value === 'operational' || value === 'team' || value === 'stewardship';
 
 export const DomainAgentProfile: React.FC = () => {
   const { agentId } = useParams();
   const navigate = useNavigate();
   const [ask, setAsk] = useState('');
   const [requestLog, setRequestLog] = useState<RequestCaptureEntry[]>([]);
+  const [profile, setProfile] = useState<DomainAgentProfilePayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const validAgentId = isDomainAgentId(agentId) ? agentId : null;
 
-  if (!isDomainAgentId(agentId)) {
+  useEffect(() => {
+    if (!validAgentId) return;
+    let mounted = true;
+    getDomainAgentProfile(validAgentId)
+      .then((payload) => {
+        if (!mounted) return;
+        setProfile(payload);
+        setError(null);
+      })
+      .catch((err) => mounted && setError(err instanceof Error ? err.message : 'Could not load this agent.'));
+    return () => {
+      mounted = false;
+    };
+  }, [validAgentId]);
+
+  const agent = profile?.agent;
+  const recentTasks = profile?.recentTasks ?? [];
+  const recentArtifacts = profile?.recentArtifacts ?? [];
+  const workflowsById = useMemo(() => new Map((agent?.workflows ?? []).map((workflow) => [workflow.id, workflow])), [agent]);
+
+  const launchWorkflow = async (workflowId: string) => {
+    if (!agent?.uuid || !workflowId) return;
+    try {
+      const workflow = workflowsById.get(workflowId);
+      const task = await createTask({
+        agentId: agent.uuid,
+        workflowId,
+        title: workflow?.defaultTaskTitle ?? workflow?.name ?? null,
+      });
+      navigate(`/pro/intelligence/domain-agents/tasks/${task.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not launch workflow.');
+    }
+  };
+
+  const submitAsk = async () => {
+    const request = ask.trim();
+    if (!request) return;
+    setSubmitting(true);
+    try {
+      if (!validAgentId) return;
+      const result = await submitFreeformRequest(validAgentId, request);
+      setRequestLog((current) => [result.request, ...current]);
+      setAsk('');
+      if (result.mapped && result.task?.id) {
+        navigate(`/pro/intelligence/domain-agents/tasks/${result.task.id}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not capture request.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!validAgentId) {
     return <Navigate to="/pro/intelligence/domain-agents" replace />;
   }
 
-  const agent = getAgent(agentId);
-  const recentTasks = domainTasks.filter((task) => task.agentId === agent.id).slice(0, 3);
-  const recentArtifacts = domainArtifacts.filter((artifact) => artifact.agentId === agent.id).slice(0, 2);
-
-  const launchWorkflow = (workflowId: string) => {
-    const existingTask = domainTasks.find((task) => task.workflowId === workflowId);
-    navigate(`/pro/intelligence/domain-agents/tasks/${existingTask?.id ?? 'task-fin-pricing'}`);
-  };
-
-  const submitAsk = () => {
-    const request = ask.trim();
-    if (!request) return;
-    const lower = request.toLowerCase();
-    const mappedWorkflow = agent.workflows.find((workflow) => lower.includes(workflow.name.toLowerCase().split(' ')[0]));
-
-    // Open decision: out-of-scope guardrails are placeholder only in this wireframe.
-    setRequestLog((current) => [
-      {
-        id: `request-${Date.now()}`,
-        agentId: agent.id,
-        request,
-        mappedWorkflowId: mappedWorkflow?.id,
-        capturedAt: 'Just now',
-      },
-      ...current,
-    ]);
-    setAsk('');
-  };
+  if (!agent) {
+    return (
+      <div className="rounded-[var(--radius-md)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--fg-3)]">
+        {error ?? 'Loading agent...'}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -71,6 +109,12 @@ export const DomainAgentProfile: React.FC = () => {
           All agents
         </Link>
       </div>
+
+      {error && (
+        <div className="rounded-[var(--radius-sm)] border border-[var(--aos-risk)] bg-[var(--aos-risk-tint)] px-4 py-3 text-sm text-[var(--aos-risk)]">
+          {error}
+        </div>
+      )}
 
       <section>
         <SectionEyebrow>What it does</SectionEyebrow>
@@ -96,6 +140,7 @@ export const DomainAgentProfile: React.FC = () => {
             <button
               key={starter.text}
               onClick={() => launchWorkflow(starter.workflowId)}
+              disabled={!starter.workflowId}
               className="max-w-[280px] rounded-[var(--radius-sm)] border border-dashed border-[var(--aos-steel-blue)] bg-[var(--bg-sunken)] px-4 py-3 text-left text-sm leading-relaxed text-[var(--aos-slate-blue)] transition-colors hover:border-[var(--aos-brass)] hover:bg-[var(--bg-surface)]"
             >
               "{starter.text}"
@@ -136,14 +181,11 @@ export const DomainAgentProfile: React.FC = () => {
               placeholder={`Ask the ${agent.shortName} Agent to analyze or produce something...`}
               className="aos-input flex-1"
             />
-            <button className="aos-btn aos-btn--primary" onClick={submitAsk}>
+            <button className="aos-btn aos-btn--primary" onClick={submitAsk} disabled={submitting}>
               <Send className="h-4 w-4" />
-              Capture request
+              {submitting ? 'Capturing...' : 'Capture request'}
             </button>
           </div>
-          <p className="mt-3 text-xs leading-relaxed text-[var(--fg-3)]">
-            Placeholder only: requests are captured locally for roadmap signal. Net-new guardrails are intentionally not decided in this pass.
-          </p>
           {requestLog.length > 0 && (
             <div className="mt-4 space-y-2">
               {requestLog.map((entry) => (
@@ -176,6 +218,11 @@ export const DomainAgentProfile: React.FC = () => {
                 <StatusChip status={task.status} />
               </Link>
             ))}
+            {recentTasks.length === 0 && (
+              <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--aos-mist)] px-4 py-6 text-sm text-[var(--fg-3)]">
+                No recent tasks yet.
+              </div>
+            )}
           </div>
         </div>
 
@@ -192,6 +239,11 @@ export const DomainAgentProfile: React.FC = () => {
                 <span className="text-xs capitalize text-[var(--fg-3)]">{artifact.type} / {artifact.createdAt}</span>
               </Link>
             ))}
+            {recentArtifacts.length === 0 && (
+              <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--aos-mist)] px-4 py-6 text-sm text-[var(--fg-3)]">
+                No artifacts yet.
+              </div>
+            )}
           </div>
         </div>
       </section>

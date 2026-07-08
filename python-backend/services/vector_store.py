@@ -7,10 +7,12 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from langsmith.wrappers import wrap_openai
 from openai import OpenAI, OpenAIError
 from supabase import Client, create_client
 
 from core.config import Settings, get_settings
+from services.usage_events import log_ai_usage_event, openai_embedding_usage
 
 if TYPE_CHECKING:
     from services.doc_processor import DocumentChunk
@@ -20,6 +22,9 @@ T = TypeVar('T')
 
 class VectorStoreError(RuntimeError):
     pass
+
+
+RAW_DOCUMENT_SIGNED_URL_EXPIRES_SECONDS = 300
 
 
 class VectorStore:
@@ -35,7 +40,7 @@ class VectorStore:
             raise VectorStoreError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.")
         return cls(
             create_client(settings.supabase_url, settings.supabase_service_role_key),
-            OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None,
+            wrap_openai(OpenAI(api_key=settings.openai_api_key)) if settings.openai_api_key else None,
             settings,
         )
 
@@ -44,6 +49,27 @@ class VectorStore:
             return self.client.storage.from_(self.settings.raw_document_bucket).download(storage_path)
         except Exception as exc:
             raise VectorStoreError(f"Could not download raw document: {exc}") from exc
+
+    def create_raw_document_signed_url(
+        self,
+        storage_path: str,
+        expires_seconds: int = RAW_DOCUMENT_SIGNED_URL_EXPIRES_SECONDS,
+    ) -> str:
+        try:
+            response = self.client.storage.from_(self.settings.raw_document_bucket).create_signed_url(
+                storage_path,
+                expires_seconds,
+            )
+        except Exception as exc:
+            raise VectorStoreError(f"Could not create raw document signed URL: {exc}") from exc
+
+        if isinstance(response, dict):
+            signed_url = response.get("signedURL") or response.get("signedUrl") or response.get("signed_url")
+        else:
+            signed_url = getattr(response, "signed_url", None) or getattr(response, "signedURL", None)
+        if not signed_url:
+            raise VectorStoreError("Supabase did not return a raw document signed URL.")
+        return str(signed_url)
 
     def get_document(self, document_id: str, user_id: str) -> dict[str, Any]:
         try:
@@ -242,7 +268,12 @@ class VectorStore:
     ) -> None:
         chunk_list = list(chunks)
         texts = [chunk.content for chunk in chunk_list]
-        embeddings = self._embed_texts(texts) if texts else []
+        embeddings = self._embed_texts(
+            texts,
+            user_id=user_id,
+            surface="ingestion",
+            capability_key="ingestion_embeddings",
+        ) if texts else []
         inherited_metadata = document_metadata or {}
 
         self.clear_document_chunks(document_id, user_id)
@@ -256,6 +287,9 @@ class VectorStore:
                 "embedding": embedding,
                 "embedding_model": self.settings.embedding_model,
                 "metadata": {**metadata, **inherited_metadata, **chunk.metadata},
+                "page_number": chunk.page_number,
+                "bbox": chunk.bbox,
+                "verbatim": chunk.verbatim if chunk.verbatim is not None else chunk.content,
             }
             for chunk, embedding in zip(chunk_list, embeddings, strict=True)
         ]
@@ -266,8 +300,20 @@ class VectorStore:
             except Exception as exc:
                 raise VectorStoreError(f"Could not insert document chunks: {exc}") from exc
 
-    def embed_query(self, query: str) -> list[float]:
-        embeddings = self._embed_texts([query])
+    def embed_query(
+        self,
+        query: str,
+        *,
+        user_id: str | None = None,
+        surface: str = "retrieval",
+        capability_key: str = "ingestion_embeddings",
+    ) -> list[float]:
+        embeddings = self._embed_texts(
+            [query],
+            user_id=user_id,
+            surface=surface,
+            capability_key=capability_key,
+        )
         if not embeddings:
             raise VectorStoreError("Could not generate query embedding.")
         return embeddings[0]
@@ -291,11 +337,11 @@ class VectorStore:
         setting_key: str,
         fallback_model_name: str,
         fallback_provider: str,
-    ) -> dict[str, str]:
+    ) -> dict[str, Any]:
         try:
             response = (
                 self.client.table("platform_ai_settings")
-                .select("provider,fallback_model_name,is_enabled,model_id,ai_models(provider,model_name)")
+                .select("provider,fallback_model_name,is_enabled,model_id,ai_models(provider,model_name,context_window)")
                 .eq("setting_key", setting_key)
                 .eq("is_enabled", True)
                 .limit(1)
@@ -312,6 +358,7 @@ class VectorStore:
         return {
             "provider": model_row.get("provider") or setting.get("provider") or fallback_provider,
             "model_name": model_row.get("model_name") or setting.get("fallback_model_name") or fallback_model_name,
+            "context_window": model_row.get("context_window"),
         }
 
     def resolve_platform_setting(
@@ -324,7 +371,7 @@ class VectorStore:
         try:
             response = (
                 self.client.table("platform_ai_settings")
-                .select("provider,fallback_model_name,is_enabled,settings,model_id,ai_models(provider,model_name)")
+                .select("provider,fallback_model_name,is_enabled,settings,model_id,ai_models(provider,model_name,context_window)")
                 .eq("setting_key", setting_key)
                 .limit(1)
                 .execute()
@@ -350,22 +397,50 @@ class VectorStore:
         return {
             "provider": model_row.get("provider") or setting.get("provider") or fallback_provider,
             "model_name": model_row.get("model_name") or setting.get("fallback_model_name") or fallback_model_name,
+            "context_window": model_row.get("context_window"),
             "is_enabled": bool(setting.get("is_enabled")),
             "settings": setting.get("settings") or {},
         }
 
-    def _embed_texts(self, texts: list[str]) -> list[list[float]]:
+    def _embed_texts(
+        self,
+        texts: list[str],
+        *,
+        user_id: str | None = None,
+        surface: str = "ingestion",
+        capability_key: str = "ingestion_embeddings",
+    ) -> list[list[float]]:
         if not self.openai_client:
             raise VectorStoreError("OPENAI_API_KEY is required for embedding.")
+        model = self.resolve_platform_model(
+            setting_key=capability_key,
+            fallback_model_name=self.settings.embedding_model,
+            fallback_provider="openai",
+        )
+        if model.get("provider") and model["provider"] != "openai":
+            raise VectorStoreError(f"Unsupported embedding provider: {model['provider']}")
         embeddings: list[list[float]] = []
         for batch in _batched(texts, self.settings.embedding_batch_size):
             try:
                 response = self.openai_client.embeddings.create(
-                    model=self.settings.embedding_model,
+                    model=model["model_name"],
                     input=batch,
                 )
             except OpenAIError as exc:
                 raise VectorStoreError(f"OpenAI embedding request failed: {exc}") from exc
+            if user_id:
+                usage = openai_embedding_usage(response)
+                log_ai_usage_event(
+                    self.client,
+                    user_id=user_id,
+                    surface=surface,
+                    model=model["model_name"],
+                    role="utility",
+                    provider="openai",
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    capability_key=capability_key,
+                )
             embeddings.extend([item.embedding for item in response.data])
         return embeddings
 

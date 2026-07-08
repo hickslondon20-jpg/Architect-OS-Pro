@@ -1,0 +1,48 @@
+# Phase 4 Advanced Tool Calling (Sandbox Bridge / Code Mode): deny-all egress
+# for sandbox pods.
+#
+# Rationale: the exec-channel bridge (CONTEXT.md, phases/04-sandbox-bridge/)
+# means sandbox pods never need to initiate any network connection - the host
+# drives them entirely through the authenticated Kubernetes exec channel
+# (kubectl-exec-style), reading/writing files inside the pod. Credentials
+# never enter the pod, and with this policy applied the pod also cannot
+# exfiltrate over the network even if compromised.
+#
+# Selector: llm-sandbox's Kubernetes backend labels every pod it creates with
+# `app: sandbox` (see llm_sandbox/kubernetes.py pod_manifest metadata) - this
+# targets all sandbox pods in the namespace without needing per-pod policies.
+#
+# DNS is intentionally NOT allowed. Under the exec-channel design the pod
+# never resolves a hostname or opens an outbound socket, so no port-53
+# allowance should be needed. If sandbox pods start failing in ways that
+# point to a DNS dependency (e.g. a base image doing a startup lookup), that
+# is a signal to re-examine the image, not to loosen this policy by default.
+#
+# Apply once per cluster/namespace (not per pod - pods are ephemeral):
+#   kubectl apply -f python-backend/infra/gke/sandbox-network-policy.yaml
+#
+# Verify before relying on it - GKE Autopilot must have NetworkPolicy
+# enforcement active for this to do anything (Autopilot clusters use Dataplane
+# V2 / Cilium, which enforces NetworkPolicy by default, but this has not been
+# confirmed against ArchitectOS's actual cluster from this build - no live GCP
+# credentials were available in this session). To verify on a live cluster:
+#   1. kubectl apply -f sandbox-network-policy.yaml
+#   2. Open a sandbox session (creates a pod labeled app=sandbox)
+#   3. kubectl exec <pod> -- python -c "import urllib.request;
+#      urllib.request.urlopen('https://example.com', timeout=5)"
+#      -> must fail/time out (egress denied)
+#   4. Confirm the exec-channel bridge still works end to end (kubectl exec
+#      itself is server-initiated against the pod, not pod-initiated, so it is
+#      unaffected by an egress-only policy)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: architectos-sandbox-deny-all-egress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: sandbox
+  policyTypes:
+    - Egress
+  egress: []

@@ -34,6 +34,14 @@ export type GuidedSkillDraft = Partial<SkillPayload> & {
   ready: boolean;
 };
 
+export type ConnectorCandidate = {
+  key: string;
+  label: string;
+  category: string;
+  description: string;
+  status: 'coming_soon';
+};
+
 const getBaseUrl = () => {
   if (!INGESTION_API_URL) throw new Error('Skills backend is not configured.');
   return INGESTION_API_URL.replace(/\/$/, '');
@@ -67,6 +75,14 @@ export const loadSkills = async (): Promise<SkillPack[]> => {
     headers: await getAuthHeaders(false),
   });
   if (!response.ok) throw new Error(await parseApiError(response, 'Could not load skills.'));
+  return response.json();
+};
+
+export const loadConnectorCandidates = async (): Promise<ConnectorCandidate[]> => {
+  const response = await fetch(`${getBaseUrl()}/api/skills/connectors`, {
+    headers: await getAuthHeaders(false),
+  });
+  if (!response.ok) throw new Error(await parseApiError(response, 'Could not load connector candidates.'));
   return response.json();
 };
 

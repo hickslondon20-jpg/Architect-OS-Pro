@@ -599,3 +599,9 @@ can_spawn_agents: false
 - Promotion is the **only** quarantined→trusted path; **founder-confirmation** in beta; every
   promotion is **auditable + reversible** via the action-log (A4/B4).
 - Read precedence: **override > compiled > insight**.
+
+## Additive Amendment: citation-1.0
+
+Read-tool citations MAY carry optional `verbatim` and `locator` values under the `citation-1.0`
+currency. This is an additive, backward-compatible extension for citation normalization only; the
+frozen `wiki-1.0` evidence, `AgentSourceRef[]`, and allowed-source-kind shapes above are not changed.

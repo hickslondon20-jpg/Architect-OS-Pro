@@ -9,11 +9,21 @@ from pathlib import Path
 from typing import Any
 
 import anthropic
+from langsmith.wrappers import wrap_anthropic
 from supabase import Client, create_client
 
 from core.config import get_settings
+from services.agent_capabilities import AgentCapabilityError
+from services.sandbox_bridge import BridgeFulfiller
 from services.sandbox_service import SandboxService, SandboxServiceError, get_sandbox_service
 from services.skills import SKILL_FILE_BUCKET
+from services.tool_registry import (
+    RegistryNativeScopeSource,
+    ToolExecutionContext,
+    ToolRegistry,
+    to_anthropic,
+)
+from services.usage_events import anthropic_usage, log_ai_usage_event
 
 
 PRODUCED_FILE_PATTERN = re.compile(r"^PRODUCED_FILE:\s*(?P<path>/[^\r\n]+?)\s*$", re.MULTILINE)
@@ -38,38 +48,20 @@ Rules:
 - Be concise in your final summary. State what you calculated or produced."""
 
 
-SANDBOX_EXECUTION_TOOLS: list[dict[str, Any]] = [
-    {
-        "name": "execute_code",
-        "description": (
-            "Run Python code in the persistent sandbox session for this task. Variables and "
-            "imports persist across calls. Returns stdout, stderr, and exit code. If your code "
-            "writes an output file, report it in the final summary using the PRODUCED_FILE line."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "code": {"type": "string", "description": "Python code to execute."},
-                "description": {"type": "string", "description": "Brief purpose of this code run."},
-            },
-            "required": ["code"],
-        },
-    },
-    {
-        "name": "read_skill_file",
-        "description": (
-            "Read the full text content of a file attached to the selected skill. Use a "
-            "skill_file_id from the task context."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "skill_file_id": {"type": "string", "description": "UUID of the skill file to read."},
-            },
-            "required": ["skill_file_id"],
-        },
-    },
-]
+SANDBOX_EXECUTION_TOOL_NAMES = ["execute_code", "read_skill_file"]
+SANDBOX_EXECUTION_TOOLS: list[dict[str, Any]] = to_anthropic(
+    [
+        ToolRegistry(scope_source=RegistryNativeScopeSource()).get(name)
+        for name in SANDBOX_EXECUTION_TOOL_NAMES
+    ]
+)
+
+# Code Mode (the exec-channel bridge): tools authorized for sandbox_execution_agent
+# minus these are exposed as in-code stubs. execute_code itself is excluded to
+# prevent recursion; read_skill_file stays a top-level-only tool. This is
+# independent of SANDBOX_EXECUTION_TOOLS above, which is what Claude's own
+# tool-use loop sees and does not change when agent_capabilities widens.
+CODE_MODE_EXCLUDED_TOOL_NAMES = frozenset({"execute_code", "read_skill_file"})
 
 
 @dataclass(frozen=True)
@@ -82,21 +74,31 @@ class SandboxExecutionResult:
 
 
 class SandboxExecutionService:
-    def __init__(self, sandbox_service: SandboxService, supabase_client: Client) -> None:
+    def __init__(
+        self,
+        sandbox_service: SandboxService,
+        supabase_client: Client,
+        model_setting_key: str | None = "sandbox_execution_agent",
+    ) -> None:
         self._sandbox_service = sandbox_service
         self._supabase = supabase_client
         settings = get_settings()
-        self.anthropic_client = anthropic.Anthropic(api_key=settings.anthropic_api_key or "")
+        self.anthropic_client = wrap_anthropic(anthropic.Anthropic(api_key=settings.anthropic_api_key or ""))
+        self._settings = settings
+        self.model_setting_key = model_setting_key or "sandbox_execution_agent"
         self.model = settings.claude_synthesis_model
+        self.provider = "anthropic"
+        self.tool_registry = ToolRegistry(store=_VectorStoreProxy(supabase_client, settings))
 
     @classmethod
-    def from_env(cls) -> "SandboxExecutionService":
+    def from_env(cls, model_setting_key: str | None = "sandbox_execution_agent") -> "SandboxExecutionService":
         settings = get_settings()
         if not settings.supabase_url or not settings.supabase_service_role_key:
             raise SandboxServiceError("Supabase service-role configuration is required for sandbox execution.")
         return cls(
             sandbox_service=get_sandbox_service(),
             supabase_client=create_client(settings.supabase_url, settings.supabase_service_role_key),
+            model_setting_key=model_setting_key,
         )
 
     def run_execution(
@@ -106,12 +108,21 @@ class SandboxExecutionService:
         thread_id: str,
         task_summary: str,
         skill_file_ids: list[str] | None = None,
+        run_id: str | None = None,
         max_rounds: int = 6,
         timeout_seconds: float = 90,
+        surface: str = "virtual_cso",
     ) -> SandboxExecutionResult:
         """Run a bounded native tool-use loop for sandbox execution."""
+        self._resolve_model()
         scoped_file_ids = [str(item) for item in skill_file_ids or [] if str(item).strip()]
         file_context = self._skill_file_context(scoped_file_ids)
+        code_mode_tool_names = self._resolve_code_mode_tool_names(surface)
+        bridge_fulfiller = (
+            self._build_code_mode_fulfiller(user_id=user_id, tool_names=code_mode_tool_names)
+            if code_mode_tool_names
+            else None
+        )
         messages: list[dict[str, Any]] = [
             {
                 "role": "user",
@@ -128,9 +139,23 @@ class SandboxExecutionService:
             response = self.anthropic_client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                system=SANDBOX_EXECUTION_SYSTEM_PROMPT,
-                tools=SANDBOX_EXECUTION_TOOLS,  # type: ignore[arg-type]
+                system=_build_system_prompt(code_mode_tool_names),
+                tools=SANDBOX_EXECUTION_TOOLS,
                 messages=messages,
+            )
+            usage = anthropic_usage(response)
+            log_ai_usage_event(
+                self._supabase,
+                user_id=user_id,
+                surface="virtual_cso",
+                model=self.model,
+                role="sub_agent",
+                provider=self.provider,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                thread_id=thread_id,
+                capability_key=self.model_setting_key,
+                run_id=run_id,
             )
 
             if response.stop_reason == "end_turn":
@@ -153,15 +178,16 @@ class SandboxExecutionService:
                 for block in response.content:
                     if block.type != "tool_use":
                         continue
-                    tool_result_content, step = self._dispatch_tool(
+                    tool_result_content, steps = self._dispatch_tool(
                         user_id=user_id,
                         thread_id=thread_id,
                         timeout_seconds=timeout_seconds,
                         allowed_skill_file_ids=scoped_file_ids,
                         tool_name=block.name,
                         tool_input=block.input,
+                        bridge_fulfiller=bridge_fulfiller,
                     )
-                    tool_steps.append(step)
+                    tool_steps.extend(steps)
                     tool_results.append(
                         {
                             "type": "tool_result",
@@ -189,34 +215,44 @@ class SandboxExecutionService:
         allowed_skill_file_ids: list[str],
         tool_name: str,
         tool_input: dict[str, Any],
-    ) -> tuple[str, dict[str, Any]]:
+        bridge_fulfiller: BridgeFulfiller | None = None,
+    ) -> tuple[str, list[dict[str, Any]]]:
         try:
-            result_dict = self._execute_tool(
+            envelope = self._execute_tool(
                 user_id=user_id,
                 thread_id=thread_id,
                 timeout_seconds=timeout_seconds,
                 allowed_skill_file_ids=allowed_skill_file_ids,
                 tool_name=tool_name,
                 tool_input=tool_input,
+                bridge_fulfiller=bridge_fulfiller,
             )
-            step = {
-                "tool_name": tool_name,
-                "input_summary": _safe_input_summary(tool_input),
-                "output_summary": _safe_output_summary(result_dict),
-                "summary": f"{tool_name} completed.",
-                "error": None,
-            }
-            return json.dumps(result_dict), step
+            result_dict = envelope.content
+            steps = [
+                {
+                    "tool_name": tool_name,
+                    "input_summary": _safe_input_summary(tool_input),
+                    "output_summary": _safe_output_summary(result_dict),
+                    "summary": f"{tool_name} completed.",
+                    "sources": [source.to_dict() for source in envelope.sources],
+                    "error": None,
+                }
+            ]
+            steps.extend(_bridge_call_steps(envelope.provenance.get("bridge_tool_calls")))
+            return json.dumps(result_dict), steps
         except Exception as exc:
             error_str = str(exc)
-            step = {
-                "tool_name": tool_name,
-                "input_summary": _safe_input_summary(tool_input),
-                "output_summary": {},
-                "summary": f"{tool_name} returned an error.",
-                "error": error_str,
-            }
-            return json.dumps({"error": error_str}), step
+            steps = [
+                {
+                    "tool_name": tool_name,
+                    "input_summary": _safe_input_summary(tool_input),
+                    "output_summary": {},
+                    "summary": f"{tool_name} returned an error.",
+                    "sources": [],
+                    "error": error_str,
+                }
+            ]
+            return json.dumps({"error": error_str}), steps
 
     def _execute_tool(
         self,
@@ -227,29 +263,46 @@ class SandboxExecutionService:
         allowed_skill_file_ids: list[str],
         tool_name: str,
         tool_input: dict[str, Any],
-    ) -> dict[str, Any]:
-        if tool_name == "execute_code":
-            result = self._sandbox_service.execute_code(
+        bridge_fulfiller: BridgeFulfiller | None = None,
+    ):
+        return self.tool_registry.execute(
+            tool_name,
+            ToolExecutionContext(
+                user_id=user_id,
+                supabase_client=self._supabase,
+                sandbox_service=self._sandbox_service,
                 thread_id=thread_id,
-                code=str(tool_input["code"]),
                 timeout_seconds=timeout_seconds,
+                allowed_skill_file_ids=allowed_skill_file_ids,
+                metadata={"sandbox_execution_service": self, "bridge_fulfiller": bridge_fulfiller},
+            ),
+            tool_input,
+        )
+
+    def _resolve_code_mode_tool_names(self, surface: str) -> list[str]:
+        """Read/compute tools this session's Code Mode may call, host-side.
+
+        Degrades to no Code Mode tools (rather than raising) if the capability
+        isn't authorized for this surface - Code Mode is additive, not a hard
+        dependency of plain execute_code.
+        """
+        try:
+            authorized = self.tool_registry.get_tools(
+                surface=surface,
+                capability="sandbox_execution_agent",
+                format="definition",
             )
-            return {
-                "thread_id": result.thread_id,
-                "pod_name": result.pod_name,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "exit_code": result.exit_code,
-                "status": result.status,
-            }
+        except AgentCapabilityError:
+            return []
+        return [tool.name for tool in authorized if tool.name not in CODE_MODE_EXCLUDED_TOOL_NAMES]
 
-        if tool_name == "read_skill_file":
-            skill_file_id = str(tool_input.get("skill_file_id") or "").strip()
-            if skill_file_id not in set(allowed_skill_file_ids):
-                raise SandboxServiceError("Skill file is not in scope for this run.")
-            return self._read_skill_file(user_id=user_id, skill_file_id=skill_file_id)
-
-        raise SandboxServiceError(f"Unknown tool: {tool_name!r}")
+    def _build_code_mode_fulfiller(self, *, user_id: str, tool_names: list[str]) -> BridgeFulfiller:
+        context = ToolExecutionContext(
+            user_id=user_id,
+            store=_VectorStoreProxy(self._supabase, self._settings),
+            supabase_client=self._supabase,
+        )
+        return BridgeFulfiller(registry=self.tool_registry, context=context, allowed_tool_names=tool_names)
 
     def _read_skill_file(self, *, user_id: str, skill_file_id: str) -> dict[str, Any]:
         rows = (
@@ -313,6 +366,67 @@ class SandboxExecutionService:
             f"mime={row.get('mime_type') or 'unknown'} size={row.get('size') or 0}"
             for row in rows
         )
+
+    def _resolve_model(self) -> None:
+        store = _VectorStoreProxy(self._supabase, self._settings)
+        resolved = store.resolve_platform_model(
+            setting_key=self.model_setting_key,
+            fallback_model_name=self._settings.claude_synthesis_model,
+            fallback_provider="anthropic",
+        )
+        self.model = resolved["model_name"] if resolved.get("provider") == "anthropic" else self._settings.claude_synthesis_model
+
+
+class _VectorStoreProxy:
+    def __init__(self, supabase_client: Client, settings: Any) -> None:
+        self.client = supabase_client
+        self.settings = settings
+
+    def resolve_platform_model(self, *, setting_key: str, fallback_model_name: str, fallback_provider: str) -> dict[str, str]:
+        from services.vector_store import VectorStore
+
+        return VectorStore(self.client, None, self.settings).resolve_platform_model(
+            setting_key=setting_key,
+            fallback_model_name=fallback_model_name,
+            fallback_provider=fallback_provider,
+        )
+
+
+def _build_system_prompt(code_mode_tool_names: list[str]) -> str:
+    if not code_mode_tool_names:
+        return SANDBOX_EXECUTION_SYSTEM_PROMPT
+    tool_list = ", ".join(sorted(code_mode_tool_names))
+    return (
+        f"{SANDBOX_EXECUTION_SYSTEM_PROMPT}\n\n"
+        "Code Mode: the Python code you run via execute_code can also call these read-only "
+        f"platform tools directly as plain functions, without a separate tool_use round trip: {tool_list}. "
+        'Call them like normal Python functions (e.g. kb_grep(pattern="revenue")); each call blocks '
+        "briefly while the platform resolves it host-side and raises an exception if it fails. Results "
+        "match the same structure the platform returns everywhere else. These functions are only "
+        "available inside sandbox code, not in your own top-level tool list."
+    )
+
+
+def _bridge_call_steps(bridge_calls: Any) -> list[dict[str, Any]]:
+    if not isinstance(bridge_calls, list):
+        return []
+    steps: list[dict[str, Any]] = []
+    for call in bridge_calls:
+        if not isinstance(call, dict):
+            continue
+        tool_name = str(call.get("tool_name") or "")
+        ok = bool(call.get("ok"))
+        steps.append(
+            {
+                "tool_name": tool_name,
+                "input_summary": {},
+                "output_summary": {},
+                "summary": f"Code Mode called {tool_name}." if ok else f"Code Mode call to {tool_name} failed.",
+                "sources": [],
+                "error": None if ok else str(call.get("error") or "Tool call failed."),
+            }
+        )
+    return steps
 
 
 def _parse_produced_file(summary: str) -> str | None:

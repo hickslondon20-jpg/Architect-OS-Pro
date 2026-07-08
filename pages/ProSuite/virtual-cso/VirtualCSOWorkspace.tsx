@@ -5,6 +5,9 @@ import { ChatThread } from '../../../components/pro-suite/virtual-cso/ChatThread
 import { Composer } from '../../../components/pro-suite/virtual-cso/Composer';
 import { SourcesPanel } from '../../../components/pro-suite/virtual-cso/SourcesPanel';
 import { EmptyState } from '../../../components/pro-suite/virtual-cso/EmptyState';
+import { PlanPanel } from '../../../components/pro-suite/virtual-cso/PlanPanel';
+import { WorkspacePanel } from '../../../components/pro-suite/virtual-cso/WorkspacePanel';
+import { CitationReaderBody, citationLabel, citationMeta } from '../../../components/pro-suite/virtual-cso/CitationReaderBody';
 import { Reader } from '../../../components/pro-suite/shared/Reader';
 import { Button } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
@@ -14,24 +17,34 @@ import {
   createThread,
   deleteProject,
   deleteThread,
+  checkMessageCitations,
   getChatById,
   getChatsForProject,
+  getCitationRefsForChat,
   getMessagesForChat,
   getProjectById,
   getSourcePage,
-  getSourceRefsForChat,
+  getThreadTodos,
+  getThreadWorkspaceFiles,
   loadVirtualCsoData,
   renameThread,
+  requestThreadCompaction,
   requestThreadWriteback,
+  saveThreadTodos,
   sendUserMessage,
   setThreadPinned,
+  type AgentTodo,
   type Chat,
+  type CitationRef,
+  type ContextRemainingSignal,
   type Message,
   type Project,
+  type ThreadWorkspaceFile,
 } from '../../../lib/virtualCsoApi';
 
 type View = 'chat' | 'project' | 'new';
 const ARTIFACT_READER_PREFIX = 'artifact:';
+const WORKSPACE_READER_PREFIX = 'workspace:';
 
 const ProjectView: React.FC<{
   project: Project;
@@ -103,17 +116,28 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [readerPageId, setReaderPageId] = useState<string | null>(null);
+  const [readerCitation, setReaderCitation] = useState<CitationRef | null>(null);
   const [readerArtifact, setReaderArtifact] = useState<ArtifactDelivery | null>(null);
+  const [readerWorkspaceFile, setReaderWorkspaceFile] = useState<ThreadWorkspaceFile | null>(null);
   const [linkedFolder, setLinkedFolder] = useState<string | null>('Financial');
   const [projects, setProjects] = useState<Project[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const [sourcesByChat, setSourcesByChat] = useState<Record<string, ReturnType<typeof getSourceRefsForChat>>>({});
+  const [sourcesByChat, setSourcesByChat] = useState<Record<string, ReturnType<typeof getCitationRefsForChat>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [composerText, setComposerText] = useState('');
+  const [contextByChat, setContextByChat] = useState<Record<string, ContextRemainingSignal>>({});
+  const [compacting, setCompacting] = useState(false);
+  const [checkingMessageId, setCheckingMessageId] = useState<string | null>(null);
+  const [deepMode, setDeepMode] = useState(false);
+  const [todosByChat, setTodosByChat] = useState<Record<string, AgentTodo[]>>({});
+  const [workspaceFilesByChat, setWorkspaceFilesByChat] = useState<Record<string, ThreadWorkspaceFile[]>>({});
+  const [savingTodos, setSavingTodos] = useState(false);
+  const [askUserQuestion, setAskUserQuestion] = useState<string | null>(null);
+  const [agentStatusByChat, setAgentStatusByChat] = useState<Record<string, Chat['agentStatus']>>({});
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const refreshLists = async () => {
@@ -135,6 +159,17 @@ export const VirtualCSOWorkspace: React.FC = () => {
     }
     const nextMessages = await getMessagesForChat(chatId);
     setMessages(nextMessages);
+    setDeepMode(nextMessages.some((message) => message.deepMode));
+  };
+
+  const loadDeepPanels = async (chatId: string | null) => {
+    if (!chatId) return;
+    const [todos, files] = await Promise.all([
+      getThreadTodos(chatId).catch(() => []),
+      getThreadWorkspaceFiles(chatId).catch(() => []),
+    ]);
+    setTodosByChat((current) => ({ ...current, [chatId]: todos }));
+    setWorkspaceFilesByChat((current) => ({ ...current, [chatId]: files }));
   };
 
   useEffect(() => {
@@ -150,18 +185,31 @@ export const VirtualCSOWorkspace: React.FC = () => {
     loadMessages(activeChatId).catch((err) =>
       setError(err instanceof Error ? err.message : 'Could not load messages.'),
     );
+    loadDeepPanels(activeChatId).catch((err) =>
+      setError(err instanceof Error ? err.message : 'Could not load Deep Mode panels.'),
+    );
   }, [activeChatId]);
 
   useEffect(() => {
+    if (readerPageId?.startsWith(WORKSPACE_READER_PREFIX)) {
+      const fileId = readerPageId.slice(WORKSPACE_READER_PREFIX.length);
+      const file = activeChatId ? (workspaceFilesByChat[activeChatId] ?? []).find((item) => item.id === fileId) : null;
+      setReaderWorkspaceFile(file ?? null);
+      setReaderArtifact(null);
+      setReaderCitation(null);
+      return;
+    }
+    setReaderWorkspaceFile(null);
     if (!readerPageId?.startsWith(ARTIFACT_READER_PREFIX)) {
       setReaderArtifact(null);
+      setReaderCitation(null);
       return;
     }
     const artifactId = readerPageId.slice(ARTIFACT_READER_PREFIX.length);
     getArtifact(artifactId)
       .then(setReaderArtifact)
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load artifact.'));
-  }, [readerPageId]);
+  }, [readerPageId, activeChatId, workspaceFilesByChat]);
 
   const openChat = async (chatId: string) => {
     const chat = getChatById(chats, chatId);
@@ -169,6 +217,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setActiveProjectId(chat?.projectId ?? null);
     setView('chat');
     setReaderPageId(null);
+    setReaderCitation(null);
+    setAskUserQuestion(null);
     setNotice(null);
   };
 
@@ -176,6 +226,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setActiveProjectId(projectId);
     setView('project');
     setReaderPageId(null);
+    setReaderCitation(null);
+    setAskUserQuestion(null);
     setNotice(null);
   };
 
@@ -185,6 +237,9 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setActiveProjectId(null);
     setMessages([]);
     setReaderPageId(null);
+    setReaderCitation(null);
+    setAskUserQuestion(null);
+    setDeepMode(false);
     setNotice(null);
   };
 
@@ -233,6 +288,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
       const result = await sendUserMessage(activeChatId, text, {
         linkedFolder,
         projectId: activeProjectId,
+        deepMode: deepMode || (targetChatId ? agentStatusByChat[targetChatId] === 'waiting_for_user' : false),
         onUserMessage: (message) => {
           targetChatId = message.chatId;
           setActiveChatId(message.chatId);
@@ -269,6 +325,44 @@ export const VirtualCSOWorkspace: React.FC = () => {
             ),
           );
         },
+        onTrace: (steps) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantTempId
+                ? { ...message, agentSteps: steps }
+                : message,
+            ),
+          );
+        },
+        onTodosUpdated: (todos) => {
+          if (!targetChatId) return;
+          setTodosByChat((current) => ({ ...current, [targetChatId as string]: todos }));
+        },
+        onWorkspaceUpdated: () => {
+          if (!targetChatId) return;
+          loadDeepPanels(targetChatId).catch(() => {});
+        },
+        onAgentTask: (handle) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantTempId
+                ? { ...message, agentTasks: [...(message.agentTasks ?? []), handle] }
+                : message,
+            ),
+          );
+        },
+        onAskUser: (question) => {
+          setAskUserQuestion(question);
+          setNotice('Deep Mode is waiting for your reply.');
+        },
+        onAgentStatus: (status) => {
+          if (!targetChatId || !status) return;
+          setAgentStatusByChat((current) => ({ ...current, [targetChatId as string]: status }));
+        },
+        onContext: (signal) => {
+          if (!targetChatId) return;
+          setContextByChat((current) => ({ ...current, [targetChatId as string]: signal }));
+        },
       });
 
       targetChatId = result.chat.id;
@@ -278,6 +372,12 @@ export const VirtualCSOWorkspace: React.FC = () => {
         current.map((message) => (message.id === assistantTempId ? result.assistantMessage : message)),
       );
       setSourcesByChat((current) => ({ ...current, [result.chat.id]: result.sources }));
+      setAgentStatusByChat((current) => ({ ...current, [result.chat.id]: result.chat.agentStatus ?? 'complete' }));
+      await loadDeepPanels(result.chat.id);
+      if (result.chat.agentStatus !== 'waiting_for_user') setAskUserQuestion(null);
+      if (result.contextSignal) {
+        setContextByChat((current) => ({ ...current, [result.chat.id]: result.contextSignal as ContextRemainingSignal }));
+      }
       await refreshLists();
       setNotice('Response saved. Founder-page sources are available in the Sources panel.');
     } catch (err) {
@@ -301,6 +401,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
       setActiveProjectId(null);
       setMessages([]);
       setReaderPageId(null);
+      setReaderCitation(null);
     }
     window.setTimeout(() => composerRef.current?.focus(), 0);
   };
@@ -331,6 +432,61 @@ export const VirtualCSOWorkspace: React.FC = () => {
     }
   };
 
+  const compactActiveThread = async () => {
+    if (!activeChatId) return;
+    try {
+      setCompacting(true);
+      const result = await requestThreadCompaction(activeChatId);
+      if (result.remainingPercent !== undefined && result.remainingPercent !== null && result.band) {
+        setContextByChat((current) => ({
+          ...current,
+          [activeChatId]: {
+            remainingPercent: result.remainingPercent ?? 100,
+            band: result.band ?? 'green',
+          },
+        }));
+      }
+      setNotice(result.compacted ? 'Thread context compacted.' : 'Thread is already compact enough.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not compact this thread.');
+    } finally {
+      setCompacting(false);
+    }
+  };
+
+  const checkCitationsForMessage = async (messageId: string) => {
+    try {
+      setCheckingMessageId(messageId);
+      const result = await checkMessageCitations(messageId);
+      setMessages((current) => {
+        const next = current.map((message) => {
+          if (message.id !== messageId) return message;
+          const verdictByKey = new Map(
+            result.verdicts.map((verdict) => [
+              `${verdict.source_kind ?? ''}:${verdict.source_id ?? ''}:${verdict.ordinal ?? ''}`,
+              verdict,
+            ]),
+          );
+          const citations = (message.citations ?? []).map((citation) => {
+            const key = `${citation.source_kind}:${citation.source_id ?? ''}:${citation.ordinal ?? ''}`;
+            return verdictByKey.has(key) ? { ...citation, verdict: verdictByKey.get(key) } : citation;
+          });
+          return { ...message, citations };
+        });
+        const activeMessage = next.find((message) => message.id === messageId);
+        if (activeChatId && activeMessage?.citations) {
+          setSourcesByChat((currentSources) => ({ ...currentSources, [activeChatId]: activeMessage.citations ?? [] }));
+        }
+        return next;
+      });
+      setNotice(result.summary);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not check citations.');
+    } finally {
+      setCheckingMessageId(null);
+    }
+  };
+
   const togglePin = async () => {
     if (!activeChatId) return;
     const current = getChatById(chats, activeChatId);
@@ -339,21 +495,76 @@ export const VirtualCSOWorkspace: React.FC = () => {
   };
 
   const openArtifactInReader = (artifactId: string) => {
+    setReaderCitation(null);
     setReaderPageId(`${ARTIFACT_READER_PREFIX}${artifactId}`);
+  };
+
+  const openWorkspaceFileInReader = (file: ThreadWorkspaceFile) => {
+    setReaderCitation(null);
+    setReaderPageId(`${WORKSPACE_READER_PREFIX}${file.id}`);
+  };
+
+  const openCitationInReader = (citation: CitationRef) => {
+    setReaderCitation(citation);
+    setReaderPageId(null);
+    setReaderArtifact(null);
+    setReaderWorkspaceFile(null);
+  };
+
+  const closeReader = () => {
+    setReaderPageId(null);
+    setReaderCitation(null);
+    setReaderArtifact(null);
+    setReaderWorkspaceFile(null);
+  };
+
+  const saveActiveTodos = async (todos: AgentTodo[]) => {
+    if (!activeChatId) return;
+    try {
+      setSavingTodos(true);
+      const saved = await saveThreadTodos(activeChatId, todos);
+      setTodosByChat((current) => ({ ...current, [activeChatId]: saved }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save plan.');
+    } finally {
+      setSavingTodos(false);
+    }
   };
 
   const activeChat: Chat | undefined = activeChatId ? getChatById(chats, activeChatId) : undefined;
   const activeProject = activeChat?.projectId ? getProjectById(projects, activeChat.projectId) : undefined;
   const activeProjectForView = activeProjectId ? getProjectById(projects, activeProjectId) : undefined;
   const projectChats = activeProjectId ? getChatsForProject(chats, activeProjectId) : [];
-  const sources = activeChatId ? sourcesByChat[activeChatId] ?? getSourceRefsForChat(activeChatId) : [];
+  const latestMessageCitations = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && (message.citations?.length ?? 0) > 0)?.citations;
+  const sources = activeChatId
+    ? sourcesByChat[activeChatId] ?? latestMessageCitations ?? getCitationRefsForChat(activeChatId)
+    : [];
+  const activeContextSignal = activeChatId ? contextByChat[activeChatId] ?? null : null;
+  const activeTodos = activeChatId ? todosByChat[activeChatId] ?? [] : [];
+  const activeWorkspaceFiles = activeChatId ? workspaceFilesByChat[activeChatId] ?? [] : [];
+  const activeAgentStatus = activeChatId ? agentStatusByChat[activeChatId] ?? activeChat?.agentStatus ?? 'complete' : 'complete';
+  const planPanelOpen = view === 'chat' && !!activeChatId && (deepMode || activeTodos.length > 0 || messages.some((message) => message.deepMode));
   const readerPage = readerPageId && !readerPageId.startsWith(ARTIFACT_READER_PREFIX) ? getSourcePage(readerPageId) : undefined;
-  const activeReader = readerArtifact
+  const activeReader = readerCitation
+    ? {
+        title: citationLabel(readerCitation),
+        meta: citationMeta(readerCitation),
+        body: <CitationReaderBody citation={readerCitation} />,
+      }
+    : readerArtifact
     ? {
         title: readerArtifact.filename,
         meta: readerArtifact.description ?? `${readerArtifact.mime_type} · ${readerArtifact.size} bytes`,
         content: readerArtifact.content ?? '',
       }
+    : readerWorkspaceFile
+      ? {
+          title: readerWorkspaceFile.filePath,
+          meta: `${readerWorkspaceFile.source}${readerWorkspaceFile.size == null ? '' : ` - ${readerWorkspaceFile.size} bytes`}`,
+          content: readerWorkspaceFile.content ?? '',
+        }
     : readerPage;
   const crumbs =
     view === 'chat' && activeChat
@@ -398,6 +609,9 @@ export const VirtualCSOWorkspace: React.FC = () => {
             value={composerText}
             onChange={setComposerText}
             textareaRef={composerRef}
+            contextSignal={null}
+            deepMode={deepMode}
+            onDeepModeChange={setDeepMode}
           />
           {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
         </div>
@@ -438,8 +652,20 @@ export const VirtualCSOWorkspace: React.FC = () => {
           </button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <ChatThread crumbs={crumbs} messages={messages} onOpenArtifact={openArtifactInReader} />
+          <ChatThread
+            crumbs={crumbs}
+            messages={messages}
+            onOpenArtifact={openArtifactInReader}
+            onOpenCitation={openCitationInReader}
+            onCheckCitations={checkCitationsForMessage}
+            checkingMessageId={checkingMessageId}
+          />
         </div>
+        {askUserQuestion && activeAgentStatus === 'waiting_for_user' && (
+          <div className="border-t border-[var(--aos-mist)] bg-[var(--aos-brass-tint)] px-6 py-3 text-sm text-[var(--fg-1)]">
+            {askUserQuestion}
+          </div>
+        )}
         <Composer
           linkedFolder={linkedFolder}
           onRemoveLinkedFolder={() => setLinkedFolder(null)}
@@ -447,6 +673,11 @@ export const VirtualCSOWorkspace: React.FC = () => {
           value={composerText}
           onChange={setComposerText}
           textareaRef={composerRef}
+          contextSignal={activeContextSignal}
+          onCompact={compactActiveThread}
+          compacting={compacting}
+          deepMode={deepMode || activeAgentStatus === 'waiting_for_user'}
+          onDeepModeChange={setDeepMode}
         />
         {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
       </div>
@@ -478,24 +709,32 @@ export const VirtualCSOWorkspace: React.FC = () => {
           <SourcesPanel
             sources={sources}
             hasActiveChat={view === 'chat' && !!activeChatId && messages.length > 0}
-            onOpenSource={(pageId) => setReaderPageId(pageId)}
+            onOpenCitation={openCitationInReader}
           />
+        )}
+
+        {planPanelOpen && (
+          <PlanPanel
+            open={planPanelOpen}
+            todos={activeTodos}
+            saving={savingTodos}
+            onSave={saveActiveTodos}
+          />
+        )}
+
+        {view === 'chat' && activeChatId && (
+          <WorkspacePanel files={activeWorkspaceFiles} onOpenFile={openWorkspaceFileInReader} />
         )}
 
         <Reader
           open={!!activeReader}
-          onClose={() => setReaderPageId(null)}
+          onClose={closeReader}
           title={activeReader?.title}
           meta={activeReader?.meta}
           content={activeReader?.content}
+          body={activeReader?.body}
         />
       </div>
     </div>
   );
 };
-
-
-
-
-
-

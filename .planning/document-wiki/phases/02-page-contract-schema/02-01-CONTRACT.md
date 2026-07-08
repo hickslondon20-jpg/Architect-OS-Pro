@@ -392,3 +392,10 @@ These fields are dormant in beta but must be present now:
    the vocabulary at synthesis time.
 8. Layer 2 pages never duplicate Layer 1's claim store. The bridge is read-only from Layer 1's
    perspective.
+
+## Additive Amendment: citation-1.0
+
+Read-tool citations MAY carry optional `verbatim` and `locator` values under the `citation-1.0`
+currency. This is an additive, backward-compatible extension for citation normalization only; the
+frozen `doc-wiki-1.0` `agent_result_v1`, `AgentSourceRef[]`, and inline `[[Source:]]` shapes above
+are not changed.

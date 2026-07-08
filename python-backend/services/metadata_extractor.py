@@ -9,6 +9,7 @@ from typing import Any
 from openai import OpenAIError
 
 from core.config import Settings
+from services.usage_events import log_ai_usage_event, openai_chat_usage
 from services.vector_store import VectorStore, VectorStoreError
 
 
@@ -23,7 +24,7 @@ class MetadataExtractor:
         self.store = store
         self.settings = settings
 
-    def extract(self, *, text: str, file_name: str, file_type: str) -> MetadataExtractionResult:
+    def extract(self, *, text: str, file_name: str, file_type: str, user_id: str | None = None) -> MetadataExtractionResult:
         if not self.settings.metadata_extraction_enabled:
             return MetadataExtractionResult(metadata={}, model="disabled")
         if not self.store.openai_client:
@@ -71,6 +72,19 @@ Document text:
             )
         except OpenAIError as exc:
             raise VectorStoreError(f"OpenAI metadata extraction request failed: {exc}") from exc
+        if user_id:
+            usage = openai_chat_usage(response)
+            log_ai_usage_event(
+                self.store.client,
+                user_id=user_id,
+                surface="ingestion",
+                model=model["model_name"],
+                role="utility",
+                provider="openai",
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                capability_key="ingestion_metadata_extraction",
+            )
 
         content = response.choices[0].message.content or "{}"
         try:

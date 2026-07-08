@@ -9,6 +9,8 @@ export interface ReaderProps {
   meta?: React.ReactNode;
   /** Markdown body. Rendered to HTML. */
   content?: string;
+  /** Structured body for non-markdown reader surfaces such as resolved citations. */
+  body?: React.ReactNode;
   /** Optional footer region (e.g. the Notes & corrections composer). */
   footer?: React.ReactNode;
   onClose: () => void;
@@ -19,7 +21,7 @@ export interface ReaderProps {
  * Collapsed/hidden by default — renders nothing when `open` is false.
  * Reused by the OS Engine workspace and the Virtual CSO workspace.
  */
-export const Reader: React.FC<ReaderProps> = ({ open, title, meta, content, footer, onClose }) => {
+export const Reader: React.FC<ReaderProps> = ({ open, title, meta, content, body, footer, onClose }) => {
   if (!open) return null;
 
   return (
@@ -43,7 +45,9 @@ export const Reader: React.FC<ReaderProps> = ({ open, title, meta, content, foot
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
-        {content ? (
+        {body ? (
+          body
+        ) : content ? (
           <div className="os-reader-markdown">
             <ReactMarkdown>{content}</ReactMarkdown>
           </div>

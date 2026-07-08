@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Domain Agents — Wireframe (ArchitectOS Pro)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --obsidian:#193052; --slate:#335373; --steel:#5F7EA3; --teal:#143E43;
+    --brass:#B8922A; --parchment:#F7F4EF; --cloud:#FCFBF8; --graphite:#222B38;
+    --line:#E4DECF; --line-soft:#EFE9DD; --muted:#6F7787;
+    --r:14px; --r-sm:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:'Geist',system-ui,sans-serif; color:var(--graphite);
+    background:var(--parchment); font-size:14px; line-height:1.45;
+  }
+  .mono{font-family:'Geist Mono',ui-monospace,monospace}
+  .serif{font-family:'Instrument Serif',Georgia,serif;font-style:italic}
+  .app{display:grid;grid-template-columns:248px 1fr;height:100vh;overflow:hidden}
+
+  /* ---------- Sidebar ---------- */
+  .side{background:var(--obsidian);color:#D7DEEA;display:flex;flex-direction:column;padding:18px 14px;gap:6px}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
+  .brand .logo{width:26px;height:26px;border-radius:7px;background:var(--brass);display:grid;place-items:center;color:var(--obsidian);font-weight:700}
+  .brand b{color:#fff;font-weight:600;letter-spacing:.2px}
+  .nav-label{font-size:10px;letter-spacing:.14em;color:var(--steel);text-transform:uppercase;padding:14px 8px 6px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:#C4CDDC;cursor:pointer;font-size:13px}
+  .nav-item .ic{width:16px;height:16px;border-radius:4px;border:1.5px solid currentColor;opacity:.7}
+  .nav-item:hover{background:var(--slate);color:#fff}
+  .nav-item.active{background:var(--slate);color:#fff}
+  .nav-item.active .ic{background:var(--brass);border-color:var(--brass);opacity:1}
+  .side-foot{margin-top:auto;font-size:11px;color:var(--steel);padding:8px}
+
+  /* ---------- Main ---------- */
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 26px;border-bottom:1px solid var(--line);background:var(--cloud)}
+  .crumb{font-size:12px;color:var(--muted)}
+  .crumb b{color:var(--graphite);font-weight:600}
+  .subnav{display:flex;gap:4px;background:var(--parchment);padding:4px;border-radius:11px;border:1px solid var(--line)}
+  .tab{padding:7px 16px;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;border:none;background:none;font-family:inherit}
+  .tab.active{background:var(--obsidian);color:#fff}
+  .canvas{padding:26px 30px;overflow-y:auto}
+  .view{display:none;animation:f .2s ease}
+  .view.active{display:block}
+  @keyframes f{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  h1{font-size:22px;margin:0 0 4px;font-weight:600}
+  h2{font-size:15px;margin:0 0 12px;font-weight:600}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 22px}
+  .pill{display:inline-block;font-size:10px;letter-spacing:.04em;padding:3px 9px;border-radius:999px;font-weight:600}
+  .anno{font-size:10.5px;color:var(--brass);letter-spacing:.06em;text-transform:uppercase;font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:7px}
+  .anno::before{content:"";width:14px;height:1px;background:var(--brass)}
+
+  .card{background:var(--cloud);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+  .btn{font-family:inherit;font-size:13px;font-weight:600;border-radius:9px;padding:9px 16px;border:1px solid var(--line);background:var(--cloud);color:var(--graphite);cursor:pointer}
+  .btn.gold{background:var(--brass);border-color:var(--brass);color:#fff}
+  .btn.ghost{background:none;border-color:var(--steel);color:var(--slate)}
+  .dim{color:var(--muted)}
+
+  /* ---------- Gallery ---------- */
+  .recent{background:var(--cloud);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:22px}
+  .recent-row{display:flex;gap:10px;overflow:auto}
+  .recent-chip{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);border-radius:10px;padding:9px 13px;min-width:190px;cursor:pointer;background:var(--parchment)}
+  .recent-chip:hover{border-color:var(--brass)}
+  .recent-chip small{color:var(--muted);font-size:11px}
+  .agrid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .acard{cursor:pointer;border-radius:var(--r);padding:18px;border:1px solid var(--line);background:var(--cloud);display:flex;flex-direction:column;gap:10px;min-height:150px;transition:.15s}
+  .acard:hover{border-color:var(--brass);transform:translateY(-2px)}
+  .acard .top{display:flex;align-items:center;gap:11px}
+  .dot{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px}
+  .acard h3{margin:0;font-size:16px;font-weight:600}
+  .acard p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .acard .act{margin-top:auto;font-size:11px;color:var(--steel)}
+
+  /* ---------- Profile ---------- */
+  .prof-head{display:flex;gap:16px;align-items:flex-start;margin-bottom:22px}
+  .prof-head .dot{width:48px;height:48px;border-radius:12px;font-size:18px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12px;color:var(--slate);background:var(--cloud)}
+  .chip b{color:var(--graphite)}
+  .starters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+  .starter{border:1px dashed var(--steel);border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--slate);background:var(--parchment);cursor:pointer;max-width:260px}
+  .starter:hover{border-style:solid;border-color:var(--brass)}
+  .wf{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+  .wfrow{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--cloud);cursor:pointer}
+  .wfrow:hover{border-color:var(--brass)}
+  .wfrow .t{font-weight:600;font-size:14px}
+  .wfrow .d{font-size:12.5px;color:var(--muted)}
+  .ask{display:flex;gap:10px;border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 16px;background:var(--cloud);align-items:center}
+  .ask input{flex:1;border:none;background:none;font-family:inherit;font-size:13px;outline:none;color:var(--graphite)}
+  .ask .cap{font-size:10px;color:var(--brass);font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-top:8px}
+
+  /* ---------- Workspace ---------- */
+  .ws{display:grid;grid-template-columns:1fr 380px;gap:18px}
+  .ws-meta{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:12px 16px;background:var(--cloud);margin-bottom:14px}
+  .ws-meta .l{display:flex;gap:14px;align-items:center;font-size:12.5px}
+  .thread{border:1px solid var(--line);border-radius:14px;background:var(--cloud);padding:16px;min-height:420px;display:flex;flex-direction:column;gap:14px}
+  .msg{display:flex;gap:11px;max-width:90%}
+  .msg .av{width:28px;height:28px;border-radius:8px;flex:0 0 auto;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700}
+  .bub{border-radius:12px;padding:11px 14px;font-size:13px;line-height:1.5}
+  .msg.ai .bub{background:var(--parchment);border:1px solid var(--line-soft)}
+  .msg.me{margin-left:auto;flex-direction:row-reverse}
+  .msg.me .bub{background:var(--obsidian);color:#EaeFf6}
+  .upload{border:1px dashed var(--steel);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--slate);background:var(--parchment)}
+  .ws-input{display:flex;gap:8px;margin-top:6px;border:1px solid var(--line);border-radius:11px;padding:7px 7px 7px 14px;align-items:center;background:var(--cloud)}
+  .ws-input input{flex:1;border:none;background:none;outline:none;font-family:inherit;font-size:13px}
+  .render{border:1px solid var(--line);border-radius:14px;background:var(--cloud);overflow:hidden;display:flex;flex-direction:column}
+  .render .rh{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .render .rbody{padding:18px;font-size:12px;color:#3a4150}
+  .render h4{margin:0 0 3px;font-size:15px;color:var(--graphite)}
+  .skel{height:8px;border-radius:4px;background:var(--line-soft);margin:7px 0}
+  .progress{display:flex;flex-direction:column;gap:7px;margin-top:14px}
+  .step{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted)}
+  .step .b{width:13px;height:13px;border-radius:50%;border:2px solid var(--steel)}
+  .step.done .b{background:var(--brass);border-color:var(--brass)}
+  .step.done{color:var(--graphite)}
+  .step.now .b{border-color:var(--brass);box-shadow:inset 0 0 0 2px var(--cloud),0 0 0 2px var(--brass)}
+
+  /* ---------- Kanban ---------- */
+  .kb{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  .col{background:var(--cloud);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:300px}
+  .col .ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;font-size:12px;font-weight:600}
+  .col .ch .n{display:flex;align-items:center;gap:7px}
+  .st-dot{width:8px;height:8px;border-radius:50%}
+  .kcard{background:var(--parchment);border:1px solid var(--line);border-radius:10px;padding:11px;margin-bottom:9px;cursor:pointer;font-size:12.5px}
+  .kcard:hover{border-color:var(--brass)}
+  .kcard .kt{font-weight:600;margin-bottom:7px;line-height:1.35}
+  .kcard .km{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--muted)}
+  .flag{background:#F3E2C4;color:#8a6a14;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:600}
+
+  /* ---------- Artifacts ---------- */
+  .filters{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .sel{border:1px solid var(--line);border-radius:9px;padding:8px 13px;font-size:12.5px;background:var(--cloud);color:var(--slate)}
+  .arts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:8px}
+  .art{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--cloud);cursor:pointer}
+  .art:hover{border-color:var(--brass)}
+  .art .prev{height:120px;background:var(--parchment);border-bottom:1px solid var(--line);padding:14px}
+  .art .prev .skel{background:#E8E1D2}
+  .art .meta{padding:12px 14px}
+  .art .meta .at{font-weight:600;font-size:13px;margin-bottom:5px}
+  .art .meta .am{font-size:11px;color:var(--muted);display:flex;justify-content:space-between}
+  .art .acts{display:flex;gap:7px;padding:0 14px 13px}
+  .mini{font-size:11px;padding:5px 10px;border-radius:7px;border:1px solid var(--line);background:var(--parchment);color:var(--slate)}
+  .mini.gold{background:var(--brass);border-color:var(--brass);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand"><span class="logo">A</span><b>ArchitectOS&nbsp;Pro</b></div>
+    <div class="nav-label">Platform</div>
+    <div class="nav-item"><span class="ic"></span>Foundations</div>
+    <div class="nav-item"><span class="ic"></span>Diagnostics</div>
+    <div class="nav-label">Pro Suite — Intelligence</div>
+    <div class="nav-item"><span class="ic"></span>Virtual CSO</div>
+    <div class="nav-item"><span class="ic"></span>OS Engine</div>
+    <div class="nav-item active"><span class="ic"></span>Domain Agents</div>
+    <div class="nav-label">Execution</div>
+    <div class="nav-item"><span class="ic"></span>Status Tracker</div>
+    <div class="nav-item"><span class="ic"></span>Settings · AI Usage</div>
+    <div class="side-foot">Beta · Founder-only<br>Wireframe v0.1</div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">Pro Suite / <b>Domain Agents</b> <span id="crumbExtra"></span></div>
+      <div class="subnav">
+        <button class="tab active" data-tab="gallery" onclick="go('gallery',this)">Agents</button>
+        <button class="tab" data-tab="kanban" onclick="go('kanban',this)">Tasks</button>
+        <button class="tab" data-tab="artifacts" onclick="go('artifacts',this)">Artifacts</button>
+      </div>
+    </div>
+
+    <div class="canvas">
+
+      <!-- ===== GALLERY ===== -->
+      <section class="view active" id="gallery">
+        <h1>Domain Agents</h1>
+        <p class="sub">Your team of specialist strategic operators. Pick an agent to see what it can produce.</p>
+
+        <p class="anno">Recent tasks strip · top of gallery</p>
+        <div class="recent">
+          <div class="recent-row">
+            <div class="recent-chip" onclick="go('workspace')"><span>Monthly P&amp;L Assessment · Apr–May</span><small>Financial · <span style="color:#8a6a14">Review</span> · 2d ago</small></div>
+            <div class="recent-chip" onclick="go('workspace')"><span>Client Segmentation Analysis</span><small>Client · Running · 3d ago</small></div>
+            <div class="recent-chip" onclick="go('workspace')"><span>Capacity &amp; Delivery Risk Read</span><small>Operational · Done · 5d ago</small></div>
+            <div class="recent-chip" onclick="go('workspace')"><span>Team Alignment Diagnostic</span><small>Team · Blocked · 6d ago</small></div>
+          </div>
+        </div>
+
+        <p class="anno">Five disciplines · asymmetric grid (no 3 equal cards)</p>
+        <div class="agrid">
+          <div class="acard" style="grid-column:span 5" onclick="go('profile')">
+            <div class="top"><span class="dot" style="background:var(--teal)">F</span><h3>Financial</h3></div>
+            <p>Interprets any financial evidence — margin, revenue quality, growth economics, scenarios.</p>
+            <div class="act mono">6 artifacts · last run 2d ago</div>
+          </div>
+          <div class="acard" style="grid-column:span 7" onclick="go('profile')">
+            <div class="top"><span class="dot" style="background:var(--brass)">C</span><h3>Client &amp; Market</h3></div>
+            <p>Acquisition, retention, concentration, profitability, positioning, portfolio quality — and the commercial/sales view.</p>
+            <div class="act mono">3 artifacts · last run 3d ago</div>
+          </div>
+          <div class="acard" style="grid-column:span 4" onclick="go('profile')">
+            <div class="top"><span class="dot" style="background:var(--slate)">O</span><h3>Operational</h3></div>
+            <p>Process, capacity, delivery, utilization, SOP maturity.</p>
+            <div class="act mono">4 artifacts · 5d ago</div>
+          </div>
+          <div class="acard" style="grid-column:span 5" onclick="go('profile')">
+            <div class="top"><span class="dot" style="background:var(--obsidian)">T</span><h3>Team</h3></div>
+            <p>Organizational design, leadership, delegation, accountability, capability.</p>
+            <div class="act mono">2 artifacts · 6d ago</div>
+          </div>
+          <div class="acard" style="grid-column:span 3" onclick="go('profile')">
+            <div class="top"><span class="dot" style="background:#7a5b1f">S</span><h3>Stewardship</h3></div>
+            <p>Founder role, leverage, focus, evolution. Orchestrates cross-domain calls.</p>
+            <div class="act mono">1 artifact</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== AGENT PROFILE ===== -->
+      <section class="view" id="profile">
+        <div class="prof-head">
+          <span class="dot" style="background:var(--teal)">F</span>
+          <div>
+            <h1 style="margin-bottom:6px">Financial Agent</h1>
+            <p class="sub" style="margin:0;max-width:640px">The financial discipline that knows how to interpret any financial evidence placed in front of it — P&amp;L, balance sheet, cash flow, budget, forecast.</p>
+          </div>
+          <button class="btn ghost" style="margin-left:auto" onclick="go('gallery')">&larr; All agents</button>
+        </div>
+
+        <p class="anno">What it does · capability groupings (skills stay backstage)</p>
+        <div class="chips">
+          <div class="chip"><b>Analyze</b> · P&amp;L, margins, cash flow, pricing</div>
+          <div class="chip"><b>Create</b> · briefs, monthly reviews, board memos</div>
+          <div class="chip"><b>Plan</b> · hiring affordability, forecasts, scenarios</div>
+        </div>
+
+        <p class="anno">Thought starters · prompts that orient &amp; point to workflows</p>
+        <div class="starters">
+          <div class="starter" onclick="go('workspace')">"Why did profit change last month?"</div>
+          <div class="starter" onclick="go('workspace')">"Can we afford another account manager?"</div>
+          <div class="starter" onclick="go('workspace')">"Where is margin leaking?"</div>
+        </div>
+
+        <p class="anno">Workflows · the clickable packages</p>
+        <div class="wf">
+          <div class="wfrow" onclick="go('workspace')">
+            <div><div class="t">Produce a Monthly P&amp;L Assessment</div><div class="d">Reads your P&amp;L, compares to prior months, benchmarks, and writes a business review.</div></div>
+            <button class="btn gold">Launch</button>
+          </div>
+          <div class="wfrow" onclick="go('workspace')">
+            <div><div class="t">Hiring Affordability Read</div><div class="d">Tests a prospective hire against margin, runway, and capacity signals.</div></div>
+            <button class="btn gold">Launch</button>
+          </div>
+          <div class="wfrow" onclick="go('workspace')">
+            <div><div class="t">Pricing &amp; Margin Audit</div><div class="d">Surfaces where pricing and delivery economics diverge across the book.</div></div>
+            <button class="btn gold">Launch</button>
+          </div>
+        </div>
+
+        <p class="anno">Free-form ask · maps to skills/workflows · every request logged to roadmap capture</p>
+        <div class="ask">
+          <input placeholder="Ask the Financial Agent to analyze or produce something…" />
+          <button class="btn gold">Send</button>
+        </div>
+      </section>
+
+      <!-- ===== WORKSPACE ===== -->
+      <section class="view" id="workspace">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <button class="btn ghost" onclick="go('profile')">&larr; Financial Agent</button>
+          <span class="pill" style="background:#F3E2C4;color:#8a6a14">● BLOCKED · waiting on you</span>
+        </div>
+        <div class="ws-meta">
+          <div class="l">
+            <span><b>Task</b> · Monthly P&amp;L Assessment</span>
+            <span class="dim mono">run #2 · Apr–May</span>
+          </div>
+          <div class="dim" style="font-size:12px">Resources: <span class="mono">0 attached</span></div>
+        </div>
+
+        <p class="anno">Task-bound workspace · reuses Virtual CSO chat · NOT open brainstorming</p>
+        <div class="ws">
+          <div>
+            <div class="thread">
+              <div class="msg ai"><span class="av" style="background:var(--teal)">F</span><div class="bub">Here's how I'll run the <b>Monthly P&amp;L Assessment</b>: read your last two months' P&amp;L, compare the trend, benchmark margin, then write the review. I checked OS Engine — I don't have April or May on file yet.</div></div>
+              <div class="msg ai"><span class="av" style="background:var(--teal)">F</span><div class="bub" style="padding-bottom:6px">To proceed I need:<div class="upload" style="margin-top:9px">⤓ Upload — April &amp; May P&amp;L (PDF or CSV)</div></div></div>
+              <div class="msg me"><div class="bub">Here's April. Pulling May now.</div></div>
+              <div class="progress" style="margin-top:6px">
+                <div class="step done"><span class="b"></span>Plan confirmed</div>
+                <div class="step done"><span class="b"></span>Checked OS Engine for existing P&amp;Ls</div>
+                <div class="step now"><span class="b"></span>Waiting on May P&amp;L upload</div>
+                <div class="step"><span class="b"></span>Analyze · compare · benchmark</div>
+                <div class="step"><span class="b"></span>Draft artifact → Review</div>
+              </div>
+            </div>
+            <div class="ws-input"><input placeholder="Reply, or attach a resource…" /><button class="btn">Attach</button><button class="btn gold">Send</button></div>
+          </div>
+
+          <div class="render">
+            <div class="rh"><span>Artifact preview · live render</span><span class="mono">.md → HTML</span></div>
+            <div class="rbody">
+              <h4>Monthly Business Review</h4>
+              <div class="dim mono" style="font-size:11px;margin-bottom:12px">Financial Agent · Apr–May 2026</div>
+              <div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Summary</div>
+              <div class="skel" style="width:100%"></div><div class="skel" style="width:92%"></div><div class="skel" style="width:70%"></div>
+              <div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin:14px 0 6px">Margin movement</div>
+              <div class="skel" style="width:88%"></div><div class="skel" style="width:96%"></div>
+              <div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin:14px 0 6px">Recommendations</div>
+              <div class="skel" style="width:80%"></div><div class="skel" style="width:60%"></div>
+              <div style="margin-top:16px;color:var(--muted);font-size:11px">Renders here as it's produced · download &amp; “Add to Second Brain” unlock at Review.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== KANBAN ===== -->
+      <section class="view" id="kanban">
+        <h1>Tasks</h1>
+        <p class="sub">Every job across all agents. Drag/auto-moves through states. Click a card to re-enter its workspace.</p>
+        <p class="anno">State machine · Ready → Running → Review → Blocked → Done (non-linear)</p>
+        <div class="kb">
+          <div class="col">
+            <div class="ch"><span class="n"><span class="st-dot" style="background:var(--steel)"></span>Ready</span><span class="dim mono">1</span></div>
+            <div class="kcard" onclick="go('workspace')"><div class="kt">Pricing &amp; Margin Audit</div><div class="km"><span>Financial</span><span class="mono">queued</span></div></div>
+          </div>
+          <div class="col">
+            <div class="ch"><span class="n"><span class="st-dot" style="background:var(--brass)"></span>Running</span><span class="dim mono">2</span></div>
+            <div class="kcard" onclick="go('workspace')"><div class="kt">Client Segmentation Analysis</div><div class="km"><span>Client</span><span class="mono">running</span></div></div>
+            <div class="kcard" onclick="go('workspace')"><div class="kt">Organizational Health Read</div><div class="km"><span>Team</span><span class="mono">running</span></div></div>
+          </div>
+          <div class="col">
+            <div class="ch"><span class="n"><span class="st-dot" style="background:var(--teal)"></span>Review</span><span class="dim mono">1</span></div>
+            <div class="kcard" onclick="go('workspace')"><div class="kt">Monthly P&amp;L Assessment · Apr–May</div><div class="km"><span>Financial</span><span class="mono">awaiting accept</span></div></div>
+          </div>
+          <div class="col">
+            <div class="ch"><span class="n"><span class="st-dot" style="background:#caa53a"></span>Blocked</span><span class="dim mono">1</span></div>
+            <div class="kcard" onclick="go('workspace')"><div class="kt">Team Alignment Diagnostic</div><div class="km"><span>Team</span><span class="flag">waiting on you</span></div></div>
+          </div>
+          <div class="col">
+            <div class="ch"><span class="n"><span class="st-dot" style="background:var(--obsidian)"></span>Done</span><span class="dim mono">2</span></div>
+            <div class="kcard" onclick="go('workspace')"><div class="kt">Capacity &amp; Delivery Risk Read</div><div class="km"><span>Operational</span><span class="mono">✓</span></div></div>
+            <div class="kcard" onclick="go('workspace')"><div class="kt">Onboarding Process Diagnostic</div><div class="km"><span>Operational</span><span class="mono">✓</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ARTIFACTS ===== -->
+      <section class="view" id="artifacts">
+        <h1>Artifacts</h1>
+        <p class="sub">Everything produced, gated to you. Preview before download · promote to the second brain · trace provenance.</p>
+        <div class="filters">
+          <span class="sel">Agent · All ▾</span>
+          <span class="sel">Type · All ▾</span>
+          <span class="sel">Workflow · All ▾</span>
+          <span class="sel">Date · Newest ▾</span>
+        </div>
+        <p class="anno">Each artifact links back to its task → workflow → agent</p>
+        <div class="arts">
+          <div class="art">
+            <div class="prev"><div class="skel" style="width:60%;height:11px"></div><div class="skel" style="width:100%"></div><div class="skel" style="width:90%"></div><div class="skel" style="width:75%"></div></div>
+            <div class="meta"><div class="at">Monthly Business Review · April</div><div class="am"><span>Financial · brief</span><span class="mono">Apr 30</span></div></div>
+            <div class="acts"><span class="mini">Preview</span><span class="mini">Download</span><span class="mini gold">+ Second Brain</span></div>
+          </div>
+          <div class="art">
+            <div class="prev"><div class="skel" style="width:55%;height:11px"></div><div class="skel" style="width:95%"></div><div class="skel" style="width:88%"></div><div class="skel" style="width:64%"></div></div>
+            <div class="meta"><div class="at">Client Segmentation Analysis</div><div class="am"><span>Client · analysis</span><span class="mono">Jun 18</span></div></div>
+            <div class="acts"><span class="mini">Preview</span><span class="mini">Download</span><span class="mini" style="opacity:.55">✓ In brain</span></div>
+          </div>
+          <div class="art">
+            <div class="prev"><div class="skel" style="width:50%;height:11px"></div><div class="skel" style="width:92%"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:70%"></div></div>
+            <div class="meta"><div class="at">Capacity &amp; Delivery Risk Read</div><div class="am"><span>Operational · read</span><span class="mono">Jun 20</span></div></div>
+            <div class="acts"><span class="mini">Preview</span><span class="mini">Download</span><span class="mini gold">+ Second Brain</span></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  var crumbs={profile:' / Financial Agent',workspace:' / Financial Agent / Task',gallery:'',kanban:'',artifacts:''};
+  function go(id,el){
+    document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});
+    document.getElementById(id).classList.add('active');
+    document.getElementById('crumbExtra').textContent=crumbs[id]||'';
+    // sync subnav highlight
+    var map={gallery:'gallery',profile:'gallery',workspace:'gallery',kanban:'kanban',artifacts:'artifacts'};
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===map[id])});
+    document.querySelector('.canvas').scrollTop=0;
+  }
+</script>
+</body>
+</html>

@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
-import { SectionEyebrow, TaskCard } from '../../../components/pro-suite/domain-agents/DomainAgentPrimitives';
-import { domainAgents, domainTasks, statusLabels, statusOrder } from './mockDomainAgents';
-import type { DomainAgentId, DomainTaskStatus } from './types';
+import { SectionEyebrow, TaskCard, statusLabels, statusOrder } from '../../../components/pro-suite/domain-agents/DomainAgentPrimitives';
+import { listDomainAgents, listDomainTasks } from '../../../lib/domainAgentsApi';
+import type { DomainAgent, DomainAgentId, DomainTask, DomainTaskStatus } from './types';
 
 const columnDot: Record<DomainTaskStatus, string> = {
   ready: 'var(--aos-steel-blue)',
@@ -16,15 +16,39 @@ export const DomainAgentTasks: React.FC = () => {
   const [agentFilter, setAgentFilter] = useState<DomainAgentId | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<DomainTaskStatus | 'all'>('all');
   const [query, setQuery] = useState('');
+  const [agents, setAgents] = useState<DomainAgent[]>([]);
+  const [tasks, setTasks] = useState<DomainTask[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([listDomainAgents(), listDomainTasks({ agent: agentFilter, status: statusFilter, q: query })])
+      .then(([agentRows, taskRows]) => {
+        if (!mounted) return;
+        setAgents(agentRows);
+        setTasks(taskRows);
+        setError(null);
+      })
+      .catch((err) => mounted && setError(err instanceof Error ? err.message : 'Could not load tasks.'));
+    return () => {
+      mounted = false;
+    };
+  }, [agentFilter, query, statusFilter]);
+
+  const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
+  const workflowsById = useMemo(
+    () => new Map(agents.flatMap((agent) => agent.workflows).map((workflow) => [workflow.id, workflow])),
+    [agents],
+  );
 
   const filteredTasks = useMemo(() => {
-    return domainTasks.filter((task) => {
+    return tasks.filter((task) => {
       const matchesAgent = agentFilter === 'all' || task.agentId === agentFilter;
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
       const matchesQuery = task.title.toLowerCase().includes(query.toLowerCase());
       return matchesAgent && matchesStatus && matchesQuery;
     });
-  }, [agentFilter, query, statusFilter]);
+  }, [agentFilter, query, statusFilter, tasks]);
 
   return (
     <div className="space-y-6">
@@ -36,6 +60,12 @@ export const DomainAgentTasks: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-[var(--radius-sm)] border border-[var(--aos-risk)] bg-[var(--aos-risk-tint)] px-4 py-3 text-sm text-[var(--aos-risk)]">
+          {error}
+        </div>
+      )}
 
       <div className="rounded-[var(--radius-md)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft-1)]">
         <SectionEyebrow>Filters</SectionEyebrow>
@@ -51,7 +81,7 @@ export const DomainAgentTasks: React.FC = () => {
           </label>
           <select value={agentFilter} onChange={(event) => setAgentFilter(event.target.value as DomainAgentId | 'all')} className="aos-select">
             <option value="all">Agent - All</option>
-            {domainAgents.map((agent) => (
+            {agents.map((agent) => (
               <option key={agent.id} value={agent.id}>{agent.shortName}</option>
             ))}
           </select>
@@ -83,7 +113,12 @@ export const DomainAgentTasks: React.FC = () => {
                 </div>
                 <div className="space-y-3">
                   {tasks.map((task) => (
-                    <TaskCard key={task.id} task={task} />
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      agent={agentsById.get(task.agentId)}
+                      workflow={workflowsById.get(task.workflowId)}
+                    />
                   ))}
                   {tasks.length === 0 && (
                     <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--aos-mist)] bg-[var(--bg-canvas)] px-3 py-6 text-center text-xs text-[var(--fg-3)]">

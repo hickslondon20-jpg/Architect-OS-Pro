@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowUp, Paperclip, X } from 'lucide-react';
+import { ArrowUp, BrainCircuit, Minimize2, Paperclip, X } from 'lucide-react';
+import type { ContextRemainingSignal } from '../../../lib/virtualCsoApi';
 
 /**
  * Chat composer: multi-line input + submit, an add-context affordance,
@@ -13,6 +14,12 @@ export const Composer: React.FC<{
   value?: string;
   onChange?: (value: string) => void;
   textareaRef?: React.Ref<HTMLTextAreaElement>;
+  contextSignal?: ContextRemainingSignal | null;
+  onCompact?: () => void;
+  compacting?: boolean;
+  onAttach?: () => void;
+  deepMode?: boolean;
+  onDeepModeChange?: (enabled: boolean) => void;
 }> = ({
   onSubmit,
   linkedFolder,
@@ -21,6 +28,12 @@ export const Composer: React.FC<{
   value,
   onChange,
   textareaRef,
+  contextSignal,
+  onCompact,
+  compacting = false,
+  onAttach,
+  deepMode = false,
+  onDeepModeChange,
 }) => {
   const [localText, setLocalText] = useState('');
   const text = value ?? localText;
@@ -39,10 +52,41 @@ export const Composer: React.FC<{
       submit();
     }
   };
+  const showCompaction = contextSignal?.band === 'amber' || contextSignal?.band === 'red';
+  const barColor =
+    contextSignal?.band === 'red'
+      ? 'var(--aos-risk)'
+      : contextSignal?.band === 'amber'
+        ? 'var(--aos-brass)'
+        : 'var(--aos-teal)';
 
   return (
     <div className="border-t border-[var(--aos-mist)] bg-[var(--bg-surface)] px-6 py-4">
       <div className="mx-auto max-w-3xl">
+        {contextSignal && (
+          <div className="mb-2 flex items-center gap-3">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg-canvas)]">
+              <div
+                className="h-full rounded-full transition-[width] duration-300"
+                style={{ width: `${contextSignal.remainingPercent}%`, backgroundColor: barColor }}
+              />
+            </div>
+            <span className="aos-mono min-w-[132px] text-right text-[11px] text-[var(--fg-3)]">
+              {contextSignal.remainingPercent}% context remaining
+            </span>
+            {showCompaction && onCompact && (
+              <button
+                onClick={onCompact}
+                disabled={compacting}
+                className="rounded-md p-1.5 text-[var(--fg-3)] transition-colors hover:bg-[var(--bg-canvas)] hover:text-[var(--aos-brass)] disabled:cursor-not-allowed disabled:opacity-40"
+                title="Compact thread context"
+                aria-label="Compact thread context"
+              >
+                <Minimize2 size={15} />
+              </button>
+            )}
+          </div>
+        )}
         {linkedFolder && (
           <div className="mb-2 flex items-center gap-1.5">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--aos-sage)] bg-[var(--aos-sage-soft)] px-2.5 py-1 text-xs text-[var(--fg-2)]">
@@ -61,12 +105,29 @@ export const Composer: React.FC<{
 
         <div className="flex items-end gap-2 rounded-[var(--radius-sm)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] px-3 py-2 focus-within:border-[var(--aos-brass)] focus-within:ring-1 focus-within:ring-[var(--aos-brass)]">
           <button
+            onClick={onAttach}
             className="mb-0.5 flex-shrink-0 rounded-md p-1.5 text-[var(--fg-3)] transition-colors hover:bg-[var(--bg-canvas)] hover:text-[var(--fg-1)]"
             title="Add context / link a folder"
             aria-label="Add context"
+            type="button"
           >
             <Paperclip size={16} />
           </button>
+          {onDeepModeChange && (
+            <button
+              onClick={() => onDeepModeChange(!deepMode)}
+              className={`mb-0.5 flex-shrink-0 rounded-md p-1.5 transition-colors ${
+                deepMode
+                  ? 'bg-[var(--aos-brass)] text-[var(--fg-on-dark)]'
+                  : 'text-[var(--fg-3)] hover:bg-[var(--bg-canvas)] hover:text-[var(--fg-1)]'
+              }`}
+              title={deepMode ? 'Deep Mode on' : 'Deep Mode off'}
+              aria-label={deepMode ? 'Turn Deep Mode off' : 'Turn Deep Mode on'}
+              type="button"
+            >
+              <BrainCircuit size={16} />
+            </button>
+          )}
           <textarea
             ref={textareaRef}
             value={text}

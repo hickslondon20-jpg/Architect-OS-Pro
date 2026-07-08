@@ -18,9 +18,10 @@ class Settings(BaseSettings):
     cohere_api_key: str | None = Field(default=None, validation_alias="COHERE_API_KEY")
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
     claude_synthesis_model: str = Field(
-        default="claude-sonnet-4-5",
+        default="claude-sonnet-4-6",
         validation_alias="ARCHITECTOS_CLAUDE_SYNTHESIS_MODEL",
     )
+    llm_context_window: int = Field(default=200000, validation_alias="ARCHITECTOS_LLM_CONTEXT_WINDOW")
 
     raw_document_bucket: str = Field(default="raw-documents", validation_alias="ARCHITECTOS_RAW_DOCUMENT_BUCKET")
     ingest_secret: str | None = Field(default=None, validation_alias="ARCHITECTOS_INGEST_SECRET")

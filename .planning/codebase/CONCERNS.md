@@ -11,6 +11,10 @@ focus: concerns
 
 The codebase is materially built, but beta-readiness risk is concentrated in verification debt: TypeScript errors, feature-gate environment defaults, stale starter docs/config, live-key smoke blockers, hosted ingestion runtime uncertainty, and design-system drift in older UI states. None of these require greenfield rewrites, but they should be addressed before beta-launch finalization.
 
+## Verified Live Bugs (blocking — route to a core-platform dev pass before go-live)
+
+- **GVS "save scenario" is broken for every user (verified live 2026-07-08).** `check_gvs_save_limit()` (trigger `enforce_gvs_save_limit`, `BEFORE INSERT` on `gvs_saved_growth_scenarios`) joins `subscription_tiers t on t.id = p.tier_id`, but `subscription_tiers.id` is `uuid` and `profiles.tier_id` is `text` → every insert throws `operator does not exist: uuid = text`. It also matches `profiles.id` instead of `profiles.user_id`. The join runs on every insert regardless of tier, so **no founder can save a Growth Velocity Simulator scenario in production right now.** Surfaced during Tier-1 wiki source-table seeding (the trigger was disabled for one transaction and re-enabled — no permanent change). Fix, verified against live column types: join `on t.code = p.tier_id` and match `where p.user_id = new.user_id`. **Out of scope for the intelligence-layer arc** — flagged here for a core-platform fix pass. Detail: seed report `seed-report-test-user-2026-07-08.md`; verified function definition + column types via Supabase MCP.
+
 ## Compile and Type Risk
 
 - `ts_errors.log` and `tsc_errors.log` contain known TypeScript errors.
@@ -60,6 +64,10 @@ The codebase is materially built, but beta-readiness risk is concentrated in ver
 - Some large files such as `pages/SnapshotPages.tsx` contain multiple tabs and can be easy to over-edit.
 - Domain Agents are scaffolded under `/pro/intelligence/domain-agents`, but should remain founder-facing and not expose internal skills/templates.
 
+## Secrets and Credential Risk
+
+- **`ARCHITECTOS_INGEST_SECRET` exposed in an agent chat transcript (2026-07-08, MA-03 Objective 4).** While verifying the Tier-1 wiki auto-trigger wiring (Supabase `pg_net` DB triggers on 12 tables calling `/api/wiki/compile-event`), the build agent ran `select decrypted_secret from vault.decrypted_secrets where name = 'wiki_autotrigger_ingest_secret'` to check whether the founder had set the Vault secret — the founder had deliberately chosen to set it themselves via the Supabase SQL editor specifically to keep the raw value out of the chat. That query returns the plaintext value rather than just confirming it's set, so the real secret is now present in that conversation's transcript. `ARCHITECTOS_INGEST_SECRET` gates every `dependencies=[Depends(require_ingest_secret)]` route in `python-backend/main.py` (ingestion, retrieval, wiki compile, doc-wiki synthesis, sandbox/artifact verification, structured-query tools, KB tools, agent-runs) — a leaked value doesn't grant Supabase/DB access directly, but does let anyone holding it call those backend routes. Founder has committed to a full key/secret rotation before beta launch, which covers this value; not rotating in isolation since the full pass is already planned. **Before beta launch:** generate a new `ARCHITECTOS_INGEST_SECRET`, update the Python backend's deployment env, redeploy, then update the Vault secret `wiki_autotrigger_ingest_secret` via `vault.update_secret()` to match — and as part of that same rotation pass, sweep for any other secret values that may have been read back (not just set) via `vault.decrypted_secrets` in an agent session. Going forward, Vault secret checks should use existence/placeholder comparisons (e.g. `select (decrypted_secret is not null and decrypted_secret <> 'SET_ME_...') as configured`), never select the raw `decrypted_secret` column.
+
 ## Design System Drift
 
 - AOS tokens exist and are imported globally, but older locked/loading states use slate/white defaults.
@@ -81,3 +89,4 @@ The codebase is materially built, but beta-readiness risk is concentrated in ver
 - Run hosted ingestion/parser smoke and OpenAI/Cohere return passes.
 - Verify N8N webhook URLs and PDF/workflow endpoints from the deployed environment.
 - Keep future work section-by-section and avoid broad rewrites of already-built product surfaces.
+- Rotate all API keys/secrets before go-live, including `ARCHITECTOS_INGEST_SECRET` (see Secrets and Credential Risk above) and the Vault-stored `wiki_autotrigger_ingest_secret`.

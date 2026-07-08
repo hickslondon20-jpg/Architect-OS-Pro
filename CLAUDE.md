@@ -27,23 +27,25 @@
 ## Critical Architecture Rules
 
 ### 1. AI synthesis: three lanes, N8N is no longer the default fallback
-**Revised 2026-06-30, Ep4 Phase 4 build.** The original rule ("all synthesis through N8N except Virtual CSO streaming") predates the platform's growth into a more expansive Python/FastAPI backend and no longer reflects reality — it was already being violated by two live services before this revision made it official: `python-backend/services/doc_wiki_synthesis.py` and `python-backend/services/kb_explorer_service.py` both call Anthropic directly today. The rule now has three lanes instead of one default + one exception:
+**Revised 2026-07-03, Ep5 Phase 3 build.** The original rule ("all synthesis through N8N except Virtual CSO streaming") predates the platform's growth into a more expansive Python/FastAPI backend and no longer reflects reality. `python-backend/services/doc_wiki_synthesis.py`, `python-backend/services/kb_explorer_service.py`, and `python-backend/services/vcso_chat_service.py` call Anthropic directly from the backend. The rule now has three lanes:
 
-- **Synthesis colocated with a Python backend service** (KB Explorer, doc/wiki synthesis, skill authoring/guided-creation, and similar) calls Anthropic directly from that service — the same pattern already proven in the two files above. This is the default for any new synthesis living inside `python-backend/`, not an exception that needs special justification.
-- **Virtual CSO interactive chat** keeps its Vercel serverless streaming exception (decided 2026-06-12, unchanged): context assembly + token-by-token streaming from Claude to the browser, API key server-side in the function env. n8n still cannot stream tokens cleanly, so this stays a dedicated path.
+- **Synthesis colocated with a Python backend service** (KB Explorer, doc/wiki synthesis, skill authoring/guided-creation, Virtual CSO streaming chat, and similar) calls Anthropic directly from that service. This is the default for any new synthesis living inside `python-backend/`, not an exception that needs special justification.
+- **Virtual CSO interactive chat streaming** now lives in the Python/FastAPI lane: `VcsoChatService` runs the registry-sourced tool loop and streams curated trace + answer tokens to the browser through `/api/vcso/chat`. The older Vercel `api/vcso/chat.ts` path is retained only as a feature-flagged rollback during cutover, not the canonical orchestration lane.
 - **Batch, scheduled, or cron-triggered workflows** — anything that genuinely needs external scheduling, retries, or non-code-owned orchestration (PDF generation via Google Docs merge fields, drip/nurture sequences, etc.) — stay on N8N. N8N remains the right tool here, just not the default for everything else.
 - **Never, in any lane:** direct client-side (browser) Anthropic API calls, or Supabase Edge Functions for AI.
 
-When adding new synthesis, ask: does this live inside a Python service, does it need token-by-token streaming to the browser, or does it need external scheduling/retries? That answers which lane it belongs to — N8N is no longer the fallback answer for "everything else."
+When adding new synthesis, ask: does this live inside a Python service, does it need external scheduling/retries, or is it a rollback-only legacy path? That answers which lane it belongs to - N8N is no longer the fallback answer for "everything else".
 
 ### 2. openai package is dead code — remove it
-The `openai` npm package is a legacy remnant. All synthesis has migrated to Claude (via N8N, direct Python-backend calls, or the Virtual CSO streaming function — see Rule #1). Remove the package and any import that references it.
+The `openai` npm package is a legacy remnant. All synthesis has migrated to Claude (via N8N or direct Python-backend calls; the old Vercel Virtual CSO stream is rollback-only - see Rule #1). Remove the package and any import that references it.
 
 ### 3. MRA checkpoint content is in Supabase — not a config file
 125 checkpoints × 5 AE Ladder stages = 500 stage-calibrated definitions live in the `mra_checkpoints` table (or similar) in Supabase. Do not create a config file for this content. Verify the table, don't recreate it.
 
 ### 4. PDF exports use the established pattern
 MRA Report and AE Ladder Report PDF downloads are already built via N8N + Google Docs merge fields. Sprint Launch Document PDF must be built using this same pattern — not a frontend PDF library (no jspdf, no react-to-pdf).
+
+**Scope of this rule (Ep6 decision L20).** This rule governs the **fixed platform reports only** — MRA Report, AE Ladder Report, Sprint Launch Document. It does **not** apply to **Domain Agent artifacts**, which are produced through the Ep4 **sandbox export path** (`ArtifactService` + sandbox render, markdown → HTML/DOCX) per locked decisions L4 and L20. A Domain Agent artifact rendering/downloading via the sandbox is **not** a violation of this rule. See `.planning/INTELLIGENCE-LAYER-EPISODE-MAP.md` (L20) and `.planning/agent-harness/` (developed plans; the reference PRD stays in `docs/plans/ep6-agent-harness/`).
 
 ### 5. Beta is founder-only
 No team member accounts exist in beta. Do not build or wire team access flows. Access is controlled via `beta_cohort_week` field and `beta_feature_gates` table in Supabase.
@@ -175,7 +177,7 @@ See `../ArchitectOS Beta Launch/ArchitectOS Design System/uploads/ArchitectOS-de
 
 ### Core Adaptation Principles
 
-- **Never rewrite what works.** Our frontend (React 19 / Vite 6 / TypeScript) stays. Our N8N synthesis pipeline stays. The Virtual CSO streaming endpoint stays.
+- **Never rewrite what works.** Our frontend (React 19 / Vite 6 / TypeScript) stays. Batch/scheduled N8N workflows stay. The old Vercel Virtual CSO streaming endpoint stays as rollback while the canonical VCSO stream moves to Python.
 - **Weigh the stack tradeoffs explicitly.** For every reference-repo pattern (e.g. Python/FastAPI backend, Docling doc processing, LangSmith observability), we evaluate: adopt into our stack, find an equivalent that fits our stack, or skip.
 - **Align to our use case.** Their KB is generic documents. Ours is structured founder context (MRA results, AE Ladder, initiatives, sprints, brand briefs). Every adaptation must respect that specificity.
 - **One plan file per feature.** Plans live in `docs/plans/`. Plans are the handoff artifact to execution agents — they must be self-contained and executable without this conversation thread.
@@ -185,12 +187,12 @@ See `../ArchitectOS Beta Launch/ArchitectOS Design System/uploads/ArchitectOS-de
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Backend for ingestion | TBD — evaluate Ep1 | Weigh Python/FastAPI vs. extending N8N or Vercel serverless |
-| Doc processing | TBD — evaluate Ep1 | Weigh Docling vs. N8N-native processing |
+| Backend for ingestion | **Python/FastAPI (live-verified 2026-07-08, MA-01 Gate 1)** | Docling + persistent runtime; proven end-to-end |
+| Doc processing | **Docling (live-verified 2026-07-08)** | CSV + failure path smoked in Gate 1 |
 | Vector search | Supabase pgvector (already in use) | Confirmed — matches their stack |
-| Hybrid search / reranking | TBD — evaluate Ep1 | Their approach is a clear upgrade over static KB |
+| Hybrid search / reranking | **Hybrid RRF default + optional Cohere (live-verified 2026-07-08)** | RRF fusion proven; Cohere fails open with no key |
 | LLM provider | Claude Sonnet (locked) | Our stack constraint — never swap for OpenAI-compatible |
-| Observability | TBD — evaluate Ep1 | LangSmith vs. N8N execution logs |
+| Observability | **LangSmith (adopted 2026-07-06; wired + live-verified 2026-07-08)** | Wrapped across all Python-backend Anthropic/OpenAI client sites + `load_dotenv`, project `ArchitectOS-pro`. Standing bar: any Python-backend LLM call on an episode's critical path must emit a LangSmith trace as part of "live-verified" evidence (necessary, not sufficient — pair with DB/output checks). Does not cover N8N batch or front-end. New Python synthesis clients must be wrapped. |
 
 ### Intelligence Layer Vision
 

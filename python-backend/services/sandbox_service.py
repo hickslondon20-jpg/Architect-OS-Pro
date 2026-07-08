@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 import base64
@@ -12,7 +12,9 @@ from pathlib import Path
 import shlex
 import tempfile
 import threading
+import time
 from typing import Any
+import uuid
 
 from google.auth.transport.requests import Request
 from google.cloud import container_v1
@@ -20,10 +22,19 @@ from google.oauth2 import service_account
 from kubernetes import client as k8s_client
 from kubernetes.client.exceptions import ApiException
 from llm_sandbox import InteractiveSandboxSession, SandboxBackend
+from llm_sandbox.exceptions import ContainerError, NotOpenSessionError, SandboxTimeoutError
 from llm_sandbox.interactive import _INTERACTIVE_RUNNER_SCRIPT
 from supabase import Client, create_client
 
 from core.config import Settings, get_settings
+from services.sandbox_bridge import (
+    DEFAULT_BRIDGE_MAX_TOOL_CALLS,
+    DEFAULT_BRIDGE_POLL_INTERVAL_SECONDS,
+    BridgeFulfiller,
+    BridgeRunOutput,
+    BridgeToolCall,
+    generate_bridge_module_source,
+)
 
 
 class SandboxServiceError(RuntimeError):
@@ -40,12 +51,37 @@ class SandboxExecutionResult:
     status: str
 
 
+@dataclass(frozen=True)
+class SandboxBridgeExecutionResult:
+    thread_id: str
+    pod_name: str
+    stdout: str
+    stderr: str
+    exit_code: int
+    status: str
+    tool_calls: list[BridgeToolCall] = field(default_factory=list)
+
+
 class KubernetesInteractiveSandboxSession(InteractiveSandboxSession):
     def _ensure_runtime_dependencies(self) -> None:
         self.execute_commands([
             (f"mkdir -p {self._commands_dir}", None),
             (f"mkdir -p {self._results_dir}", None),
+            (f"mkdir -p {self._bridge_requests_dir}", None),
+            (f"mkdir -p {self._bridge_responses_dir}", None),
         ])
+
+    @property
+    def _bridge_dir(self) -> str:
+        return f"{self.config.workdir.rstrip('/')}/.bridge"
+
+    @property
+    def _bridge_requests_dir(self) -> str:
+        return f"{self._bridge_dir}/requests"
+
+    @property
+    def _bridge_responses_dir(self) -> str:
+        return f"{self._bridge_dir}/responses"
 
     def _upload_runner_script(self) -> None:
         payload = base64.b64encode(_INTERACTIVE_RUNNER_SCRIPT.encode("utf-8")).decode("ascii")
@@ -76,6 +112,128 @@ class KubernetesInteractiveSandboxSession(InteractiveSandboxSession):
         if result.exit_code:
             raise SandboxServiceError(f"Failed to read interactive result: {result.stderr or result.stdout}")
         return json.loads(result.stdout)
+
+    def _write_remote_json(self, remote_path: str, payload: dict[str, Any]) -> None:
+        encoded = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
+        command = (
+            "import base64, pathlib; "
+            f"path = pathlib.Path({remote_path!r}); "
+            "path.parent.mkdir(parents=True, exist_ok=True); "
+            "tmp_path = path.with_suffix('.tmp'); "
+            f"tmp_path.write_text(base64.b64decode({encoded!r}).decode('utf-8'), encoding='utf-8'); "
+            "tmp_path.replace(path)"
+        )
+        result = self.execute_command(f"python -c {shlex.quote(command)}")
+        if result.exit_code:
+            raise SandboxServiceError(f"Failed to write bridge response: {result.stderr or result.stdout}")
+
+    def run_with_bridge(
+        self,
+        code: str,
+        *,
+        fulfiller: BridgeFulfiller,
+        timeout: float | None = None,
+        poll_interval: float = DEFAULT_BRIDGE_POLL_INTERVAL_SECONDS,
+        max_tool_calls: int = DEFAULT_BRIDGE_MAX_TOOL_CALLS,
+    ) -> BridgeRunOutput:
+        """Run one cell with in-code tool calls resolved host-side (Code Mode).
+
+        Reuses the same command/result file protocol as `run()` to detect
+        completion, and interleaves polling the bridge request directory so a
+        single execution can make several tool calls without a per-tool
+        inference round trip. Plain cells that call no tools pay only the
+        cost of one extra (near-instant) directory listing per poll tick.
+        """
+        if not self.container or not self.is_open:
+            raise NotOpenSessionError
+        if not self._runner_ready:
+            msg = "Interactive runtime is not ready"
+            raise ContainerError(msg)
+
+        self._check_session_timeout()
+        actual_timeout = timeout or self.settings.timeout or self.config.get_execution_timeout()
+
+        stub_source = generate_bridge_module_source(
+            fulfiller.tool_definitions,
+            requests_dir=self._bridge_requests_dir,
+            responses_dir=self._bridge_responses_dir,
+            poll_interval=min(poll_interval, 1.0),
+            call_timeout=actual_timeout or 60.0,
+        )
+        full_code = f"{stub_source}\n\n{code}"
+
+        request_id = uuid.uuid4().hex
+        command_path = f"{self._commands_dir}/command-{request_id}.json"
+        result_path = f"{self._results_dir}/result-{request_id}.json"
+        self._write_remote_command(command_path, request_id, full_code)
+
+        deadline = time.monotonic() + actual_timeout if actual_timeout else None
+        fulfilled_ids: set[str] = set()
+        tool_calls: list[BridgeToolCall] = []
+
+        while True:
+            status = self.execute_command(f"test -f {result_path}")
+            if status.exit_code == 0:
+                break
+
+            self._poll_bridge_requests(fulfiller, fulfilled_ids, tool_calls, max_tool_calls)
+
+            if deadline and time.monotonic() >= deadline:
+                self._interrupt_runner()
+                msg = f"Interactive execution timed out after {actual_timeout} seconds"
+                raise SandboxTimeoutError(msg, timeout_duration=actual_timeout)
+
+            time.sleep(poll_interval)
+
+        payload = self._read_remote_result(result_path)
+        self.execute_command(f"rm -f {result_path}")
+        exit_code = 0 if payload.get("success") else 1
+        return BridgeRunOutput(
+            stdout=payload.get("stdout", ""),
+            stderr=payload.get("stderr", ""),
+            exit_code=exit_code,
+            tool_calls=tool_calls,
+        )
+
+    def _poll_bridge_requests(
+        self,
+        fulfiller: BridgeFulfiller,
+        fulfilled_ids: set[str],
+        tool_calls: list[BridgeToolCall],
+        max_tool_calls: int,
+    ) -> None:
+        listing = self.execute_command(f"ls -1 {self._bridge_requests_dir} 2>/dev/null")
+        if listing.exit_code:
+            return
+        names = [line.strip() for line in listing.stdout.splitlines() if line.strip().endswith(".json")]
+        for name in names:
+            request_path = f"{self._bridge_requests_dir}/{name}"
+            try:
+                request_payload = self._read_remote_result(request_path)
+            except SandboxServiceError:
+                continue
+            request_id = str(request_payload.get("id") or "")
+            if not request_id or request_id in fulfilled_ids:
+                continue
+            fulfilled_ids.add(request_id)
+            if len(fulfilled_ids) > max_tool_calls:
+                self._interrupt_runner()
+                raise SandboxServiceError(
+                    f"Sandbox code exceeded the maximum of {max_tool_calls} tool calls for this execution."
+                )
+            tool_name = str(request_payload.get("tool_name") or "")
+            arguments = request_payload.get("arguments") or {}
+            response_payload = fulfiller.fulfill(request_id, tool_name, arguments)
+            tool_calls.append(
+                BridgeToolCall(
+                    tool_name=tool_name,
+                    ok=bool(response_payload.get("ok")),
+                    arguments=arguments,
+                    error=response_payload.get("error"),
+                )
+            )
+            self._write_remote_json(f"{self._bridge_responses_dir}/{name}", response_payload)
+            self.execute_command(f"rm -f {request_path}")
 
 
 class SandboxService:
@@ -123,6 +281,54 @@ class SandboxService:
             stderr=output.stderr,
             exit_code=output.exit_code,
             status="active",
+        )
+
+    def execute_code_with_bridge(
+        self,
+        thread_id: str,
+        code: str,
+        *,
+        fulfiller: BridgeFulfiller,
+        timeout_seconds: float | None = None,
+        poll_interval: float = DEFAULT_BRIDGE_POLL_INTERVAL_SECONDS,
+        max_tool_calls: int = DEFAULT_BRIDGE_MAX_TOOL_CALLS,
+    ) -> SandboxBridgeExecutionResult:
+        """Code Mode: same session/pod as execute_code, with in-code tool calls."""
+        if not thread_id:
+            raise SandboxServiceError("thread_id is required.")
+        if not code.strip():
+            raise SandboxServiceError("code is required.")
+
+        with self._lock:
+            session, row = self._get_or_create_session(thread_id)
+            self._refresh_session_client(session)
+
+        if not isinstance(session, KubernetesInteractiveSandboxSession):
+            raise SandboxServiceError("Bridge execution requires the Kubernetes interactive sandbox session.")
+
+        try:
+            output = session.run_with_bridge(
+                code,
+                fulfiller=fulfiller,
+                timeout=timeout_seconds,
+                poll_interval=poll_interval,
+                max_tool_calls=max_tool_calls,
+            )
+        except Exception as exc:
+            with self._lock:
+                self._expire_thread_session(thread_id, reason="run_failed")
+            raise SandboxServiceError(f"Sandbox bridge execution failed: {exc}") from exc
+
+        pod_name = str(row["pod_name"])
+        self._touch_session_row(str(row["id"]))
+        return SandboxBridgeExecutionResult(
+            thread_id=thread_id,
+            pod_name=pod_name,
+            stdout=output.stdout,
+            stderr=output.stderr,
+            exit_code=output.exit_code,
+            status="active",
+            tool_calls=output.tool_calls,
         )
 
     def close_session(self, thread_id: str, status: str = "closed") -> None:

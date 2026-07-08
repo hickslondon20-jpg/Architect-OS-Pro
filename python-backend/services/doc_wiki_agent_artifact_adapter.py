@@ -64,6 +64,62 @@ class DocWikiAgentArtifactAdapter:
         self._write_related_page_links(user_id, result, related_keys)
         return result
 
+    async def synthesize_from_task(
+        self,
+        task_id: str,
+        user_id: str,
+        *,
+        artifact_id: str | None = None,
+    ) -> SynthesisResult | None:
+        """
+        Trigger OS Engine synthesis from a promoted Domain Agent task artifact.
+
+        This is the L17 task-sourced entry point. It reuses DocWikiSynthesisService
+        and the agent_artifact page kind, but does not force Tasks through the
+        agent_delegation_runs path.
+        """
+        task = self._load_task(task_id, user_id)
+        artifact = self._load_task_artifact(task_id, user_id, artifact_id=artifact_id)
+        workflow = self._load_workflow(task.get("workflow_id"))
+        title = str(artifact.get("description") or task.get("title") or workflow.get("name") or "Domain agent artifact")
+        provenance = artifact.get("provenance") if isinstance(artifact.get("provenance"), dict) else {}
+        related_keys = self._extract_related_canonical_keys(provenance)
+        related_keys.extend(self._extract_related_canonical_keys(task.get("step_results")))
+        payload = SourcePayload(
+            user_id=user_id,
+            source_kind="agent_artifact",
+            source_id=str(artifact["id"]),
+            source_title=title,
+            full_text=self._assemble_task_artifact_body(task, workflow, artifact),
+            chunk_refs=[],
+            metadata={
+                "source_table": "artifacts",
+                "source_task_table": "tasks",
+                "task_id": task_id,
+                "artifact_id": artifact.get("id"),
+                "workflow_id": task.get("workflow_id"),
+                "workflow_key": workflow.get("key"),
+                "agent_id": task.get("agent_id"),
+                "template_id": artifact.get("template_id") or workflow.get("template_id"),
+                "observed_date": artifact.get("updated_at") or artifact.get("created_at") or task.get("updated_at"),
+                "provenance": provenance,
+                "source_refs": provenance.get("source_refs") or [],
+                "related_canonical_keys": list(dict.fromkeys(related_keys)),
+                "forced_page_kind": "agent_artifact",
+                "forced_canonical_key": self._task_artifact_canonical_key(task_id),
+                "forced_page_title": title,
+                "synthesis_directive": (
+                    "Synthesize this promoted Domain Agent artifact into a wiki page capturing the task, "
+                    "artifact findings, founder-relevant implications, and provenance. OS Engine is the sole "
+                    "knowledge-base writer; do not expose internal workflow plumbing."
+                ),
+            },
+            synthesis_job_id=str(uuid.uuid4()),
+        )
+        result = self._service.synthesize(payload)
+        self._write_related_page_links(user_id, result, related_keys)
+        return result
+
     def _load_run(self, run_id: str, user_id: str) -> dict[str, Any]:
         result = (
             self._sb.table("agent_delegation_runs")
@@ -98,6 +154,42 @@ class DocWikiAgentArtifactAdapter:
         )
         return result.data or []
 
+    def _load_task(self, task_id: str, user_id: str) -> dict[str, Any]:
+        result = (
+            self._sb.table("tasks")
+            .select("*")
+            .eq("id", task_id)
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if not result.data:
+            raise ValueError("Task not found.")
+        return result.data
+
+    def _load_task_artifact(self, task_id: str, user_id: str, *, artifact_id: str | None = None) -> dict[str, Any]:
+        query = (
+            self._sb.table("artifacts")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("source_kind", "domain_agent_task")
+            .eq("task_id", task_id)
+        )
+        if artifact_id:
+            query = query.eq("id", artifact_id)
+        result = query.order("updated_at", desc=True).limit(1).execute()
+        rows = result.data or []
+        if not rows:
+            raise ValueError("Registered Domain Agent artifact not found.")
+        return rows[0]
+
+    def _load_workflow(self, workflow_id: Any) -> dict[str, Any]:
+        if not workflow_id:
+            return {}
+        result = self._sb.table("workflows").select("*").eq("id", str(workflow_id)).limit(1).execute()
+        rows = result.data or []
+        return rows[0] if rows else {}
+
     def _is_artifact_worthy(self, run: dict) -> bool:
         return (
             run.get("status") == "completed"
@@ -108,6 +200,9 @@ class DocWikiAgentArtifactAdapter:
 
     def _artifact_canonical_key(self, run_id: str) -> str:
         return f"agent_artifact_{run_id[:8]}"
+
+    def _task_artifact_canonical_key(self, task_id: str) -> str:
+        return f"domain_agent_task_{task_id[:8]}"
 
     def _assemble_artifact_body(self, run: dict, steps: list[dict], sources: list[dict]) -> str:
         """Build body text. See 04-RESEARCH.md section 4.4 for template."""
@@ -139,6 +234,58 @@ class DocWikiAgentArtifactAdapter:
                 "\n".join(source_lines) or "No context sources recorded.",
             ]
         )
+
+    def _assemble_task_artifact_body(self, task: dict[str, Any], workflow: dict[str, Any], artifact: dict[str, Any]) -> str:
+        step_results = task.get("step_results") if isinstance(task.get("step_results"), dict) else {}
+        step_lines = []
+        source_lines = []
+        for key in sorted([item for item in step_results.keys() if str(item).isdigit()], key=lambda item: int(item)):
+            result = step_results.get(key) or {}
+            if not isinstance(result, dict):
+                continue
+            step_lines.append(
+                f"- Step {key} - {result.get('name') or result.get('step_type') or 'Workflow step'}: {result.get('summary') or ''}"
+            )
+            for source in result.get("source_refs") or []:
+                if isinstance(source, dict):
+                    source_lines.append(
+                        f"- {source.get('label') or source.get('path') or source.get('source_id') or 'Source'} "
+                        f"({source.get('source_kind') or 'unknown'})"
+                    )
+        content = self._load_artifact_content(artifact)
+        provenance = artifact.get("provenance") if isinstance(artifact.get("provenance"), dict) else {}
+        return "\n".join(
+            [
+                f"## Domain Agent task: {task.get('title') or 'Untitled task'}",
+                f"Workflow: {workflow.get('name') or task.get('workflow_id') or ''}",
+                f"Task status: {task.get('status') or ''}",
+                f"Artifact: {artifact.get('filename') or artifact.get('id')}",
+                "",
+                "## Artifact content",
+                content,
+                "",
+                "## Workflow step summaries",
+                "\n".join(step_lines) or "No content-bearing steps recorded.",
+                "",
+                "## Sources and provenance",
+                "\n".join(source_lines) or "No explicit source refs recorded.",
+                "",
+                "## Provenance payload",
+                str(provenance),
+            ]
+        )
+
+    def _load_artifact_content(self, artifact: dict[str, Any]) -> str:
+        storage_path = artifact.get("storage_path")
+        if not storage_path:
+            return str(artifact.get("description") or "")
+        try:
+            content = self._sb.storage.from_("artifacts").download(storage_path)
+            if isinstance(content, bytes):
+                return content.decode("utf-8", errors="replace")
+            return str(content or "")
+        except Exception:
+            return str(artifact.get("description") or "")
 
     def _artifact_title(self, run: dict[str, Any]) -> str:
         if run.get("task_title"):

@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 import anthropic
+from langsmith.wrappers import wrap_anthropic
 
 from core.config import get_settings
 from core.doc_wiki_config import doc_wiki_config
+from services.usage_events import anthropic_usage, log_ai_usage_event
 from services.vector_store import VectorStore
 
 
@@ -67,13 +69,14 @@ class DocWikiSynthesisService:
         self._config = doc_wiki_config()
         self._settings = get_settings()
         self._last_write_created: bool = False
+        self._model_setting_key = "doc_wiki_synthesis"
 
     @classmethod
     def from_env(cls) -> "DocWikiSynthesisService":
         settings = get_settings()
         return cls(
             store=VectorStore.from_env(),
-            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key or ""),
+            anthropic_client=wrap_anthropic(anthropic.Anthropic(api_key=settings.anthropic_api_key or "")),
         )
 
     def synthesize(self, source_payload: SourcePayload) -> SynthesisResult:
@@ -123,7 +126,7 @@ class DocWikiSynthesisService:
                 result.contradictions_flagged += contradictions
 
                 # _embed_page handles its own exceptions internally.
-                self._embed_page(page_id, output.get("content", ""))
+                self._embed_page(source_payload.user_id, page_id, output.get("content", ""))
 
                 self._write_log(
                     source_payload.user_id,
@@ -149,9 +152,10 @@ class DocWikiSynthesisService:
         """
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(payload)
+        model = self._resolve_model()
         try:
             response = self._anthropic.messages.create(
-                model=self._settings.claude_synthesis_model,
+                model=model,
                 max_tokens=4096,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
@@ -163,8 +167,20 @@ class DocWikiSynthesisService:
                     "activity",
                     f"[SYNTHESIS_ERROR] Claude request failed | {exc} | job:{payload.synthesis_job_id}",
                     result,
-                )
+            )
             return []
+        usage = anthropic_usage(response)
+        log_ai_usage_event(
+            self._store.client,
+            user_id=payload.user_id,
+            surface="os_engine",
+            model=model,
+            role="utility",
+            provider="anthropic",
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            capability_key=self._model_setting_key,
+        )
 
         text = _response_text(response)
         try:
@@ -342,7 +358,7 @@ class DocWikiSynthesisService:
                 continue
         return count
 
-    def _embed_page(self, page_id: str, content: str) -> None:
+    def _embed_page(self, user_id: str, page_id: str, content: str) -> None:
         """Embed the synthesized page content and store in ose_knowledge_pages.embedding.
 
         Uses VectorStore (text-embedding-3-small, vector(1536)) - same model as
@@ -361,7 +377,12 @@ class DocWikiSynthesisService:
 
         try:
             store = VectorStore.from_env()
-            embedding: list[float] = store.embed_query(content)
+            embedding: list[float] = store.embed_query(
+                content,
+                user_id=user_id,
+                surface="os_engine",
+                capability_key="ingestion_embeddings",
+            )
             (
                 self._store.client.table("ose_knowledge_pages")
                 .update({"embedding": embedding})
@@ -388,6 +409,16 @@ class DocWikiSynthesisService:
         rows = response.data or []
         if rows and rows[0].get("id"):
             result.log_event_ids.append(str(rows[0]["id"]))
+
+    def _resolve_model(self) -> str:
+        resolved = self._store.resolve_platform_model(
+            setting_key=self._model_setting_key,
+            fallback_model_name=self._settings.claude_synthesis_model,
+            fallback_provider="anthropic",
+        )
+        if resolved.get("provider") != "anthropic":
+            return self._settings.claude_synthesis_model
+        return resolved["model_name"]
 
     def _was_created(self, user_id: str, canonical_key: str) -> bool:
         return self._last_write_created
@@ -581,7 +612,7 @@ class DocWikiDocumentAdapter:
             store=store,
             synthesis_service=DocWikiSynthesisService(
                 store=store,
-                anthropic_client=anthropic.Anthropic(api_key=get_settings().anthropic_api_key or ""),
+                anthropic_client=wrap_anthropic(anthropic.Anthropic(api_key=get_settings().anthropic_api_key or "")),
             ),
         )
 

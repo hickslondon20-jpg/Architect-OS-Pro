@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import anthropic
+from langsmith.wrappers import wrap_anthropic
 
 from core.config import get_settings
 from services.folder_navigation import (
@@ -19,6 +20,13 @@ from services.folder_navigation import (
     tree_result_to_dict,
 )
 from services.doc_wiki_read_service import DocWikiReadError, DocWikiReadService
+from services.tool_registry import (
+    RegistryNativeScopeSource,
+    ToolExecutionContext,
+    ToolRegistry,
+    to_anthropic,
+)
+from services.usage_events import anthropic_usage, log_ai_usage_event
 from services.vector_store import VectorStore
 
 
@@ -55,207 +63,22 @@ Rules:
 - When referencing a wiki page, include its page kind and canonical key."""
 
 
-KB_EXPLORER_TOOLS: list[dict[str, Any]] = [
-    {
-        "name": "kb_ls",
-        "description": (
-            "List the immediate contents of a Knowledge Base folder. "
-            "Returns folders first (alphabetical), then files (alphabetical). "
-            "Use this to explore one level at a time."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "folder_id": {
-                    "type": ["string", "null"],
-                    "description": "UUID of the folder to list. null = Knowledge Base root.",
-                }
-            },
-            "required": [],
-        },
-    },
-    {
-        "name": "kb_tree",
-        "description": (
-            "Get a nested tree view of the Knowledge Base from a starting folder. "
-            "Use depth=2 for an overview, depth=3 or more for detailed exploration."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "folder_id": {
-                    "type": ["string", "null"],
-                    "description": "Root folder UUID. null = Knowledge Base root.",
-                },
-                "depth": {
-                    "type": "integer",
-                    "description": "Levels to traverse (1-10). Default: 3.",
-                    "default": 3,
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max items to return (1-500). Default: 200.",
-                    "default": 200,
-                },
-            },
-            "required": [],
-        },
-    },
-    {
-        "name": "kb_grep",
-        "description": (
-            "Search the extracted text of all documents for a regex pattern. "
-            "Returns matching document names and IDs - not content excerpts. "
-            "Use kb_read to inspect matching documents."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "Case-insensitive regex to search for (e.g. 'revenue', 'Q[34]\\s+\\d{4}').",
-                },
-                "folder_id": {
-                    "type": ["string", "null"],
-                    "description": "Scope search to a folder subtree. null = all documents.",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max results (1-100). Default: 50.",
-                    "default": 50,
-                },
-            },
-            "required": ["pattern"],
-        },
-    },
-    {
-        "name": "kb_glob",
-        "description": (
-            "Find documents whose filenames match a glob pattern. "
-            "Supports *, ?, [seq] wildcards. Case-insensitive. Filename only - no folder path."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "Glob pattern (e.g. '*.pdf', 'report*', '*Q3*').",
-                },
-                "folder_id": {
-                    "type": ["string", "null"],
-                    "description": "Scope to a folder subtree. null = all documents.",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max results (1-200). Default: 200.",
-                    "default": 200,
-                },
-            },
-            "required": ["pattern"],
-        },
-    },
-    {
-        "name": "kb_read",
-        "description": (
-            "Read the extracted text content of a document. "
-            "Omit start_line and end_line for the full document (max 2000 lines). "
-            "Provide both start_line and end_line for a specific range (max 500 lines, 1-indexed inclusive). "
-            "Use the document_id from kb_grep, kb_glob, kb_ls, or kb_tree results."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "document_id": {
-                    "type": "string",
-                    "description": "UUID of the document to read.",
-                },
-                "start_line": {
-                    "type": "integer",
-                    "description": "Start line (1-indexed, inclusive). Omit for full read.",
-                },
-                "end_line": {
-                    "type": "integer",
-                    "description": "End line (1-indexed, inclusive). Must be provided with start_line.",
-                },
-            },
-            "required": ["document_id"],
-        },
-    },
-    {
-        "name": "wiki_search",
-        "description": (
-            "Search the founder's compiled wiki by keyword query. "
-            "Returns matching wiki pages with titles and summaries. "
-            "Use this to find synthesized knowledge about business context, diagnostics, "
-            "sprint history, clients, offers, and conversation threads. "
-            "Prefer wiki_search over kb_grep when looking for synthesized intelligence "
-            "rather than raw document content."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Keyword or phrase to search for (e.g. 'revenue', 'client retention', 'sprint goals').",
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max results to return (1-20). Default: 5.",
-                    "default": 5,
-                },
-            },
-            "required": ["query"],
-        },
-    },
-    {
-        "name": "wiki_get_page",
-        "description": (
-            "Retrieve a specific wiki page by its canonical key. "
-            "Use this when you know the exact page key from a wiki_search or wiki_list result. "
-            "Returns the full page content."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "canonical_key": {
-                    "type": "string",
-                    "description": (
-                        "The canonical key of the wiki page "
-                        "(e.g. 'business_context', 'diagnostic_synthesis', or a Layer 2 page key)."
-                    ),
-                },
-            },
-            "required": ["canonical_key"],
-        },
-    },
-    {
-        "name": "wiki_list",
-        "description": (
-            "List wiki pages available for this founder, optionally filtered by page kind. "
-            "Use this to discover what synthesized knowledge exists before searching. "
-            "Returns page titles, kinds, and canonical keys."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "kind": {
-                    "type": ["string", "null"],
-                    "description": (
-                        "Filter by page kind. Examples: 'wiki_layer1' (compiled platform knowledge), "
-                        "'sprint_history', 'thread_synthesis', 'client', 'offer'. "
-                        "null = return all kinds."
-                    ),
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "Max pages to return (1-50). Default: 20.",
-                    "default": 20,
-                },
-            },
-            "required": [],
-        },
-    },
+KB_EXPLORER_TOOL_NAMES = [
+    "kb_ls",
+    "kb_tree",
+    "kb_grep",
+    "kb_glob",
+    "kb_read",
+    "wiki_search",
+    "wiki_get_page",
+    "wiki_list",
 ]
+KB_EXPLORER_TOOLS: list[dict[str, Any]] = to_anthropic(
+    [
+        ToolRegistry(scope_source=RegistryNativeScopeSource()).get(name)
+        for name in KB_EXPLORER_TOOL_NAMES
+    ]
+)
 
 
 @dataclass(frozen=True)
@@ -269,14 +92,22 @@ class KbExplorerResult:
 
 
 class KbExplorerService:
-    def __init__(self, store: VectorStore) -> None:
+    def __init__(self, store: VectorStore, model_setting_key: str | None = "kb_explorer_agent") -> None:
         self.store = store
         settings = get_settings()
         self.nav = KbNavigationService(store)
-        self.anthropic_client = anthropic.Anthropic(
+        self.anthropic_client = wrap_anthropic(anthropic.Anthropic(
             api_key=settings.anthropic_api_key or "",
+        ))
+        resolved = store.resolve_platform_model(
+            setting_key=model_setting_key or "kb_explorer_agent",
+            fallback_model_name=settings.claude_synthesis_model,
+            fallback_provider="anthropic",
         )
-        self.model = settings.claude_synthesis_model
+        self.model = resolved["model_name"] if resolved.get("provider") == "anthropic" else settings.claude_synthesis_model
+        self.provider = "anthropic"
+        self.capability_key = model_setting_key or "kb_explorer_agent"
+        self.tool_registry = ToolRegistry(store=store)
 
     @classmethod
     def from_env(cls) -> "KbExplorerService":
@@ -286,6 +117,8 @@ class KbExplorerService:
         self,
         user_id: str,
         task_summary: str,
+        thread_id: str | None = None,
+        run_id: str | None = None,
         max_rounds: int = 5,
     ) -> KbExplorerResult:
         """Run the KB Explorer tool-use loop."""
@@ -299,8 +132,26 @@ class KbExplorerService:
                 model=self.model,
                 max_tokens=4096,
                 system=KB_EXPLORER_SYSTEM_PROMPT,
-                tools=KB_EXPLORER_TOOLS,  # type: ignore[arg-type]
+                tools=self.tool_registry.get_tools(
+                    surface="virtual_cso",
+                    capability="kb_explorer_agent",
+                    format="anthropic",
+                ),  # type: ignore[arg-type]
                 messages=messages,
+            )
+            usage = anthropic_usage(response)
+            log_ai_usage_event(
+                self.store.client,
+                user_id=user_id,
+                surface="virtual_cso",
+                model=self.model,
+                role="sub_agent",
+                provider=self.provider,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                thread_id=thread_id,
+                capability_key=self.capability_key,
+                run_id=run_id,
             )
 
             if response.stop_reason == "end_turn":
@@ -361,19 +212,15 @@ class KbExplorerService:
     ) -> tuple[str, dict[str, Any]]:
         """Execute a tool call and return (result_json_string, step_record)."""
         try:
-            result_dict = self._execute_tool(
-                user_id,
-                tool_name,
-                tool_input,
-                referenced_doc_ids,
-                referenced_doc_names,
-            )
+            envelope = self._execute_tool(user_id, tool_name, tool_input)
+            result_dict = envelope.content
             result_str = json.dumps(result_dict)
             step = {
                 "tool_name": tool_name,
                 "input_summary": _safe_input_summary(tool_input),
                 "output_summary": _safe_output_summary(result_dict),
                 "summary": f"{tool_name} returned {_item_count(result_dict)} item(s).",
+                "sources": [source.to_dict() for source in envelope.sources],
                 "error": None,
             }
             if tool_name == "kb_read" and "document_id" in result_dict:
@@ -390,6 +237,7 @@ class KbExplorerService:
                 "input_summary": _safe_input_summary(tool_input),
                 "output_summary": {},
                 "summary": f"{tool_name} returned an error.",
+                "sources": [],
                 "error": error_str,
             }
             return json.dumps({"error": error_str}), step
@@ -399,100 +247,12 @@ class KbExplorerService:
         user_id: str,
         tool_name: str,
         tool_input: dict[str, Any],
-        referenced_doc_ids: list[str],
-        referenced_doc_names: dict[str, str],
-    ) -> dict[str, Any]:
-        if tool_name == "kb_ls":
-            result = self.nav.execute_ls(
-                user_id=user_id,
-                folder_id=tool_input.get("folder_id"),
-            )
-            return ls_result_to_dict(result)
-
-        if tool_name == "kb_tree":
-            result = self.nav.execute_tree(
-                user_id=user_id,
-                folder_id=tool_input.get("folder_id"),
-                depth=int(tool_input.get("depth", 3)),
-                limit=int(tool_input.get("limit", 200)),
-            )
-            return tree_result_to_dict(result)
-
-        if tool_name == "kb_grep":
-            result = self.nav.execute_grep(
-                user_id=user_id,
-                pattern=str(tool_input["pattern"]),
-                folder_id=tool_input.get("folder_id"),
-                limit=int(tool_input.get("limit", 50)),
-            )
-            return grep_result_to_dict(result)
-
-        if tool_name == "kb_glob":
-            result = self.nav.execute_glob(
-                user_id=user_id,
-                pattern=str(tool_input["pattern"]),
-                folder_id=tool_input.get("folder_id"),
-                limit=int(tool_input.get("limit", 200)),
-            )
-            return glob_result_to_dict(result)
-
-        if tool_name == "kb_read":
-            start_line = tool_input.get("start_line")
-            end_line = tool_input.get("end_line")
-            result = self.nav.execute_read(
-                user_id=user_id,
-                document_id=str(tool_input["document_id"]),
-                start_line=int(start_line) if start_line is not None else None,
-                end_line=int(end_line) if end_line is not None else None,
-            )
-            return read_result_to_dict(result)
-
-        if tool_name == "wiki_search":
-            reader = DocWikiReadService(self.store)
-            query = str(tool_input.get("query", ""))
-            limit = int(tool_input.get("limit", 5))
-            try:
-                result = reader.search(user_id=user_id, query=query, limit=limit)
-            except DocWikiReadError as exc:
-                return {"error": str(exc)}
-            pages = result.get("findings", [])
-            return {
-                **result,
-                "pages": pages if isinstance(pages, list) else [],
-                "result_count": len(pages) if isinstance(pages, list) else 0,
-            }
-
-        if tool_name == "wiki_get_page":
-            reader = DocWikiReadService(self.store)
-            canonical_key = str(tool_input.get("canonical_key", ""))
-            try:
-                result = reader.get_page(user_id=user_id, canonical_key=canonical_key)
-            except DocWikiReadError as exc:
-                return {"error": str(exc)}
-            pages = result.get("findings", [])
-            return {
-                **result,
-                "page": pages[0] if isinstance(pages, list) and pages else None,
-                "result_count": len(pages) if isinstance(pages, list) else 0,
-            }
-
-        if tool_name == "wiki_list":
-            reader = DocWikiReadService(self.store)
-            kind = tool_input.get("kind") or None
-            limit = int(tool_input.get("limit", 20))
-            page_kinds = [str(kind)] if kind else None
-            try:
-                result = reader.list_pages(user_id=user_id, page_kinds=page_kinds, limit=limit)
-            except DocWikiReadError as exc:
-                return {"error": str(exc)}
-            pages = result.get("findings", [])
-            return {
-                **result,
-                "pages": pages if isinstance(pages, list) else [],
-                "result_count": len(pages) if isinstance(pages, list) else 0,
-            }
-
-        raise KbNavigationError(f"Unknown tool: {tool_name!r}")
+    ):
+        return self.tool_registry.execute(
+            tool_name,
+            ToolExecutionContext(user_id=user_id, store=self.store),
+            tool_input,
+        )
 
 
 def _safe_input_summary(tool_input: dict[str, Any]) -> dict[str, Any]:

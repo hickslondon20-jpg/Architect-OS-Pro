@@ -104,8 +104,18 @@ def test_user_id(store):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def cleanup_test_user(store, test_user_id):
+def cleanup_test_user(request):
     """Delete all wiki rows for the test user before and after the session."""
+    needs_live_store = any(
+        "store" in item.fixturenames or "test_user_id" in item.fixturenames
+        for item in request.session.items
+    )
+    if not needs_live_store:
+        yield
+        return
+
+    store = request.getfixturevalue("store")
+    test_user_id = request.getfixturevalue("test_user_id")
     _purge(store, test_user_id)
     yield
     _purge(store, test_user_id)

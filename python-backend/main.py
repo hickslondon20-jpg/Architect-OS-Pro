@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
+# Load .env / .env.local into the process environment before anything else runs.
+# pydantic-settings (core.config.Settings) only parses the env file into its own
+# Settings model fields — it never exports those values to os.environ. The
+# LangSmith SDK (and wrap_anthropic/wrap_openai) read LANGSMITH_* directly from
+# os.environ, so without this call tracing silently never activates even with a
+# fully correct .env file. Must run before any service module that constructs an
+# Anthropic/OpenAI client is imported/instantiated.
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import asyncio
+import json
 from contextlib import suppress
 from datetime import date
 from typing import Annotated
@@ -10,13 +22,17 @@ import uuid
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 from core.config import get_settings
-from routers import kb_documents, kb_folders, skills
+from routers import domain_agents, kb_documents, kb_folders, skills, tasks
 from routers.kb_folders import get_current_user_id
 from services.doc_processor import process_document_bytes
 from services.artifact_service import ArtifactServiceError, get_artifact_service
+from services.citations.models import CitationRef
+from services.citations.resolvers import resolve as resolve_citation_ref
+from services.citations.verify import CitationVerifierService
 from services.folder_navigation import KbNavigationError, KbNavigationService
 from services.folder_navigation import ls_result_to_dict, tree_result_to_dict
 from services.folder_navigation import grep_result_to_dict, glob_result_to_dict
@@ -38,6 +54,7 @@ from services.sub_agent_orchestrator import SubAgentError
 from services.sub_agent_orchestrator import SubAgentRunRequest as SubAgentServiceRunRequest
 from services.sub_agent_orchestrator import SubAgentOrchestrator
 from services.vector_store import VectorStore, VectorStoreError
+from services.vcso_chat_service import VcsoChatPayload, VcsoChatService
 from services.web_search import WebSearchService
 from services.wiki_compilation import CompileResult, WikiCompilationError, WikiCompilationService
 from services.wiki_consolidation import ConsolidationResult, WikiConsolidationError, WikiConsolidationService
@@ -306,14 +323,62 @@ class AgentRunResponse(BaseModel):
     error_message: str | None = None
 
 
+class VcsoChatRequest(BaseModel):
+    threadId: str | None = None
+    text: str = Field(..., min_length=1)
+    linkedFolder: str | None = None
+    projectId: str | None = None
+    deepMode: bool = False
+
+
+class VcsoCompactRequest(BaseModel):
+    threadId: str = Field(..., min_length=1)
+
+
+class VcsoCompactResponse(BaseModel):
+    compacted: bool
+    message: str | None = None
+    remainingPercent: int | None = None
+    band: str | None = None
+
+
+class CitationResolveRequest(BaseModel):
+    ref: dict = Field(..., min_length=1)
+
+
+class CitationResolveResponse(BaseModel):
+    status: str
+    view: dict
+
+
+class CitationCheckRequest(BaseModel):
+    message_id: str = Field(..., min_length=1)
+
+
+class CitationCheckResponse(BaseModel):
+    status: str
+    overall: str
+    summary: str
+    verdicts: list[dict]
+    model: str
+
+
+class DocumentSignedUrlResponse(BaseModel):
+    document_id: str
+    signed_url: str
+    expires_in: int
+
+
 class WikiCompileRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
     page_key: str = Field(..., min_length=1)
+    force: bool = False
 
 
 class WikiCompileEventRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
     event: str = Field(..., min_length=1)
+    force: bool = False
 
 
 class DocWikiSynthesizeRequest(BaseModel):
@@ -357,6 +422,8 @@ class WikiCompileResponse(BaseModel):
     digest_generated_at: str
     rebuilt_pages: list[str]
     validation_counts: dict[str, int]
+    synthesis_used: bool = False
+    skipped: bool = False
 
 
 class WikiEvidencePayload(BaseModel):
@@ -506,6 +573,7 @@ class ArtifactDeliveryResponse(BaseModel):
     description: str | None = None
     content: str | None = None
     signed_url: str | None = None
+    provenance: dict = Field(default_factory=dict)
 
 
 class ArtifactVerifyRequest(BaseModel):
@@ -542,6 +610,8 @@ app.add_middleware(
 app.include_router(kb_folders.router, prefix="/kb/folders", tags=["KB Folders"])
 app.include_router(kb_documents.router, prefix="/kb/documents", tags=["KB Documents"])
 app.include_router(skills.router, prefix="/api/skills", tags=["Skills"])
+app.include_router(tasks.router, prefix="/api/tasks", tags=["Domain Agent Tasks"])
+app.include_router(domain_agents.router, tags=["Domain Agents"])
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -804,6 +874,72 @@ def web_search(payload: WebSearchRequest) -> WebSearchResponse:
     return WebSearchResponse(**result.__dict__)
 
 
+@app.post("/api/citations/resolve", response_model=CitationResolveResponse)
+def resolve_citation(
+    payload: CitationResolveRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> CitationResolveResponse:
+    try:
+        ref = CitationRef.from_dict(payload.ref)
+        view = resolve_citation_ref(ref, str(user_id), VectorStore.from_env())
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid citation ref: {exc}") from exc
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Citation resolve failed: {exc}") from exc
+
+    status_value = "ok" if view.get("type") not in {"error"} else "error"
+    return CitationResolveResponse(status=status_value, view=view)
+
+
+@app.post("/api/citations/check", response_model=CitationCheckResponse)
+def check_citations(
+    payload: CitationCheckRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> CitationCheckResponse:
+    try:
+        result = CitationVerifierService.from_env().check_message(
+            message_id=payload.message_id,
+            user_id=str(user_id),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Citation check failed: {exc}") from exc
+
+    return CitationCheckResponse(status="ok", **result.to_dict())
+
+
+@app.get("/api/documents/{document_id}/signed-url", response_model=DocumentSignedUrlResponse)
+def get_document_signed_url(
+    document_id: str,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> DocumentSignedUrlResponse:
+    try:
+        store = VectorStore.from_env()
+        document = store.get_document(document_id, str(user_id))
+        storage_path = str(document.get("storage_path") or "").strip()
+        if not storage_path:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document source PDF was not found.",
+            )
+        return DocumentSignedUrlResponse(
+            document_id=document_id,
+            signed_url=store.create_raw_document_signed_url(storage_path),
+            expires_in=300,
+        )
+    except HTTPException:
+        raise
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not create document URL: {exc}") from exc
+
+
 @app.post("/api/tools/kb-ls", response_model=KbLsResponse, dependencies=[Depends(require_ingest_secret)])
 def kb_ls(payload: KbLsRequest) -> KbLsResponse:
     try:
@@ -917,10 +1053,57 @@ def start_agent_run(payload: AgentRunRequest) -> AgentRunResponse:
     return AgentRunResponse(**result.__dict__)
 
 
+@app.post("/api/vcso/chat")
+def stream_vcso_chat(
+    payload: VcsoChatRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> StreamingResponse:
+    def event_stream():
+        try:
+            service = VcsoChatService.from_env()
+            chat_payload = VcsoChatPayload(
+                thread_id=payload.threadId,
+                text=payload.text,
+                linked_folder=payload.linkedFolder,
+                project_id=payload.projectId,
+                deep_mode=payload.deepMode,
+            )
+            for item in service.stream_chat(user_id=str(user_id), payload=chat_payload):
+                yield _sse(item["event"], item["data"])
+        except Exception as exc:
+            yield _sse("error", {"message": str(exc) or "Virtual CSO stream failed."})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/api/vcso/compact", response_model=VcsoCompactResponse)
+def compact_vcso_thread(
+    payload: VcsoCompactRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> VcsoCompactResponse:
+    try:
+        result = VcsoChatService.from_env().compact_thread(user_id=str(user_id), thread_id=payload.threadId)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return VcsoCompactResponse(**result)
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
+
+
 @app.post("/api/wiki/compile-page", response_model=WikiCompileResponse, dependencies=[Depends(require_ingest_secret)])
 def compile_wiki_page(payload: WikiCompileRequest) -> WikiCompileResponse:
     try:
-        result = WikiCompilationService.from_env().compile_page(payload.user_id, payload.page_key)
+        result = WikiCompilationService.from_env().compile_page(payload.user_id, payload.page_key, force=payload.force)
     except WikiCompilationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except VectorStoreError as exc:
@@ -931,7 +1114,7 @@ def compile_wiki_page(payload: WikiCompileRequest) -> WikiCompileResponse:
 @app.post("/api/wiki/compile-event", response_model=list[WikiCompileResponse], dependencies=[Depends(require_ingest_secret)])
 def compile_wiki_event(payload: WikiCompileEventRequest) -> list[WikiCompileResponse]:
     try:
-        results = WikiCompilationService.from_env().compile_event(payload.user_id, payload.event)
+        results = WikiCompilationService.from_env().compile_event(payload.user_id, payload.event, force=payload.force)
     except WikiCompilationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except VectorStoreError as exc:
@@ -1323,6 +1506,7 @@ def _process_ingestion(payload: IngestRequest) -> None:
                 text=processed.text,
                 file_name=payload.file_name,
                 file_type=payload.file_type,
+                user_id=payload.user_id,
             )
             document_metadata = extraction.metadata
             store.mark_metadata_complete(

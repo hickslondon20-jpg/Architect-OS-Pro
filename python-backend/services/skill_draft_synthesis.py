@@ -8,8 +8,11 @@ import re
 from typing import Any
 
 import anthropic
+from langsmith.wrappers import wrap_anthropic
 
 from core.config import get_settings
+from services.usage_events import anthropic_usage, log_ai_usage_event
+from services.vector_store import VectorStore
 
 
 class SkillDraftSynthesisError(RuntimeError):
@@ -23,28 +26,46 @@ class GuidedDraftRequest:
 
 
 class SkillDraftSynthesisService:
-    def __init__(self, anthropic_client: anthropic.Anthropic, model: str) -> None:
+    def __init__(self, anthropic_client: anthropic.Anthropic, store: VectorStore, model: str) -> None:
         self._anthropic = anthropic_client
+        self._store = store
         self._model = model
+        self._model_setting_key = "skill_draft_synthesis"
 
     @classmethod
     def from_env(cls) -> "SkillDraftSynthesisService":
         settings = get_settings()
+        store = VectorStore.from_env()
         return cls(
-            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key or ""),
+            anthropic_client=wrap_anthropic(anthropic.Anthropic(api_key=settings.anthropic_api_key or "")),
+            store=store,
             model=settings.claude_synthesis_model,
         )
 
-    def draft(self, request: GuidedDraftRequest) -> dict[str, Any]:
+    def draft(self, request: GuidedDraftRequest, *, user_id: str | None = None) -> dict[str, Any]:
+        model = self._resolve_model()
         try:
             response = self._anthropic.messages.create(
-                model=self._model,
+                model=model,
                 max_tokens=1800,
                 system=_system_prompt(),
                 messages=[{"role": "user", "content": _user_prompt(request)}],
             )
         except Exception as exc:
             raise SkillDraftSynthesisError(f"Claude skill-draft request failed: {exc}") from exc
+        if user_id:
+            usage = anthropic_usage(response)
+            log_ai_usage_event(
+                self._store.client,
+                user_id=user_id,
+                surface="skills",
+                model=model,
+                role="utility",
+                provider="anthropic",
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                capability_key=self._model_setting_key,
+            )
 
         text = _response_text(response)
         try:
@@ -54,6 +75,16 @@ class SkillDraftSynthesisService:
         if not isinstance(parsed, dict):
             return _fallback_response(request.current_draft)
         return _normalize_draft(parsed, request.current_draft)
+
+    def _resolve_model(self) -> str:
+        resolved = self._store.resolve_platform_model(
+            setting_key=self._model_setting_key,
+            fallback_model_name=self._model,
+            fallback_provider="anthropic",
+        )
+        if resolved.get("provider") != "anthropic":
+            return self._model
+        return resolved["model_name"]
 
 
 def _system_prompt() -> str:

@@ -1,6 +1,6 @@
 ﻿import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
+const DEFAULT_CLAUDE_MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
 const MAX_TOKENS = Number(process.env.WS5_MAX_TOKENS ?? 1800);
 const CORE_PAGE_KEYS = new Set([
   // Layer 1 compiled page keys - get +10 priority boost in Virtual CSO context loading
@@ -136,6 +136,31 @@ const serviceClient = () =>
   createClient(env('VITE_SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY', 'service_role'), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+const resolveVcsoChatModel = async (service: SupabaseClient): Promise<{ provider: 'anthropic'; model: string }> => {
+  try {
+    const { data, error } = await service
+      .from('platform_ai_settings')
+      .select('provider,fallback_model_name,is_enabled,ai_models(provider,model_name)')
+      .eq('setting_key', 'vcso_chat')
+      .eq('is_enabled', true)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return { provider: 'anthropic', model: DEFAULT_CLAUDE_MODEL };
+
+    const modelRow = Array.isArray((data as any).ai_models)
+      ? (data as any).ai_models[0]
+      : (data as any).ai_models;
+    const provider = modelRow?.provider ?? (data as any).provider;
+    const model = modelRow?.model_name ?? (data as any).fallback_model_name;
+    if (provider !== 'anthropic' || typeof model !== 'string' || !model.includes('claude')) {
+      return { provider: 'anthropic', model: DEFAULT_CLAUDE_MODEL };
+    }
+    return { provider: 'anthropic', model };
+  } catch {
+    return { provider: 'anthropic', model: DEFAULT_CLAUDE_MODEL };
+  }
+};
 
 const titleFromMessage = (text: string) => {
   const compact = text.replace(/\s+/g, ' ').trim();
@@ -592,7 +617,7 @@ const writeSse = (res: VercelResponse, event: string, data: unknown) => {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 };
 
-const streamAnthropic = async (prompt: string, onText: (text: string) => void) => {
+const streamAnthropic = async (prompt: string, model: string, onText: (text: string) => void) => {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -601,7 +626,7 @@ const streamAnthropic = async (prompt: string, onText: (text: string) => void) =
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: MAX_TOKENS,
       stream: true,
       messages: [{ role: 'user', content: prompt }],
@@ -662,6 +687,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const jwt = getJwt(req);
     const supabase = userClient(jwt);
     const service = serviceClient();
+    const chatModel = await resolveVcsoChatModel(service);
     const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
     if (userError || !userData.user) throw userError ?? new Error('Invalid session.');
     const userId = userData.user.id;
@@ -805,7 +831,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     let assistantText = '';
-    const usage = await streamAnthropic(prompt, (chunk) => {
+    const usage = await streamAnthropic(prompt, chatModel.model, (chunk) => {
       assistantText += chunk;
       writeSse(res, 'token', { text: chunk });
     });
@@ -850,10 +876,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .update({ last_message_at: new Date().toISOString(), message_count: (thread.message_count ?? 0) + 2 })
         .eq('id', threadId)
         .eq('user_id', userId),
-      supabase.from('ai_usage_log').insert({
+      service.from('ai_usage_log').insert({
         user_id: userId,
         surface: 'ws5-chat',
-        model: MODEL,
+        model: chatModel.model,
+        role: 'main',
+        provider: chatModel.provider,
         input_tokens: usage.inputTokens,
         output_tokens: usage.outputTokens,
         thread_id: threadId,

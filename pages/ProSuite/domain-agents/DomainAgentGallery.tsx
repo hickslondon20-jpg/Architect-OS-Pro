@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AgentCard, RecentTaskChip, SectionEyebrow } from '../../../components/pro-suite/domain-agents/DomainAgentPrimitives';
-import { domainAgents, domainTasks } from './mockDomainAgents';
+import { listDomainAgents, listDomainTasks } from '../../../lib/domainAgentsApi';
+import type { DomainAgent, DomainTask } from './types';
 
 const spanClasses = [
   'lg:col-span-5',
@@ -11,7 +12,25 @@ const spanClasses = [
 ];
 
 export const DomainAgentGallery: React.FC = () => {
-  const recentTasks = domainTasks.slice(0, 4);
+  const [agents, setAgents] = useState<DomainAgent[]>([]);
+  const [recentTasks, setRecentTasks] = useState<DomainTask[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([listDomainAgents(), listDomainTasks()])
+      .then(([agentRows, taskRows]) => {
+        if (!mounted) return;
+        setAgents(agentRows);
+        setRecentTasks(taskRows.slice(0, 4));
+      })
+      .catch((err) => mounted && setError(err instanceof Error ? err.message : 'Could not load Domain Agents.'));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
 
   return (
     <div className="space-y-6">
@@ -25,6 +44,12 @@ export const DomainAgentGallery: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-[var(--radius-sm)] border border-[var(--aos-risk)] bg-[var(--aos-risk-tint)] px-4 py-3 text-sm text-[var(--aos-risk)]">
+          {error}
+        </div>
+      )}
+
       {recentTasks.length > 0 && (
         <section
           className="rounded-[var(--radius-md)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft-1)]"
@@ -33,7 +58,7 @@ export const DomainAgentGallery: React.FC = () => {
           <SectionEyebrow>Recent tasks</SectionEyebrow>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {recentTasks.map((task) => (
-              <RecentTaskChip key={task.id} task={task} />
+              <RecentTaskChip key={task.id} task={task} agent={agentsById.get(task.agentId)} />
             ))}
           </div>
         </section>
@@ -42,9 +67,14 @@ export const DomainAgentGallery: React.FC = () => {
       <section>
         <SectionEyebrow>Five disciplines</SectionEyebrow>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {domainAgents.map((agent, index) => (
+          {agents.map((agent, index) => (
             <AgentCard key={agent.id} agent={agent} spanClass={spanClasses[index]} />
           ))}
+          {!error && agents.length === 0 && (
+            <div className="rounded-[var(--radius-sm)] border border-dashed border-[var(--aos-mist)] bg-[var(--bg-surface)] px-4 py-8 text-center text-sm text-[var(--fg-3)] lg:col-span-12">
+              Loading agents...
+            </div>
+          )}
         </div>
       </section>
     </div>

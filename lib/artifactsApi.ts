@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import type { CitationRef } from './virtualCsoApi';
 
 const INGESTION_API_URL = import.meta.env.VITE_INGESTION_API_URL as string | undefined;
 const ARTIFACT_VERIFY_SECRET = import.meta.env.VITE_ARTIFACT_VERIFY_SECRET as string | undefined;
@@ -16,6 +17,10 @@ export interface ArtifactDelivery {
   description?: string | null;
   content?: string | null;
   signed_url?: string | null;
+  provenance?: {
+    source_refs?: CitationRef[];
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface ArtifactVerifyResult {

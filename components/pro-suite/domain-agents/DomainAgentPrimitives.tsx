@@ -1,8 +1,17 @@
 import React from 'react';
 import { ArrowRight, Check, Download, FileText, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { DomainAgent, DomainArtifact, DomainTask, DomainTaskStatus } from '../../../pages/ProSuite/domain-agents/types';
-import { getAgent, getWorkflow, statusLabels } from '../../../pages/ProSuite/domain-agents/mockDomainAgents';
+import type { DomainAgent, DomainArtifact, DomainTask, DomainTaskStatus, DomainWorkflow } from '../../../pages/ProSuite/domain-agents/types';
+
+export const statusLabels: Record<DomainTaskStatus, string> = {
+  ready: 'Ready',
+  running: 'Running',
+  review: 'Review',
+  blocked: 'Blocked',
+  done: 'Done',
+};
+
+export const statusOrder: DomainTaskStatus[] = ['ready', 'running', 'review', 'blocked', 'done'];
 
 const statusStyles: Record<DomainTaskStatus, { className: string; dot: string }> = {
   ready: { className: 'aos-chip--notstarted', dot: 'var(--aos-steel-blue)' },
@@ -64,8 +73,31 @@ export const AgentCard: React.FC<{ agent: DomainAgent; spanClass: string }> = ({
   </Link>
 );
 
-export const RecentTaskChip: React.FC<{ task: DomainTask }> = ({ task }) => {
-  const agent = getAgent(task.agentId);
+const fallbackAgent = (agentId?: string): DomainAgent => ({
+  id: (agentId || 'financial') as DomainAgent['id'],
+  name: 'Domain Agent',
+  shortName: agentId ? `${agentId[0].toUpperCase()}${agentId.slice(1)}` : 'Agent',
+  initial: (agentId || 'A').slice(0, 1).toUpperCase(),
+  color: 'var(--aos-obsidian)',
+  discipline: '',
+  strength: '',
+  activity: '',
+  fullDescription: '',
+  capabilities: [],
+  thoughtStarters: [],
+  workflows: [],
+});
+
+const fallbackWorkflow = (workflowId?: string | null): DomainWorkflow => ({
+  id: workflowId || '',
+  agentId: 'financial',
+  name: 'Workflow',
+  description: '',
+  defaultTaskTitle: 'Domain Agent Task',
+});
+
+export const RecentTaskChip: React.FC<{ task: DomainTask; agent?: DomainAgent }> = ({ task, agent: providedAgent }) => {
+  const agent = providedAgent ?? fallbackAgent(task.agentId);
   return (
     <Link
       to={`/pro/intelligence/domain-agents/tasks/${task.id}`}
@@ -84,9 +116,9 @@ export const RecentTaskChip: React.FC<{ task: DomainTask }> = ({ task }) => {
   );
 };
 
-export const TaskCard: React.FC<{ task: DomainTask }> = ({ task }) => {
-  const agent = getAgent(task.agentId);
-  const workflow = getWorkflow(task.workflowId);
+export const TaskCard: React.FC<{ task: DomainTask; agent?: DomainAgent; workflow?: DomainWorkflow }> = ({ task, agent: providedAgent, workflow: providedWorkflow }) => {
+  const agent = providedAgent ?? fallbackAgent(task.agentId);
+  const workflow = providedWorkflow ?? fallbackWorkflow(task.workflowId);
   return (
     <Link
       to={`/pro/intelligence/domain-agents/tasks/${task.id}`}
@@ -115,11 +147,15 @@ export const TaskCard: React.FC<{ task: DomainTask }> = ({ task }) => {
 
 export const ArtifactCard: React.FC<{
   artifact: DomainArtifact;
+  agent?: DomainAgent;
+  workflow?: DomainWorkflow;
   onPromote: (artifactId: string) => void;
   onPreview: (artifactId: string) => void;
-}> = ({ artifact, onPromote, onPreview }) => {
-  const agent = getAgent(artifact.agentId);
-  const workflow = getWorkflow(artifact.workflowId);
+  onDownload?: (artifactId: string) => void;
+  promotionDisabled?: boolean;
+}> = ({ artifact, agent: providedAgent, workflow: providedWorkflow, onPromote, onPreview, onDownload, promotionDisabled = false }) => {
+  const agent = providedAgent ?? fallbackAgent(artifact.agentId);
+  const workflow = providedWorkflow ?? fallbackWorkflow(artifact.workflowId);
 
   return (
     <article className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft-1)]">
@@ -150,14 +186,14 @@ export const ArtifactCard: React.FC<{
           <button className="aos-btn aos-btn--sm aos-btn--outline" onClick={() => onPreview(artifact.id)}>
             Preview
           </button>
-          <button className="aos-btn aos-btn--sm aos-btn--outline">
+          <button className="aos-btn aos-btn--sm aos-btn--outline" onClick={() => onDownload?.(artifact.id)} disabled={!onDownload}>
             <Download className="h-3.5 w-3.5" />
             Download
           </button>
           <button
             className={`aos-btn aos-btn--sm ${artifact.promoted ? 'aos-btn--ghost' : 'aos-btn--brass'}`}
             onClick={() => onPromote(artifact.id)}
-            disabled={artifact.promoted}
+            disabled={artifact.promoted || promotionDisabled}
           >
             {artifact.promoted ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {artifact.promoted ? 'In Second Brain' : 'Second Brain'}

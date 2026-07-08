@@ -22,6 +22,7 @@ export interface Chat {
   title: string;
   projectId?: string | null;
   pinned?: boolean;
+  agentStatus?: 'working' | 'waiting_for_user' | 'complete' | 'error';
   /** ISO-ish display string; mock only. */
   lastMessageAt: string;
 }
@@ -31,6 +32,11 @@ export interface AgentStep {
   input: Record<string, unknown>;
   output: string;
   status?: string;
+  stepIndex?: number;
+  stepType?: string;
+  title?: string;
+  summary?: string;
+  sourceRefs?: CitationRef[];
 }
 
 export interface Message {
@@ -39,17 +45,42 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   createdAt: string;
+  deepMode?: boolean;
   agentSteps?: AgentStep[];
+  citations?: CitationRef[];
   artifactDeliveries?: import('./artifactsApi').ArtifactDelivery[];
+  agentTasks?: import('./virtualCsoApi').AgentTaskHandle[];
 }
 
-export type SourceKind = 'wiki' | 'platform' | 'ip' | 'context';
+export type CitationSourceKind = 'document_chunk' | 'wiki_page' | 'platform_record' | 'web' | 'derived';
+export type CitationVerdict = 'supported' | 'partial' | 'unsupported' | 'unresolvable';
 
-export interface SourceRef {
-  kind: SourceKind;
-  label: string;
-  /** Points at a mock page id whose markdown opens in the Reader (wiki / ip). */
-  pageId?: string;
+export interface CitationLocator {
+  kind?: 'lines' | 'section' | 'page_key' | 'record_path' | 'bbox' | 'url_fragment' | string | null;
+  path?: string | null;
+  lines?: { start: number; end: number } | null;
+  section_label?: string | null;
+  page_key?: string | null;
+  record_path?: string | null;
+  page_number?: number | null;
+  bbox?: [number, number, number, number] | null;
+}
+
+export interface CitationRef {
+  source_kind: CitationSourceKind;
+  source_id?: string | null;
+  source_label?: string | null;
+  verbatim?: string | null;
+  locator?: CitationLocator | null;
+  source_metadata: Record<string, unknown>;
+  ordinal?: number;
+  verdict?: {
+    ordinal?: number | null;
+    source_kind?: string | null;
+    source_id?: string | null;
+    verdict: CitationVerdict;
+    summary?: string | null;
+  };
 }
 
 /** Markdown bodies opened in the shared Reader when a source is clicked. */
@@ -157,15 +188,53 @@ export const MOCK_MESSAGES: Record<string, Message[]> = {
 // Source references for the populated thread + the readable pages behind them
 // ---------------------------------------------------------------------------
 
-export const MOCK_SOURCE_REFS: Record<string, SourceRef[]> = {
+export const MOCK_CITATION_REFS: Record<string, CitationRef[]> = {
   'chat-q2-pricing': [
-    { kind: 'wiki', label: 'Financial Position', pageId: 'page-financial' },
-    { kind: 'wiki', label: 'Client Concentration', pageId: 'page-concentration' },
-    { kind: 'platform', label: 'AE Ladder — Operator stage' },
-    { kind: 'platform', label: 'Agency Snapshot' },
-    { kind: 'platform', label: 'Current sprint focus' },
-    { kind: 'ip', label: 'Pricing frameworks', pageId: 'ip-pricing' },
-    { kind: 'context', label: 'linked: Financial' },
+    {
+      source_kind: 'wiki_page',
+      source_id: 'page-financial',
+      source_label: 'Financial Position',
+      verbatim: 'Blended margin ~41%, down from ~44% two months ago.',
+      locator: { kind: 'section', page_key: 'financial-position', section_label: 'Margin' },
+      source_metadata: { page_key: 'financial-position', mock_page_id: 'page-financial' },
+      ordinal: 1,
+    },
+    {
+      source_kind: 'wiki_page',
+      source_id: 'page-concentration',
+      source_label: 'Client Concentration',
+      verbatim: 'Top client: ~38% of revenue.',
+      locator: { kind: 'section', page_key: 'client-concentration', section_label: 'Current picture' },
+      source_metadata: { page_key: 'client-concentration', mock_page_id: 'page-concentration' },
+      ordinal: 2,
+    },
+    {
+      source_kind: 'platform_record',
+      source_id: 'ae-operator',
+      source_label: 'AE Ladder - Operator stage',
+      verbatim: 'Operator stage',
+      locator: { kind: 'record_path', record_path: 'ae_assessments/ae-operator/stage_id' },
+      source_metadata: { record_path: 'ae_assessments/ae-operator/stage_id' },
+      ordinal: 3,
+    },
+    {
+      source_kind: 'platform_record',
+      source_id: 'snapshot-current',
+      source_label: 'Agency Snapshot',
+      verbatim: 'Win rate held steady through the last price step.',
+      locator: { kind: 'record_path', record_path: 'founder_dataset_rows/snapshot-current/win_rate' },
+      source_metadata: { record_path: 'founder_dataset_rows/snapshot-current/win_rate' },
+      ordinal: 4,
+    },
+    {
+      source_kind: 'platform_record',
+      source_id: 'current-sprint',
+      source_label: 'Current sprint focus',
+      verbatim: 'Current sprint is oriented around delivery throughput.',
+      locator: { kind: 'record_path', record_path: 'sp_sprint_goals/current-sprint/goal_text' },
+      source_metadata: { record_path: 'sp_sprint_goals/current-sprint/goal_text' },
+      ordinal: 5,
+    },
   ],
 };
 
@@ -275,8 +344,8 @@ export const getProjectById = (id: string): Project | undefined =>
 export const getMessagesForChat = (chatId: string): Message[] =>
   MOCK_MESSAGES[chatId] ?? [];
 
-export const getSourceRefsForChat = (chatId: string): SourceRef[] =>
-  MOCK_SOURCE_REFS[chatId] ?? [];
+export const getCitationRefsForChat = (chatId: string): CitationRef[] =>
+  MOCK_CITATION_REFS[chatId] ?? [];
 
 export const getSourcePage = (pageId: string): SourcePage | undefined =>
   MOCK_SOURCE_PAGES[pageId];
@@ -289,9 +358,10 @@ export const getPinnedChats = (): Chat[] => MOCK_CHATS.filter((c) => c.pinned);
 export const getRecentChats = (): Chat[] =>
   [...MOCK_CHATS].sort((a, b) => (a.lastMessageAt < b.lastMessageAt ? 1 : -1));
 
-export const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
-  wiki: 'Your wiki',
-  platform: 'Platform',
-  ip: 'Architect OS IP',
-  context: 'Your context',
+export const CITATION_SOURCE_KIND_LABELS: Record<CitationSourceKind, string> = {
+  document_chunk: 'Documents',
+  wiki_page: 'Your wiki',
+  platform_record: 'Platform',
+  web: 'Web',
+  derived: 'Trace',
 };

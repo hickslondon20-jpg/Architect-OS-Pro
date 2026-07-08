@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bot, Download, FileArchive, Library, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { Bot, Download, FileArchive, Library, Plug, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { Card } from '../../components/ui';
 import {
   createSkill,
   deleteSkill,
   exportSkillZip,
   importSkillZip,
+  loadConnectorCandidates,
   loadSkills,
   requestGuidedSkillDraft,
+  type ConnectorCandidate,
   type SkillPack,
   type SkillPayload,
 } from '../../lib/skillsApi';
@@ -32,6 +34,7 @@ const fromList = (value: string[]) => value.join(', ');
 
 export const SkillsWorkspace: React.FC = () => {
   const [skills, setSkills] = useState<SkillPack[]>([]);
+  const [connectors, setConnectors] = useState<ConnectorCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,7 +59,9 @@ export const SkillsWorkspace: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      setSkills(await loadSkills());
+      const [skillRows, connectorRows] = await Promise.all([loadSkills(), loadConnectorCandidates()]);
+      setSkills(skillRows);
+      setConnectors(connectorRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load skills.');
     } finally {
@@ -213,6 +218,7 @@ export const SkillsWorkspace: React.FC = () => {
             <div className="space-y-5">
               <SkillSection title="Platform skills" skills={globalSkills} onExport={exportSkillZip} />
               <SkillSection title="Your skills" skills={ownSkills} onExport={exportSkillZip} onDelete={removeSkill} />
+              <ConnectorSection connectors={connectors} />
             </div>
           )}
         </Card>
@@ -346,6 +352,42 @@ const TextInput: React.FC<{
       className="w-full rounded-md border border-[var(--aos-mist)] bg-[var(--bg-canvas)] px-3 py-2 text-sm text-[var(--fg-1)] placeholder:text-[var(--fg-4)] focus:outline-none"
     />
   </label>
+);
+
+const ConnectorSection: React.FC<{ connectors: ConnectorCandidate[] }> = ({ connectors }) => (
+  <section>
+    <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="aos-eyebrow">Connectors</div>
+      <Plug className="h-4 w-4 text-[var(--aos-brass)]" />
+    </div>
+    {connectors.length === 0 ? (
+      <p className="rounded-[var(--radius-xs)] bg-[var(--bg-canvas)] px-3 py-2 text-sm text-[var(--fg-3)]">
+        No connector candidates configured.
+      </p>
+    ) : (
+      <div className="grid grid-cols-1 gap-2 lg:grid-cols-[1.15fr_0.85fr]">
+        {connectors.map((connector, index) => (
+          <div
+            key={connector.key}
+            className={`min-w-0 rounded-[var(--radius-xs)] border border-[var(--aos-mist)] bg-[var(--bg-canvas)] p-4 ${
+              index === 0 ? 'lg:row-span-2' : ''
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold text-[var(--fg-1)]">{connector.label}</h3>
+                <p className="mt-1 text-xs text-[var(--fg-3)]">{connector.category}</p>
+              </div>
+              <span className="shrink-0 rounded bg-[var(--aos-brass-tint)] px-2 py-0.5 text-xs text-[var(--aos-brass)]">
+                Soon
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--fg-2)]">{connector.description}</p>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
 );
 
 const SkillSection: React.FC<{

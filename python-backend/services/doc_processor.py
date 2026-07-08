@@ -49,6 +49,9 @@ class DocumentChunk:
     content: str
     chunk_index: int
     metadata: dict[str, Any]
+    page_number: int | None = None
+    bbox: dict[str, Any] | None = None
+    verbatim: str | None = None
 
 
 @dataclass(frozen=True)
@@ -156,6 +159,190 @@ def _read_with_docling(file_bytes: bytes, file_name: str, format_family: str) ->
         Path(tmp_path).unlink(missing_ok=True)
 
 
+def _read_docling_layout_chunks(
+    file_bytes: bytes,
+    file_name: str,
+    normalized_type: str,
+    format_family: str,
+) -> tuple[str, list[DocumentChunk], dict[str, Any]]:
+    from docling.chunking import HybridChunker
+    from docling.document_converter import DocumentConverter
+
+    converter_kwargs, ocr_preflight = _docling_converter_options(file_bytes, normalized_type)
+    suffix = Path(file_name).suffix or f".{normalized_type or 'bin'}"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        converter = DocumentConverter(**converter_kwargs)
+        result = converter.convert(source=tmp_path)
+        document = result.document
+        chunker = HybridChunker()
+        layout_chunks = list(chunker.chunk(dl_doc=document))
+
+        chunks: list[DocumentChunk] = []
+        text_parts: list[str] = []
+        geometry_count = 0
+        for index, layout_chunk in enumerate(layout_chunks):
+            verbatim = str(getattr(layout_chunk, "text", "") or "").strip()
+            content = str(chunker.serialize(chunk=layout_chunk) or verbatim).strip()
+            if not content:
+                continue
+            bbox = _chunk_bbox(layout_chunk, document)
+            page_number = _bbox_page_number(bbox)
+            if bbox:
+                geometry_count += 1
+            text_parts.append(content)
+            chunks.append(
+                DocumentChunk(
+                    content=content,
+                    chunk_index=len(chunks),
+                    metadata={
+                        "file_type": normalized_type,
+                        "parser": "docling",
+                        "format_family": format_family,
+                        "token_count": _token_length(content),
+                        "chunk_strategy": "docling_hybrid_layout",
+                    },
+                    page_number=page_number,
+                    bbox=bbox,
+                    verbatim=verbatim or content,
+                )
+            )
+
+        text = "\n\n".join(text_parts)
+        metadata = _infer_structure_metadata(text, format_family)
+        metadata.update(
+            {
+                "parser": "docling",
+                "parser_version": _docling_version(),
+                "format_family": format_family,
+                "docling_export_mode": "hybrid_chunker_serialize",
+                "preserves_structure": True,
+                "warnings": [],
+                "extraction_quality": "structured" if text.strip() else "empty",
+                "layout_chunker": "HybridChunker",
+                "ocr_preflight": ocr_preflight,
+                "geometry_chunk_count": geometry_count,
+            }
+        )
+        if not text.strip():
+            metadata["warnings"] = ["Docling layout chunking returned no text."]
+        return text, chunks, metadata
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+
+def _docling_converter_options(file_bytes: bytes, normalized_type: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    if normalized_type != "pdf":
+        return {}, {"enabled": False, "reason": "not_pdf"}
+
+    has_text_layer = _pdf_likely_has_text_layer(file_bytes)
+    if has_text_layer:
+        return {}, {"enabled": False, "reason": "text_layer_detected"}
+
+    try:
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.document_converter import PdfFormatOption
+    except Exception:
+        return {}, {"enabled": False, "reason": "ocr_options_unavailable"}
+
+    pipeline_options = PdfPipelineOptions(do_ocr=True)
+    return (
+        {"format_options": {InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}},
+        {"enabled": True, "reason": "no_text_layer_detected"},
+    )
+
+
+def _pdf_likely_has_text_layer(file_bytes: bytes) -> bool:
+    sample = file_bytes[:2_000_000]
+    return bool(re.search(rb"\bBT\b|\bTj\b|\bTJ\b|/Font\b", sample))
+
+
+def _chunk_bbox(layout_chunk: Any, document: Any) -> dict[str, Any] | None:
+    provs = _chunk_provs(layout_chunk)
+    by_page: dict[int, list[Any]] = {}
+    for prov in provs:
+        page_no = getattr(prov, "page_no", None)
+        bbox = getattr(prov, "bbox", None)
+        if page_no is None or bbox is None:
+            continue
+        by_page.setdefault(int(page_no), []).append(prov)
+    if not by_page:
+        return None
+
+    page_no = sorted(by_page)[0]
+    page_provs = by_page[page_no]
+    boxes = [getattr(prov, "bbox", None) for prov in page_provs if getattr(prov, "bbox", None) is not None]
+    if not boxes:
+        return None
+
+    union = {
+        "page_no": page_no,
+        "l": min(float(getattr(box, "l")) for box in boxes),
+        "t": min(float(getattr(box, "t")) for box in boxes),
+        "r": max(float(getattr(box, "r")) for box in boxes),
+        "b": max(float(getattr(box, "b")) for box in boxes),
+        "coord_origin": _coord_origin(boxes[0]),
+        "charspan": [_charspan(getattr(prov, "charspan", None)) for prov in page_provs if getattr(prov, "charspan", None) is not None],
+    }
+    page_size = _page_size(document, page_no)
+    if page_size:
+        union.update(page_size)
+    if len(by_page) > 1:
+        union["multi_page"] = True
+        union["pages"] = sorted(by_page)
+    return union
+
+
+def _chunk_provs(layout_chunk: Any) -> list[Any]:
+    meta = getattr(layout_chunk, "meta", None)
+    doc_items = getattr(meta, "doc_items", None) or []
+    provs: list[Any] = []
+    for item in doc_items:
+        provs.extend(getattr(item, "prov", None) or [])
+    return provs
+
+
+def _coord_origin(box: Any) -> str | None:
+    origin = getattr(box, "coord_origin", None)
+    if origin is None:
+        return None
+    return str(getattr(origin, "value", origin))
+
+
+def _charspan(charspan: Any) -> dict[str, int] | Any:
+    start = getattr(charspan, "start", None)
+    end = getattr(charspan, "end", None)
+    if start is not None and end is not None:
+        return {"start": int(start), "end": int(end)}
+    return charspan
+
+
+def _page_size(document: Any, page_no: int) -> dict[str, float] | None:
+    pages = getattr(document, "pages", None)
+    page = None
+    if isinstance(pages, dict):
+        page = pages.get(page_no) or pages.get(str(page_no))
+    elif isinstance(pages, list) and 0 <= page_no - 1 < len(pages):
+        page = pages[page_no - 1]
+    size = getattr(page, "size", None) if page is not None else None
+    width = getattr(size, "width", None) or getattr(size, "w", None)
+    height = getattr(size, "height", None) or getattr(size, "h", None)
+    if width is None or height is None:
+        return None
+    return {"page_w": float(width), "page_h": float(height)}
+
+
+def _bbox_page_number(bbox: dict[str, Any] | None) -> int | None:
+    if not bbox:
+        return None
+    page_no = bbox.get("page_no")
+    return int(page_no) if page_no is not None else None
+
+
 def _read_plain_text(file_bytes: bytes, format_family: str) -> tuple[str, dict[str, Any]]:
     text = file_bytes.decode("utf-8", errors="replace")
     metadata = _infer_structure_metadata(text, format_family)
@@ -259,6 +446,27 @@ def process_document_bytes(
         text, parser_metadata = _read_csv(file_bytes)
     elif parser == "plain_text":
         text, parser_metadata = _read_plain_text(file_bytes, format_family)
+    elif normalized_type == "pdf" or format_family == "image":
+        text, chunks, parser_metadata = _read_docling_layout_chunks(
+            file_bytes,
+            file_name,
+            normalized_type,
+            format_family,
+        )
+        return ProcessedDocument(
+            text=text,
+            chunks=chunks,
+            metadata={
+                **parser_metadata,
+                "file_name": file_name,
+                "file_type": normalized_type,
+                "parser_format": str(format_info["format_key"]),
+                "supported_by_docling": True,
+                "chunk_count": len(chunks),
+                "chunk_size_tokens": chunk_size_tokens,
+                "chunk_overlap_tokens": chunk_overlap_tokens,
+            },
+        )
     else:
         text, parser_metadata = _read_with_docling(file_bytes, file_name, format_family)
 
@@ -274,6 +482,7 @@ def process_document_bytes(
                 "token_count": _token_length(chunk),
                 "chunk_strategy": "structure_first_token",
             },
+            verbatim=chunk,
         )
         for index, chunk in enumerate(raw_chunks)
     ]

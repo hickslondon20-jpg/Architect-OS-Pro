@@ -19,6 +19,7 @@ export interface DomainWorkflow {
 
 export interface DomainAgent {
   id: DomainAgentId;
+  uuid?: string;
   name: string;
   shortName: string;
   initial: string;
@@ -51,7 +52,7 @@ export interface DomainTask {
   id: string;
   title: string;
   agentId: DomainAgentId;
-  workflowId: string;
+  workflowId?: string | null;
   status: DomainTaskStatus;
   period?: string;
   runLabel: string;
@@ -62,19 +63,23 @@ export interface DomainTask {
   messages: DomainMessage[];
   progress: DomainProgressStep[];
   artifactId?: string;
+  origin?: 'profile' | 'kanban' | 'vcso';
+  originThreadId?: string | null;
 }
 
 export interface DomainArtifact {
   id: string;
   title: string;
   type: ArtifactType;
-  agentId: DomainAgentId;
-  workflowId: string;
+  agentId?: DomainAgentId;
+  workflowId?: string;
   taskId: string;
   createdAt: string;
   promoted: boolean;
   summary: string;
   sections: string[];
+  filename?: string;
+  renderable?: boolean;
 }
 
 export interface RequestCaptureEntry {

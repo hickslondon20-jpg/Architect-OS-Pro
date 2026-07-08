@@ -13,6 +13,7 @@
     "dotenv": "^17.2.3",
     "lucide-react": "^0.562.0",
     "openai": "^6.17.0",
+    "pdfjs-dist": "^6.1.200",
     "puppeteer": "^24.37.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

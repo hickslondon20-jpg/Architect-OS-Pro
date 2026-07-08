@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from routers.kb_folders import _get_supabase_client, get_current_user_id
 from core.config import get_settings
+from services.mcp_connectors import list_connector_candidates
 from services.skill_draft_synthesis import GuidedDraftRequest, SkillDraftSynthesisError, SkillDraftSynthesisService
 from services.skills import SkillService, SkillServiceError
 
@@ -61,6 +62,11 @@ def list_skills(user_id: Annotated[UUID, Depends(get_current_user_id)]) -> list[
         return _service().list_visible(user_id)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not load skills: {exc}") from exc
+
+
+@router.get("/connectors")
+def list_connectors(_user_id: Annotated[UUID, Depends(get_current_user_id)]) -> list[dict]:
+    return list_connector_candidates()
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -123,7 +129,8 @@ def guided_skill_draft(
             GuidedDraftRequest(
                 messages=[message.model_dump() for message in payload.messages],
                 current_draft=payload.currentDraft,
-            )
+            ),
+            user_id=str(user_id),
         )
     except SkillDraftSynthesisError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
