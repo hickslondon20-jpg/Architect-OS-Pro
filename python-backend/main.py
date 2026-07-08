@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Annotated
+import logging
 import uuid
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
@@ -705,26 +706,27 @@ def start_agent_run(payload: AgentRunRequest) -> AgentRunResponse:
     return AgentRunResponse(**result.__dict__)
 
 
-@app.post("/api/wiki/compile-page", response_model=WikiCompileResponse, dependencies=[Depends(require_ingest_secret)])
-def compile_wiki_page(payload: WikiCompileRequest) -> WikiCompileResponse:
-    try:
-        result = WikiCompilationService.from_env().compile_page(payload.user_id, payload.page_key, force=payload.force)
-    except WikiCompilationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except VectorStoreError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-    return WikiCompileResponse(**result.__dict__)
+@app.post("/api/wiki/compile-page", dependencies=[Depends(require_ingest_secret)])
+def compile_wiki_page(payload: WikiCompileRequest, background_tasks: BackgroundTasks) -> dict:
+    # Objective 4 (auto-trigger, 2026-07-08): moved to fire-and-forget/BackgroundTasks after a
+    # live 502 proved a synchronous multi-second synthesis call can outlast Railway/Cloudflare's
+    # edge gateway timeout (confirmed ~10-12s at the edge, well under a real Sonnet-call-plus-
+    # Supabase-round-trips compile). pg_net (the caller for DB-trigger-fired events) never
+    # inspects the response body anyway, so an immediate "queued" ack plus background execution
+    # matches the existing /api/ingest and /api/doc-wiki/synthesize-document pattern in this
+    # file. Errors from the actual compile are swallowed inside _run_wiki_compile_page and
+    # surfaced only via logs/wiki_pages state, not this response.
+    background_tasks.add_task(_run_wiki_compile_page, payload.user_id, payload.page_key, payload.force)
+    return {"user_id": payload.user_id, "page_key": payload.page_key, "status": "queued"}
 
 
-@app.post("/api/wiki/compile-event", response_model=list[WikiCompileResponse], dependencies=[Depends(require_ingest_secret)])
-def compile_wiki_event(payload: WikiCompileEventRequest) -> list[WikiCompileResponse]:
-    try:
-        results = WikiCompilationService.from_env().compile_event(payload.user_id, payload.event, force=payload.force)
-    except WikiCompilationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except VectorStoreError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-    return [WikiCompileResponse(**result.__dict__) for result in results]
+@app.post("/api/wiki/compile-event", dependencies=[Depends(require_ingest_secret)])
+def compile_wiki_event(payload: WikiCompileEventRequest, background_tasks: BackgroundTasks) -> dict:
+    # Same fire-and-forget rationale as compile_wiki_page above - compile_event can run 2-3
+    # sequential page compiles (plus the open_questions chain), which is even more likely to
+    # outlast a short edge-gateway timeout than a single page.
+    background_tasks.add_task(_run_wiki_compile_event, payload.user_id, payload.event, payload.force)
+    return {"user_id": payload.user_id, "event": payload.event, "status": "queued"}
 
 
 @app.post("/api/doc-wiki/synthesize-document", dependencies=[Depends(require_ingest_secret)])
@@ -1165,6 +1167,24 @@ def _run_doc_wiki_synthesis(document_id: str, user_id: str, job_id: str) -> None
         )
     except Exception:
         pass
+
+
+def _run_wiki_compile_page(user_id: str, page_key: str, force: bool) -> None:
+    try:
+        WikiCompilationService.from_env().compile_page(user_id, page_key, force=force)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "wiki_compile_page background task failed for user=%s page_key=%s", user_id, page_key
+        )
+
+
+def _run_wiki_compile_event(user_id: str, event: str, force: bool) -> None:
+    try:
+        WikiCompilationService.from_env().compile_event(user_id, event, force=force)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "wiki_compile_event background task failed for user=%s event=%s", user_id, event
+        )
 
 
 def _validate_user_scoped_path(user_id: str, storage_path: str) -> None:
