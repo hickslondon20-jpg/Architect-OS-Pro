@@ -646,7 +646,7 @@ class WikiCompilationService:
         if self._anthropic_client_instance is None:
             settings = get_settings()
             self._anthropic_client_instance = wrap_anthropic(
-                anthropic.Anthropic(api_key=settings.anthropic_api_key or "")
+                anthropic.Anthropic(api_key=settings.anthropic_api_key_value)
             )
         return self._anthropic_client_instance
 

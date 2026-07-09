@@ -31,7 +31,7 @@ class SkillDraftSynthesisService:
     def from_env(cls) -> "SkillDraftSynthesisService":
         settings = get_settings()
         return cls(
-            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key or ""),
+            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key_value),
             model=settings.claude_synthesis_model,
         )
 

@@ -73,7 +73,7 @@ class DocWikiSynthesisService:
         settings = get_settings()
         return cls(
             store=VectorStore.from_env(),
-            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key or ""),
+            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key_value),
         )
 
     def synthesize(self, source_payload: SourcePayload) -> SynthesisResult:
@@ -581,7 +581,7 @@ class DocWikiDocumentAdapter:
             store=store,
             synthesis_service=DocWikiSynthesisService(
                 store=store,
-                anthropic_client=anthropic.Anthropic(api_key=get_settings().anthropic_api_key or ""),
+                anthropic_client=anthropic.Anthropic(api_key=get_settings().anthropic_api_key_value),
             ),
         )
 

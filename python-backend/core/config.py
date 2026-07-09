@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
+    @property
+    def anthropic_api_key_value(self) -> str:
+        """Return the Anthropic key with common deployment paste wrappers removed."""
+        return (self.anthropic_api_key or "").strip().strip('"').strip("'")
+
+    @property
+    def anthropic_api_key_has_wrapping(self) -> bool:
+        raw = self.anthropic_api_key or ""
+        return bool(raw) and raw != self.anthropic_api_key_value
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

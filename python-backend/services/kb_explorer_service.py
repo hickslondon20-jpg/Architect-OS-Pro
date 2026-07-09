@@ -274,7 +274,7 @@ class KbExplorerService:
         settings = get_settings()
         self.nav = KbNavigationService(store)
         self.anthropic_client = anthropic.Anthropic(
-            api_key=settings.anthropic_api_key or "",
+            api_key=settings.anthropic_api_key_value,
         )
         self.model = settings.claude_synthesis_model
 

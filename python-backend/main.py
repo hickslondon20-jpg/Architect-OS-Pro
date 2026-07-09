@@ -59,6 +59,7 @@ class HealthResponse(BaseModel):
 class ProviderConfigDebugResponse(BaseModel):
     anthropic_env_present: bool
     anthropic_settings_present: bool
+    anthropic_key_wrapping_suspected: bool
     openai_env_present: bool
     openai_settings_present: bool
     langsmith_env_present: bool
@@ -69,6 +70,7 @@ class AnthropicSmokeResponse(BaseModel):
     ok: bool
     anthropic_env_present: bool
     anthropic_settings_present: bool
+    anthropic_key_wrapping_suspected: bool
     model: str | None = None
     error_type: str | None = None
     error_message: str | None = None
@@ -531,7 +533,8 @@ def debug_provider_config() -> ProviderConfigDebugResponse:
     current_settings = get_settings()
     return ProviderConfigDebugResponse(
         anthropic_env_present=bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip()),
-        anthropic_settings_present=bool((current_settings.anthropic_api_key or "").strip()),
+        anthropic_settings_present=bool(current_settings.anthropic_api_key_value),
+        anthropic_key_wrapping_suspected=current_settings.anthropic_api_key_has_wrapping,
         openai_env_present=bool((os.environ.get("OPENAI_API_KEY") or "").strip()),
         openai_settings_present=bool((current_settings.openai_api_key or "").strip()),
         langsmith_env_present=bool((os.environ.get("LANGSMITH_API_KEY") or "").strip()),
@@ -550,12 +553,13 @@ def debug_anthropic_smoke() -> AnthropicSmokeResponse:
 
     current_settings = get_settings()
     env_present = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
-    settings_present = bool((current_settings.anthropic_api_key or "").strip())
+    settings_present = bool(current_settings.anthropic_api_key_value)
     if not settings_present:
         return AnthropicSmokeResponse(
             ok=False,
             anthropic_env_present=env_present,
             anthropic_settings_present=settings_present,
+            anthropic_key_wrapping_suspected=current_settings.anthropic_api_key_has_wrapping,
             error_type="missing_anthropic_api_key",
             error_message="ANTHROPIC_API_KEY is not visible to the running backend process.",
         )
@@ -566,7 +570,7 @@ def debug_anthropic_smoke() -> AnthropicSmokeResponse:
             fallback_model_name=current_settings.claude_synthesis_model,
             fallback_provider="anthropic",
         )["model_name"]
-        client = anthropic.Anthropic(api_key=current_settings.anthropic_api_key)
+        client = anthropic.Anthropic(api_key=current_settings.anthropic_api_key_value)
         client.messages.create(
             model=model_name,
             max_tokens=8,
@@ -577,6 +581,7 @@ def debug_anthropic_smoke() -> AnthropicSmokeResponse:
             ok=False,
             anthropic_env_present=env_present,
             anthropic_settings_present=settings_present,
+            anthropic_key_wrapping_suspected=current_settings.anthropic_api_key_has_wrapping,
             model=locals().get("model_name"),
             error_type=type(exc).__name__,
             error_message=str(exc),
@@ -586,6 +591,7 @@ def debug_anthropic_smoke() -> AnthropicSmokeResponse:
         ok=True,
         anthropic_env_present=env_present,
         anthropic_settings_present=settings_present,
+        anthropic_key_wrapping_suspected=current_settings.anthropic_api_key_has_wrapping,
         model=model_name,
     )
 
