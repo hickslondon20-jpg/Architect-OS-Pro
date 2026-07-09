@@ -12,6 +12,26 @@
 
 ---
 
+## Commit & Versioning Convention
+
+Every commit to this repo is version-tagged so the `git` history reads as an ordered version log. **Every commit message must begin with a semantic version prefix**, followed by a short description:
+
+`vMAJOR.MINOR.PATCH <concise description>`  —  e.g. `v0.5.8 Repoint MRA citation resolver to gm_checkpoints`
+
+**Increment rules:**
+- **PATCH** (third digit) — bump for **every incremental push/commit**: routine work, fixes, doc updates, a single agent's deliverable. e.g. `v0.5.7 → v0.5.8`.
+- **MINOR** (second digit) — bump on **every major phase / milestone completion** (an episode, or a major workstream such as the testing/verification-debt pass, the connection phase, or the §8 front-end pass). Reset PATCH to 0. e.g. `v0.5.9 → v0.6.0`.
+- **MAJOR** (first digit) — bump to **`v1.0.0` only at the live MVP launch** (`0.x.0 → 1.0.0`).
+
+**Rules of use:**
+- Versions only move **forward** — never reuse, decrement, or duplicate a version.
+- To find the current version, read the **most recent commit message's `vX.Y.Z` prefix** and increment from there. (Baseline as of this rule: **v0.5.7**.)
+- Agents default to a **PATCH** bump for routine commits. **MINOR and MAJOR bumps are the founder's call** — do not bump them without explicit instruction.
+- **Commit-after-every-file / logical unit is a hard rule** (uncommitted files do not persist across session boundaries): write a file, then immediately stage + commit it with a version-tagged message before moving on.
+- **Never commit secrets.** `.env` and any credential file stay out of every commit and must be in `.gitignore`.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
