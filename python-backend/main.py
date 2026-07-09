@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 import logging
+import os
 import uuid
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
@@ -53,6 +54,24 @@ class IngestRequest(BaseModel):
 class HealthResponse(BaseModel):
     ok: bool
     service: str
+
+
+class ProviderConfigDebugResponse(BaseModel):
+    anthropic_env_present: bool
+    anthropic_settings_present: bool
+    openai_env_present: bool
+    openai_settings_present: bool
+    langsmith_env_present: bool
+    claude_synthesis_model: str
+
+
+class AnthropicSmokeResponse(BaseModel):
+    ok: bool
+    anthropic_env_present: bool
+    anthropic_settings_present: bool
+    model: str | None = None
+    error_type: str | None = None
+    error_message: str | None = None
 
 
 class IngestResponse(BaseModel):
@@ -496,6 +515,79 @@ app.include_router(skills.router, prefix="/api/skills", tags=["Skills"])
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(ok=True, service="architectos-ingestion")
+
+
+@app.get(
+    "/api/debug/provider-config",
+    response_model=ProviderConfigDebugResponse,
+    dependencies=[Depends(require_ingest_secret)],
+)
+def debug_provider_config() -> ProviderConfigDebugResponse:
+    """Secret-safe runtime provider config check.
+
+    This endpoint intentionally returns booleans only. It exists for production
+    env debugging when a deployed service appears not to see a rotated key.
+    """
+    current_settings = get_settings()
+    return ProviderConfigDebugResponse(
+        anthropic_env_present=bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip()),
+        anthropic_settings_present=bool((current_settings.anthropic_api_key or "").strip()),
+        openai_env_present=bool((os.environ.get("OPENAI_API_KEY") or "").strip()),
+        openai_settings_present=bool((current_settings.openai_api_key or "").strip()),
+        langsmith_env_present=bool((os.environ.get("LANGSMITH_API_KEY") or "").strip()),
+        claude_synthesis_model=current_settings.claude_synthesis_model,
+    )
+
+
+@app.post(
+    "/api/debug/anthropic-smoke",
+    response_model=AnthropicSmokeResponse,
+    dependencies=[Depends(require_ingest_secret)],
+)
+def debug_anthropic_smoke() -> AnthropicSmokeResponse:
+    """Tiny live Anthropic auth smoke, without exposing provider credentials."""
+    import anthropic
+
+    current_settings = get_settings()
+    env_present = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
+    settings_present = bool((current_settings.anthropic_api_key or "").strip())
+    if not settings_present:
+        return AnthropicSmokeResponse(
+            ok=False,
+            anthropic_env_present=env_present,
+            anthropic_settings_present=settings_present,
+            error_type="missing_anthropic_api_key",
+            error_message="ANTHROPIC_API_KEY is not visible to the running backend process.",
+        )
+
+    try:
+        model_name = VectorStore.from_env().resolve_platform_model(
+            setting_key="wiki_tier1_synthesis",
+            fallback_model_name=current_settings.claude_synthesis_model,
+            fallback_provider="anthropic",
+        )["model_name"]
+        client = anthropic.Anthropic(api_key=current_settings.anthropic_api_key)
+        client.messages.create(
+            model=model_name,
+            max_tokens=8,
+            messages=[{"role": "user", "content": "Return ok."}],
+        )
+    except Exception as exc:
+        return AnthropicSmokeResponse(
+            ok=False,
+            anthropic_env_present=env_present,
+            anthropic_settings_present=settings_present,
+            model=locals().get("model_name"),
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
+    return AnthropicSmokeResponse(
+        ok=True,
+        anthropic_env_present=env_present,
+        anthropic_settings_present=settings_present,
+        model=model_name,
+    )
 
 
 @app.post("/api/ingest", response_model=IngestResponse, dependencies=[Depends(require_ingest_secret)])
