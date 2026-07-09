@@ -58,6 +58,9 @@ class CompileResult:
     # observable field for the same reason synthesis_model=mechanical_fallback is observable -
     # a skipped compile must never look indistinguishable from a real one.
     skipped: bool = False
+    # MA-03B anti-clobber guard: true when synthesis fell back but an existing real-synthesis
+    # page was preserved and marked stale instead of being overwritten by mechanical text.
+    kept_stale: bool = False
 
 
 # Objective 4 (auto-trigger): recency-guard debounce. The 10 event_rebuild_targets events are
@@ -333,11 +336,14 @@ class WikiCompilationService:
         valid_sources = {(item["table"], item["source_id"]) for item in all_sources}
 
         synthesis_used = False
+        fallback_reason: str | None = None
         narrative = ""
         claims: list[dict[str, Any]] = []
         sourced_from: list[dict[str, Any]] = []
 
         parsed = self._synthesize_page(user_id, page_key, page_config, source_bundle) if all_sources else None
+        if parsed is None:
+            fallback_reason = "synthesis_unavailable" if all_sources else "no_source_rows"
         if parsed is not None:
             candidate_narrative, candidate_claims, candidate_sourced_from, _thin = self._normalize_synthesis_output(
                 user_id, page_key, parsed, valid_sources
@@ -353,7 +359,9 @@ class WikiCompilationService:
                 claims = candidate_claims
                 sourced_from = candidate_sourced_from
                 synthesis_used = True
+                fallback_reason = None
             else:
+                fallback_reason = "synthesis_ungrounded"
                 raw_claim_count = len(parsed.get("claims") or []) if isinstance(parsed.get("claims"), list) else -1
                 logger.warning(
                     "wiki_compilation: Tier-1 synthesis for page_key=%s user=%s returned %d raw claim(s) but 0 "
@@ -365,6 +373,15 @@ class WikiCompilationService:
                 )
 
         if not claims:
+            kept_result = self._keep_prior_real_page_on_fallback(
+                user_id=user_id,
+                page_key=page_key,
+                fallback_reason=fallback_reason or "mechanical_fallback",
+                source_count=len(all_sources),
+            )
+            if kept_result is not None:
+                return kept_result
+
             # Thin-page policy: fall back to the mechanical compiled claims so a synthesis miss
             # (LLM call failed, bad JSON, or zero groundable claims) never regresses below the
             # pre-MA-03 baseline, and a genuinely empty source set still produces an honest thin
@@ -460,6 +477,95 @@ class WikiCompilationService:
             synthesis_used=synthesis_used,
         )
 
+    def _keep_prior_real_page_on_fallback(
+        self,
+        *,
+        user_id: str,
+        page_key: str,
+        fallback_reason: str,
+        source_count: int,
+    ) -> CompileResult | None:
+        existing = self._load_prior_real_synthesis_page(user_id, page_key)
+        if existing is None:
+            return None
+
+        kept_model = existing.get("synthesis_model")
+        kept_last_compiled_at = existing.get("last_compiled_at")
+        logger.warning(
+            "wiki_compilation: preserving prior real synthesis for page_key=%s user=%s after fallback_reason=%s; "
+            "marking page stale instead of overwriting with mechanical fallback.",
+            page_key,
+            user_id,
+            fallback_reason,
+        )
+
+        try:
+            self.store.client.table("wiki_pages").update({"stale": True}).eq("user_id", user_id).eq(
+                "page_key", page_key
+            ).execute()
+            self.store.client.table("wiki_action_log").insert(
+                {
+                    "user_id": user_id,
+                    "action": "compile",
+                    "actor": "compilation_service",
+                    "page_key": page_key,
+                    "payload": {
+                        "outcome": "kept_stale_after_synthesis_failure",
+                        "fallback_reason": fallback_reason,
+                        "source_count": source_count,
+                        "kept_synthesis_model": kept_model,
+                        "kept_last_compiled_at": kept_last_compiled_at,
+                        "attempted_at": _now(),
+                    },
+                }
+            ).execute()
+        except Exception as exc:
+            raise WikiCompilationError(f"Wiki anti-clobber guard failed: {exc}") from exc
+
+        try:
+            validation_summary = WikiHealthService(self.store).run_post_compile(user_id, page_key)
+        except WikiHealthError as exc:
+            raise WikiCompilationError(f"Wiki post-compile validation failed: {exc}") from exc
+
+        return CompileResult(
+            user_id=user_id,
+            page_key=page_key,
+            claim_count=0,
+            evidence_count=0,
+            thin=False,
+            digest_generated_at=str(kept_last_compiled_at or _now()),
+            rebuilt_pages=[],
+            validation_counts=validation_summary.counts,
+            synthesis_used=False,
+            skipped=False,
+            kept_stale=True,
+        )
+
+    def _load_prior_real_synthesis_page(self, user_id: str, page_key: str) -> dict[str, Any] | None:
+        try:
+            rows = (
+                self.store.client.table("wiki_pages")
+                .select("page_key,synthesis_model,last_compiled_at,narrative,stale")
+                .eq("user_id", user_id)
+                .eq("page_key", page_key)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+        except Exception as exc:
+            raise WikiCompilationError(f"Wiki prior-page lookup failed: {exc}") from exc
+
+        if not rows:
+            return None
+        row = rows[0]
+        synthesis_model = str(row.get("synthesis_model") or "")
+        if not synthesis_model or synthesis_model == "mechanical_fallback":
+            return None
+        if not str(row.get("narrative") or "").strip():
+            return None
+        return row
+
     def _check_recompile_debounce(self, user_id: str, page_key: str) -> CompileResult | None:
         """Returns a skipped CompileResult if page_key was compiled within the debounce window
         for this user, else None (caller should proceed with a real compile)."""
@@ -501,6 +607,7 @@ class WikiCompilationService:
             validation_counts={},
             synthesis_used=False,
             skipped=True,
+            kept_stale=False,
         )
 
     def compile_event(self, user_id: str, event: str, *, force: bool = False) -> list[CompileResult]:

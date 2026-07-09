@@ -357,6 +357,7 @@ class WikiCompileResponse(BaseModel):
     validation_counts: dict[str, int]
     synthesis_used: bool = False
     skipped: bool = False
+    kept_stale: bool = False
 
 
 class WikiEvidencePayload(BaseModel):

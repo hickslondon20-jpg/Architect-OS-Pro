@@ -6,6 +6,7 @@ Run from the python-backend/ directory, inside the founder's venv:
 
     python scripts/ma03_tier1_synthesis_smoke.py
     python scripts/ma03_tier1_synthesis_smoke.py growth_constraints   # optional: any page_key
+    python scripts/ma03_tier1_synthesis_smoke.py diagnostic_synthesis --force --simulate-synthesis-failure
 
 Why a script instead of hitting an HTTP endpoint: WikiCompilationService.compile_page(...)
 is already the exact function the two existing FastAPI endpoints call - running it directly
@@ -58,9 +59,15 @@ DEFAULT_PAGE_KEY = "diagnostic_synthesis"  # compiled_base_only; exercises the g
 def main() -> None:
     page_key = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PAGE_KEY
     force = "--force" in sys.argv[2:]
-    print(f"[ma03] compiling page_key={page_key!r} for user_id={TEST_USER_ID} force={force}")
+    simulate_synthesis_failure = "--simulate-synthesis-failure" in sys.argv[2:]
+    print(
+        f"[ma03] compiling page_key={page_key!r} for user_id={TEST_USER_ID} "
+        f"force={force} simulate_synthesis_failure={simulate_synthesis_failure}"
+    )
 
     service = WikiCompilationService(VectorStore.from_env())
+    if simulate_synthesis_failure:
+        service._synthesize_page = lambda *args, **kwargs: None  # type: ignore[method-assign]
     try:
         result = service.compile_page(TEST_USER_ID, page_key, force=force)
     except WikiCompilationError as exc:
@@ -77,6 +84,7 @@ def main() -> None:
                 "thin": result.thin,
                 "synthesis_used": result.synthesis_used,
                 "skipped": result.skipped,
+                "kept_stale": result.kept_stale,
                 "validation_counts": result.validation_counts,
             },
             indent=2,
@@ -86,7 +94,7 @@ def main() -> None:
     store = VectorStore.from_env()
     page_row = (
         store.client.table("wiki_pages")
-        .select("page_key,title,one_line,narrative,sourced_from,synthesis_model,last_compiled_at")
+        .select("page_key,title,one_line,narrative,sourced_from,synthesis_model,last_compiled_at,stale")
         .eq("user_id", TEST_USER_ID)
         .eq("page_key", page_key)
         .limit(1)
@@ -124,6 +132,25 @@ def main() -> None:
               "mismatch, both silently swallowed before). If this is still empty, something "
               "regressed - check the console/logs above for a warning from "
               "'wiki_compilation: _project_to_ose'.")
+
+    if result.kept_stale:
+        action_rows = (
+            store.client.table("wiki_action_log")
+            .select("action,actor,page_key,payload,created_at")
+            .eq("user_id", TEST_USER_ID)
+            .eq("page_key", page_key)
+            .eq("action", "compile")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        print("\n[ma03] latest kept-stale audit log:")
+        if action_rows:
+            print(json.dumps(action_rows[0], indent=2, default=str))
+        else:
+            print("  MISSING - kept_stale=True but no compile audit row was found.")
 
 
 if __name__ == "__main__":
