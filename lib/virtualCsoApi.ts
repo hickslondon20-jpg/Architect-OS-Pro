@@ -64,7 +64,10 @@ const PYTHON_BACKEND_URL = import.meta.env.VITE_INGESTION_API_URL as string | un
 
 const backendApiUrl = (path: string) => {
   if (!PYTHON_BACKEND_URL) return path;
-  return `${PYTHON_BACKEND_URL.replace(/\/$/, '')}${path}`;
+  const normalizedBaseUrl = /^https?:\/\//i.test(PYTHON_BACKEND_URL)
+    ? PYTHON_BACKEND_URL
+    : `https://${PYTHON_BACKEND_URL}`;
+  return `${normalizedBaseUrl.replace(/\/$/, '')}${path}`;
 };
 
 const requireUserId = async () => {
