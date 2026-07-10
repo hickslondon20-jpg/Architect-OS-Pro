@@ -18,6 +18,9 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'import.meta.env.VITE_INGESTION_API_URL': JSON.stringify(
+        env.VITE_INGESTION_API_URL ?? env.ARCHITECTOS_PYTHON_BACKEND_URL,
+      ),
     },
     resolve: {
       alias: {
