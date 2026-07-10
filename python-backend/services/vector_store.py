@@ -287,9 +287,9 @@ class VectorStore:
                 "embedding": embedding,
                 "embedding_model": self.settings.embedding_model,
                 "metadata": {**metadata, **inherited_metadata, **chunk.metadata},
-                "page_number": chunk.page_number,
-                "bbox": chunk.bbox,
-                "verbatim": chunk.verbatim if chunk.verbatim is not None else chunk.content,
+                "page_number": chunk.metadata.get("page_number"),
+                "bbox": chunk.metadata.get("bbox"),
+                "verbatim": chunk.metadata.get("verbatim") or chunk.content,
             }
             for chunk, embedding in zip(chunk_list, embeddings, strict=True)
         ]

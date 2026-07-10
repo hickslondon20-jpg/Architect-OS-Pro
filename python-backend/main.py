@@ -1599,7 +1599,6 @@ def _process_ingestion(payload: IngestRequest) -> None:
                 text=processed.text,
                 file_name=payload.file_name,
                 file_type=payload.file_type,
-                user_id=payload.user_id,
             )
             document_metadata = extraction.metadata
             store.mark_metadata_complete(
