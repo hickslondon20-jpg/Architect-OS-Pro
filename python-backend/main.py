@@ -89,6 +89,11 @@ class ProviderConfigDebugResponse(BaseModel):
     claude_synthesis_model: str
 
 
+class CorsConfigDebugResponse(BaseModel):
+    allowed_origins: list[str]
+    local_dev_allowed: bool
+
+
 class AnthropicSmokeResponse(BaseModel):
     ok: bool
     anthropic_env_present: bool
@@ -627,7 +632,7 @@ app.add_middleware(
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["POST", "GET", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["authorization", "content-type", "x-ingest-secret"],
+    allow_headers=["*"],
 )
 
 app.include_router(kb_folders.router, prefix="/kb/folders", tags=["KB Folders"])
@@ -658,6 +663,20 @@ def debug_provider_config() -> ProviderConfigDebugResponse:
         openai_settings_present=bool((current_settings.openai_api_key or "").strip()),
         langsmith_env_present=bool((os.environ.get("LANGSMITH_API_KEY") or "").strip()),
         claude_synthesis_model=current_settings.claude_synthesis_model,
+    )
+
+
+@app.get(
+    "/api/debug/cors-config",
+    response_model=CorsConfigDebugResponse,
+    dependencies=[Depends(require_ingest_secret)],
+)
+def debug_cors_config() -> CorsConfigDebugResponse:
+    current_settings = get_settings()
+    allowed_origins = current_settings.allowed_origins
+    return CorsConfigDebugResponse(
+        allowed_origins=allowed_origins,
+        local_dev_allowed="http://127.0.0.1:5180" in allowed_origins,
     )
 
 

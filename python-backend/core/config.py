@@ -61,7 +61,9 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        configured = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        local_dev = ["http://127.0.0.1:5180", "http://localhost:5180"]
+        return list(dict.fromkeys([*configured, *local_dev]))
 
     @property
     def anthropic_api_key_value(self) -> str:
