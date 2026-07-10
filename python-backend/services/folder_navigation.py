@@ -268,11 +268,9 @@ class KbNavigationService:
 
         query = (
             self.client.table("ose_raw_document_registry")
-            .select("id,file_name,file_type,status,folder_id")
+            .select("id,file_name,file_type,status,folder_id,full_markdown")
             .eq("user_id", user_id)
             .neq("status", "deleted")
-            .filter("full_markdown", "~*", pattern)
-            .limit(limit)
         )
 
         if folder_id is not None:
@@ -288,16 +286,22 @@ class KbNavigationService:
             query = query.in_("folder_id", list(subtree_ids))
 
         resp = query.execute()
-        matches = [
-            KbSearchMatch(
-                id=row["id"],
-                name=row["file_name"],
-                file_type=row.get("file_type") or "",
-                status=row.get("status") or "",
-                folder_id=row.get("folder_id"),
+        regex = re.compile(pattern, flags=re.IGNORECASE)
+        matches: list[KbSearchMatch] = []
+        for row in resp.data or []:
+            if not regex.search(str(row.get("full_markdown") or "")):
+                continue
+            matches.append(
+                KbSearchMatch(
+                    id=row["id"],
+                    name=row["file_name"],
+                    file_type=row.get("file_type") or "",
+                    status=row.get("status") or "",
+                    folder_id=row.get("folder_id"),
+                )
             )
-            for row in resp.data or []
-        ]
+            if len(matches) >= limit:
+                break
         return KbGrepResult(
             pattern=pattern,
             scope_folder_id=folder_id,

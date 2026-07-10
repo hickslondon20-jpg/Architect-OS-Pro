@@ -1658,6 +1658,25 @@ def _run_doc_wiki_synthesis(document_id: str, user_id: str, job_id: str) -> None
             user_id,
             job_id,
         )
+        try:
+            VectorStore.from_env().client.table("ose_activity_log").insert(
+                {
+                    "user_id": user_id,
+                    "kind": "activity",
+                    "text": (
+                        "[SYNTHESIS_ERROR] Document background task failed "
+                        f"| document:{document_id} | job:{job_id}"
+                    ),
+                    "icon": "alert-circle",
+                }
+            ).execute()
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "doc_wiki_synthesis background failure log write failed for document_id=%s user_id=%s job_id=%s",
+                document_id,
+                user_id,
+                job_id,
+            )
 
 
 def _run_wiki_compile_page(user_id: str, page_key: str, force: bool) -> None:
