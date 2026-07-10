@@ -210,7 +210,7 @@ See `../ArchitectOS Beta Launch/ArchitectOS Design System/uploads/ArchitectOS-de
 | Vector search | Supabase pgvector (already in use) | Confirmed — matches their stack |
 | Hybrid search / reranking | TBD — evaluate Ep1 | Their approach is a clear upgrade over static KB |
 | LLM provider | Claude Sonnet (locked) | Our stack constraint — never swap for OpenAI-compatible |
-| Observability | TBD — evaluate Ep1 | LangSmith vs. N8N execution logs |
+| Observability | LangSmith adopted 2026-07-06; instrumentation rebuilt + outcome-verified 2026-07-10 | Standing bar: any Python-backend LLM call on an episode's critical path emits a LangSmith trace as evidence; traces are necessary, not sufficient, and must be paired with DB/output checks. |
 
 ### Intelligence Layer Vision
 

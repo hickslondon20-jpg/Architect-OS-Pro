@@ -52,7 +52,7 @@ Full ways-of-working context: see `CLAUDE.md` ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬
 | Hybrid search / reranking | **Hybrid RRF default + optional Cohere rerank** | 2026-06-27 | Explicit vector and keyword candidate sets with RRF fusion; Cohere is config-gated and fails open |
 | Structured data tools | Governed founder dataset workspace + read-only approved SQL surfaces | 2026-06-27 | Avoid arbitrary agent-created tables while enabling safe analysis of P&Ls, utilization, capacity, client concentration, and other structured agency data. |
 | Sub-agent orchestration | Shared capability registry + scoped delegation runs | 2026-06-28 | Create a reusable bounded-specialist scaffold for Virtual CSO, OS Engine, Domain Agents, and future Sprint Planning helpers without jumping into full Deep Mode or domain harness execution. |
-| LangSmith observability | **TBD** | ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â | Evaluate Ep1: adopt vs. N8N execution logs as proxy |
+| LangSmith observability | **Adopted** | 2026-07-06; rebuilt + outcome-verified 2026-07-10 | Python-backend LLM clients route through fail-open LangSmith wrappers; production diagnostic smoke produced a fresh `ChatAnthropic` trace in `ArchitectOS-pro`. Standing bar: any Python-backend LLM call on an episode's critical path emits a LangSmith trace as evidence; traces are necessary, not sufficient, and must be paired with DB/output checks. |
 | User-facing ingestion UI | **TBD** | ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â | Evaluate Ep1: drag-and-drop upload + processing status |
 | Sub-agent dispatch | **TBD** | ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â | Evaluate Ep6: domain-specific harness pattern |
 
