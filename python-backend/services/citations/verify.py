@@ -15,7 +15,7 @@ from services.usage_events import anthropic_usage, log_ai_usage_event
 from services.vector_store import VectorStore
 
 CitationVerdict = Literal["supported", "partial", "unsupported", "unresolvable"]
-UTILITY_FALLBACK_MODEL = "claude-3-5-haiku-latest"
+UTILITY_FALLBACK_MODEL = "claude-haiku-4-5-20251001"
 
 
 @dataclass(frozen=True)
