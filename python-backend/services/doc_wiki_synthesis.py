@@ -13,6 +13,7 @@ import anthropic
 
 from core.config import get_settings
 from core.doc_wiki_config import doc_wiki_config
+from core.langsmith_tracing import trace_anthropic_client
 from services.vector_store import VectorStore
 
 
@@ -73,7 +74,9 @@ class DocWikiSynthesisService:
         settings = get_settings()
         return cls(
             store=VectorStore.from_env(),
-            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key_value),
+            anthropic_client=trace_anthropic_client(
+                anthropic.Anthropic(api_key=settings.anthropic_api_key_value)
+            ),
         )
 
     def synthesize(self, source_payload: SourcePayload) -> SynthesisResult:
@@ -581,7 +584,9 @@ class DocWikiDocumentAdapter:
             store=store,
             synthesis_service=DocWikiSynthesisService(
                 store=store,
-                anthropic_client=anthropic.Anthropic(api_key=get_settings().anthropic_api_key_value),
+                anthropic_client=trace_anthropic_client(
+                    anthropic.Anthropic(api_key=get_settings().anthropic_api_key_value)
+                ),
             ),
         )
 

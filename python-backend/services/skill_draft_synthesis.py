@@ -10,6 +10,7 @@ from typing import Any
 import anthropic
 
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 
 
 class SkillDraftSynthesisError(RuntimeError):
@@ -31,7 +32,9 @@ class SkillDraftSynthesisService:
     def from_env(cls) -> "SkillDraftSynthesisService":
         settings = get_settings()
         return cls(
-            anthropic_client=anthropic.Anthropic(api_key=settings.anthropic_api_key_value),
+            anthropic_client=trace_anthropic_client(
+                anthropic.Anthropic(api_key=settings.anthropic_api_key_value)
+            ),
             model=settings.claude_synthesis_model,
         )
 

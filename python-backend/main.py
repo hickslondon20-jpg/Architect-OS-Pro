@@ -28,6 +28,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from routers import domain_agents, kb_documents, kb_folders, skills, tasks
 from routers.kb_folders import get_current_user_id
 from services.doc_processor import process_document_bytes
@@ -690,7 +691,9 @@ def debug_anthropic_smoke() -> AnthropicSmokeResponse:
             fallback_provider="anthropic",
         )
         model_name = str(resolved.get("model_name") or current_settings.claude_synthesis_model)
-        client = anthropic.Anthropic(api_key=current_settings.anthropic_api_key_value)
+        client = trace_anthropic_client(
+            anthropic.Anthropic(api_key=current_settings.anthropic_api_key_value)
+        )
         client.messages.create(
             model=model_name,
             max_tokens=8,
