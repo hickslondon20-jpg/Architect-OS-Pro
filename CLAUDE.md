@@ -107,6 +107,11 @@ Full spec: `DESIGN-GUIDE-QUICK.md` (this repo root) and `../ArchitectOS Beta Lau
 
 ## Session Rules
 
+### Work from live
+The canonical working surface is production: `main` auto-deploys to Railway and Vercel, then verification happens against the live frontend URL and `https://api.architectospro.com`. Local servers are a pre-push safety net only, not the source of truth for acceptance.
+
+For each milestone: run the narrow compile/import checks that fit the touched code, commit with the required version prefix, let the `main` deploy go green, then test the live URL. Do not add Vercel preview/branch environments unless the founder explicitly changes the deployment model.
+
 ### Visual-only pass
 When doing Phase 5B design alignment, change CSS/styles only. Do not touch component logic, data wiring, or API calls. Flag any issues found — don't fix them in the same pass.
 

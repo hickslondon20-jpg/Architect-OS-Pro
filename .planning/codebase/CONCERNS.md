@@ -88,6 +88,8 @@ The codebase is materially built, but beta-readiness risk is concentrated in ver
 
 ## Local Development Environment Gotchas
 
+**Status as of 2026-07-10: deprioritized by the work-from-live policy.** Keep these notes as historical diagnosis for rare local reproduction, but the default verification path is now `main` auto-deploys to Vercel/Railway, then tests run against the live frontend URL and `https://api.architectospro.com`.
+
 - **Local Python version must match production (3.13), not 3.14.** Production (Railway) runs Python **3.13.14**. A local machine on **Python 3.14** cannot `pip install` some backend deps (e.g. `langsmith` → `zstandard`/`cffi`), because those lack prebuilt 3.14 wheels and fall back to building from source, which requires Microsoft C++ Build Tools. Symptom: `DistutilsPlatformError: Microsoft Visual C++ 14.0 or greater is required`. Fix: use a **Python 3.13 venv** matching production for any founder-run backend smoke, or verify in production instead of locally. (Encountered 2026-07-10 during MA-01 LangSmith verification — the smoke's fail-open helper correctly used unwrapped clients when `langsmith` was absent, so tracing couldn't be verified locally; it was verified in production instead.)
 - **`.venv-kb-nav` is an execution-agent sandbox venv, not present on the founder's machine.** Prompts that reference activating it will fail locally; the founder should point at their own 3.13 venv.
 
@@ -98,5 +100,6 @@ The codebase is materially built, but beta-readiness risk is concentrated in ver
 - Verify live Supabase access, RLS, migrations, and seed data for founder-only beta behavior.
 - Run hosted ingestion/parser smoke and OpenAI/Cohere return passes.
 - Verify N8N webhook URLs and PDF/workflow endpoints from the deployed environment.
+- Confirm Supabase Auth Site URL and Redirect URLs point at the live frontend domain, including `/reset-password`, before starting the forgot-password feature.
 - Keep future work section-by-section and avoid broad rewrites of already-built product surfaces.
 - Rotate exposed or transcript-touched secrets before go-live, especially `ARCHITECTOS_INGEST_SECRET` and the Vault-stored `wiki_autotrigger_ingest_secret`. `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are no longer blocked for MA-03 production synthesis as of 2026-07-09, but should still be included in any full hygiene rotation if the founder chooses a complete pre-launch sweep.
