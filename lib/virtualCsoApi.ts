@@ -60,6 +60,12 @@ export interface SendUserMessageResult {
 
 const sourceRefsByChat = new Map<string, SourceRef[]>();
 const sourcePagesById = new Map<string, SourcePage>(Object.entries(MOCK_SOURCE_PAGES));
+const PYTHON_BACKEND_URL = import.meta.env.VITE_INGESTION_API_URL as string | undefined;
+
+const backendApiUrl = (path: string) => {
+  if (!PYTHON_BACKEND_URL) return path;
+  return `${PYTHON_BACKEND_URL.replace(/\/$/, '')}${path}`;
+};
 
 const requireUserId = async () => {
   const { data, error } = await supabase.auth.getUser();
@@ -277,7 +283,7 @@ export const sendUserMessage = async (
   options: SendUserMessageOptions = {},
 ): Promise<SendUserMessageResult> => {
   const token = await requireAccessToken();
-  const response = await fetch('/api/vcso/chat', {
+  const response = await fetch(backendApiUrl('/api/vcso/chat'), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
