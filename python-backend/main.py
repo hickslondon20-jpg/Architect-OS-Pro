@@ -1651,7 +1651,8 @@ def _run_doc_wiki_synthesis(document_id: str, user_id: str, job_id: str) -> None
             file_name="",
             synthesis_job_id=job_id,
         )
-    except Exception:
+    except Exception as exc:
+        error_summary = f"{type(exc).__name__}: {exc}"[:500]
         logging.getLogger(__name__).exception(
             "doc_wiki_synthesis background task failed for document_id=%s user_id=%s job_id=%s",
             document_id,
@@ -1665,7 +1666,7 @@ def _run_doc_wiki_synthesis(document_id: str, user_id: str, job_id: str) -> None
                     "kind": "activity",
                     "text": (
                         "[SYNTHESIS_ERROR] Document background task failed "
-                        f"| document:{document_id} | job:{job_id}"
+                        f"| {error_summary} | document:{document_id} | job:{job_id}"
                     ),
                     "icon": "alert-circle",
                 }
