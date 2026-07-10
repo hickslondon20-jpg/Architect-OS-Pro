@@ -2,25 +2,46 @@
 
 from __future__ import annotations
 
-from datetime import date
-from typing import Annotated
+# Load .env / .env.local into the process environment before anything else runs.
+# pydantic-settings (core.config.Settings) only parses the env file into its own
+# Settings model fields — it never exports those values to os.environ. The
+# LangSmith SDK (and wrap_anthropic/wrap_openai) read LANGSMITH_* directly from
+# os.environ, so without this call tracing silently never activates even with a
+# fully correct .env file. Must run before any service module that constructs an
+# Anthropic/OpenAI client is imported/instantiated.
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import asyncio
+import json
 import logging
 import os
+from contextlib import suppress
+from datetime import date
+from typing import Annotated
 import uuid
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 from core.config import get_settings
-from routers import kb_documents, kb_folders, skills
+from routers import domain_agents, kb_documents, kb_folders, skills, tasks
+from routers.kb_folders import get_current_user_id
 from services.doc_processor import process_document_bytes
+from services.artifact_service import ArtifactServiceError, get_artifact_service
+from services.citations.models import CitationRef
+from services.citations.resolvers import resolve as resolve_citation_ref
+from services.citations.verify import CitationVerifierService
 from services.folder_navigation import KbNavigationError, KbNavigationService
 from services.folder_navigation import ls_result_to_dict, tree_result_to_dict
 from services.folder_navigation import grep_result_to_dict, glob_result_to_dict
 from services.folder_navigation import read_result_to_dict
 from services.metadata_extractor import MetadataExtractor
 from services.retrieval import RetrievalService
+from services.sandbox_service import SandboxServiceError, get_sandbox_service
 from services.structured_data import (
     DatasetRegistrationInput,
     StructuredColumnInput,
@@ -35,6 +56,7 @@ from services.sub_agent_orchestrator import SubAgentError
 from services.sub_agent_orchestrator import SubAgentRunRequest as SubAgentServiceRunRequest
 from services.sub_agent_orchestrator import SubAgentOrchestrator
 from services.vector_store import VectorStore, VectorStoreError
+from services.vcso_chat_service import VcsoChatPayload, VcsoChatService
 from services.web_search import WebSearchService
 from services.wiki_compilation import CompileResult, WikiCompilationError, WikiCompilationService
 from services.wiki_consolidation import ConsolidationResult, WikiConsolidationError, WikiConsolidationService
@@ -323,6 +345,52 @@ class AgentRunResponse(BaseModel):
     error_message: str | None = None
 
 
+class VcsoChatRequest(BaseModel):
+    threadId: str | None = None
+    text: str = Field(..., min_length=1)
+    linkedFolder: str | None = None
+    projectId: str | None = None
+    deepMode: bool = False
+
+
+class VcsoCompactRequest(BaseModel):
+    threadId: str = Field(..., min_length=1)
+
+
+class VcsoCompactResponse(BaseModel):
+    compacted: bool
+    message: str | None = None
+    remainingPercent: int | None = None
+    band: str | None = None
+
+
+class CitationResolveRequest(BaseModel):
+    ref: dict = Field(..., min_length=1)
+
+
+class CitationResolveResponse(BaseModel):
+    status: str
+    view: dict
+
+
+class CitationCheckRequest(BaseModel):
+    message_id: str = Field(..., min_length=1)
+
+
+class CitationCheckResponse(BaseModel):
+    status: str
+    overall: str
+    summary: str
+    verdicts: list[dict]
+    model: str
+
+
+class DocumentSignedUrlResponse(BaseModel):
+    document_id: str
+    signed_url: str
+    expires_in: int
+
+
 class WikiCompileRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
     page_key: str = Field(..., min_length=1)
@@ -378,7 +446,6 @@ class WikiCompileResponse(BaseModel):
     validation_counts: dict[str, int]
     synthesis_used: bool = False
     skipped: bool = False
-    kept_stale: bool = False
 
 
 class WikiEvidencePayload(BaseModel):
@@ -494,12 +561,65 @@ class WikiCompiledWriteProbeRequest(BaseModel):
     actor: str = Field(..., min_length=1)
 
 
+class SandboxVerifyRequest(BaseModel):
+    thread_id: str = Field(..., min_length=1)
+    step: str = Field(default="two_call", pattern="^(two_call|set|get|imports)$")
+    timeout_seconds: float = Field(default=30.0, ge=1, le=120)
+    close_session: bool = False
+
+
+class SandboxVerifyExecution(BaseModel):
+    pod_name: str
+    stdout: str
+    stderr: str
+    exit_code: int
+
+
+class SandboxVerifyResponse(BaseModel):
+    thread_id: str
+    step: str
+    status: str
+    executions: list[SandboxVerifyExecution]
+
+
+class ArtifactDeliveryResponse(BaseModel):
+    id: str
+    user_id: str
+    source_kind: str
+    source_id: str
+    filename: str
+    mime_type: str
+    size: int
+    storage_path: str
+    renderable: bool
+    description: str | None = None
+    content: str | None = None
+    signed_url: str | None = None
+    provenance: dict = Field(default_factory=dict)
+
+
+class ArtifactVerifyRequest(BaseModel):
+    user_id: str = Field(..., min_length=1)
+    thread_id: str = Field(..., min_length=1)
+    timeout_seconds: float = Field(default=45.0, ge=1, le=120)
+    close_session: bool = False
+
+
+class ArtifactVerifyResponse(BaseModel):
+    thread_id: str
+    status: str
+    execution: SandboxVerifyExecution
+    renderable: ArtifactDeliveryResponse
+    downloadable: ArtifactDeliveryResponse
+
+
 def require_ingest_secret(x_ingest_secret: Annotated[str | None, Header()] = None) -> None:
     if settings.ingest_secret and x_ingest_secret != settings.ingest_secret:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ingestion secret.")
 
 
 app = FastAPI(title="ArchitectOS Ingestion Backend", version="0.2.0")
+_sandbox_sweep_task: asyncio.Task | None = None
 
 app.add_middleware(
     CORSMiddleware,
@@ -512,6 +632,8 @@ app.add_middleware(
 app.include_router(kb_folders.router, prefix="/kb/folders", tags=["KB Folders"])
 app.include_router(kb_documents.router, prefix="/kb/documents", tags=["KB Documents"])
 app.include_router(skills.router, prefix="/api/skills", tags=["Skills"])
+app.include_router(tasks.router, prefix="/api/tasks", tags=["Domain Agent Tasks"])
+app.include_router(domain_agents.router, tags=["Domain Agents"])
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -525,11 +647,7 @@ def health() -> HealthResponse:
     dependencies=[Depends(require_ingest_secret)],
 )
 def debug_provider_config() -> ProviderConfigDebugResponse:
-    """Secret-safe runtime provider config check.
-
-    This endpoint intentionally returns booleans only. It exists for production
-    env debugging when a deployed service appears not to see a rotated key.
-    """
+    """Secret-safe runtime provider config check."""
     current_settings = get_settings()
     return ProviderConfigDebugResponse(
         anthropic_env_present=bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip()),
@@ -565,11 +683,13 @@ def debug_anthropic_smoke() -> AnthropicSmokeResponse:
         )
 
     try:
-        model_name = VectorStore.from_env().resolve_platform_model(
+        store = VectorStore.from_env()
+        resolved = store.resolve_platform_model(
             setting_key="wiki_tier1_synthesis",
             fallback_model_name=current_settings.claude_synthesis_model,
             fallback_provider="anthropic",
-        )["model_name"]
+        )
+        model_name = str(resolved.get("model_name") or current_settings.claude_synthesis_model)
         client = anthropic.Anthropic(api_key=current_settings.anthropic_api_key_value)
         client.messages.create(
             model=model_name,
@@ -593,6 +713,165 @@ def debug_anthropic_smoke() -> AnthropicSmokeResponse:
         anthropic_settings_present=settings_present,
         anthropic_key_wrapping_suspected=current_settings.anthropic_api_key_has_wrapping,
         model=model_name,
+    )
+
+
+@app.on_event("startup")
+async def start_sandbox_sweeper() -> None:
+    global _sandbox_sweep_task
+    if settings.gke_service_account_key and settings.supabase_url and settings.supabase_service_role_key:
+        _sandbox_sweep_task = asyncio.create_task(_sandbox_sweep_loop())
+
+
+@app.on_event("shutdown")
+async def stop_sandbox_sweeper() -> None:
+    if _sandbox_sweep_task:
+        _sandbox_sweep_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await _sandbox_sweep_task
+
+
+@app.post("/api/sandbox/verify", response_model=SandboxVerifyResponse, dependencies=[Depends(require_ingest_secret)])
+def verify_sandbox(payload: SandboxVerifyRequest) -> SandboxVerifyResponse:
+    service = get_sandbox_service()
+    executions: list[SandboxVerifyExecution] = []
+    try:
+        for code in _sandbox_verify_codes(payload.step):
+            result = service.execute_code(payload.thread_id, code, timeout_seconds=payload.timeout_seconds)
+            executions.append(
+                SandboxVerifyExecution(
+                    pod_name=result.pod_name,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    exit_code=result.exit_code,
+                )
+            )
+    except SandboxServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    finally:
+        if payload.close_session:
+            with suppress(Exception):
+                service.close_session(payload.thread_id)
+
+    return SandboxVerifyResponse(
+        thread_id=payload.thread_id,
+        step=payload.step,
+        status="ok" if all(item.exit_code == 0 for item in executions) else "error",
+        executions=executions,
+    )
+
+
+@app.get("/api/artifacts/{artifact_id}", response_model=ArtifactDeliveryResponse)
+def get_artifact(
+    artifact_id: str,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> ArtifactDeliveryResponse:
+    try:
+        result = get_artifact_service().get_delivery(artifact_id, str(user_id))
+    except ArtifactServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not load artifact: {exc}") from exc
+    return ArtifactDeliveryResponse(**result.to_dict())
+
+
+@app.delete("/api/artifacts/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def delete_artifact(
+    artifact_id: str,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> None:
+    try:
+        get_artifact_service().delete_artifact(artifact_id, str(user_id))
+    except ArtifactServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not delete artifact: {exc}") from exc
+    return None
+
+
+@app.post("/api/artifacts/verify", response_model=ArtifactVerifyResponse, dependencies=[Depends(require_ingest_secret)])
+def verify_artifacts(payload: ArtifactVerifyRequest) -> ArtifactVerifyResponse:
+    sandbox_service = get_sandbox_service()
+    artifact_service = get_artifact_service()
+    renderable_path = "/sandbox/phase6-renderable.md"
+    downloadable_path = "/sandbox/phase6-workbook.xlsx"
+    code = f"""
+from openpyxl import Workbook
+
+markdown = "# Phase 6 Artifact\\n\\nThis renderable artifact came from the live sandbox.\\n"
+open({renderable_path!r}, "w", encoding="utf-8").write(markdown)
+
+workbook = Workbook()
+sheet = workbook.active
+sheet.title = "Phase 6"
+sheet["A1"] = "artifact"
+sheet["B1"] = "ok"
+workbook.save({downloadable_path!r})
+print("phase6 artifacts written")
+"""
+    try:
+        result = sandbox_service.execute_code(payload.thread_id, code, timeout_seconds=payload.timeout_seconds)
+        execution = SandboxVerifyExecution(
+            pod_name=result.pod_name,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            exit_code=result.exit_code,
+        )
+        if result.exit_code != 0:
+            return ArtifactVerifyResponse(
+                thread_id=payload.thread_id,
+                status="error",
+                execution=execution,
+                renderable=ArtifactDeliveryResponse(**{
+                    "id": "",
+                    "user_id": payload.user_id,
+                    "source_kind": "vcso_thread",
+                    "source_id": payload.thread_id,
+                    "filename": "phase6-renderable.md",
+                    "mime_type": "text/markdown",
+                    "size": 0,
+                    "storage_path": "",
+                    "renderable": True,
+                }),
+                downloadable=ArtifactDeliveryResponse(**{
+                    "id": "",
+                    "user_id": payload.user_id,
+                    "source_kind": "vcso_thread",
+                    "source_id": payload.thread_id,
+                    "filename": "phase6-workbook.xlsx",
+                    "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "size": 0,
+                    "storage_path": "",
+                    "renderable": False,
+                }),
+            )
+        renderable = artifact_service.deliver_from_sandbox(
+            user_id=payload.user_id,
+            thread_id=payload.thread_id,
+            container_path=renderable_path,
+            filename="phase6-renderable.md",
+            description="Temporary Phase 6 renderable verification artifact.",
+        )
+        downloadable = artifact_service.deliver_from_sandbox(
+            user_id=payload.user_id,
+            thread_id=payload.thread_id,
+            container_path=downloadable_path,
+            filename="phase6-workbook.xlsx",
+            description="Temporary Phase 6 downloadable verification artifact.",
+        )
+    except (SandboxServiceError, ArtifactServiceError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    finally:
+        if payload.close_session:
+            with suppress(Exception):
+                sandbox_service.close_session(payload.thread_id)
+
+    return ArtifactVerifyResponse(
+        thread_id=payload.thread_id,
+        status="ok",
+        execution=execution,
+        renderable=ArtifactDeliveryResponse(**renderable.to_dict()),
+        downloadable=ArtifactDeliveryResponse(**downloadable.to_dict()),
     )
 
 
@@ -690,6 +969,72 @@ def web_search(payload: WebSearchRequest) -> WebSearchResponse:
         include_private_context=payload.include_private_context,
     )
     return WebSearchResponse(**result.__dict__)
+
+
+@app.post("/api/citations/resolve", response_model=CitationResolveResponse)
+def resolve_citation(
+    payload: CitationResolveRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> CitationResolveResponse:
+    try:
+        ref = CitationRef.from_dict(payload.ref)
+        view = resolve_citation_ref(ref, str(user_id), VectorStore.from_env())
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid citation ref: {exc}") from exc
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Citation resolve failed: {exc}") from exc
+
+    status_value = "ok" if view.get("type") not in {"error"} else "error"
+    return CitationResolveResponse(status=status_value, view=view)
+
+
+@app.post("/api/citations/check", response_model=CitationCheckResponse)
+def check_citations(
+    payload: CitationCheckRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> CitationCheckResponse:
+    try:
+        result = CitationVerifierService.from_env().check_message(
+            message_id=payload.message_id,
+            user_id=str(user_id),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Citation check failed: {exc}") from exc
+
+    return CitationCheckResponse(status="ok", **result.to_dict())
+
+
+@app.get("/api/documents/{document_id}/signed-url", response_model=DocumentSignedUrlResponse)
+def get_document_signed_url(
+    document_id: str,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> DocumentSignedUrlResponse:
+    try:
+        store = VectorStore.from_env()
+        document = store.get_document(document_id, str(user_id))
+        storage_path = str(document.get("storage_path") or "").strip()
+        if not storage_path:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document source PDF was not found.",
+            )
+        return DocumentSignedUrlResponse(
+            document_id=document_id,
+            signed_url=store.create_raw_document_signed_url(storage_path),
+            expires_in=300,
+        )
+    except HTTPException:
+        raise
+    except VectorStoreError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not create document URL: {exc}") from exc
 
 
 @app.post("/api/tools/kb-ls", response_model=KbLsResponse, dependencies=[Depends(require_ingest_secret)])
@@ -805,25 +1150,64 @@ def start_agent_run(payload: AgentRunRequest) -> AgentRunResponse:
     return AgentRunResponse(**result.__dict__)
 
 
+@app.post("/api/vcso/chat")
+def stream_vcso_chat(
+    payload: VcsoChatRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> StreamingResponse:
+    def event_stream():
+        try:
+            service = VcsoChatService.from_env()
+            chat_payload = VcsoChatPayload(
+                thread_id=payload.threadId,
+                text=payload.text,
+                linked_folder=payload.linkedFolder,
+                project_id=payload.projectId,
+                deep_mode=payload.deepMode,
+            )
+            for item in service.stream_chat(user_id=str(user_id), payload=chat_payload):
+                yield _sse(item["event"], item["data"])
+        except Exception as exc:
+            yield _sse("error", {"message": str(exc) or "Virtual CSO stream failed."})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/api/vcso/compact", response_model=VcsoCompactResponse)
+def compact_vcso_thread(
+    payload: VcsoCompactRequest,
+    user_id: Annotated[uuid.UUID, Depends(get_current_user_id)],
+) -> VcsoCompactResponse:
+    try:
+        result = VcsoChatService.from_env().compact_thread(user_id=str(user_id), thread_id=payload.threadId)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return VcsoCompactResponse(**result)
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
+
+
 @app.post("/api/wiki/compile-page", dependencies=[Depends(require_ingest_secret)])
 def compile_wiki_page(payload: WikiCompileRequest, background_tasks: BackgroundTasks) -> dict:
-    # Objective 4 (auto-trigger, 2026-07-08): moved to fire-and-forget/BackgroundTasks after a
-    # live 502 proved a synchronous multi-second synthesis call can outlast Railway/Cloudflare's
-    # edge gateway timeout (confirmed ~10-12s at the edge, well under a real Sonnet-call-plus-
-    # Supabase-round-trips compile). pg_net (the caller for DB-trigger-fired events) never
-    # inspects the response body anyway, so an immediate "queued" ack plus background execution
-    # matches the existing /api/ingest and /api/doc-wiki/synthesize-document pattern in this
-    # file. Errors from the actual compile are swallowed inside _run_wiki_compile_page and
-    # surfaced only via logs/wiki_pages state, not this response.
+    # Objective 4 (auto-trigger, 2026-07-08): queued to avoid edge-gateway timeout on
+    # real Sonnet synthesis plus Supabase writeback. Trigger callers inspect page state,
+    # not this response body.
     background_tasks.add_task(_run_wiki_compile_page, payload.user_id, payload.page_key, payload.force)
     return {"user_id": payload.user_id, "page_key": payload.page_key, "status": "queued"}
 
 
 @app.post("/api/wiki/compile-event", dependencies=[Depends(require_ingest_secret)])
 def compile_wiki_event(payload: WikiCompileEventRequest, background_tasks: BackgroundTasks) -> dict:
-    # Same fire-and-forget rationale as compile_wiki_page above - compile_event can run 2-3
-    # sequential page compiles (plus the open_questions chain), which is even more likely to
-    # outlast a short edge-gateway timeout than a single page.
     background_tasks.add_task(_run_wiki_compile_event, payload.user_id, payload.event, payload.force)
     return {"user_id": payload.user_id, "event": payload.event, "status": "queued"}
 
@@ -1212,6 +1596,7 @@ def _process_ingestion(payload: IngestRequest) -> None:
                 text=processed.text,
                 file_name=payload.file_name,
                 file_type=payload.file_type,
+                user_id=payload.user_id,
             )
             document_metadata = extraction.metadata
             store.mark_metadata_complete(
@@ -1284,6 +1669,29 @@ def _run_wiki_compile_event(user_id: str, event: str, force: bool) -> None:
         logging.getLogger(__name__).exception(
             "wiki_compile_event background task failed for user=%s event=%s", user_id, event
         )
+
+
+async def _sandbox_sweep_loop() -> None:
+    while True:
+        await asyncio.sleep(300)
+        with suppress(Exception):
+            await asyncio.to_thread(get_sandbox_service().sweep_idle_sessions_once)
+
+
+def _sandbox_verify_codes(step: str) -> list[str]:
+    if step == "set":
+        return ["_architectos_phase5_probe = 'phase5-state-ok'\nprint('set ok')"]
+    if step == "get":
+        return ["print(_architectos_phase5_probe)"]
+    if step == "imports":
+        return [
+            "import pandas, numpy, docx, pptx, openpyxl, matplotlib, IPython, ipykernel\n"
+            "print('all imports OK')"
+        ]
+    return [
+        "_architectos_phase5_probe = 'phase5-state-ok'\nprint('set ok')",
+        "print(_architectos_phase5_probe)",
+    ]
 
 
 def _validate_user_scoped_path(user_id: str, storage_path: str) -> None:

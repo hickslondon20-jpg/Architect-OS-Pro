@@ -16,6 +16,7 @@ dist-ssr
 __pycache__/
 *.py[cod]
 *.pyo
+python-backend/venv/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/
