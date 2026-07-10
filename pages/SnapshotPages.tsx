@@ -756,11 +756,12 @@ export const FinancialSnapshot: React.FC = () => {
          const { data: { user } } = await supabase.auth.getUser();
          if (!user) throw new Error("Not authenticated");
 
+         if (!import.meta.env.VITE_N8N_WEBHOOK_URL) throw new Error("Missing VITE_N8N_WEBHOOK_URL.");
+
          const response = await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL + '/agency-snapshot/economic-foundation/synthesize', {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-architectos-secret': 'ArchitectOS_9f3a2c1d_7b8e_4c99_a1e2_3d4f5g6h7i8j'
             },
             body: JSON.stringify({ id: currentRowId, user_id: user.id })
          });
@@ -1549,11 +1550,12 @@ export const GrowthPipeline: React.FC = () => {
          const { data: { user } } = await supabase.auth.getUser();
          if (!user) throw new Error("Not authenticated");
 
+         if (!import.meta.env.VITE_N8N_WEBHOOK_URL) throw new Error("Missing VITE_N8N_WEBHOOK_URL.");
+
          const response = await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL + '/agency-snapshot/revenue-model/synthesize', {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-architectos-secret': 'ArchitectOS_9f3a2c1d_7b8e_4c99_a1e2_3d4f5g6h7i8j'
             },
             body: JSON.stringify({ id: currentRowId, user_id: user.id })
          });
@@ -2338,11 +2340,12 @@ export const DeliveryArchitectureTab: React.FC = () => {
          const { data: { user } } = await supabase.auth.getUser();
          if (!user) throw new Error("Not authenticated");
 
+         if (!import.meta.env.VITE_N8N_WEBHOOK_URL) throw new Error("Missing VITE_N8N_WEBHOOK_URL.");
+
          const response = await fetch(import.meta.env.VITE_N8N_WEBHOOK_URL + '/agency-snapshot/delivery/synthesize', {
             method: 'POST',
             headers: {
                'Content-Type': 'application/json',
-               'x-architectos-secret': 'ArchitectOS_9f3a2c1d_7b8e_4c99_a1e2_3d4f5g6h7i8j'
             },
             body: JSON.stringify({ id: currentRowId, user_id: user.id })
          });

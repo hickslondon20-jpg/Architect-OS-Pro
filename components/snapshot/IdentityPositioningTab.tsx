@@ -455,12 +455,15 @@ export const IdentityPositioningTab: React.FC = () => {
         setSynthesis(prev => ({ ...prev, status: 'running' }));
 
         try {
-            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || 'http://localhost:5678/webhook';
+            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+            if (!webhookUrl) {
+                throw new Error('Missing VITE_N8N_WEBHOOK_URL.');
+            }
+
             fetch(`${webhookUrl}/agency-snapshot/market-footprint/synthesize`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-architectos-secret': 'ArchitectOS_9f3a2c1d_7b8e_4c99_a1e2_3d4f5g6h7i8j'
                 },
                 body: JSON.stringify({ id: rowId, user_id: user.id })
             }).catch(console.error);

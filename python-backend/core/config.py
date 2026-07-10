@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     raw_document_bucket: str = Field(default="raw-documents", validation_alias="ARCHITECTOS_RAW_DOCUMENT_BUCKET")
     ingest_secret: str | None = Field(default=None, validation_alias="ARCHITECTOS_INGEST_SECRET")
-    cors_origins: str = Field(default="http://127.0.0.1:5180,http://localhost:5180", validation_alias="ARCHITECTOS_CORS_ORIGINS")
+    cors_origins: str = Field(default="", validation_alias="ARCHITECTOS_CORS_ORIGINS")
 
     embedding_model: str = Field(default="text-embedding-3-small", validation_alias="OPENAI_EMBEDDING_MODEL")
     metadata_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_METADATA_MODEL")
@@ -62,8 +62,7 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         configured = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-        local_dev = ["http://127.0.0.1:5180", "http://localhost:5180"]
-        return list(dict.fromkeys([*configured, *local_dev]))
+        return list(dict.fromkeys(configured))
 
     @property
     def anthropic_api_key_value(self) -> str:

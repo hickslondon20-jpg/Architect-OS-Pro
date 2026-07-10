@@ -23,8 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'http://localhost:5678/webhook';
-const WEBHOOK_SECRET = 'ArchitectOS_9f3a2c1d_7b8e_4c99_a1e2_3d4f5g6h7i8j';
+const WEBHOOK_URL = import.meta.env.VITE_N8N_WEBHOOK_URL;
 const POLL_INTERVAL_MS = 3000;
 
 type DashboardStatus =
@@ -1076,11 +1075,14 @@ export const SnapshotDashboard: React.FC = () => {
         setUiStatus('processing_call_1');
 
         try {
+            if (!WEBHOOK_URL) {
+                throw new Error('Missing VITE_N8N_WEBHOOK_URL.');
+            }
+
             fetch(`${WEBHOOK_URL}/agency-snapshot/dashboard/synthesize`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-architectos-secret': WEBHOOK_SECRET,
                 },
                 body: JSON.stringify({ user_id: user.id, force }),
             }).catch(console.error);
