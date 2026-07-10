@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from langsmith.wrappers import wrap_openai
 from openai import OpenAI, OpenAIError
 from supabase import Client, create_client
 
 from core.config import Settings, get_settings
+from core.langsmith_tracing import trace_openai_client
 from services.usage_events import log_ai_usage_event, openai_embedding_usage
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ class VectorStore:
             raise VectorStoreError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.")
         return cls(
             create_client(settings.supabase_url, settings.supabase_service_role_key),
-            wrap_openai(OpenAI(api_key=settings.openai_api_key)) if settings.openai_api_key else None,
+            trace_openai_client(OpenAI(api_key=settings.openai_api_key)) if settings.openai_api_key else None,
             settings,
         )
 

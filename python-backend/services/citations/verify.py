@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import anthropic
-from langsmith.wrappers import wrap_anthropic
 
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from services.citations.models import CitationRef
 from services.citations.resolvers import resolve as resolve_citation_ref
 from services.usage_events import anthropic_usage, log_ai_usage_event
@@ -45,7 +45,7 @@ class CitationVerifierService:
         settings = get_settings()
         return cls(
             store=VectorStore.from_env(),
-            anthropic_client=wrap_anthropic(anthropic.Anthropic(api_key=settings.anthropic_api_key or "")),
+            anthropic_client=trace_anthropic_client(anthropic.Anthropic(api_key=settings.anthropic_api_key or "")),
         )
 
     def check_message(self, *, message_id: str, user_id: str) -> CitationCheckResult:

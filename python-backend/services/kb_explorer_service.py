@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import anthropic
-from langsmith.wrappers import wrap_anthropic
 
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from services.folder_navigation import (
     KbNavigationError,
     KbNavigationService,
@@ -96,9 +96,11 @@ class KbExplorerService:
         self.store = store
         settings = get_settings()
         self.nav = KbNavigationService(store)
-        self.anthropic_client = wrap_anthropic(anthropic.Anthropic(
-            api_key=settings.anthropic_api_key_value,
-        ))
+        self.anthropic_client = trace_anthropic_client(
+            anthropic.Anthropic(
+                api_key=settings.anthropic_api_key_value,
+            )
+        )
         resolved = store.resolve_platform_model(
             setting_key=model_setting_key or "kb_explorer_agent",
             fallback_model_name=settings.claude_synthesis_model,

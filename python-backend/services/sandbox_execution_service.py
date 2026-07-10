@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any
 
 import anthropic
-from langsmith.wrappers import wrap_anthropic
 from supabase import Client, create_client
 
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from services.agent_capabilities import AgentCapabilityError
 from services.sandbox_bridge import BridgeFulfiller
 from services.sandbox_service import SandboxService, SandboxServiceError, get_sandbox_service
@@ -83,7 +83,9 @@ class SandboxExecutionService:
         self._sandbox_service = sandbox_service
         self._supabase = supabase_client
         settings = get_settings()
-        self.anthropic_client = wrap_anthropic(anthropic.Anthropic(api_key=settings.anthropic_api_key or ""))
+        self.anthropic_client = trace_anthropic_client(
+            anthropic.Anthropic(api_key=settings.anthropic_api_key or "")
+        )
         self._settings = settings
         self.model_setting_key = model_setting_key or "sandbox_execution_agent"
         self.model = settings.claude_synthesis_model

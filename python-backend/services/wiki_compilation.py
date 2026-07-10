@@ -21,13 +21,8 @@ from uuid import uuid4
 
 import anthropic
 
-try:
-    from langsmith.wrappers import wrap_anthropic
-except Exception:  # pragma: no cover - defensive: never let optional tracing take the app down
-    def wrap_anthropic(client):  # type: ignore[no-redef]
-        return client
-
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from core.wiki_schema import event_rebuild_targets, get_wiki_schema, valid_page_key
 from services.vector_store import VectorStoreError
 from services.wiki_health import WikiHealthError, WikiHealthService
@@ -645,7 +640,7 @@ class WikiCompilationService:
     def _anthropic_client(self) -> "anthropic.Anthropic":
         if self._anthropic_client_instance is None:
             settings = get_settings()
-            self._anthropic_client_instance = wrap_anthropic(
+            self._anthropic_client_instance = trace_anthropic_client(
                 anthropic.Anthropic(api_key=settings.anthropic_api_key_value)
             )
         return self._anthropic_client_instance

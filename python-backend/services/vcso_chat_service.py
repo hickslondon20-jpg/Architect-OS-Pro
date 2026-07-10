@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 from typing import Any, Iterator
 
 import anthropic
-from langsmith.wrappers import wrap_anthropic
 from supabase import Client, create_client
 
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from services.citations.binding import (
     format_numbered_source_list,
     normalize_vcso_turn_sources,
@@ -89,7 +89,9 @@ class VcsoChatService:
         self.store = store
         self.supabase = supabase_client or store.client
         self.settings = get_settings()
-        self.anthropic_client = wrap_anthropic(anthropic.Anthropic(api_key=self.settings.anthropic_api_key or ""))
+        self.anthropic_client = trace_anthropic_client(
+            anthropic.Anthropic(api_key=self.settings.anthropic_api_key or "")
+        )
         self.provider = "anthropic"
         self.model = self.settings.claude_synthesis_model
         self.context_window = self.settings.llm_context_window

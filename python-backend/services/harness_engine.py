@@ -14,10 +14,10 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Iterator
 
 import anthropic
-from langsmith.wrappers import wrap_anthropic
 from supabase import Client, create_client
 
 from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
 from services.tool_registry import AgentCapabilityScopeSource, ToolRegistry, build_registry
 from services.usage_events import anthropic_usage, log_ai_usage_event
@@ -94,7 +94,9 @@ class HarnessEngine:
         self.settings = get_settings()
         self.model = model or self.settings.claude_synthesis_model
         self.provider = "anthropic"
-        self.anthropic_client = anthropic_client or wrap_anthropic(anthropic.Anthropic(api_key=self.settings.anthropic_api_key or ""))
+        self.anthropic_client = anthropic_client or trace_anthropic_client(
+            anthropic.Anthropic(api_key=self.settings.anthropic_api_key or "")
+        )
         self.sub_agent_factory = sub_agent_factory or (lambda: SubAgentOrchestrator.from_env())
         self.registry_factory = registry_factory or self._default_registry
         self.artifact_service_factory = artifact_service_factory or (lambda: ArtifactService(self.settings, self.client))
