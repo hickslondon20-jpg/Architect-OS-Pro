@@ -12,7 +12,7 @@ Every status statement uses one rung. A green Episode row means **backend-comple
 
 **backend-complete → live-verified → usable (front-end wired) → polished**
 
-## Where we are (updated 2026-07-09)
+## Where we are (updated 2026-07-10)
 - **Repo integrity restored (2026-07-09).** A branch-divergence incident had left `main` missing the entire
   Ep5–Ep7 backend service layer (VCSO chat, harness/Domain Agents, sandbox, MCP scaffold, Ep7 citations) — the
   code was safe on `codex/release-v0.4-skills-sandbox` (`b6ca8881`). Surgically recovered + reconciled onto
@@ -32,10 +32,12 @@ Every status statement uses one rung. A green Episode row means **backend-comple
   auto-triggering (`pg_net` on 12 source tables) and an anti-clobber guard. Verified for test user
   `cd490873-…`: all 7 pages `claude-sonnet-4-6`, embeddings present, `stale=false`. This makes the
   "knows-your-business" differentiator real for an account for the first time.
-- **Open debt from the incident:** MA-01 Gate 1's LangSmith instrumentation (wrapping the client sites +
-  `load_dotenv`) was lost and needs rebuild — now **unblocked** against the complete, recovered tree; only
-  `wiki_compilation.py` is wrapped today (from MA-03). `CLAUDE.md` + `Pro-Suite-Progress.md` still say
-  Observability "TBD" and must be corrected during the rebuild. Provider keys rotated 2026-07-08.
+- **Observability spine rebuilt — MA-01 CLOSED (2026-07-10, v0.5.13).** The lost LangSmith instrumentation
+  was recovered with the service layer and completed: all live Anthropic/OpenAI client sites route through a
+  fail-open `core/langsmith_tracing.py` helper, `load_dotenv()` is in `main.py`, and tracing was
+  outcome-verified. `CLAUDE.md` + `Pro-Suite-Progress.md` corrected. **Standing bar now in effect:** any
+  Python-backend LLM call on an episode's critical path emits a LangSmith trace as evidence (necessary, not
+  sufficient — paired with DB/output checks). Provider keys rotated 2026-07-08.
   **Standing rule:** commit after every milestone; `main` is canonical.
 - **Still not usable:** no front-end is wired to any of this (that's §8).
 
@@ -66,11 +68,13 @@ MCP connections (L7 scaffold-only at beta); dark-by-design citations (`web`, `re
 6. **Consolidated cross-episode smoke → flip go-live.**
 
 ## Current position + next initiatives
-MA-03 (Tier-1 synthesis) **closed**. Next, per the founder's MA-03-then-MA-01 sequencing:
-1. **MA-01 Gate 1 LangSmith rebuild** — re-wrap the lost client sites, confirm traces, correct the docs.
-2. **Resume MA-02 (Ep2)** — now lighter (MA-03 proved the Tier-1 path); KB tool suite, doc-wiki path,
-   connection-A canonical-path, the fix-it batch, and the MA-03 carry-forward verify items.
-3. Then Ep4 → Ep5 → Ep6 → Ep7, per MA-01 scope.
+MA-03 (Tier-1 synthesis) **closed**; the repo-recovery incident **resolved** (main canonical, v0.5.8 deployed);
+MA-01 (LangSmith observability) **closed** (v0.5.13). Next:
+1. **MA-02 (Ep2 — KB Explorer + wiki-read)** — the lighter version (MA-03 proved the Tier-1 path): KB tool
+   suite, doc-wiki path, connection-A canonical-path + Phase-9-router divergence, the fix-it batch (stale model
+   alias, silent-except, HTML/MD ingestion), and the MA-03 carry-forward verify items (narrowed index vs.
+   onboarding scaffold, `open_questions` ordering, `page_type` read).
+2. Then Ep4 → Ep5 → Ep6 → Ep7, per the MA-01 episode-by-episode scope.
 
 ## Standing operational rules (post-incident)
 Commit to git after **every** milestone (uncommitted work has been lost across session boundaries).

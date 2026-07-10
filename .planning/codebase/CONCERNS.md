@@ -83,6 +83,11 @@ The codebase is materially built, but beta-readiness risk is concentrated in ver
 - `CLAUDE.md`/`AGENTS.md` are more accurate operational references than `README.md`.
 - `Pro-Suite-Progress.md` contains mojibake in some status symbols, though the functional content is readable.
 
+## Local Development Environment Gotchas
+
+- **Local Python version must match production (3.13), not 3.14.** Production (Railway) runs Python **3.13.14**. A local machine on **Python 3.14** cannot `pip install` some backend deps (e.g. `langsmith` → `zstandard`/`cffi`), because those lack prebuilt 3.14 wheels and fall back to building from source, which requires Microsoft C++ Build Tools. Symptom: `DistutilsPlatformError: Microsoft Visual C++ 14.0 or greater is required`. Fix: use a **Python 3.13 venv** matching production for any founder-run backend smoke, or verify in production instead of locally. (Encountered 2026-07-10 during MA-01 LangSmith verification — the smoke's fail-open helper correctly used unwrapped clients when `langsmith` was absent, so tracing couldn't be verified locally; it was verified in production instead.)
+- **`.venv-kb-nav` is an execution-agent sandbox venv, not present on the founder's machine.** Prompts that reference activating it will fail locally; the founder should point at their own 3.13 venv.
+
 ## Launch Readiness Concerns
 
 - Resolve or explicitly scope TypeScript errors before beta finalization.
