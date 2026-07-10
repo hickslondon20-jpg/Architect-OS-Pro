@@ -1,0 +1,62 @@
+{
+  "schema_version": "doc-wiki-1.0",
+  "page_kind_vocabulary": [
+    "client",
+    "competitor",
+    "vendor_partner",
+    "offer",
+    "method",
+    "market_trend",
+    "comparison",
+    "query_answer",
+    "sprint_history",
+    "capability_evolution",
+    "thread_synthesis",
+    "agent_artifact",
+    "entity",
+    "concept",
+    "wiki_layer1"
+  ],
+  "kind_to_category": {
+    "client": "client_market",
+    "competitor": "client_market",
+    "vendor_partner": "operational",
+    "offer": "operational",
+    "method": "founder_identity",
+    "market_trend": "client_market",
+    "comparison": "conversation_meeting",
+    "query_answer": "conversation_meeting",
+    "sprint_history": "operational",
+    "capability_evolution": "operational",
+    "thread_synthesis": "conversation_meeting",
+    "agent_artifact": "operational",
+    "entity": "founder_identity",
+    "concept": "founder_identity",
+    "wiki_layer1": "compiled_intelligence"
+  },
+  "kind_to_page_type": {
+    "client": "custom",
+    "competitor": "custom",
+    "vendor_partner": "custom",
+    "offer": "strategic_context",
+    "method": "business_context",
+    "market_trend": "business_context",
+    "comparison": "conversation_intelligence",
+    "query_answer": "conversation_intelligence",
+    "sprint_history": "strategic_context",
+    "capability_evolution": "assessment_intelligence",
+    "thread_synthesis": "conversation_intelligence",
+    "agent_artifact": "custom",
+    "entity": "custom",
+    "concept": "business_context",
+    "wiki_layer1": "compiled_intelligence"
+  },
+  "link_relation_vocabulary": [
+    "related",
+    "supersedes",
+    "supports",
+    "contradicts",
+    "derived_from",
+    "summarizes"
+  ]
+}
