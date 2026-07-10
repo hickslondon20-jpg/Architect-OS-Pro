@@ -68,6 +68,8 @@ class DocWikiReadService:
             }
             for row in rows
         ]
+        if not findings:
+            findings = self._lexical_search_fallback(user_id, query, page_kinds, limit)
         confidence = (
             sum(f["similarity"] for f in findings) / len(findings)
             if findings else 0.0
@@ -96,6 +98,58 @@ class DocWikiReadService:
             "source_count": len(findings),
             "citations": citations,
         }
+
+    def _lexical_search_fallback(
+        self,
+        user_id: str,
+        query: str,
+        page_kinds: list[str] | None,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        terms = [term.lower() for term in query.split() if len(term.strip()) >= 4]
+        if not terms:
+            return []
+        try:
+            q = (
+                self._sb.table("ose_knowledge_pages")
+                .select("id,page_title,content,canonical_key,page_kind,source_file_ids,origin_thread_id")
+                .eq("user_id", user_id)
+                .neq("status", "deleted")
+                .limit(100)
+            )
+            if page_kinds:
+                q = q.in_("page_kind", page_kinds)
+            rows = q.execute().data or []
+        except Exception as exc:
+            logger.warning("doc_wiki lexical fallback failed: %s", exc)
+            return []
+
+        scored: list[tuple[int, dict[str, Any]]] = []
+        for row in rows:
+            haystack = " ".join(
+                str(row.get(key) or "")
+                for key in ("page_title", "canonical_key", "page_kind", "content")
+            ).lower()
+            score = sum(1 for term in terms if term in haystack)
+            if score <= 0:
+                continue
+            scored.append((score, row))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        findings: list[dict[str, Any]] = []
+        for score, row in scored[: max(1, min(limit, 20))]:
+            findings.append(
+                {
+                    "page_id": row["id"],
+                    "title": row["page_title"],
+                    "canonical_key": row["canonical_key"],
+                    "page_kind": row["page_kind"],
+                    "source_type": _source_type(row),
+                    "similarity": round(score / len(terms), 4),
+                    "excerpt": (row.get("content") or "")[:400],
+                }
+            )
+        return findings
 
     def get_page(
         self,
