@@ -12,7 +12,15 @@ Every status statement uses one rung. A green Episode row means **backend-comple
 
 **backend-complete → live-verified → usable (front-end wired) → polished**
 
-## Where we are (updated 2026-07-08)
+## Where we are (updated 2026-07-09)
+- **Repo integrity restored (2026-07-09).** A branch-divergence incident had left `main` missing the entire
+  Ep5–Ep7 backend service layer (VCSO chat, harness/Domain Agents, sandbox, MCP scaffold, Ep7 citations) — the
+  code was safe on `codex/release-v0.4-skills-sandbox` (`b6ca8881`). Surgically recovered + reconciled onto
+  `main`: kept MA-03B's newer `wiki_compilation.py`, union-merged `requirements.txt`/`config.py`, took b6's
+  fuller `vector_store`/`sub_agent_orchestrator`/`kb_explorer`. Committed as **v0.5.8 (`2062773d`)** and
+  **deployed clean to Railway production (Online)**, which deploys from `main`. `main` is now the single
+  canonical branch (retire `codex/release`). Note: for the ~4h prior window (v0.5.7), production was missing
+  the Ep5–Ep7 surfaces — now restored (boots clean; functional verification of those surfaces folds into MA-01/MA-02).
 - **Ep1 Gate 1 PASSED** — the pipeline ran end-to-end with real LLM calls, no mocks (upload → ingestion →
   chunks → embeddings → `document_chunks` → doc-wiki synthesis → `ose_knowledge_pages` → hybrid/RRF).
 - **Two-writer model (correction):** `ose_knowledge_pages` has two writers — document-sourced pages written
@@ -24,9 +32,11 @@ Every status statement uses one rung. A green Episode row means **backend-comple
   auto-triggering (`pg_net` on 12 source tables) and an anti-clobber guard. Verified for test user
   `cd490873-…`: all 7 pages `claude-sonnet-4-6`, embeddings present, `stale=false`. This makes the
   "knows-your-business" differentiator real for an account for the first time.
-- **Open debt from the incident:** MA-01 Gate 1's LangSmith instrumentation (wrapping the 9 client sites +
-  `load_dotenv`) was lost uncommitted and needs rebuild; docs that say "LangSmith wired everywhere" overstate
-  reality until then. Provider keys were rotated 2026-07-08.
+- **Open debt from the incident:** MA-01 Gate 1's LangSmith instrumentation (wrapping the client sites +
+  `load_dotenv`) was lost and needs rebuild — now **unblocked** against the complete, recovered tree; only
+  `wiki_compilation.py` is wrapped today (from MA-03). `CLAUDE.md` + `Pro-Suite-Progress.md` still say
+  Observability "TBD" and must be corrected during the rebuild. Provider keys rotated 2026-07-08.
+  **Standing rule:** commit after every milestone; `main` is canonical.
 - **Still not usable:** no front-end is wired to any of this (that's §8).
 
 **Connection-phase decision:** routed cross-tier reasoning (C) is the MVP target — beta should feel like a
