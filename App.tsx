@@ -9,7 +9,7 @@ import { FeatureGate } from './components/FeatureGate';
 import { FeatureKey } from './lib/featureGates';
 
 // Pages
-import { LandingPage, SignInPage, SignUpPage } from './pages/PublicPages';
+import { ForgotPasswordPage, LandingPage, RecoveryAwareFallback, ResetPasswordPage, SignInPage, SignUpPage } from './pages/PublicPages';
 import { DashboardPage } from './pages/DashboardPage';
 import { ResourcesPage } from './pages/ResourcesPage';
 
@@ -65,6 +65,8 @@ const App: React.FC = () => {
               <Route path="/" element={<LandingPage />} />
               <Route path="/sign-in" element={<SignInPage />} />
               <Route path="/sign-up" element={<SignUpPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               {/* Authenticated Routes */}
               <Route element={<ProtectedRoute />}>
@@ -311,6 +313,7 @@ const App: React.FC = () => {
                   </Route>
                 </Route>
               </Route> {/* This is the added closing Route tag for <Route element={<ProtectedRoute />}> */}
+              <Route path="*" element={<RecoveryAwareFallback />} />
             </Routes>
           </Router>
         </ErrorBoundary>
