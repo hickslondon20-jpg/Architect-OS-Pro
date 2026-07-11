@@ -122,7 +122,11 @@ export const OSEngineWorkspace: React.FC = () => {
         setActiveSection('wiki');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load OS Engine data.');
+      if (!quiet) {
+        setError(err instanceof Error ? err.message : 'Could not load OS Engine data.');
+      } else {
+        console.warn('OS Engine background refresh failed.', err);
+      }
     } finally {
       if (!quiet) setLoading(false);
     }
