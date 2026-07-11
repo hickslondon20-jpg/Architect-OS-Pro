@@ -73,7 +73,10 @@ class SkillService:
     def list_visible(self, user_id: UUID) -> list[dict[str, Any]]:
         response = (
             self._client.table("skill_packs")
-            .select("id,slug,name,description,domain,skill_kind,trigger_tags,required_platform_context,status,scope,user_id,created_at,updated_at")
+            .select(
+                "id,slug,name,description,domain,skill_kind,trigger_tags,"
+                "required_platform_context,status,scope,user_id,created_at,updated_at:last_updated"
+            )
             .or_(f"scope.eq.global,user_id.eq.{user_id}")
             .order("scope", desc=False)
             .order("name")
