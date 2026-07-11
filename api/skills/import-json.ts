@@ -8,6 +8,20 @@ type SkillValues = Record<string, string | string[]>;
 
 const SKILL_FILE_BUCKET = 'skill-files';
 const SKILL_FILE_CATEGORIES = new Set(['scripts', 'references', 'assets']);
+// Must mirror the DB CHECK constraints on public.skill_packs (ip_skill_packs_domain_check /
+// ip_skill_packs_skill_kind_check). Imported SKILL.md files are free-form and commonly won't
+// match this internal business taxonomy, so out-of-range values are normalized to null on
+// import rather than failing the whole request.
+const ALLOWED_DOMAINS = new Set(['financial', 'market', 'operations', 'team', 'founder', 'strategic', 'cross']);
+const ALLOWED_SKILL_KINDS = new Set([
+  'analysis',
+  'diagnostic',
+  'prioritization',
+  'preparation',
+  'reflection',
+  'brainstorming',
+  'synthesis',
+]);
 
 const env = (name: string, fallback?: string) => {
   const value = process.env[name] ?? (fallback ? process.env[fallback] : undefined);
@@ -106,14 +120,22 @@ const parseSkillMd = (content: string) => {
   const description = optionalString(values.description);
   if (!name) throw new Error('SKILL.md frontmatter requires name.');
   if (!description) throw new Error('SKILL.md frontmatter requires description.');
+  const rawDomain = optionalString(values.domain);
+  const rawSkillKind = optionalString(values.skill_kind);
   return {
     name,
     description,
-    domain: optionalString(values.domain),
-    skill_kind: optionalString(values.skill_kind),
+    // Out-of-taxonomy values are normalized to null rather than left to blow up the
+    // downstream DB CHECK constraint (see ALLOWED_DOMAINS / ALLOWED_SKILL_KINDS above).
+    domain: rawDomain && ALLOWED_DOMAINS.has(rawDomain) ? rawDomain : null,
+    skill_kind: rawSkillKind && ALLOWED_SKILL_KINDS.has(rawSkillKind) ? rawSkillKind : null,
     trigger_tags: stringList(values.trigger_tags),
     required_platform_context: stringList(values.required_platform_context),
     body,
+    normalized: {
+      domainDropped: Boolean(rawDomain) && !ALLOWED_DOMAINS.has(rawDomain as string),
+      skillKindDropped: Boolean(rawSkillKind) && !ALLOWED_SKILL_KINDS.has(rawSkillKind as string),
+    },
   };
 };
 
@@ -155,12 +177,15 @@ const readZipEntries = (zipBytes: Buffer): ZipEntry[] => {
   return entries;
 };
 
+// ip_skill_packs_slug_key is a table-wide UNIQUE(slug) constraint (not scoped per user), so
+// uniqueness must be checked globally here too, or the insert can still hit a 23505 conflict
+// against another user's (or a global-scope) skill with the same slug.
 const uniqueSlug = async (supabase: SupabaseClient, name: string, userId: string) => {
   const base = slugify(name);
   let slug = base;
   let suffix = 2;
   while (true) {
-    const { data, error } = await supabase.from('skill_packs').select('id').eq('slug', slug).eq('user_id', userId).limit(1);
+    const { data, error } = await supabase.from('skill_packs').select('id').eq('slug', slug).limit(1);
     if (error) throw error;
     if (!data?.length) return slug;
     slug = `${base}-${suffix}`;
@@ -199,6 +224,17 @@ class PhaseError extends Error {
   }
 }
 
+// PostgrestError / StorageError objects from supabase-js are plain objects, not `instanceof
+// Error`, so a naive `error instanceof Error ? error.message : fallback` silently discards the
+// real database/storage error text. Check for a string `.message` property generically instead.
+const errorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && typeof (error as Record<string, unknown>).message === 'string') {
+    return (error as Record<string, unknown>).message as string;
+  }
+  return fallback;
+};
+
 const safeErrorFields = (error: unknown): Record<string, unknown> => {
   const extra: Record<string, unknown> = {};
   if (error && typeof error === 'object') {
@@ -217,7 +253,7 @@ const importZip = async (supabase: SupabaseClient, userId: string, zipBytes: Buf
   try {
     entries = readZipEntries(zipBytes);
   } catch (error) {
-    throw new PhaseError('decode_zip', error instanceof Error ? error.message : 'Could not read the ZIP archive.', error);
+    throw new PhaseError('decode_zip', errorMessage(error, 'Could not read the ZIP archive.'), error);
   }
 
   const skillEntry = entries.find((entry) => entry.name === 'SKILL.md');
@@ -232,28 +268,30 @@ const importZip = async (supabase: SupabaseClient, userId: string, zipBytes: Buf
   try {
     parsed = parseSkillMd(skillEntry.data.toString('utf8'));
   } catch (error) {
-    throw new PhaseError('parse_skill_md', error instanceof Error ? error.message : 'Could not parse SKILL.md.', error);
+    throw new PhaseError('parse_skill_md', errorMessage(error, 'Could not parse SKILL.md.'), error);
   }
 
   let slug: string;
   try {
     slug = await uniqueSlug(supabase, parsed.name, userId);
   } catch (error) {
-    throw new PhaseError('unique_slug', error instanceof Error ? error.message : 'Could not check for slug uniqueness.', error);
+    throw new PhaseError('unique_slug', errorMessage(error, 'Could not check for slug uniqueness.'), error);
   }
+
+  const { normalized: _normalized, ...insertableParsed } = parsed;
 
   const created: Record<string, any> = await (async () => {
     try {
       const { data: createdRows, error: createError } = await supabase
         .from('skill_packs')
-        .insert({ user_id: userId, scope: 'private', slug, status: 'active', ...parsed })
+        .insert({ user_id: userId, scope: 'private', slug, status: 'active', ...insertableParsed })
         .select('*');
       if (createError) throw createError;
       const row = createdRows?.[0];
       if (!row?.id) throw new Error('Insert returned no row.');
       return row as Record<string, any>;
     } catch (error) {
-      throw new PhaseError('create_skill', error instanceof Error ? error.message : 'Could not create the skill_packs row.', error);
+      throw new PhaseError('create_skill', errorMessage(error, 'Could not create the skill_packs row.'), error);
     }
   })();
 
@@ -274,7 +312,7 @@ const importZip = async (supabase: SupabaseClient, userId: string, zipBytes: Buf
       } catch (error) {
         throw new PhaseError(
           `upload_file:${categorized.filename}`,
-          error instanceof Error ? error.message : `Could not upload ${categorized.filename} to storage.`,
+          errorMessage(error, `Could not upload ${categorized.filename} to storage.`),
           error,
         );
       }
@@ -338,10 +376,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(201).json(imported);
   } catch (error) {
     const reportedPhase = error instanceof PhaseError ? error.phase : phase;
-    const message = error instanceof Error ? error.message : 'Could not import skill.';
+    const message = errorMessage(error, 'Could not import skill.');
     const extra = safeErrorFields(error instanceof PhaseError ? error.cause : error);
+    // parseApiError on the frontend only reads `.detail`, so fold the safe Postgres/Storage
+    // fields directly into the visible message instead of leaving them as sibling JSON keys
+    // that silently get dropped.
+    const extraBits = Object.entries(extra)
+      .map(([key, value]) => `${key}=${String(value)}`)
+      .join(', ');
     res.status(400).json({
-      detail: `Could not import skill at phase ${reportedPhase}: ${message}`,
+      detail: `Could not import skill at phase ${reportedPhase}: ${message}${extraBits ? ` (${extraBits})` : ''}`,
       phase: reportedPhase,
       ...extra,
     });
