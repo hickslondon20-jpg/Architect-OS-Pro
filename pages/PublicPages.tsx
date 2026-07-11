@@ -7,7 +7,7 @@ const PASSWORD_RESET_REDIRECT_TO = 'https://architectospro.com/#/reset-password'
 
 const getRecoveryParams = (): URLSearchParams | null => {
   const candidates: string[] = [];
-  const { hash, search } = window.location;
+  const { hash, href, search } = window.location;
 
   if (search) candidates.push(search.slice(1));
 
@@ -26,8 +26,16 @@ const getRecoveryParams = (): URLSearchParams | null => {
     }
   }
 
+  for (const marker of ['#access_token=', '#code=', '#error=']) {
+    const markerIndex = href.indexOf(marker);
+    if (markerIndex >= 0) {
+      candidates.push(href.slice(markerIndex + 1));
+    }
+  }
+
   for (const candidate of candidates) {
-    const params = new URLSearchParams(candidate);
+    const normalizedCandidate = candidate.replace(/&amp;/g, '&');
+    const params = new URLSearchParams(normalizedCandidate);
     if (
       params.has('access_token') ||
       params.has('refresh_token') ||
@@ -258,9 +266,10 @@ export const ResetPasswordPage: React.FC = () => {
       const accessToken = params?.get('access_token');
       const refreshToken = params?.get('refresh_token');
       const code = params?.get('code');
+      let recoverySessionReady = false;
 
       if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({
+        const { data, error } = await supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
         });
@@ -273,9 +282,10 @@ export const ResetPasswordPage: React.FC = () => {
           return;
         }
 
+        recoverySessionReady = Boolean(data.session);
         window.history.replaceState(null, '', `${window.location.origin}${window.location.pathname}#/reset-password`);
       } else if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
         if (error) {
           if (isMounted) {
@@ -285,13 +295,14 @@ export const ResetPasswordPage: React.FC = () => {
           return;
         }
 
+        recoverySessionReady = Boolean(data.session);
         window.history.replaceState(null, '', `${window.location.origin}${window.location.pathname}#/reset-password`);
       }
 
       const { data } = await supabase.auth.getSession();
       if (!isMounted) return;
 
-      if (data.session) {
+      if (recoverySessionReady || data.session) {
         setReady(true);
         setError(null);
       } else {
