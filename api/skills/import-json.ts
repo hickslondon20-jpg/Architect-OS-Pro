@@ -61,7 +61,7 @@ const optionalString = (value: string | string[] | undefined) => {
 };
 
 const splitFrontmatter = (content: string) => {
-  const normalized = content.replace(/^\ufeff/, '').replace(/\r\n/g, '\n');
+  const normalized = content.replace(/^﻿/, '').replace(/\r\n/g, '\n');
   if (!normalized.startsWith('---\n')) throw new Error('SKILL.md must start with YAML frontmatter.');
   const end = normalized.indexOf('\n---', 4);
   if (end === -1) throw new Error('SKILL.md frontmatter is missing a closing delimiter.');
@@ -189,20 +189,73 @@ const mimeType = (filename: string) => {
   return 'application/octet-stream';
 };
 
-const importZip = async (supabase: SupabaseClient, userId: string, zipBytes: Buffer) => {
-  const entries = readZipEntries(zipBytes);
-  const skillEntry = entries.find((entry) => entry.name === 'SKILL.md');
-  if (!skillEntry) throw new Error('ZIP must include SKILL.md at the root.');
+class PhaseError extends Error {
+  phase: string;
+  cause?: unknown;
+  constructor(phase: string, message: string, cause?: unknown) {
+    super(message);
+    this.phase = phase;
+    this.cause = cause;
+  }
+}
 
-  const parsed = parseSkillMd(skillEntry.data.toString('utf8'));
-  const slug = await uniqueSlug(supabase, parsed.name, userId);
-  const { data: createdRows, error: createError } = await supabase
-    .from('skill_packs')
-    .insert({ user_id: userId, scope: 'private', slug, status: 'active', ...parsed })
-    .select('*');
-  if (createError) throw createError;
-  const created = createdRows?.[0];
-  if (!created?.id) throw new Error('Could not create skill.');
+const safeErrorFields = (error: unknown): Record<string, unknown> => {
+  const extra: Record<string, unknown> = {};
+  if (error && typeof error === 'object') {
+    const err = error as Record<string, unknown>;
+    if (typeof err.code === 'string') extra.code = err.code;
+    if (typeof err.hint === 'string') extra.hint = err.hint;
+    if (typeof err.details === 'string') extra.details = err.details;
+    if (typeof err.status === 'number') extra.status = err.status;
+    if (typeof err.name === 'string') extra.errorName = err.name;
+  }
+  return extra;
+};
+
+const importZip = async (supabase: SupabaseClient, userId: string, zipBytes: Buffer) => {
+  let entries: ZipEntry[];
+  try {
+    entries = readZipEntries(zipBytes);
+  } catch (error) {
+    throw new PhaseError('decode_zip', error instanceof Error ? error.message : 'Could not read the ZIP archive.', error);
+  }
+
+  const skillEntry = entries.find((entry) => entry.name === 'SKILL.md');
+  if (!skillEntry) {
+    throw new PhaseError(
+      'find_skill_md',
+      `ZIP must include SKILL.md at the root. Found entries: ${entries.map((e) => e.name).join(', ') || '(none)'}`,
+    );
+  }
+
+  let parsed: ReturnType<typeof parseSkillMd>;
+  try {
+    parsed = parseSkillMd(skillEntry.data.toString('utf8'));
+  } catch (error) {
+    throw new PhaseError('parse_skill_md', error instanceof Error ? error.message : 'Could not parse SKILL.md.', error);
+  }
+
+  let slug: string;
+  try {
+    slug = await uniqueSlug(supabase, parsed.name, userId);
+  } catch (error) {
+    throw new PhaseError('unique_slug', error instanceof Error ? error.message : 'Could not check for slug uniqueness.', error);
+  }
+
+  const created: Record<string, any> = await (async () => {
+    try {
+      const { data: createdRows, error: createError } = await supabase
+        .from('skill_packs')
+        .insert({ user_id: userId, scope: 'private', slug, status: 'active', ...parsed })
+        .select('*');
+      if (createError) throw createError;
+      const row = createdRows?.[0];
+      if (!row?.id) throw new Error('Insert returned no row.');
+      return row as Record<string, any>;
+    } catch (error) {
+      throw new PhaseError('create_skill', error instanceof Error ? error.message : 'Could not create the skill_packs row.', error);
+    }
+  })();
 
   const uploadedPaths: string[] = [];
   try {
@@ -213,10 +266,18 @@ const importZip = async (supabase: SupabaseClient, userId: string, zipBytes: Buf
       if (!categorized) continue;
       const storagePath = `${userId}/${created.id}/${categorized.category}/${categorized.filename}`;
       const contentType = mimeType(categorized.filename);
-      const { error: uploadError } = await supabase.storage
-        .from(SKILL_FILE_BUCKET)
-        .upload(storagePath, entry.data, { contentType, upsert: false });
-      if (uploadError) throw uploadError;
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from(SKILL_FILE_BUCKET)
+          .upload(storagePath, entry.data, { contentType, upsert: false });
+        if (uploadError) throw uploadError;
+      } catch (error) {
+        throw new PhaseError(
+          `upload_file:${categorized.filename}`,
+          error instanceof Error ? error.message : `Could not upload ${categorized.filename} to storage.`,
+          error,
+        );
+      }
       uploadedPaths.push(storagePath);
       metadataRows.push({
         skill_id: created.id,
@@ -229,7 +290,7 @@ const importZip = async (supabase: SupabaseClient, userId: string, zipBytes: Buf
     }
     if (metadataRows.length) {
       const { error } = await supabase.from('skill_files').insert(metadataRows);
-      if (error) throw error;
+      if (error) throw new PhaseError('insert_skill_files', error.message, error);
     }
     return { ...created, files: metadataRows };
   } catch (error) {
@@ -249,21 +310,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  let phase = 'auth';
   try {
     const jwt = getJwt(req);
+
+    phase = 'validate_session';
     const authSupabase = userClient(jwt);
     const { data: userData, error: userError } = await authSupabase.auth.getUser(jwt);
     if (userError || !userData.user) throw userError ?? new Error('Invalid session.');
 
+    phase = 'parse_body';
     const body = parseBody(req.body);
     const filename = String(body.filename ?? '');
     const contentBase64 = String(body.contentBase64 ?? '');
     if (!filename.toLowerCase().endsWith('.zip')) throw new Error('Upload a .zip file.');
     if (!contentBase64) throw new Error('filename and contentBase64 are required.');
 
-    const imported = await importZip(serviceClient(), userData.user.id, Buffer.from(contentBase64, 'base64'));
+    phase = 'decode_zip';
+    const zipBytes = Buffer.from(contentBase64, 'base64');
+    if (!zipBytes.length) throw new Error('Decoded ZIP is empty.');
+
+    phase = 'service_client_init';
+    const service = serviceClient();
+
+    phase = 'import_zip';
+    const imported = await importZip(service, userData.user.id, zipBytes);
     res.status(201).json(imported);
   } catch (error) {
-    res.status(400).json({ detail: error instanceof Error ? error.message : 'Could not import skill.' });
+    const reportedPhase = error instanceof PhaseError ? error.phase : phase;
+    const message = error instanceof Error ? error.message : 'Could not import skill.';
+    const extra = safeErrorFields(error instanceof PhaseError ? error.cause : error);
+    res.status(400).json({
+      detail: `Could not import skill at phase ${reportedPhase}: ${message}`,
+      phase: reportedPhase,
+      ...extra,
+    });
   }
 }
