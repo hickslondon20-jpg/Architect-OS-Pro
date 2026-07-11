@@ -224,7 +224,7 @@ class SubAgentOrchestrator:
                 "user_id": user_id,
                 "run_id": run_id,
                 "step_index": step_index,
-                "step_type": step_type,
+                "step_type": _stored_agent_step_type(step_type),
                 "status": status,
                 "tool_name": tool_name,
                 "title": title,
@@ -652,6 +652,11 @@ def _safe_string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if str(item).strip()]
+
+
+def _stored_agent_step_type(step_type: str) -> str:
+    allowed = {"context_build", "tool_call", "source_review", "result", "error"}
+    return step_type if step_type in allowed else "tool_call"
 
 
 def _now() -> str:

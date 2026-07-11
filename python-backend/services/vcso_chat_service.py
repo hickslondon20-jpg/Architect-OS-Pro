@@ -1120,7 +1120,7 @@ class VcsoChatService:
                 "user_id": user_id,
                 "run_id": run_id,
                 "step_index": step_index,
-                "step_type": step_type,
+                "step_type": _stored_agent_step_type(step_type),
                 "status": status,
                 "tool_name": tool_name,
                 "title": title,
@@ -1387,6 +1387,11 @@ def _step_type_for_tool(tool_name: str, input_summary: dict[str, Any]) -> str:
     if tool_name == "execute_code":
         return "code_execution"
     return "tool_call"
+
+
+def _stored_agent_step_type(step_type: str) -> str:
+    allowed = {"context_build", "tool_call", "source_review", "result", "error"}
+    return step_type if step_type in allowed else "tool_call"
 
 
 def _step_title_for_tool(tool_name: str, input_summary: dict[str, Any]) -> str:
