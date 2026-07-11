@@ -102,21 +102,58 @@ export const importSkillZip = async (file: File): Promise<SkillPack> => {
   const form = new FormData();
   form.append('file', file);
   const url = `${getBaseUrl()}/api/skills/import`;
+  const headers = await getAuthHeaders(false);
   let response: Response;
   try {
     response = await fetch(url, {
       method: 'POST',
       mode: 'cors',
-      headers: await getAuthHeaders(false),
+      headers,
       body: form,
     });
   } catch (err) {
-    const detail = err instanceof Error ? err.message : 'The browser could not complete the request.';
-    throw new Error(`Could not reach the skills import API at ${url}. ${detail}`);
+    try {
+      return await importSkillZipWithXhr(url, headers.authorization, form);
+    } catch (xhrErr) {
+      const detail = err instanceof Error ? err.message : 'The browser could not complete the request.';
+      const xhrDetail = xhrErr instanceof Error ? xhrErr.message : 'XHR fallback also failed.';
+      throw new Error(`Could not reach the skills import API at ${url}. Fetch: ${detail}. XHR: ${xhrDetail}`);
+    }
   }
   if (!response.ok) throw new Error(await parseApiError(response, 'Could not import skill.'));
   return response.json();
 };
+
+const importSkillZipWithXhr = (url: string, authorization: string, form: FormData): Promise<SkillPack> =>
+  new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('POST', url);
+    request.setRequestHeader('authorization', authorization);
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        try {
+          resolve(JSON.parse(request.responseText) as SkillPack);
+        } catch {
+          reject(new Error('Import completed, but the response could not be parsed.'));
+        }
+        return;
+      }
+      try {
+        const parsed = JSON.parse(request.responseText) as { detail?: unknown };
+        if (typeof parsed.detail === 'string') {
+          reject(new Error(parsed.detail));
+          return;
+        }
+      } catch {
+        // Fall through to the generic response body.
+      }
+      reject(new Error(request.responseText || `HTTP ${request.status}`));
+    };
+    request.onerror = () => reject(new Error('Network error'));
+    request.ontimeout = () => reject(new Error('Request timed out'));
+    request.timeout = 60000;
+    request.send(form);
+  });
 
 export const exportSkillZip = async (skill: SkillPack): Promise<void> => {
   const response = await fetch(`${getBaseUrl()}/api/skills/${skill.id}/export`, {
