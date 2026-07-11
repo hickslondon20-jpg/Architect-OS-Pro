@@ -101,11 +101,19 @@ export const deleteSkill = async (skillId: string): Promise<void> => {
 export const importSkillZip = async (file: File): Promise<SkillPack> => {
   const form = new FormData();
   form.append('file', file);
-  const response = await fetch(`${getBaseUrl()}/api/skills/import`, {
-    method: 'POST',
-    headers: await getAuthHeaders(false),
-    body: form,
-  });
+  const url = `${getBaseUrl()}/api/skills/import`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: await getAuthHeaders(false),
+      body: form,
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : 'The browser could not complete the request.';
+    throw new Error(`Could not reach the skills import API at ${url}. ${detail}`);
+  }
   if (!response.ok) throw new Error(await parseApiError(response, 'Could not import skill.'));
   return response.json();
 };

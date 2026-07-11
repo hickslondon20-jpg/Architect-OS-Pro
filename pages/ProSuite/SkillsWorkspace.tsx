@@ -321,7 +321,11 @@ export const SkillsWorkspace: React.FC = () => {
             <input
               type="file"
               accept=".zip,application/zip"
-              onChange={(event) => importZip(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                event.currentTarget.value = '';
+                importZip(file);
+              }}
               className="block w-full text-sm text-[var(--fg-2)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--aos-brass)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--fg-on-dark)]"
             />
           </Card>
