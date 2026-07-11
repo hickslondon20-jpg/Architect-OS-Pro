@@ -17,10 +17,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
+
         // Check active session
         supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!isMounted) return;
             setSession(session);
             setUser(session?.user ?? null);
+            setLoading(false);
+        }).catch((error) => {
+            if (!isMounted) return;
+            console.warn('[auth] Could not restore Supabase session.', error);
+            setSession(null);
+            setUser(null);
             setLoading(false);
         });
 
@@ -28,12 +37,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (!isMounted) return;
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const signOut = async () => {
