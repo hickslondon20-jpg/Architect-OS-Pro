@@ -348,13 +348,13 @@ export const queueDocumentIngestion = async (doc: RawDocument) => {
     return { queued: false, skipped: true, reason: 'This file was already added.' };
   }
 
-  if (!INGESTION_API_URL || !doc.storagePath || !doc.userId) {
-    return { queued: false, reason: 'Ingestion backend is not configured.' };
+  if (!doc.storagePath || !doc.userId) {
+    return { queued: false, reason: 'Document is missing ingestion metadata.' };
   }
 
-  const response = await fetch(`${INGESTION_API_URL.replace(/\/$/, '')}/api/ingest`, {
+  const response = await fetch('/api/os-engine/ingest', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({
       document_id: doc.id,
       user_id: doc.userId,
@@ -365,8 +365,7 @@ export const queueDocumentIngestion = async (doc: RawDocument) => {
   });
 
   if (!response.ok) {
-    const detail = await response.text().catch(() => 'Ingestion request failed.');
-    throw new Error(detail || 'Ingestion request failed.');
+    throw new Error(await parseApiError(response, 'Ingestion request failed.'));
   }
 
   return { queued: true };
