@@ -53,6 +53,10 @@ const getAuthHeaders = async (json = true) => {
 const parseApiError = async (response: Response, fallback: string) => {
   const text = await response.text().catch(() => '');
   if (!text) return fallback;
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('text/html') || /^\s*<!doctype html/i.test(text)) {
+    return `${fallback} The backend returned a gateway page; please retry after the live backend recovers.`;
+  }
   try {
     const parsed = JSON.parse(text) as { detail?: unknown };
     if (typeof parsed.detail === 'string') return parsed.detail;

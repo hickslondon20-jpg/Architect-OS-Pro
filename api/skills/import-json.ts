@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 type VercelRequest = { method?: string; headers: Record<string, string | string[] | undefined>; body?: any };
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => void };
 
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+
 const env = (name: string, fallback?: string) => {
   const value = process.env[name] ?? (fallback ? process.env[fallback] : undefined);
   if (!value) throw new Error(`Missing server environment variable: ${name}`);
@@ -40,7 +42,31 @@ const upstreamBody = async (response: Response) => {
     return response.json().catch(() => ({ ok: response.ok }));
   }
   const detail = await response.text().catch(() => '');
+  if (contentType.includes('text/html') || /^\s*<!doctype html/i.test(detail)) {
+    return { detail: 'The skills backend returned a gateway error. Please retry now that the backend is healthy.' };
+  }
   return detail ? { detail } : { ok: response.ok };
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const postToBackend = async (backendUrl: string, jwt: string, filename: string, contentBase64: string) => {
+  const payload = JSON.stringify({ filename, contentBase64 });
+  let lastResponse: Response | null = null;
+  for (const delayMs of [0, 750, 1500]) {
+    if (delayMs) await wait(delayMs);
+    const response = await fetch(`${backendUrl}/api/skills/import-json`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${jwt}`,
+        'content-type': 'application/json',
+      },
+      body: payload,
+    });
+    if (!GATEWAY_STATUSES.has(response.status)) return response;
+    lastResponse = response;
+  }
+  return lastResponse;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -61,14 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!filename || !contentBase64) throw new Error('filename and contentBase64 are required.');
 
     const backendUrl = normalizeUrl(env('ARCHITECTOS_PYTHON_BACKEND_URL'));
-    const response = await fetch(`${backendUrl}/api/skills/import-json`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${jwt}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ filename, contentBase64 }),
-    });
+    const response = await postToBackend(backendUrl, jwt, filename, contentBase64);
+    if (!response) throw new Error('The skills backend did not respond.');
 
     res.status(response.status).json(await upstreamBody(response));
   } catch (error) {
