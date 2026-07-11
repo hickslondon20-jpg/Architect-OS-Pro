@@ -119,7 +119,7 @@ const importSkillZipAsJson = async (file: File): Promise<SkillPack> => {
   for (let index = 0; index < bytes.length; index += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
-  const response = await fetch(`${getBaseUrl()}/api/skills/import-json`, {
+  const response = await fetch('/api/skills/import-json', {
     method: 'POST',
     headers: await getAuthHeaders(),
     body: JSON.stringify({
