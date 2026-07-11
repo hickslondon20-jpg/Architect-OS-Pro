@@ -21,6 +21,11 @@ const env = (name: string) => {
   return value;
 };
 
+const normalizeUrl = (value: string) => {
+  const trimmed = value.trim().replace(/\/$/, '');
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
+
 const getJwt = (req: VercelRequest) => {
   const raw = req.headers.authorization ?? req.headers.Authorization;
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -88,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const backendUrl = env('ARCHITECTOS_PYTHON_BACKEND_URL').replace(/\/$/, '');
+    const backendUrl = normalizeUrl(env('ARCHITECTOS_PYTHON_BACKEND_URL'));
     const response = await fetch(`${backendUrl}/api/ingest`, {
       method: 'POST',
       headers: {
