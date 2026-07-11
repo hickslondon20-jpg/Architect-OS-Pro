@@ -254,7 +254,7 @@ class SkillService:
 
 
 def _split_frontmatter(content: str) -> tuple[str, str]:
-    normalized = content.replace("\r\n", "\n")
+    normalized = content.lstrip("\ufeff").replace("\r\n", "\n")
     if not normalized.startswith("---\n"):
         raise SkillServiceError("SKILL.md must start with YAML frontmatter.")
     end = normalized.find("\n---", 4)

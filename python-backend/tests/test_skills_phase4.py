@@ -20,6 +20,20 @@ def test_parse_vanilla_skill_md_defaults_extension_fields():
     assert parsed["body"] == "# Instructions\nUse the founder context carefully.\n"
 
 
+def test_parse_skill_md_accepts_utf8_bom():
+    parsed = parse_skill_md(
+        "\ufeff---\n"
+        "name: BOM Fixture\n"
+        "description: Accept files saved with a UTF-8 BOM.\n"
+        "---\n"
+        "Use this skill.\n"
+    )
+
+    assert parsed["name"] == "BOM Fixture"
+    assert parsed["description"] == "Accept files saved with a UTF-8 BOM."
+    assert parsed["body"] == "Use this skill.\n"
+
+
 def test_serialize_parse_round_trip_preserves_skill_fields():
     row = {
         "name": "Margin Review",
