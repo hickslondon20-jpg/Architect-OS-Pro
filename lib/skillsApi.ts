@@ -99,6 +99,39 @@ export const deleteSkill = async (skillId: string): Promise<void> => {
 };
 
 export const importSkillZip = async (file: File): Promise<SkillPack> => {
+  try {
+    return await importSkillZipAsJson(file);
+  } catch (jsonErr) {
+    try {
+      return await importSkillZipAsMultipart(file);
+    } catch (multipartErr) {
+      const jsonDetail = jsonErr instanceof Error ? jsonErr.message : 'JSON import failed.';
+      const multipartDetail = multipartErr instanceof Error ? multipartErr.message : 'Multipart import failed.';
+      throw new Error(`Could not import skill. JSON: ${jsonDetail}. Multipart: ${multipartDetail}`);
+    }
+  }
+};
+
+const importSkillZipAsJson = async (file: File): Promise<SkillPack> => {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  const response = await fetch(`${getBaseUrl()}/api/skills/import-json`, {
+    method: 'POST',
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({
+      filename: file.name,
+      contentBase64: btoa(binary),
+    }),
+  });
+  if (!response.ok) throw new Error(await parseApiError(response, 'Could not import skill.'));
+  return response.json();
+};
+
+const importSkillZipAsMultipart = async (file: File): Promise<SkillPack> => {
   const form = new FormData();
   form.append('file', file);
   const url = `${getBaseUrl()}/api/skills/import`;

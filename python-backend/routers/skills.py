@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Annotated
 from uuid import UUID
 
@@ -43,6 +45,11 @@ class GuidedSkillMessage(BaseModel):
 class GuidedSkillDraftPayload(BaseModel):
     messages: list[GuidedSkillMessage] = Field(default_factory=list)
     currentDraft: dict = Field(default_factory=dict)
+
+
+class SkillImportJsonPayload(BaseModel):
+    filename: str = Field(..., min_length=1)
+    contentBase64: str = Field(..., min_length=1)
 
 
 router = APIRouter()
@@ -113,6 +120,25 @@ async def import_skill_zip(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload a .zip file.")
     try:
         return _service().import_zip(user_id, await file.read())
+    except SkillServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not import skill: {exc}") from exc
+
+
+@router.post("/import-json", status_code=status.HTTP_201_CREATED)
+def import_skill_zip_json(
+    payload: SkillImportJsonPayload,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+) -> dict:
+    if not payload.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload a .zip file.")
+    try:
+        zip_bytes = base64.b64decode(payload.contentBase64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ZIP payload is not valid base64.") from exc
+    try:
+        return _service().import_zip(user_id, zip_bytes)
     except SkillServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:

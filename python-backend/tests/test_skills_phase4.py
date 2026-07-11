@@ -48,3 +48,11 @@ def test_serialize_parse_round_trip_preserves_skill_fields():
     reparsed = parse_skill_md(serialize_skill_md(row))
 
     assert reparsed == row
+
+
+def test_skill_import_json_route_decodes_base64():
+    import base64
+
+    payload = base64.b64decode(base64.b64encode(b"zip-bytes").decode("ascii"), validate=True)
+
+    assert payload == b"zip-bytes"
