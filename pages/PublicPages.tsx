@@ -38,9 +38,7 @@ const getRecoveryParams = (): URLSearchParams | null => {
     const params = new URLSearchParams(normalizedCandidate);
     if (
       params.has('access_token') ||
-      params.has('refresh_token') ||
       params.has('code') ||
-      params.get('type') === 'recovery' ||
       params.has('error') ||
       params.has('error_description')
     ) {
