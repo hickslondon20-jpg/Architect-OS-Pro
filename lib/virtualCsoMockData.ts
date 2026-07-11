@@ -31,6 +31,18 @@ export interface AgentStep {
   input: Record<string, unknown>;
   output: string;
   status?: string;
+  sourceRefs?: Array<Record<string, unknown>>;
+}
+
+export interface ArtifactDelivery {
+  id: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+  renderable: boolean;
+  description?: string | null;
+  content?: string | null;
+  signed_url?: string | null;
 }
 
 export interface Message {
@@ -40,6 +52,7 @@ export interface Message {
   content: string;
   createdAt: string;
   agentSteps?: AgentStep[];
+  artifactDeliveries?: ArtifactDelivery[];
 }
 
 export type SourceKind = 'wiki' | 'platform' | 'ip' | 'context';

@@ -8,6 +8,7 @@ import { EmptyState } from '../../../components/pro-suite/virtual-cso/EmptyState
 import { Reader } from '../../../components/pro-suite/shared/Reader';
 import { Button } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
+import { getArtifact } from '../../../lib/artifactsApi';
 import {
   createProject,
   createThread,
@@ -25,6 +26,7 @@ import {
   sendUserMessage,
   setThreadPinned,
   type Chat,
+  type ArtifactDelivery,
   type Message,
   type Project,
 } from '../../../lib/virtualCsoApi';
@@ -101,6 +103,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [readerPageId, setReaderPageId] = useState<string | null>(null);
+  const [readerArtifact, setReaderArtifact] = useState<ArtifactDelivery | null>(null);
   const [linkedFolder, setLinkedFolder] = useState<string | null>('Financial');
   const [projects, setProjects] = useState<Project[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -155,6 +158,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setActiveProjectId(chat?.projectId ?? null);
     setView('chat');
     setReaderPageId(null);
+    setReaderArtifact(null);
     setNotice(null);
   };
 
@@ -162,6 +166,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setActiveProjectId(projectId);
     setView('project');
     setReaderPageId(null);
+    setReaderArtifact(null);
     setNotice(null);
   };
 
@@ -171,6 +176,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setActiveProjectId(null);
     setMessages([]);
     setReaderPageId(null);
+    setReaderArtifact(null);
     setNotice(null);
   };
 
@@ -275,6 +281,15 @@ export const VirtualCSOWorkspace: React.FC = () => {
     }
   };
 
+  const openArtifact = async (artifactId: string) => {
+    try {
+      setReaderArtifact(await getArtifact(artifactId));
+      setReaderPageId(`artifact:${artifactId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open artifact.');
+    }
+  };
+
   const useSkillInComposer = (slug: string) => {
     const mention = `@${slug} `;
     setComposerText((current) => {
@@ -329,7 +344,12 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const activeProjectForView = activeProjectId ? getProjectById(projects, activeProjectId) : undefined;
   const projectChats = activeProjectId ? getChatsForProject(chats, activeProjectId) : [];
   const sources = activeChatId ? sourcesByChat[activeChatId] ?? getSourceRefsForChat(activeChatId) : [];
-  const readerPage = readerPageId ? getSourcePage(readerPageId) : undefined;
+  const readerPage = readerPageId && !readerPageId.startsWith('artifact:') ? getSourcePage(readerPageId) : undefined;
+  const readerTitle = readerArtifact ? readerArtifact.filename : readerPage?.title;
+  const readerMeta = readerArtifact
+    ? `Artifact · ${readerArtifact.mime_type || 'file'}`
+    : readerPage?.meta;
+  const readerContent = readerArtifact?.content ?? readerPage?.content;
 
   const crumbs =
     view === 'chat' && activeChat
@@ -414,7 +434,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
           </button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <ChatThread crumbs={crumbs} messages={messages} />
+          <ChatThread crumbs={crumbs} messages={messages} onOpenArtifact={openArtifact} />
         </div>
         <Composer
           linkedFolder={linkedFolder}
@@ -454,16 +474,22 @@ export const VirtualCSOWorkspace: React.FC = () => {
           <SourcesPanel
             sources={sources}
             hasActiveChat={view === 'chat' && !!activeChatId && messages.length > 0}
-            onOpenSource={(pageId) => setReaderPageId(pageId)}
+            onOpenSource={(pageId) => {
+              setReaderArtifact(null);
+              setReaderPageId(pageId);
+            }}
           />
         )}
 
         <Reader
-          open={!!readerPage}
-          onClose={() => setReaderPageId(null)}
-          title={readerPage?.title}
-          meta={readerPage?.meta}
-          content={readerPage?.content}
+          open={!!readerPage || !!readerArtifact}
+          onClose={() => {
+            setReaderPageId(null);
+            setReaderArtifact(null);
+          }}
+          title={readerTitle}
+          meta={readerMeta}
+          content={readerContent}
         />
       </div>
     </div>

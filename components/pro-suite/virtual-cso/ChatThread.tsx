@@ -14,7 +14,8 @@ interface Crumb {
 export const ChatThread: React.FC<{
   crumbs: Crumb[];
   messages: Message[];
-}> = ({ crumbs, messages }) => (
+  onOpenArtifact?: (artifactId: string) => void;
+}> = ({ crumbs, messages, onOpenArtifact }) => (
   <div className="flex h-full flex-col overflow-hidden">
     <div className="flex items-center gap-1.5 border-b border-[var(--aos-mist)] px-6 py-3 text-xs text-[var(--fg-3)]">
       {crumbs.map((c, i) => (
@@ -37,7 +38,7 @@ export const ChatThread: React.FC<{
     <div className="flex-1 overflow-y-auto px-6 py-6">
       <div className="mx-auto flex max-w-3xl flex-col gap-5">
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble key={m.id} message={m} onOpenArtifact={onOpenArtifact} />
         ))}
       </div>
     </div>

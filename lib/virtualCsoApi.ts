@@ -12,10 +12,12 @@ import {
   type SourcePage,
   type SourceRef,
   type AgentStep,
+  type ArtifactDelivery,
 } from './virtualCsoMockData';
+import { getArtifact } from './artifactsApi';
 
 export { INSIGHT_STARTERS, MOCK_SOURCE_REFS, SOURCE_KIND_LABELS };
-export type { Chat, InsightStarter, Message, Project, SourceKind, SourcePage, SourceRef };
+export type { ArtifactDelivery, Chat, InsightStarter, Message, Project, SourceKind, SourcePage, SourceRef };
 
 export interface VirtualCsoData {
   projects: Project[];
@@ -111,11 +113,13 @@ type AgentDelegationStepRow = {
   input_summary?: Record<string, unknown> | null;
   output_summary?: unknown;
   summary?: string | null;
+  source_refs?: Array<Record<string, unknown>> | null;
 };
 
 type AgentDelegationRunWithSteps = {
   assistant_message_id?: string | null;
   agent_delegation_steps?: AgentDelegationStepRow[] | null;
+  structured_result?: Record<string, unknown> | null;
 };
 
 const outputToString = (output: unknown): string => {
@@ -129,16 +133,33 @@ const toAgentStep = (step: AgentDelegationStepRow): AgentStep => ({
   input: step.input_summary ?? {},
   output: outputToString(step.output_summary ?? step.summary ?? ''),
   status: step.status ?? undefined,
+  sourceRefs: step.source_refs ?? undefined,
 });
 
-const toMessage = (row: any, agentSteps?: AgentStep[]): Message => ({
+const toMessage = (row: any, agentSteps?: AgentStep[], artifactDeliveries?: ArtifactDelivery[]): Message => ({
   id: row.id,
   chatId: row.thread_id ?? row.chatId,
   role: row.role,
   content: row.content,
   createdAt: row.created_at ?? row.createdAt,
   agentSteps,
+  artifactDeliveries,
 });
+
+const artifactIdFromRun = (run: AgentDelegationRunWithSteps): string | null => {
+  const structuredId = run.structured_result?.artifact_id;
+  if (typeof structuredId === 'string' && structuredId) return structuredId;
+  for (const step of run.agent_delegation_steps ?? []) {
+    for (const ref of step.source_refs ?? []) {
+      const metadata = ref.metadata;
+      if (metadata && typeof metadata === 'object') {
+        const artifactId = (metadata as Record<string, unknown>).artifact_id;
+        if (typeof artifactId === 'string' && artifactId) return artifactId;
+      }
+    }
+  }
+  return null;
+};
 
 const rememberSources = (chatId: string, sources: SourceRef[] = [], pages: SourcePage[] = []) => {
   sourceRefsByChat.set(chatId, sources);
@@ -214,11 +235,13 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
     .filter((row) => row.role === 'assistant')
     .map((row) => row.id);
   const stepsByMessageId = new Map<string, AgentStep[]>();
+  const artifactIdsByMessageId = new Map<string, string>();
+  const artifactsById = new Map<string, ArtifactDelivery>();
 
   if (assistantMessageIds.length > 0) {
     const runsResult = await supabase
       .from('agent_delegation_runs')
-      .select('assistant_message_id,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary)')
+      .select('assistant_message_id,structured_result,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary,source_refs)')
       .eq('user_id', userId)
       .in('assistant_message_id', assistantMessageIds);
     if (runsResult.error) throw runsResult.error;
@@ -232,10 +255,26 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
           .sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0))
           .map(toAgentStep),
       ]);
+      const artifactId = artifactIdFromRun(run);
+      if (artifactId) artifactIdsByMessageId.set(run.assistant_message_id, artifactId);
     }
+
+    await Promise.all(
+      Array.from(new Set(artifactIdsByMessageId.values())).map(async (artifactId) => {
+        try {
+          artifactsById.set(artifactId, await getArtifact(artifactId));
+        } catch {
+          // A stale or unauthorized artifact should not prevent the chat thread from loading.
+        }
+      }),
+    );
   }
 
-  return messageRows.map((row) => toMessage(row, stepsByMessageId.get(row.id)));
+  return messageRows.map((row) => {
+    const artifactId = artifactIdsByMessageId.get(row.id);
+    const artifact = artifactId ? artifactsById.get(artifactId) : undefined;
+    return toMessage(row, stepsByMessageId.get(row.id), artifact ? [artifact] : undefined);
+  });
 };
 
 export const createProject = async (name: string): Promise<Project> => {
@@ -311,6 +350,8 @@ export const sendUserMessage = async (
   let sourcePages: SourcePage[] = [];
   let route: Ws5RouteMeta | null = null;
   let assembledContext: Ws5AssembledContextMeta | null = null;
+  let artifactId: string | null = null;
+  let artifactDelivery: ArtifactDelivery | null = null;
 
   await parseSseStream(response, {
     onEvent: (event, payload) => {
@@ -331,7 +372,11 @@ export const sendUserMessage = async (
       }
       if (event === 'done') {
         chat = payload.chat;
-        assistantMessage = toMessage(payload.assistantMessage);
+        assistantMessage = toMessage(
+          payload.assistantMessage,
+          payload.assistantMessage?.agentSteps,
+        );
+        artifactId = typeof payload.artifactId === 'string' ? payload.artifactId : null;
         sources = payload.sources ?? [];
         sourcePages = payload.sourcePages ?? [];
         if (assistantMessage) rememberSources(assistantMessage.chatId, sources, sourcePages);
@@ -344,6 +389,15 @@ export const sendUserMessage = async (
 
   if (!chat || !userMessage || !assistantMessage) {
     throw new Error('Virtual CSO stream ended before the turn was saved.');
+  }
+
+  if (artifactId) {
+    try {
+      artifactDelivery = await getArtifact(artifactId);
+      assistantMessage = { ...assistantMessage, artifactDeliveries: [artifactDelivery] };
+    } catch {
+      // A stale or unauthorized artifact should not hide the completed assistant answer.
+    }
   }
 
   return { chat, userMessage, assistantMessage, sources, sourcePages, route, assembledContext };
