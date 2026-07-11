@@ -1182,6 +1182,8 @@ def _execute_delegate_to_sub_agent(context: ToolExecutionContext, tool_input: di
     if not capability_key or not task_summary:
         raise ToolRegistryError("capability_key and task_summary are required for delegation.")
     context_scope = tool_input.get("context_scope") if isinstance(tool_input.get("context_scope"), dict) else {}
+    if capability_key == "sandbox_execution_agent" and context.thread_id and not context_scope.get("thread_id"):
+        context_scope = {**context_scope, "thread_id": context.thread_id}
     result = SubAgentOrchestrator(context.store).start_run(
         SubAgentRunRequest(
             user_id=context.user_id,
