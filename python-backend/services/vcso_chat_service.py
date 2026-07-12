@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import re
 import uuid
@@ -33,6 +34,22 @@ MAX_TOKENS = 1800
 MAX_DEEP_ROUNDS = 50
 COMPACTION_MAX_TOKENS = 1200
 COMPACTION_RECENT_MESSAGE_KEEP = 4
+
+# Ep4 Obj-2 live finding (2026-07-12): delegate_to_sub_agent (sandbox execution in
+# particular) can legitimately run for minutes. The tool dispatch below used to call
+# registry.execute() directly and block the whole SSE generator with zero bytes sent
+# to the browser for that entire window - live traces (thread 90965e00, both
+# 2026-07-11 and 2026-07-12) show the connection dying mid-turn every time a delegated
+# call ran past roughly 2 minutes: the run/step rows exist in agent_delegation_runs and
+# agent_delegation_steps (the backend kept working), but vcso_chat_tool_loop never
+# reached its final "result" step or wrote an assistant message, and the frontend
+# surfaced "Virtual CSO stream ended before the turn was saved." Something in the
+# network path (most likely Railway's edge/proxy) is treating the silent gap as a dead
+# connection. Running each tool call in a worker thread and yielding a lightweight
+# "heartbeat" SSE event every few seconds while waiting keeps bytes flowing without
+# changing the tool's result.
+TOOL_HEARTBEAT_SECONDS = 10.0
+_TOOL_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=16, thread_name_prefix="vcso-tool")
 CORE_PAGE_KEYS = {
     "business_context",
     "diagnostic_synthesis",
@@ -389,26 +406,34 @@ class VcsoChatService:
                     yield {"event": "done_waiting", "data": {"chat": _chat_payload(self._get_thread(thread_id, user_id)), "agentStatus": "waiting_for_user"}}
                     return
                 try:
-                    envelope = registry.execute(
-                        tool_name,
-                        ToolExecutionContext(
-                            user_id=user_id,
-                            store=self.store,
-                            supabase_client=self.supabase,
-                            sandbox_service=_optional_sandbox_service(),
-                            thread_id=thread_id,
-                            timeout_seconds=90,
-                            metadata={
-                                "tool_registry": registry,
-                                "surface": "virtual_cso",
-                                "tool_scope_surface": "virtual_cso_deep" if deep_mode else "virtual_cso",
-                                "deep_mode": deep_mode,
-                                "parent_message_id": user_message["id"],
-                                "sandbox_execution_service": _optional_sandbox_execution_service(self.supabase),
-                            },
-                        ),
-                        tool_input,
+                    tool_context = ToolExecutionContext(
+                        user_id=user_id,
+                        store=self.store,
+                        supabase_client=self.supabase,
+                        sandbox_service=_optional_sandbox_service(),
+                        thread_id=thread_id,
+                        timeout_seconds=90,
+                        metadata={
+                            "tool_registry": registry,
+                            "surface": "virtual_cso",
+                            "tool_scope_surface": "virtual_cso_deep" if deep_mode else "virtual_cso",
+                            "deep_mode": deep_mode,
+                            "parent_message_id": user_message["id"],
+                            "sandbox_execution_service": _optional_sandbox_execution_service(self.supabase),
+                        },
                     )
+                    tool_future = _TOOL_EXECUTOR.submit(registry.execute, tool_name, tool_context, tool_input)
+                    elapsed = 0.0
+                    while True:
+                        try:
+                            envelope = tool_future.result(timeout=TOOL_HEARTBEAT_SECONDS)
+                            break
+                        except concurrent.futures.TimeoutError:
+                            elapsed += TOOL_HEARTBEAT_SECONDS
+                            yield {
+                                "event": "heartbeat",
+                                "data": {"stepIndex": next_step_index, "tool": tool_name, "elapsedSeconds": elapsed},
+                            }
                     result_content = envelope.content
                     output_summary = _safe_output_summary(result_content)
                     raw_step_sources = [source.to_dict() for source in envelope.sources]
