@@ -32,6 +32,7 @@ class SubAgentRunRequest:
     task_title: str | None = None
     parent_thread_id: str | None = None
     parent_message_id: str | None = None
+    parent_run_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -183,6 +184,7 @@ class SubAgentOrchestrator:
             "parent_surface": request.parent_surface,
             "parent_thread_id": request.parent_thread_id,
             "parent_message_id": request.parent_message_id,
+            "parent_run_id": request.parent_run_id,
             "status": "queued",
             "task_title": request.task_title,
             "task_summary": request.task_summary,

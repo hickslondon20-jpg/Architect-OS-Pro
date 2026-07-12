@@ -339,6 +339,7 @@ class AgentRunRequest(BaseModel):
     task_title: str | None = None
     parent_thread_id: str | None = None
     parent_message_id: str | None = None
+    parent_run_id: str | None = None
 
 
 class AgentRunResponse(BaseModel):
@@ -1163,6 +1164,7 @@ def start_agent_run(payload: AgentRunRequest) -> AgentRunResponse:
                 task_title=payload.task_title,
                 parent_thread_id=payload.parent_thread_id,
                 parent_message_id=payload.parent_message_id,
+                parent_run_id=payload.parent_run_id,
             )
         )
     except SubAgentError as exc:

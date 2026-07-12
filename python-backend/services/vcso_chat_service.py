@@ -419,6 +419,7 @@ class VcsoChatService:
                             "tool_scope_surface": "virtual_cso_deep" if deep_mode else "virtual_cso",
                             "deep_mode": deep_mode,
                             "parent_message_id": user_message["id"],
+                            "parent_run_id": run_id,
                             "sandbox_execution_service": _optional_sandbox_execution_service(self.supabase),
                         },
                     )

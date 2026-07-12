@@ -1223,6 +1223,7 @@ def _execute_delegate_to_sub_agent(context: ToolExecutionContext, tool_input: di
             task_title=str(tool_input.get("task_title") or "")[:120] or None,
             parent_thread_id=context.thread_id,
             parent_message_id=context.metadata.get("parent_message_id"),
+            parent_run_id=context.metadata.get("parent_run_id"),
         )
     )
     content = {
