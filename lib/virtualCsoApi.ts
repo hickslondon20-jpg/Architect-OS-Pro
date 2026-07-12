@@ -17,7 +17,7 @@ import {
 import { getArtifact } from './artifactsApi';
 
 export { INSIGHT_STARTERS, MOCK_SOURCE_REFS, SOURCE_KIND_LABELS };
-export type { ArtifactDelivery, Chat, InsightStarter, Message, Project, SourceKind, SourcePage, SourceRef };
+export type { AgentStep, ArtifactDelivery, Chat, InsightStarter, Message, Project, SourceKind, SourcePage, SourceRef };
 
 export interface VirtualCsoData {
   projects: Project[];
@@ -47,6 +47,7 @@ export interface SendUserMessageOptions {
   projectId?: string | null;
   onUserMessage?: (message: Message) => void;
   onToken?: (text: string) => void;
+  onAgentSteps?: (steps: AgentStep[]) => void;
   onReady?: (meta: { threadId: string; route: Ws5RouteMeta; assembledContext: Ws5AssembledContextMeta; agentSteps?: AgentStep[] }) => void;
 }
 
@@ -129,6 +130,9 @@ const outputToString = (output: unknown): string => {
 };
 
 const toAgentStep = (step: AgentDelegationStepRow): AgentStep => ({
+  stepIndex: step.step_index ?? undefined,
+  stepType: step.step_type ?? undefined,
+  title: step.title ?? undefined,
   tool: String(step.tool_name ?? step.title ?? step.step_type ?? ''),
   input: step.input_summary ?? {},
   output: outputToString(step.output_summary ?? step.summary ?? ''),
@@ -352,6 +356,7 @@ export const sendUserMessage = async (
   let assembledContext: Ws5AssembledContextMeta | null = null;
   let artifactId: string | null = null;
   let artifactDelivery: ArtifactDelivery | null = null;
+  const liveAgentSteps = new Map<number, AgentStep>();
 
   await parseSseStream(response, {
     onEvent: (event, payload) => {
@@ -369,6 +374,33 @@ export const sendUserMessage = async (
       }
       if (event === 'token') {
         options.onToken?.(payload.text ?? '');
+      }
+      if (event === 'tool_call' && typeof payload.stepIndex === 'number') {
+        liveAgentSteps.set(payload.stepIndex, {
+          stepIndex: payload.stepIndex,
+          stepType: payload.stepType,
+          title: payload.title,
+          tool: payload.tool ?? payload.title ?? 'Agent tool',
+          input: payload.input ?? {},
+          output: '',
+          status: payload.status ?? 'running',
+          sourceRefs: payload.sourceRefs ?? [],
+        });
+        options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
+      }
+      if (event === 'tool_result' && typeof payload.stepIndex === 'number') {
+        const current = liveAgentSteps.get(payload.stepIndex);
+        liveAgentSteps.set(payload.stepIndex, {
+          stepIndex: payload.stepIndex,
+          stepType: payload.stepType ?? current?.stepType,
+          title: payload.title ?? current?.title,
+          tool: payload.tool ?? current?.tool ?? payload.title ?? 'Agent tool',
+          input: current?.input ?? {},
+          output: outputToString(payload.output ?? payload.summary ?? ''),
+          status: payload.status ?? 'completed',
+          sourceRefs: payload.sourceRefs ?? current?.sourceRefs ?? [],
+        });
+        options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
       }
       if (event === 'done') {
         chat = payload.chat;

@@ -27,6 +27,9 @@ export interface Chat {
 }
 
 export interface AgentStep {
+  stepIndex?: number;
+  stepType?: string;
+  title?: string;
   tool: string;
   input: Record<string, unknown>;
   output: string;

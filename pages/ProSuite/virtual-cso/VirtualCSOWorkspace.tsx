@@ -261,6 +261,13 @@ export const VirtualCSOWorkspace: React.FC = () => {
             ),
           );
         },
+        onAgentSteps: (agentSteps) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantTempId ? { ...message, agentSteps } : message,
+            ),
+          );
+        },
       });
 
       targetChatId = result.chat.id;
