@@ -724,7 +724,17 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             executor=_execute_code,
             citation={"source_kind": "computation", "mode": "provenance"},
             capability_hints=["sandbox_execution_agent"],
-            surface_tags=["virtual_cso"],
+            # Intentionally NOT tagged "virtual_cso": this tool must only be reachable inside the
+            # bounded sandbox_execution_agent sub-agent loop (SANDBOX_EXECUTION_TOOLS in
+            # sandbox_execution_service.py, which fetches it by exact name via registry.get() and
+            # bypasses surface scoping entirely). RegistryNativeScopeSource.names_for_scope() treats
+            # capability=None (as passed by the main VCSO tool loop's own surface-based tool catalog
+            # build) as "no capability restriction", so a surface_tags=["virtual_cso"] entry here would
+            # leak execute_code into the top-level VCSO loop's own tool list, letting the model call it
+            # directly outside the sub-agent and hit a bare KeyError('code') when it omits the code
+            # argument (observed live 2026-07-11, run e3208ba2, steps 5-6). Use a marker tag no real
+            # surface ever requests so this only stays reachable via direct-by-name registry lookup.
+            surface_tags=["sandbox_execution_internal"],
             keywords=["python", "code", "sandbox", "compute", "execute"],
         ),
         ToolDefinition(
@@ -745,7 +755,9 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             executor=_execute_read_skill_file,
             citation={"source_kind": "skill_file", "mode": "verbatim"},
             capability_hints=["sandbox_execution_agent"],
-            surface_tags=["virtual_cso"],
+            # See execute_code above: sandbox-sub-agent-only tool, deliberately not surfaced to the
+            # main VCSO tool loop's own catalog.
+            surface_tags=["sandbox_execution_internal"],
             keywords=["skill", "file", "template", "read"],
         ),
         ToolDefinition(
@@ -1087,6 +1099,8 @@ def _execute_wiki_list(context: ToolExecutionContext, tool_input: dict[str, Any]
 def _execute_code(context: ToolExecutionContext, tool_input: dict[str, Any]) -> ToolResultEnvelope:
     if context.sandbox_service is None or not context.thread_id:
         raise ToolRegistryError("Sandbox service and thread_id are required for execute_code.")
+    if not tool_input.get("code"):
+        raise ToolRegistryError("execute_code requires a non-empty 'code' argument.")
     code = str(tool_input["code"])
     fulfiller = context.metadata.get("bridge_fulfiller")
     if fulfiller is not None:
