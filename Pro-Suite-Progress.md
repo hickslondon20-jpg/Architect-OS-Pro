@@ -107,6 +107,7 @@ Full ways-of-working context: see `CLAUDE.md` ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬
 | 10 | Sub-agent trace UX: decide compact nested display for Virtual CSO, OS Engine, Domain Agents, and later Sprint Planning without exposing raw chain-of-thought. | Ep1 M8 return pass | Product UX refinement | 2026-06-28 |
 | 11 | Capability growth policy: define how new agent capabilities/prompts/tools are added to the registry based on observed user needs. | Ep1 M8 return pass | Platform governance | 2026-06-28 |
 | 12 | Episode 6 harness boundary: decide when to graduate from scoped sub-agent runs to Deep Mode, workspace files, ask-user, and deterministic domain harnesses. | Ep1 M8 / Ep6 bridge | Future harness sequencing | 2026-06-28 |
+| 13 | Platform-controlled model routing: should each tool and sub-agent capability declare an approved model or cost/quality tier in the Supabase-backed registry, with routing policy, fallback behavior, evaluation gates, and usage attribution? No founder-facing model selector. | Ep1 M8 / Ep5-Ep6 return pass | Agent cost governance | 2026-07-12 |
 
 ---
 
@@ -126,6 +127,7 @@ Full ways-of-working context: see `CLAUDE.md` ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬
 | Web Search Fallback Return Pass | Choose external search provider, configure keys/settings, and define privacy/citation rules before enabling web fallback. | External search can help when private docs do not answer a question, but it must stay clearly attributed and must not leak founder-private data. | Pending |
 | Sub-Agent Trace UX Return Pass | Design compact expandable trace panels for Virtual CSO, OS Engine, Domain Agents, and future Sprint Planning helpers. | Module 8 should prepare the backend trace shape now; polished nested UI can wait until the scaffolding is smoke-tested. | Pending |
 | Agent Capability Governance Return Pass | Define the process for adding new agent capabilities, prompts, tool permissions, output schemas, and evaluation gates. | The registry should grow as user needs become clear, but every capability needs deliberate scope and safety boundaries. | Pending |
+| Tool & Sub-Agent Model Routing Return Pass | Research the live tool/capability registry and usage-logging paths, then define registry-backed model assignment or model tiers for tools and sub-agents. Keep selection platform-controlled; include quality/cost evaluations, allowed-model policy, fallback/escalation rules, per-run model attribution, and safe defaults before wiring. | Sonnet-class reasoning is unnecessary for every retrieval, search, classification, or bounded worker step. Deliberate routing can lower testing and production costs without exposing model controls to founders or weakening answer quality silently. | Pending — explicitly outside MA-05 Objectives 4–8 unless later authorized |
 | Deep Mode / Harness Bridge Return Pass | Decide when to layer Episode 6 Deep Mode, workspace files, ask-user, batched agents, and deterministic harnesses onto the Module 8 scaffold. | Module 8 should stay focused on bounded delegation, while Episode 6 will make the agent system more autonomous and workflow-driven. | Pending |
 
 ---
