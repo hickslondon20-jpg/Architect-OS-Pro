@@ -39,7 +39,27 @@ Every status statement uses one rung. A green Episode row means **backend-comple
   Python-backend LLM call on an episode's critical path emits a LangSmith trace as evidence (necessary, not
   sufficient — paired with DB/output checks). Provider keys rotated 2026-07-08.
   **Standing rule:** commit after every milestone; `main` is canonical.
-- **Still not usable:** no front-end is wired to any of this (that's §8).
+- **Ep2 (KB Explorer + wiki-read) SOFT-CLOSED — backend-live-verified (2026-07-10).** Live-verified on
+  `cd490873-…`: KB Explorer tools (ls/tree/grep/glob/read) + sub-agent, Tier-1 population (incl. the narrowed
+  canonical-key index), the doc-wiki trigger (fires + logs a "not page-worthy" decision — not broken),
+  wiki-read (citation-shaped `wiki_page` results), and the canonical Python CSO path (persists a turn with
+  citations). **LangSmith production tracing confirmed** (traces show production uploads; `LANGSMITH_*` set in
+  Railway). Fix-it batch shipped v0.5.14–v0.5.18 (model-alias repoint, doc-wiki error visibility, HTML/MD
+  DB+storage support, ingestion wiring fixes). *Soft-closed* = backend wired + directionally correct;
+  **fully-closed** (all features operational) waits on the deferred items. **Deferred:** (§8) CSO
+  realtime/streaming UI rendering + Sources-panel citation UX; (connection-phase, post-episodes) **CSO Tier-0
+  platform-record retrieval** — the CSO reaches Tier-1 + docs but not base Tier-0 records directly
+  (Agency Snapshot / GV / financial KPI / sprint / quarter).
+- **Working from live now (2026-07-10/11).** Retired local hosting: all config repointed to the live URLs
+  (`architectospro.com` frontend / `api.architectospro.com` backend), workflow is `main` → auto-deploy
+  (Railway + Vercel) → test on the live URL, gated on green deploys. **Forgot-password / reset-password feature
+  shipped** — the seeded `hicks.london25@gmail.com` (`cd490873-…`) account is now usable directly, ending the
+  split-account testing. **OS Engine UI upload → auto-ingestion verified end-to-end (v0.5.32)** via a secure
+  Vercel serverless proxy (session-validated, server-held ingest secret; Supabase → proxy → Railway Processing →
+  Complete → metadata → LangSmith), plus an OS Engine refresh-hiccup fix. *Confirmed for HTML/MD; should hold for
+  all formats — flag to confirm (PDF/DOCX/CSV/XLSX).* **Current baseline: v0.5.32.**
+- **Front-end status:** some surfaces are now live-wired and dogfoggable (auth, OS Engine upload, Virtual CSO),
+  but most of the front-end still needs the §8 real-wiring + polish pass.
 
 **Connection-phase decision:** routed cross-tier reasoning (C) is the MVP target — beta should feel like a
 strategic OS, not a RAG bot. Build **A-first**; the router's final timing (first beta vs. fast-follow) is an
@@ -68,14 +88,21 @@ MCP connections (L7 scaffold-only at beta); dark-by-design citations (`web`, `re
 6. **Consolidated cross-episode smoke → flip go-live.**
 
 ## Current position + next initiatives
-MA-03 (Tier-1 synthesis) **closed**; the repo-recovery incident **resolved** (main canonical, v0.5.8 deployed);
-MA-01 (LangSmith observability) **closed** (v0.5.13). Next:
-1. **MA-02 (Ep2 — KB Explorer + wiki-read)** — the lighter version (MA-03 proved the Tier-1 path): KB tool
-   suite, doc-wiki path, connection-A canonical-path + Phase-9-router divergence, the fix-it batch (stale model
-   alias, silent-except, HTML/MD ingestion), and the MA-03 carry-forward verify items (narrowed index vs.
-   onboarding scaffold, `open_questions` ordering, `page_type` read).
-2. Then Ep4 → Ep5 → Ep6 → Ep7, per the MA-01 episode-by-episode scope.
+MA-03 (Tier-1) **closed**; recovery incident **resolved**; MA-01 (observability) **closed**;
+**Ep2 SOFT-CLOSED**; **env consolidation (work-from-live) + forgot-password + OS Engine auto-ingestion DONE**
+(v0.5.32). Next:
+1. **MA-04 — Ep4 verification (Agent Skills & Code Sandbox / artifact-production engine).** Resume the
+   episode-by-episode march, live-first: skills system (CRUD/import-export/guided creator/global-private/
+   building-block files), the GKE code sandbox, persistent tool memory, and artifacts (sub-agent → sandbox →
+   artifact → chat-message link → reader/library). Scoped with objectives + stage gates like Ep2.
+2. Then **Ep5 → Ep6 → Ep7**, same fashion.
+3. **Deferred (later passes, after the episodes):** the §8 front-end/UX refinement + real-wiring pass (incl. CSO
+   realtime rendering + Sources-panel UX), and **CSO Tier-0 retrieval**.
 
-## Standing operational rules (post-incident)
-Commit to git after **every** milestone (uncommitted work has been lost across session boundaries).
-Don't trust bash on this repo (stale/truncated); the founder's machine is authoritative.
+## Standing operational rules
+- **Work from live.** `main` → auto-deploy (Railway + Vercel) → test on `architectospro.com`; gate each milestone
+  on the deploy going green (keep pre-push compile/build checks). No local PowerShell/backend smokes.
+- **Commit after every milestone**, version-tagged per `CLAUDE.md` (`vMAJOR.MINOR.PATCH <desc>`, PATCH++ per
+  commit; find current from the latest commit). **Current baseline: v0.5.44** (Ep4 Obj-0 + Obj-1 done). Instruct every feature agent to follow this.
+- Verify by outcome: live UI + Supabase MCP + LangSmith traces (`ArchitectOS-pro`). Don't read/echo secrets.
+- Don't fully trust bash reads on this repo (stale/truncated); prefer Read/Grep/Glob; the founder's machine + live deploy are authoritative.

@@ -1378,31 +1378,92 @@ def _text_from_anthropic_response(response: Any) -> str:
 
 
 def _safe_input_summary(tool_input: dict[str, Any]) -> dict[str, Any]:
-    summary: dict[str, Any] = {}
-    for key, value in tool_input.items():
-        if key in {"code", "body", "content"} and isinstance(value, str):
-            summary[key] = f"[{len(value)} chars]"
-        else:
-            summary[key] = value
-    return summary
+    return {key: _safe_summary_value(key, value, output=False) for key, value in tool_input.items()}
 
 
 def _safe_output_summary(result: dict[str, Any]) -> dict[str, Any]:
-    summary: dict[str, Any] = {}
-    for key, value in result.items():
-        if key in {"body", "content", "stdout", "stderr", "verbatim"} and isinstance(value, str):
-            summary[key] = f"[{len(value)} chars]"
-        elif key in {"items", "matches", "tree", "pages", "trace", "citations"} and isinstance(value, list):
-            summary[key] = f"[{len(value)} items]"
-        elif key == "structured_result" and isinstance(value, dict):
-            summary[key] = {
-                "summary": value.get("summary"),
-                "source_count": value.get("source_count"),
-                "confidence": value.get("confidence"),
-            }
-        else:
-            summary[key] = value
-    return summary
+    return {key: _safe_summary_value(key, value, output=True) for key, value in result.items()}
+
+
+_SENSITIVE_SUMMARY_KEYS = {
+    "api_key",
+    "apikey",
+    "authorization",
+    "cookie",
+    "credential",
+    "credentials",
+    "ingest_secret",
+    "password",
+    "secret",
+    "service_role_key",
+    "token",
+}
+_LARGE_TEXT_KEYS = {"body", "code", "content", "stderr", "stdout", "verbatim"}
+_SAFE_RESULT_FIELDS = {
+    "canonical_key",
+    "confidence",
+    "file_type",
+    "folder_id",
+    "id",
+    "label",
+    "name",
+    "page_id",
+    "page_kind",
+    "similarity",
+    "source_type",
+    "status",
+    "title",
+}
+
+
+def _safe_summary_value(key: str, value: Any, *, output: bool) -> Any:
+    normalized_key = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+    if normalized_key in _SENSITIVE_SUMMARY_KEYS or any(
+        normalized_key.endswith(f"_{suffix}") for suffix in _SENSITIVE_SUMMARY_KEYS
+    ):
+        return "[redacted]"
+    if normalized_key in _LARGE_TEXT_KEYS and isinstance(value, str):
+        return f"[{len(value)} chars]"
+    if normalized_key == "structured_result" and isinstance(value, dict):
+        return {
+            "summary": _redact_secret_text(value.get("summary")),
+            "source_count": value.get("source_count"),
+            "confidence": value.get("confidence"),
+        }
+    if isinstance(value, dict):
+        if output and normalized_key == "page":
+            return _safe_result_item(value)
+        return {nested_key: _safe_summary_value(nested_key, nested_value, output=output) for nested_key, nested_value in value.items()}
+    if isinstance(value, list):
+        if output and normalized_key in {"findings", "items", "matches"}:
+            return [_safe_result_item(item) for item in value[:5]]
+        unit = "rows" if normalized_key in {"rows", "result_rows"} else "items"
+        return f"[{len(value)} {unit}]"
+    if isinstance(value, str):
+        return _redact_secret_text(value[:1000])
+    return value
+
+
+def _safe_result_item(item: Any) -> Any:
+    if not isinstance(item, dict):
+        return _safe_summary_value("item", item, output=True)
+    safe = {
+        key: _safe_summary_value(key, value, output=True)
+        for key, value in item.items()
+        if key in _SAFE_RESULT_FIELDS
+    }
+    if not safe:
+        return {"result": "[details hidden]"}
+    return safe
+
+
+def _redact_secret_text(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    text = re.sub(r"(?i)bearer\s+[a-z0-9._~+/-]+=*", "Bearer [redacted]", value)
+    text = re.sub(r"\bsk-[A-Za-z0-9_-]{12,}\b", "[redacted]", text)
+    text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "[redacted]", text)
+    return text
 
 
 def _step_type_for_tool(tool_name: str, input_summary: dict[str, Any]) -> str:

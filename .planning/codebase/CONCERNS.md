@@ -93,6 +93,35 @@ The codebase is materially built, but beta-readiness risk is concentrated in ver
 - **Local Python version must match production (3.13), not 3.14.** Production (Railway) runs Python **3.13.14**. A local machine on **Python 3.14** cannot `pip install` some backend deps (e.g. `langsmith` → `zstandard`/`cffi`), because those lack prebuilt 3.14 wheels and fall back to building from source, which requires Microsoft C++ Build Tools. Symptom: `DistutilsPlatformError: Microsoft Visual C++ 14.0 or greater is required`. Fix: use a **Python 3.13 venv** matching production for any founder-run backend smoke, or verify in production instead of locally. (Encountered 2026-07-10 during MA-01 LangSmith verification — the smoke's fail-open helper correctly used unwrapped clients when `langsmith` was absent, so tracing couldn't be verified locally; it was verified in production instead.)
 - **`.venv-kb-nav` is an execution-agent sandbox venv, not present on the founder's machine.** Prompts that reference activating it will fail locally; the founder should point at their own 3.13 venv.
 
+## Ep2 Soft-Close — Deferred Items (backend-live-verified, not yet usable)
+
+Ep2 (KB Explorer + wiki-read) is **soft-closed**: backend live-verified and directionally correct on the seeded
+account `cd490873-…`, LangSmith production tracing confirmed. "Fully closed" waits on:
+
+- **CSO responses don't render in real time** — the canonical Python CSO persists the turn (thread + user/assistant messages + citations) to the DB, but the assistant response only appears after refresh/relogin. Streaming/SSE UI rendering is unresolved. **→ §8** (priority, since real-time response is central UX).
+- **Sources panel / citation UX not product-ready** — citations persist and are citation-shaped (`wiki_page`), but clickable/useful source rendering in the panel is pending. **→ §8.**
+- **CSO retrieval does not reach Tier-0 platform records** — it reaches Tier-1 (synthesized wiki) + docs/IP, but not the base structured records directly (Agency Snapshot, GV calculator, financial KPIs, sprint, quarter). Needed for founder strategy questions grounded in exact records. **→ connection-phase scope item** (decide MVP-vs-v1 after the remaining episodes).
+- **Split test accounts** — UI uploads land under the founder's real `4ef8…` account (auth requires `storage_path` to start with the logged-in user id), while the seeded Tier-1 data lives under `cd490873…` (`hicks.london25@gmail.com`), for which we have no login. Being resolved by the forgot-password feature so the seeded account can be used for all UI tests. Also: two smoke docs/chunks to clean up from `4ef8…`.
+
+## Systemic Code-Quality Flags (Ep4 carry-forwards, 2026-07-11)
+
+Surfaced repeatedly during live verification; codebase-wide, not Ep4-specific. Address in a cleanup/§8 pass or incidentally:
+
+- **Uniqueness-assumption mismatches.** App-level user-scoped checks against **globally-unique** DB columns (and vice versa) have recurred (the MRA/`agent_capabilities` collision; the Ep4 Skills `last_updated`→`updated_at` alias). Audit for app uniqueness assumptions that don't match the actual DB constraints.
+- **Error-swallowing around Supabase/PostgREST/Storage.** `error instanceof Error ? error.message` on those plain-object errors loses the real diagnostic (related to the earlier "Failed to fetch" panel-blanking). Grep for that pattern and preserve the underlying error detail.
+- **Structured backend errors.** Fold the actionable text into `detail` unless the frontend error parser is broadened — otherwise the useful message is dropped before the UI sees it.
+
+## Deferred / Likely-Retire (product decisions)
+
+- **Tier-1 input sources & update governance — dedicated design pass (2026-07-11).** Tier-1 foundational pages
+  should be feedable by **documents + MCP data**, not just the fixed platform tables, per the architecture
+  ("OS Engine generates/updates Tier-1 from both the documents and platform interactions"). Current impl is
+  narrower (fixed `SOURCE_TABLES_BY_PAGE` only), so a document upload doesn't recompile Tier-1 *today* — an
+  implementation state, not a design boundary. Needs its own working session for the rules/timing of Tier-1
+  updates/resynthesis. Full note: `.planning/wiki-system/TIER1-SYNTHESIS-UPGRADE-DESIGN-BRIEF.md` → §8 Future
+  Work. **Not in scope for Ep4–Ep7.**
+- **Guided Skill Creator — likely retire for MVP** (founder decision, 2026-07-11). Not verified in Ep4 by design (the guided-draft direct-Anthropic path is left alone). Revisit in the §8 UI pass: keep or retire. Skill **import/export + CRUD + `@slug`** are the verified, kept paths.
+
 ## Launch Readiness Concerns
 
 - Resolve or explicitly scope TypeScript errors before beta finalization.

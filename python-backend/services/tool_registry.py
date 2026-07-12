@@ -1522,4 +1522,21 @@ def _sources_from_tree(nodes: list[dict[str, Any]]) -> list[ToolSourceRef]:
 def _sources_from_wiki_findings(findings: Any, *, verbatim: bool = False) -> list[ToolSourceRef]:
     if not isinstance(findings, list):
         return []
-    source
+    sources: list[ToolSourceRef] = []
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        sources.append(
+            ToolSourceRef(
+                source_kind="wiki_page",
+                source_id=finding.get("page_id") or finding.get("canonical_key"),
+                verbatim=finding.get("content") if verbatim else finding.get("excerpt"),
+                label=finding.get("title"),
+                metadata={
+                    "canonical_key": finding.get("canonical_key"),
+                    "page_kind": finding.get("page_kind"),
+                    "source_type": finding.get("source_type"),
+                },
+            )
+        )
+    return sources

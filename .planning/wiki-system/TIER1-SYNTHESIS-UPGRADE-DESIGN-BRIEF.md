@@ -60,3 +60,23 @@ compiled-synthesis base now, insight-accretion follow-on · auto-trigger async/d
 
 ## 7. Non-goals (this build)
 MCP live financial feed (design-for only); front-end rendering (§8); the founder-confirmed insight-accretion loop.
+
+## 8. Future Work — Tier-1 Input Sources & Update Governance (dedicated pass required)
+
+**Clarified 2026-07-11 (founder). Codified so it is not lost.** The 7 Tier-1 foundational pages are the
+platform's *holistic synthesized understanding of the business* — and per the canonical architecture (OS Engine
+generates/updates the Tier-1 wiki **"from both the documents and platform interactions"**), they are meant to be
+fed by **more than the fixed platform tables.** Uploaded documents — and, later, **MCP-connected data** — that
+earn their own Tier-2 synthesis **can and should be able to influence or trigger an update to the relevant
+foundational page(s)**, because Tier-1 is the confirmed "what we know about the business" that seeds other
+platform areas.
+
+**Current implementation is narrower:** Tier-1 compiles only from the fixed `SOURCE_TABLES_BY_PAGE` platform
+records via `event_rebuild_targets` triggers. Document/MCP-derived context does **not** yet feed the foundational
+pages. So a document upload correctly does not recompile Tier-1 *today* — but that is an **implementation state,
+not a correct-by-design boundary.**
+
+**Requires its own working session (not in scope for Ep4–Ep7).** Define the governing rules + timing: which
+document/MCP inputs qualify to touch Tier-1, how they map to which foundational page(s), when a Tier-1
+resynthesis/rebuild fires vs. debounces, and how to avoid noise/thrash. Scope deliberately later; do not wire it
+into the current episode passes.
