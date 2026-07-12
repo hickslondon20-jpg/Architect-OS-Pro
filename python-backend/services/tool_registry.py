@@ -964,6 +964,21 @@ def _native_tool_definitions() -> list[ToolDefinition]:
     ]
 
 
+def _int_or(value: Any, default: int) -> int:
+    """int(...) that tolerates an explicitly-passed null/None the same as omitted.
+
+    tool_input.get("limit", default) only falls back to default when the key is
+    absent; a caller that passes {"limit": null} (observed live from the sandbox
+    Code Mode bridge stub calling kb_glob) gets None back from .get(), and
+    int(None) raises TypeError: int() argument must be a string, a bytes-like
+    object or a real number, not 'NoneType' - surfaced live 2026-07-12 as two
+    failed kb_glob Code Mode calls during the Ep4 Obj-2 sandbox capstone run.
+    """
+    if value is None:
+        return default
+    return int(value)
+
+
 def _execute_kb_ls(context: ToolExecutionContext, tool_input: dict[str, Any]) -> ToolResultEnvelope:
     from services.folder_navigation import KbNavigationService, ls_result_to_dict
 
@@ -981,8 +996,8 @@ def _execute_kb_tree(context: ToolExecutionContext, tool_input: dict[str, Any]) 
     result = KbNavigationService(context.store).execute_tree(
         user_id=context.user_id,
         folder_id=tool_input.get("folder_id"),
-        depth=int(tool_input.get("depth", 3)),
-        limit=int(tool_input.get("limit", 200)),
+        depth=_int_or(tool_input.get("depth"), 3),
+        limit=_int_or(tool_input.get("limit"), 200),
     )
     content = tree_result_to_dict(result)
     return ToolResultEnvelope(content=content, sources=_sources_from_tree(content.get("tree", [])))
@@ -995,7 +1010,7 @@ def _execute_kb_grep(context: ToolExecutionContext, tool_input: dict[str, Any]) 
         user_id=context.user_id,
         pattern=str(tool_input["pattern"]),
         folder_id=tool_input.get("folder_id"),
-        limit=int(tool_input.get("limit", 50)),
+        limit=_int_or(tool_input.get("limit"), 50),
     )
     content = grep_result_to_dict(result)
     return ToolResultEnvelope(content=content, sources=_sources_from_matches(content.get("matches", [])))
@@ -1008,7 +1023,7 @@ def _execute_kb_glob(context: ToolExecutionContext, tool_input: dict[str, Any]) 
         user_id=context.user_id,
         pattern=str(tool_input["pattern"]),
         folder_id=tool_input.get("folder_id"),
-        limit=int(tool_input.get("limit", 200)),
+        limit=_int_or(tool_input.get("limit"), 200),
     )
     content = glob_result_to_dict(result)
     return ToolResultEnvelope(content=content, sources=_sources_from_matches(content.get("matches", [])))
@@ -1045,7 +1060,7 @@ def _execute_wiki_search(context: ToolExecutionContext, tool_input: dict[str, An
 
     reader = DocWikiReadService(context.store)
     try:
-        result = reader.search(user_id=context.user_id, query=str(tool_input.get("query", "")), limit=int(tool_input.get("limit", 5)))
+        result = reader.search(user_id=context.user_id, query=str(tool_input.get("query", "")), limit=_int_or(tool_input.get("limit"), 5))
     except DocWikiReadError as exc:
         return ToolResultEnvelope(content={"error": str(exc)}, sources=[])
     pages = result.get("findings", [])
@@ -1083,7 +1098,7 @@ def _execute_wiki_list(context: ToolExecutionContext, tool_input: dict[str, Any]
         result = reader.list_pages(
             user_id=context.user_id,
             page_kinds=[str(kind)] if kind else None,
-            limit=int(tool_input.get("limit", 20)),
+            limit=_int_or(tool_input.get("limit"), 20),
         )
     except DocWikiReadError as exc:
         return ToolResultEnvelope(content={"error": str(exc)}, sources=[])
@@ -1177,7 +1192,7 @@ def _execute_tool_search(context: ToolExecutionContext, tool_input: dict[str, An
         str(tool_input.get("query") or ""),
         surface=str(context.metadata.get("tool_scope_surface") or context.metadata.get("surface") or "virtual_cso"),
         capability=context.metadata.get("capability"),
-        limit=int(tool_input.get("limit", 8)),
+        limit=_int_or(tool_input.get("limit"), 8),
     )
     content = {
         "matches": to_anthropic(matches),
@@ -1507,21 +1522,4 @@ def _sources_from_tree(nodes: list[dict[str, Any]]) -> list[ToolSourceRef]:
 def _sources_from_wiki_findings(findings: Any, *, verbatim: bool = False) -> list[ToolSourceRef]:
     if not isinstance(findings, list):
         return []
-    sources: list[ToolSourceRef] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
-        sources.append(
-            ToolSourceRef(
-                source_kind="wiki_page",
-                source_id=finding.get("page_id") or finding.get("canonical_key"),
-                verbatim=finding.get("content") if verbatim else finding.get("excerpt"),
-                label=finding.get("title"),
-                metadata={
-                    "canonical_key": finding.get("canonical_key"),
-                    "page_kind": finding.get("page_kind"),
-                    "source_type": finding.get("source_type"),
-                },
-            )
-        )
-    return sources
+    source
