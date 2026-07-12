@@ -30,6 +30,7 @@ export interface AgentStep {
   stepIndex?: number;
   stepType?: string;
   title?: string;
+  summary?: string;
   tool: string;
   input: Record<string, unknown>;
   output: string;
