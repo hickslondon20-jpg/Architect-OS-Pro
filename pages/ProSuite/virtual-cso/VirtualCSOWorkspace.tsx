@@ -147,10 +147,14 @@ export const VirtualCSOWorkspace: React.FC = () => {
   }, [authLoading, user?.id]);
 
   useEffect(() => {
+    // A new thread id arrives at the start of the SSE stream, before the
+    // assistant message exists in the database. Reloading at that point would
+    // replace the temporary assistant message that receives tokens and steps.
+    if (streaming) return;
     loadMessages(activeChatId).catch((err) =>
       setError(err instanceof Error ? err.message : 'Could not load messages.'),
     );
-  }, [activeChatId]);
+  }, [activeChatId, streaming]);
 
   const openChat = async (chatId: string) => {
     const chat = getChatById(chats, chatId);
