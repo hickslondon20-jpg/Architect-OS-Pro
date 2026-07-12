@@ -118,7 +118,11 @@ type AgentDelegationStepRow = {
 };
 
 type AgentDelegationRunWithSteps = {
+  id?: string | null;
   assistant_message_id?: string | null;
+  capability_key?: string | null;
+  status?: string | null;
+  result_summary?: string | null;
   agent_delegation_steps?: AgentDelegationStepRow[] | null;
   structured_result?: Record<string, unknown> | null;
 };
@@ -129,9 +133,15 @@ const outputToString = (output: unknown): string => {
   return JSON.stringify(output);
 };
 
-const toAgentStep = (step: AgentDelegationStepRow): AgentStep => ({
+const childRunIdFromOutput = (output: unknown): string | null => {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return null;
+  const runId = (output as Record<string, unknown>).run_id;
+  return typeof runId === 'string' && runId ? runId : null;
+};
+
+const toAgentStep = (step: AgentDelegationStepRow, childRun?: AgentDelegationRunWithSteps): AgentStep => ({
   stepIndex: step.step_index ?? undefined,
-  stepType: step.step_type ?? undefined,
+  stepType: step.tool_name === 'delegate_to_sub_agent' ? 'sub_agent' : step.step_type ?? undefined,
   title: step.title ?? undefined,
   summary: step.summary ?? undefined,
   tool: String(step.tool_name ?? step.title ?? step.step_type ?? ''),
@@ -139,6 +149,19 @@ const toAgentStep = (step: AgentDelegationStepRow): AgentStep => ({
   output: outputToString(step.output_summary ?? step.summary ?? ''),
   status: step.status ?? undefined,
   sourceRefs: step.source_refs ?? undefined,
+  children: childRun?.agent_delegation_steps
+    ?.sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0))
+    .map((childStep) => toAgentStep(childStep)),
+  subAgent: childRun
+    ? {
+        runId: childRun.id ?? undefined,
+        capabilityKey: childRun.capability_key ?? undefined,
+        status: childRun.status ?? undefined,
+        summary: childRun.result_summary ?? undefined,
+      }
+    : step.tool_name === 'delegate_to_sub_agent'
+      ? { runId: childRunIdFromOutput(step.output_summary) ?? undefined }
+      : undefined,
 });
 
 const toMessage = (row: any, agentSteps?: AgentStep[], artifactDeliveries?: ArtifactDelivery[]): Message => ({
@@ -242,6 +265,7 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
   const stepsByMessageId = new Map<string, AgentStep[]>();
   const artifactIdsByMessageId = new Map<string, string>();
   const artifactsById = new Map<string, ArtifactDelivery>();
+  const childRunsById = new Map<string, AgentDelegationRunWithSteps>();
 
   if (assistantMessageIds.length > 0) {
     const runsResult = await supabase
@@ -251,6 +275,26 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
       .in('assistant_message_id', assistantMessageIds);
     if (runsResult.error) throw runsResult.error;
 
+    const childRunIds = Array.from(
+      new Set(
+        ((runsResult.data ?? []) as AgentDelegationRunWithSteps[])
+          .flatMap((run) => run.agent_delegation_steps ?? [])
+          .map((step) => childRunIdFromOutput(step.output_summary))
+          .filter((runId): runId is string => Boolean(runId)),
+      ),
+    );
+    if (childRunIds.length > 0) {
+      const childRunsResult = await supabase
+        .from('agent_delegation_runs')
+        .select('id,capability_key,status,result_summary,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary,source_refs)')
+        .eq('user_id', userId)
+        .in('id', childRunIds);
+      if (childRunsResult.error) throw childRunsResult.error;
+      for (const childRun of (childRunsResult.data ?? []) as AgentDelegationRunWithSteps[]) {
+        if (childRun.id) childRunsById.set(childRun.id, childRun);
+      }
+    }
+
     for (const run of (runsResult.data ?? []) as AgentDelegationRunWithSteps[]) {
       if (!run.assistant_message_id) continue;
       const existing = stepsByMessageId.get(run.assistant_message_id) ?? [];
@@ -258,7 +302,10 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
         ...existing,
         ...(run.agent_delegation_steps ?? [])
           .sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0))
-          .map(toAgentStep),
+          .map((step) => {
+            const childRunId = childRunIdFromOutput(step.output_summary);
+            return toAgentStep(step, childRunId ? childRunsById.get(childRunId) : undefined);
+          }),
       ]);
       const artifactId = artifactIdFromRun(run);
       if (artifactId) artifactIdsByMessageId.set(run.assistant_message_id, artifactId);
@@ -387,11 +434,21 @@ export const sendUserMessage = async (
           output: '',
           status: payload.status ?? 'running',
           sourceRefs: payload.sourceRefs ?? [],
+          subAgent: payload.stepType === 'sub_agent'
+            ? { capabilityKey: payload.input?.capability_key, status: 'running' }
+            : undefined,
         });
         options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
       }
       if (event === 'tool_result' && typeof payload.stepIndex === 'number') {
         const current = liveAgentSteps.get(payload.stepIndex);
+        const parsedOutput = (() => {
+          try {
+            return typeof payload.output === 'string' ? JSON.parse(payload.output) : payload.output;
+          } catch {
+            return null;
+          }
+        })();
         liveAgentSteps.set(payload.stepIndex, {
           stepIndex: payload.stepIndex,
           stepType: payload.stepType ?? current?.stepType,
@@ -402,6 +459,14 @@ export const sendUserMessage = async (
           output: outputToString(payload.output ?? payload.summary ?? ''),
           status: payload.status ?? 'completed',
           sourceRefs: payload.sourceRefs ?? current?.sourceRefs ?? [],
+          subAgent: current?.stepType === 'sub_agent'
+            ? {
+                runId: childRunIdFromOutput(parsedOutput) ?? current.subAgent?.runId,
+                capabilityKey: current.subAgent?.capabilityKey,
+                status: parsedOutput?.status ?? payload.status,
+                summary: parsedOutput?.result_summary,
+              }
+            : undefined,
         });
         options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
       }

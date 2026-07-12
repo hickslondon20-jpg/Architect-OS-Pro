@@ -90,14 +90,68 @@ const AgentStepRow: React.FC<{ step: AgentStep }> = ({ step }) => {
           </div>
         </div>
       )}
+      {step.subAgent && (
+        <div className="mb-2 ml-5 rounded-[var(--radius-xs)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] p-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="aos-mono text-[10px] uppercase tracking-wide text-[var(--aos-brass)]">Sub-agent</div>
+              <div className="mt-0.5 text-xs font-medium text-[var(--fg-2)]">
+                {(step.subAgent.capabilityKey ?? step.title ?? 'Delegated analysis').replaceAll('_', ' ')}
+              </div>
+            </div>
+            <span className="aos-mono text-[10px] uppercase text-[var(--fg-4)]">
+              {step.subAgent.status ?? step.status ?? 'complete'}
+            </span>
+          </div>
+          {step.subAgent.summary && (
+            <p className="mt-2 text-xs leading-relaxed text-[var(--fg-3)]">{step.subAgent.summary}</p>
+          )}
+          {step.children && step.children.length > 0 && (
+            <div className="mt-2 border-l border-[var(--aos-brass)] pl-2">
+              {step.children.map((child, index) => (
+                <AgentStepRow key={child.stepIndex ?? index} step={child} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
+
+type StepGroupKey = 'context' | 'tools' | 'delegated' | 'completion';
+
+const stepGroup = (step: AgentStep): StepGroupKey => {
+  if (step.stepType === 'context_build') return 'context';
+  if (step.stepType === 'result') return 'completion';
+  if (step.stepType === 'sub_agent' || step.stepType === 'code_execution' || step.tool === 'delegate_to_sub_agent') {
+    return 'delegated';
+  }
+  return 'tools';
+};
+
+const GROUP_LABELS: Record<StepGroupKey, string> = {
+  context: 'Context prepared',
+  tools: 'Tool activity',
+  delegated: 'Delegated analysis',
+  completion: 'Response prepared',
+};
+
+const GROUP_ORDER: StepGroupKey[] = ['context', 'tools', 'delegated', 'completion'];
 
 export const AgentStepsPanel: React.FC<{ steps: AgentStep[] }> = ({ steps }) => {
   const [open, setOpen] = useState(() => steps.some((step) => step.status === 'running'));
   const runningCount = steps.filter((step) => step.status === 'running').length;
   const failedCount = steps.filter((step) => step.status === 'failed').length;
+  const groupedSteps = GROUP_ORDER.map((key) => ({
+    key,
+    steps: steps.filter((step) => stepGroup(step) === key),
+  })).filter((group) => group.steps.length > 0);
+  const statusLabel = runningCount > 0
+    ? `${runningCount} running`
+    : failedCount > 0
+      ? `${failedCount} need attention`
+      : `${steps.length} complete`;
 
   return (
     <div className="mb-3 rounded-[var(--radius-xs)] border border-[var(--aos-mist)] bg-[var(--bg-sunken)]">
@@ -110,19 +164,23 @@ export const AgentStepsPanel: React.FC<{ steps: AgentStep[] }> = ({ steps }) => 
           size={12}
           className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
         />
-        <span className="aos-mono">
-          {runningCount > 0
-            ? `Working - ${runningCount} ${runningCount === 1 ? 'step' : 'steps'} running`
-            : failedCount > 0
-              ? `${steps.length} steps - ${failedCount} need attention`
-              : `${steps.length} ${steps.length === 1 ? 'step' : 'steps'} completed`}
-        </span>
+        <span className="font-medium text-[var(--fg-2)]">{open ? 'Hide steps' : 'Show steps'}</span>
+        <span className="aos-mono ml-auto text-[var(--fg-4)]">{statusLabel}</span>
       </button>
 
       {open && (
-        <div className="border-t border-[var(--aos-mist)] px-3">
-          {steps.map((step, i) => (
-            <AgentStepRow key={step.stepIndex ?? i} step={step} />
+        <div className="space-y-3 border-t border-[var(--aos-mist)] px-3 py-3">
+          {groupedSteps.map((group) => (
+            <section key={group.key} aria-label={GROUP_LABELS[group.key]}>
+              <div className="aos-mono mb-1.5 text-[10px] uppercase tracking-wide text-[var(--fg-4)]">
+                {GROUP_LABELS[group.key]}
+              </div>
+              <div className="border-l border-[var(--aos-mist)] pl-2">
+                {group.steps.map((step, index) => (
+                  <AgentStepRow key={step.stepIndex ?? index} step={step} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}

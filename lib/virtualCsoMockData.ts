@@ -36,6 +36,13 @@ export interface AgentStep {
   output: string;
   status?: string;
   sourceRefs?: Array<Record<string, unknown>>;
+  children?: AgentStep[];
+  subAgent?: {
+    runId?: string;
+    capabilityKey?: string;
+    status?: string;
+    summary?: string;
+  };
 }
 
 export interface ArtifactDelivery {
