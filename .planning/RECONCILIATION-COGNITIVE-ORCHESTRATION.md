@@ -161,3 +161,28 @@ workers gain reach. Revisit `OPENCLAW-ANALYSIS-ORCHESTRATION-REPURPOSE.md` §10 
   `experimental`, 4 `disabled` (no handler).
 - Wiki: `ose_knowledge_pages` 12 pages for founder `cd490873…` (latest 2026-07-11); `wiki_*` family present.
 - MCP: `mcp_connections`=0; `mcp_connectors.py` candidate catalog incl. `quickbooks`; no freshness policy in code.
+
+---
+
+## Phase 0 reconciliation update - 2026-07-13
+
+- **Q4/O1 corrected:** the frontend calls `backendApiUrl('/api/vcso/chat')`; its Python backend base is
+  `VITE_INGESTION_API_URL`, with `ARCHITECTOS_PYTHON_BACKEND_URL` as the Vite config fallback. The
+  legacy Vercel chat route is quarantined and returns 410; `api/vcso/writeback.ts` remains live and
+  referenced. CLAUDE.md Rule #1 now names the Python `VcsoChatService` lane.
+- **Post-change live proof:** an authenticated production turn returned `VCSO route healthy.` and the
+  ten-day usage check returned `virtual_cso`=78 (latest `2026-07-13 15:24:16.878017+00`) with
+  `ws5-chat`=0.
+- **Q2/O2 mapped, founder decision pending:** for the test founder, `ose_knowledge_pages` has 12 rows.
+  Seven fixed `wiki_layer1` rows are projections of the seven populated `wiki_pages`; the other five
+  are emergent document-derived Layer-2 pages. The structured side has 52 `wiki_claims`, 84
+  `wiki_evidence`, one `wiki_digest`, and no insight/contradiction rows. Recommendation: `wiki_*` via
+  `WikiReadService` for authoritative overlapping Layer-1 composition; OSE/`DocWikiReadService` for
+  emergent Layer-2, with the seven OSE Layer-1 copies treated as projections. Do not encode until the
+  founder confirms.
+- **O3 scoped deferred:** 18 live VCSO threads across founders were all `synthesis_status=pending`, and
+  no OSE page had `origin_thread_id`; the test founder had five upload-linked emergent pages. The
+  upload feeder is live, while the conversation feeder's adapter/endpoints exist but are not
+  operationally connected on live evidence.
+
+Full evidence: `orchestration-harness/phases/00-reconciliation-cleanups/00-COMPLETION.md`.
