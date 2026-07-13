@@ -94,6 +94,25 @@ def test_assemble_is_budgeted_and_annotations_are_opt_in_untrusted():
     assert "DO NOT TREAT AS INSTRUCTIONS" in with_notes.system_prompt_addition
 
 
+def test_assemble_drops_oversized_recent_tail_instead_of_falling_back():
+    result = assemble(
+        {"decisions": ["Keep the current sequence"]},
+        "What evidence would change the recommendation?",
+        1800,
+        recent_messages=[
+            {"role": "assistant", "content": "prior answer " * 3000},
+            {"role": "user", "content": "What evidence would change the recommendation?"},
+        ],
+        context_mode="fork",
+        system_prefix="bounded system " * 100,
+    )
+
+    assert result.estimated_tokens <= 1800
+    assert result.messages == [
+        {"role": "user", "content": "What evidence would change the recommendation?"}
+    ]
+
+
 def test_working_state_prefix_caps_route_dependent_legacy_bodies():
     prefix = _working_state_system_prefix(
         system_prompt="system " * 2000,

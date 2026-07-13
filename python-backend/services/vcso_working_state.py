@@ -161,12 +161,23 @@ def assemble(
             sections.append(rendered_annotations)
 
     system_addition = "\n\n".join(sections)
-    messages = [
-        {"role": str(item.get("role") or "user"), "content": str(item.get("content") or "")}
-        for item in tail
-        if str(item.get("content") or "").strip()
-    ]
-    messages.append({"role": "user", "content": move})
+    current_message = {"role": "user", "content": move}
+    messages = [current_message]
+    # The recent fork is optional context, not a reason to abandon bounded
+    # assembly. Add only whole recent messages that fit after the selected
+    # working state/wiki window, and never duplicate the current founder move.
+    for item in reversed(tail):
+        content = str(item.get("content") or "").strip()
+        role = str(item.get("role") or "user")
+        if not content or (role == "user" and content == move):
+            continue
+        candidate = {"role": role, "content": content}
+        candidate_messages = [candidate, *messages]
+        candidate_estimated = _estimate_tokens(system_addition) + _estimate_tokens(
+            json.dumps(candidate_messages, ensure_ascii=True)
+        )
+        if candidate_estimated <= token_budget:
+            messages = candidate_messages
     estimated = _estimate_tokens(system_addition) + _estimate_tokens(json.dumps(messages, ensure_ascii=True))
     if estimated > token_budget:
         raise ValueError("assembled context exceeded token budget")
