@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, LoaderCircle } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import type { Message } from '../../../lib/virtualCsoApi';
 
@@ -15,7 +15,8 @@ export const ChatThread: React.FC<{
   crumbs: Crumb[];
   messages: Message[];
   onOpenArtifact?: (artifactId: string) => void;
-}> = ({ crumbs, messages, onOpenArtifact }) => (
+  processing?: boolean;
+}> = ({ crumbs, messages, onOpenArtifact, processing = false }) => (
   <div className="flex h-full flex-col overflow-hidden">
     <div className="flex items-center gap-1.5 border-b border-[var(--aos-mist)] px-6 py-3 text-xs text-[var(--fg-3)]">
       {crumbs.map((c, i) => (
@@ -40,6 +41,16 @@ export const ChatThread: React.FC<{
         {messages.map((m) => (
           <MessageBubble key={m.id} message={m} onOpenArtifact={onOpenArtifact} />
         ))}
+        {processing && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 py-1 text-sm text-[var(--fg-3)]"
+          >
+            <LoaderCircle size={15} className="animate-spin text-[var(--aos-brass)]" />
+            <span>Virtual CSO is processing…</span>
+          </div>
+        )}
       </div>
     </div>
   </div>

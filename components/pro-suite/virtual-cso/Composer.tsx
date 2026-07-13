@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowUp, Paperclip, X } from 'lucide-react';
+import { ArrowUp, LoaderCircle, Paperclip, X } from 'lucide-react';
 
 /**
  * Chat composer: multi-line input + submit, an add-context affordance,
@@ -13,6 +13,7 @@ export const Composer: React.FC<{
   value?: string;
   onChange?: (value: string) => void;
   textareaRef?: React.Ref<HTMLTextAreaElement>;
+  streaming?: boolean;
 }> = ({
   onSubmit,
   linkedFolder,
@@ -21,6 +22,7 @@ export const Composer: React.FC<{
   value,
   onChange,
   textareaRef,
+  streaming = false,
 }) => {
   const [localText, setLocalText] = useState('');
   const text = value ?? localText;
@@ -28,7 +30,7 @@ export const Composer: React.FC<{
 
   const submit = () => {
     const nextValue = text.trim();
-    if (!nextValue) return;
+    if (!nextValue || streaming) return;
     onSubmit?.(nextValue);
     setText('');
   };
@@ -36,6 +38,7 @@ export const Composer: React.FC<{
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (streaming) return;
       submit();
     }
   };
@@ -78,12 +81,13 @@ export const Composer: React.FC<{
           />
           <button
             onClick={submit}
-            disabled={!text.trim()}
+            disabled={streaming || !text.trim()}
             className="mb-0.5 flex-shrink-0 rounded-md bg-[var(--aos-brass)] p-1.5 text-[var(--fg-on-dark)] transition-colors hover:bg-[var(--aos-brass-soft)] disabled:cursor-not-allowed disabled:opacity-40"
-            title="Send"
-            aria-label="Send"
+            title={streaming ? 'Virtual CSO is processing' : 'Send'}
+            aria-label={streaming ? 'Virtual CSO is processing' : 'Send'}
+            aria-busy={streaming}
           >
-            <ArrowUp size={16} />
+            {streaming ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowUp size={16} />}
           </button>
         </div>
         <p className="mt-2 text-center text-[11px] text-[var(--fg-4)]">

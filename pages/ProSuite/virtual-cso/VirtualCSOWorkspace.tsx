@@ -109,6 +109,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [awaitingFirstToken, setAwaitingFirstToken] = useState(false);
   const [sourcesByChat, setSourcesByChat] = useState<Record<string, ReturnType<typeof getSourceRefsForChat>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -222,6 +223,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
     const assistantTempId = `stream-${Date.now()}`;
     let targetChatId = activeChatId;
     setStreaming(true);
+    setAwaitingFirstToken(true);
     setNotice(null);
     setError(null);
 
@@ -257,6 +259,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
           }
         },
         onToken: (chunk) => {
+          if (chunk) setAwaitingFirstToken(false);
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantTempId
@@ -288,6 +291,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
       if (!targetChatId) setActiveChatId(null);
       setError(err instanceof Error ? err.message : 'Could not stream Virtual CSO response.');
     } finally {
+      setAwaitingFirstToken(false);
       setStreaming(false);
     }
   };
@@ -392,7 +396,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
       );
     }
 
-    if (view === 'new' || !activeChatId || messages.length === 0) {
+    if ((view === 'new' || !activeChatId || messages.length === 0) && !awaitingFirstToken) {
       return (
         <div className="flex h-full flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
@@ -401,10 +405,11 @@ export const VirtualCSOWorkspace: React.FC = () => {
           <Composer
             linkedFolder={linkedFolder}
             onRemoveLinkedFolder={() => setLinkedFolder(null)}
-            onSubmit={streaming ? undefined : sendMessage}
+            onSubmit={sendMessage}
             value={composerText}
             onChange={setComposerText}
             textareaRef={composerRef}
+            streaming={streaming}
           />
           {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
         </div>
@@ -445,15 +450,21 @@ export const VirtualCSOWorkspace: React.FC = () => {
           </button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <ChatThread crumbs={crumbs} messages={messages} onOpenArtifact={openArtifact} />
+          <ChatThread
+            crumbs={crumbs}
+            messages={messages}
+            onOpenArtifact={openArtifact}
+            processing={awaitingFirstToken}
+          />
         </div>
         <Composer
           linkedFolder={linkedFolder}
           onRemoveLinkedFolder={() => setLinkedFolder(null)}
-          onSubmit={streaming ? undefined : sendMessage}
+          onSubmit={sendMessage}
           value={composerText}
           onChange={setComposerText}
           textareaRef={composerRef}
+          streaming={streaming}
         />
         {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
       </div>
