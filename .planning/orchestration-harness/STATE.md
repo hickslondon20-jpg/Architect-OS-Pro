@@ -4,9 +4,13 @@
 
 ## Current Focus
 
-Phase 0 is at the **founder checkpoint**. CLEAN-1, CLEAN-2, CLEAN-4, and CLEAN-5 are complete and live
-verified. CLEAN-3's wiki-authority map and recommendation are documented, but the choice is not
-encoded and Conflict O2 remains open until London confirms it. No later phase has started.
+**Phase 1 FOUNDER CHECKPOINT** (2026-07-13). CTX-1..5 are implemented and live-verified: bounded
+working state, fail-open assembly, worker-tier afterTurn, compaction fallback, and durable annotations.
+The matched live set reduced first-call assembled input 54.2% and full main-loop input 20.8% while
+preserving grounded decision quality. The global `vcso_working_state_assembly` flag is off, its
+allowlist is empty, annotation re-injection is off, and proof annotations were removed. One evidence
+item remains before London can decide the default flip: attach paired LangSmith trace IDs. Scoped trace
+metadata is deployed, but the available local LangSmith token returns 401. No Phase 2 work has started.
 
 ## Documents
 
@@ -36,26 +40,28 @@ encoded and Conflict O2 remains open until London confirms it. No later phase ha
 
 ## Current Phase
 
-**Phase 0 — Reconciliation Cleanups** (founder checkpoint). The legacy Vercel chat route is
-quarantined, CLAUDE.md and endpoint evidence now point to Python, and the conversation feeder is
-scoped deferred. Awaiting London's authority/read-path decision before phase closeout.
+**Phase 0 — Done (2026-07-13).** Legacy Vercel chat route quarantined (410), CLAUDE.md + endpoint
+point to Python, conversation feeder scoped deferred, wiki authority resolved (layer-split + projection
+caveat). **Current: Phase 1 — Working-State Memory + Bounded Assembly** at founder checkpoint; paired
+LangSmith trace readback and the separate London default-flip decision remain.
 
 ## Open Design Forks Carried Into Build-Planning
 
 - **O1 (Phase 0) — resolved.** Python is the live chat path; the Vercel route returns 410; CLAUDE.md
   is corrected; production smoke passed with `virtual_cso` active and `ws5-chat` at zero.
-- **O2 (Phase 0) — founder decision pending.** Recommend `wiki_*` / `WikiReadService` as authority
-  for overlapping fixed Layer-1, and OSE / `DocWikiReadService` for emergent Layer-2; do not encode
-  until London confirms.
+- **O2 (Phase 0) — resolved (founder-approved 2026-07-13, projection caveat).** `wiki_*` /
+  `WikiReadService` authoritative for the fixed Layer-1 seven; OSE / `DocWikiReadService` for emergent
+  Layer-2; OSE Layer-1 rows = materialized projections. **Caveat:** the wiki_*→OSE-Layer-1 projection
+  is unverified → OS-Engine dependency; **Phase 3 composes the seven fixed pages from `wiki_*` directly**
+  (two-source read), not depending on the projection.
 - **O3 (Phase 0) — scoped deferred.** The thread adapter/endpoints exist, but 18 live threads were
   pending and zero OSE pages had a thread origin. Upload-derived pages confirm only that feeder.
 - **F-open — planner physical shape** — extend `VcsoChatService` in place vs. a distinct planner
   module the VCSO route delegates to. Decide in Phase 1/4 planning against the live loop structure.
 - **F-open — freshness policy granularity** — per-data-class defaults vs. per-connector config.
   Decide in Phase 5 planning.
-- **F-open — annotation grain scope (CTX-5)** — how far the durable annotation layer goes in v1
-  (thread-local notes only vs. cross-thread per-resource store) and its re-injection default. Decide
-  in Phase 1 planning.
+- **annotation grain scope (CTX-5) — resolved (founder-confirmed 2026-07-13):** cross-thread,
+  per-resource store over wiki components + tools + skills; re-injection off by default, untrusted.
 - **F-open — founder-context page ownership** — the new founder-operating pages (communication-style,
   decision-log, …) are OS Engine-authored; this build consumes them. Coordinate the expansion as a
   cross-workstream dependency, starting with the two highest-value pages.
@@ -65,8 +71,8 @@ scoped deferred. Awaiting London's authority/read-path decision before phase clo
 | Phase | Status |
 |---|---|
 | Seeding (5 workstream files) | **Done** (2026-07-13) |
-| 0. Reconciliation Cleanups | Founder checkpoint — CLEAN-3 decision pending |
-| 1. Working-State Memory + Bounded Assembly | Not started |
+| 0. Reconciliation Cleanups | **Done** (2026-07-13; O1 resolved, O2 resolved w/ caveat, O3 deferred) |
+| 1. Working-State Memory + Bounded Assembly | **Founder checkpoint** — live gates passed; LangSmith trace readback + default flip pending |
 | 2. Intent & Depth Read + Adaptive Triage | Not started |
 | 3. Tier-Escalating Source Router | Not started |
 | 4. Planner (thin slice) — checkpoint | Not started |
@@ -76,6 +82,10 @@ scoped deferred. Awaiting London's authority/read-path decision before phase clo
 
 ## Session Continuity Note
 
-Phase 0 evidence is in `phases/00-reconciliation-cleanups/00-COMPLETION.md`. Runtime cleanup shipped
-as v0.6.11 and documentation correction as v0.6.12. Resume only to record London's CLEAN-3 decision,
-update O2, and close Phase 0; do not begin Phase 1 in the same pass.
+Phase 0 is closed. Evidence in `phases/00-reconciliation-cleanups/00-COMPLETION.md`; runtime + docs
+cleanups shipped as v0.6.11–v0.6.14. CLEAN-3 was founder-approved (layer-split authority + projection
+caveat) and O2 is recorded resolved in `CONTEXT.md`, `ROADMAP.md`, and here. Two OS-Engine dependencies
+carry forward for Phase 3: (1) the conversation→wiki feeder (deferred), (2) the wiki_*→OSE-Layer-1
+projection (unverified; Phase 3 bypasses it by composing the seven fixed pages from `wiki_*` directly).
+**Next pass:** restore LangSmith read access, attach the paired trace IDs to `01-COMPLETION.md`, then
+return the cost + quality proof to London for the default-flip decision. Do not start Phase 2.

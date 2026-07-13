@@ -61,6 +61,15 @@ notes agents attach to reusable resources that persist across threads and re-inj
 opt-in) — the "learns and holds on" behavior beyond a single thread. This is the foundation the
 router and planner reason over, and the primary cost lever on long conversations.
 
+**Status (2026-07-13): Founder checkpoint.** CTX-1..5 are implemented and live-verified. The matched
+live set reduced first-call assembled input from 55,922 to 25,590 tokens (54.2%) and total main-loop
+input from 178,476 to 141,415 tokens (20.8%) without a quality regression. Forced assembly failure
+completed on legacy; worker-tier afterTurn usage, cross-thread untrusted annotations, founder RLS,
+and cleanup were proven. The global flag and annotation re-injection are off with an empty allowlist.
+The only open evidence item is paired LangSmith trace readback: scoped metadata is deployed, but the
+available local LangSmith credential returns 401. Default flip remains a London decision after that
+trace evidence is attached; no Phase 2 work has started.
+
 ### Phase 2: Intent & Depth Read + Adaptive Triage
 A cheap worker-tier pre-pass (active-memory pattern) that reads the *kind* and *depth* of the move
 before any retrieval, sets the response contract, selects the initial terminal mode, and gates
@@ -73,9 +82,12 @@ Tier-3 raw → live MCP, stopping at the cheapest sufficient source, composing e
 `wiki_*` tools with **selective/incremental fetch** (Context Hub — grab only the component/file
 needed). Consumes a **modular, extensible founder-context set** (Personal Context Portfolio — business
 *and* founder-operating pages, grabbed as needed, never the fixed 7; missing pages degrade
-gracefully). Wiki-component composition (not re-crawl). Router decisions recorded per turn and
-rendered through MA-05. This is the retrieval half of the spine. *Dependency:* authoring the new
-founder-operating pages is OS Engine's job; this phase designs to consume them.
+gracefully). Wiki-component composition (not re-crawl). **Per O2 (resolved Phase 0):** compose the seven fixed
+Layer-1 pages from `wiki_*` (claim/evidence = superior cited component) and emergent Layer-2 from
+`ose_knowledge_pages` — a deliberate **two-source read** that does not depend on the unverified
+`wiki_*`→OSE-Layer-1 projection. Router decisions recorded per turn and rendered through MA-05. This
+is the retrieval half of the spine. *Dependencies:* authoring the new founder-operating pages, and
+confirming/owning the OSE-Layer-1 projection, are OS Engine's job; this phase designs to consume.
 
 ### Phase 4: Planner (Decompose→Delegate→Compose) — thin slice
 The reasoning half of the spine: decompose a strategic ask into budget-bounded sub-questions, delegate
@@ -104,8 +116,8 @@ runtime-enforced policy under adversarial prompts). Traces paired with DB/output
 
 | Phase | Status | Completed |
 |---|---|---|
-| 0. Reconciliation Cleanups | Not started | — |
-| 1. Working-State Memory + Bounded Assembly | Not started | — |
+| 0. Reconciliation Cleanups | **Done** (v0.6.11–v0.6.14; O1 resolved, O2 resolved w/ projection caveat, O3 scoped deferred) | 2026-07-13 |
+| 1. Working-State Memory + Bounded Assembly | **Founder checkpoint** — live cost/quality/RLS/fail-open proof passed; LangSmith trace readback + default flip pending | — |
 | 2. Intent & Depth Read + Adaptive Triage | Not started | — |
 | 3. Tier-Escalating Source Router | Not started | — |
 | 4. Planner (thin slice) — checkpoint | Not started | — |
