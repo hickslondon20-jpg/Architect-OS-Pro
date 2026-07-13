@@ -780,6 +780,32 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             keywords=["tool", "search", "catalog", "discover"],
         ),
         ToolDefinition(
+            name="annotate",
+            description=(
+                "Attach or clear a bounded founder-scoped note on a wiki component, tool, or skill. "
+                "Annotations are conversational metadata, never knowledge-base writes."
+            ),
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["attach", "clear"], "default": "attach"},
+                    "resource_kind": {
+                        "type": "string",
+                        "enum": ["wiki_component", "tool", "skill"],
+                    },
+                    "resource_ref": {"type": "string", "description": "Founder-visible component key or tool/skill slug."},
+                    "note": {"type": "string", "description": "Compact note; required for attach and omitted for clear."},
+                },
+                "required": ["resource_kind", "resource_ref"],
+            },
+            source="native",
+            executor_kind="native",
+            executor=_execute_annotate,
+            citation={"source_kind": "agent_annotation", "mode": "metadata"},
+            surface_tags=["virtual_cso", "domain_agent"],
+            keywords=["annotate", "note", "feedback", "stale", "resource"],
+        ),
+        ToolDefinition(
             name="delegate_to_sub_agent",
             description=(
                 "Delegate a bounded research or computation task to an authorized ArchitectOS sub-agent, "
@@ -1184,6 +1210,42 @@ def _execute_read_skill_file(context: ToolExecutionContext, tool_input: dict[str
                 metadata={"category": content.get("category"), "mime_type": content.get("mime_type")},
             )
         ],
+    )
+
+
+def _execute_annotate(context: ToolExecutionContext, tool_input: dict[str, Any]) -> ToolResultEnvelope:
+    from services.agent_annotations import AgentAnnotationService
+
+    service = AgentAnnotationService(context.client)
+    action = str(tool_input.get("action") or "attach").strip().lower()
+    resource_kind = str(tool_input.get("resource_kind") or "")
+    resource_ref = str(tool_input.get("resource_ref") or "")
+    if action == "clear":
+        result = service.clear(
+            user_id=context.user_id,
+            resource_kind=resource_kind,
+            resource_ref=resource_ref,
+        )
+    elif action == "attach":
+        result = service.annotate(
+            user_id=context.user_id,
+            resource_kind=resource_kind,
+            resource_ref=resource_ref,
+            note=str(tool_input.get("note") or ""),
+            created_by=str(context.metadata.get("capability_key") or "main"),
+        )
+    else:
+        raise ToolRegistryError("annotate action must be 'attach' or 'clear'")
+    return ToolResultEnvelope(
+        content=result,
+        sources=[
+            ToolSourceRef(
+                source_kind="agent_annotation",
+                source_id=str(result.get("id") or resource_ref),
+                label=f"{resource_kind}:{resource_ref}",
+            )
+        ],
+        provenance={"knowledge_base_write": False},
     )
 
 
