@@ -4,13 +4,13 @@
 
 ## Current Focus
 
-**Phase 1 FOUNDER CHECKPOINT** (2026-07-13). CTX-1..5 are implemented and live-verified: bounded
+**Phase 1 COMPLETE** (2026-07-13). CTX-1..5 are implemented and live-verified: bounded
 working state, fail-open assembly, worker-tier afterTurn, compaction fallback, and durable annotations.
 The matched live set reduced first-call assembled input 54.2% and full main-loop input 20.8% while
 preserving grounded decision quality. The global `vcso_working_state_assembly` flag is off, its
-allowlist is empty, annotation re-injection is off, and proof annotations were removed. One evidence
-item remains before London can decide the default flip: attach paired LangSmith trace IDs. Scoped trace
-metadata is deployed, but the available local LangSmith token returns 401. No Phase 2 work has started.
+allowlist is empty, annotation re-injection is off, and proof annotations were removed. Three scoped
+LangSmith traces are paired to their exact `ai_usage_log` records. Only London's separate default-flip
+decision remains; no Phase 2 work has started.
 
 ## Documents
 
@@ -42,8 +42,8 @@ metadata is deployed, but the available local LangSmith token returns 401. No Ph
 
 **Phase 0 — Done (2026-07-13).** Legacy Vercel chat route quarantined (410), CLAUDE.md + endpoint
 point to Python, conversation feeder scoped deferred, wiki authority resolved (layer-split + projection
-caveat). **Current: Phase 1 — Working-State Memory + Bounded Assembly** at founder checkpoint; paired
-LangSmith trace readback and the separate London default-flip decision remain.
+caveat). **Phase 1 — Working-State Memory + Bounded Assembly is complete.** The separate London
+default-flip decision remains.
 
 ## Open Design Forks Carried Into Build-Planning
 
@@ -72,7 +72,7 @@ LangSmith trace readback and the separate London default-flip decision remain.
 |---|---|
 | Seeding (5 workstream files) | **Done** (2026-07-13) |
 | 0. Reconciliation Cleanups | **Done** (2026-07-13; O1 resolved, O2 resolved w/ caveat, O3 deferred) |
-| 1. Working-State Memory + Bounded Assembly | **Founder checkpoint** — live gates passed; LangSmith trace readback + default flip pending |
+| 1. Working-State Memory + Bounded Assembly | **Done** (2026-07-13) — live gates and paired-trace proof passed; default flip deferred to London |
 | 2. Intent & Depth Read + Adaptive Triage | Not started |
 | 3. Tier-Escalating Source Router | Not started |
 | 4. Planner (thin slice) — checkpoint | Not started |
@@ -87,5 +87,5 @@ cleanups shipped as v0.6.11–v0.6.14. CLEAN-3 was founder-approved (layer-split
 caveat) and O2 is recorded resolved in `CONTEXT.md`, `ROADMAP.md`, and here. Two OS-Engine dependencies
 carry forward for Phase 3: (1) the conversation→wiki feeder (deferred), (2) the wiki_*→OSE-Layer-1
 projection (unverified; Phase 3 bypasses it by composing the seven fixed pages from `wiki_*` directly).
-**Next pass:** restore LangSmith read access, attach the paired trace IDs to `01-COMPLETION.md`, then
-return the cost + quality proof to London for the default-flip decision. Do not start Phase 2.
+**Next pass:** return the completed cost, quality, and paired-trace proof to London for the separate
+default-flip decision. Do not start Phase 2.

@@ -1,8 +1,8 @@
 # Phase 1 Completion Evidence — Working-State Memory + Bounded Assembly
 
 **Date:** 2026-07-13  
-**Status:** Founder checkpoint — implementation and live acceptance passed; paired LangSmith trace
-readback remains pending; default flip not authorized.
+**Status:** Complete — CTX-1..5 and the live cost, quality, isolation, fail-open, and paired-trace
+acceptance gates passed. The production default remains off pending London's separate flip decision.
 
 ## Scope delivered
 
@@ -29,6 +29,7 @@ readback remains pending; default flip not authorized.
 - `98b37bd5` — scoped LangSmith trace metadata
 - `7e035ba1` — worker usage accounting aligned to the MA-06 `utility` role
 - `80446e2a` — oversized recent-message tail remains bounded instead of falling back
+- `21b2fb8b` — live founder-checkpoint evidence and fail-safe production reset
 
 ## Live schema and isolation
 
@@ -89,6 +90,23 @@ clear verdict, sequenced action, standing guardrail, named risk, and explicit ev
 Persisted assistant outputs in `vcso_chat_messages` contain the cited answer bodies; the browser showed
 the same structured responses after streaming. No regression was observed against the legacy control.
 
+## Paired LangSmith and usage-log proof
+
+The refreshed credential in `python-backend/.env` authenticated successfully without printing or
+inspecting the key. A scoped query matched 20 LangSmith runs on the exact working-state thread. The
+first main-model call for each fixed-set question was paired to its `ai_usage_log` row by thread,
+timestamp, capability, and exact token counts:
+
+| Question | LangSmith trace/run | `ai_usage_log` run | Input | Output | Status |
+|---|---|---|---:|---:|---|
+| Q1 | `32eebbd5-2e90-45f1-9d6e-3efd7a0307d1` | `a27c7d78-e744-4c94-b383-b37ad82bf4cd` | 8,742 | 100 | success |
+| Q2 | `f55b262f-e76a-4df6-ac9d-1953ae643ba1` | `2f498e05-2bfc-4557-8f4c-3a76adada32c` | 8,062 | 100 | success |
+| Q3 | `d6c22d2c-9d87-42d3-96ea-4ef49e655dc3` | `b0ff9256-aa8e-43ba-84a3-80603c7e5019` | 8,786 | 102 | success |
+
+All three traces carry the exact working-state `thread_id` and `capability_key=vcso_chat`. Worker-tier
+`afterTurn` remains independently proven by the bounded `ai_usage_log` rows above; no project-wide
+trace enumeration was used for worker evidence.
+
 ## Fail-open proof
 
 The founder-only test budget was temporarily set to 800 tokens, below the bounded system prefix, to
@@ -114,15 +132,10 @@ same-founder visibility and other-founder invisibility. The proof note was then 
 - Supabase advisor output contains pre-existing project-wide notices; no Phase 1 founder-isolation
   failure was found. Direct RLS replay is the acceptance evidence for this phase.
 
-## Outstanding London checkpoint
+## London default-flip checkpoint
 
-Scoped `user_id`, `thread_id`, and `capability_key` metadata is deployed around main and afterTurn
-LangSmith calls (`98b37bd5`). A direct LangSmith query for the live thread could not be completed:
-the available local credential returns HTTP 401 `Invalid token`. No credential workaround was used.
-
-Before deciding the default flip, restore authorized LangSmith read access and attach the paired trace
-IDs for the live working-state thread to this file. The cost, output, schema, RLS, annotation, worker,
-and fail-open evidence is otherwise complete. The production state remains:
+Phase 1 evidence is complete, including the paired LangSmith and database records. The production
+state remains deliberately fail-safe:
 
 - `is_enabled=false`
 - `test_user_ids=[]`
@@ -130,4 +143,5 @@ and fail-open evidence is otherwise complete. The production state remains:
 - `annotations_enabled=false`
 - `assembly_token_budget=6000`
 
-Do not flip the default without the London decision, and do not start Phase 2 from this checkpoint.
+London must decide whether to begin the staged default flip. Do not flip it implicitly, and do not
+start Phase 2 from this checkpoint.
