@@ -47,6 +47,11 @@ De-risk before building. Confirm the live Python VCSO path and retire/quarantine
 conversation→wiki feeder. Output: the drift items from `../RECONCILIATION-COGNITIVE-ORCHESTRATION.md`
 closed or explicitly scoped, so later phases build on one clear surface.
 
+**Status (2026-07-13): Founder checkpoint.** CLEAN-1, CLEAN-2, CLEAN-4, and CLEAN-5 are complete and
+live verified. O1 is resolved; O3 is scoped deferred because the thread adapter is not operationally
+feeding live pages. CLEAN-3/O2 has a documented recommendation but remains open until London confirms
+the authoritative overlapping Layer-1 and emergent Layer-2 read paths. Phase 1 has not started.
+
 ### Phase 1: Working-State Memory + Bounded Assembly
 Introduce the per-thread working-state artifact (decisions / open questions / gathered findings /
 known-unknowns) and an `assemble()`-style context seam that returns a windowed, budgeted context

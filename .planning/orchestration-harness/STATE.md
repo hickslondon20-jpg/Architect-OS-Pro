@@ -4,10 +4,9 @@
 
 ## Current Focus
 
-Workstream **seeded**. The five top-level files (CONTEXT, REFERENCES, REQUIREMENTS, ROADMAP, STATE)
-are in place. Next: develop the **planning files** — the per-phase plans under `phases/`, starting
-with Phase 0 (Reconciliation Cleanups). No code has been written for this workstream yet; the
-substrate it builds on is live (MA-05, MA-06, Ep6).
+Phase 0 is at the **founder checkpoint**. CLEAN-1, CLEAN-2, CLEAN-4, and CLEAN-5 are complete and live
+verified. CLEAN-3's wiki-authority map and recommendation are documented, but the choice is not
+encoded and Conflict O2 remains open until London confirms it. No later phase has started.
 
 ## Documents
 
@@ -18,7 +17,7 @@ substrate it builds on is live (MA-05, MA-06, Ep6).
 - `REQUIREMENTS.md` — v1 requirements (CLEAN/CTX/INT/ROUT/PLAN/STEER/GEN/VERIF) + deferred + OOS.
 - `ROADMAP.md` — 8 phases (0–7) + per-phase detail + progress tracker.
 - `STATE.md` — this file.
-- `phases/` — per-phase plans (to be created, Phase 0 first).
+- `phases/` — per-phase plans and completion/checkpoint evidence.
 
 **Canonical sources at `.planning/` root (referenced via `../`):**
 - `../COGNITIVE-ORCHESTRATION-ARCHITECTURE.md` — North Star (vision).
@@ -37,16 +36,19 @@ substrate it builds on is live (MA-05, MA-06, Ep6).
 
 ## Current Phase
 
-**Phase 0 — Reconciliation Cleanups** (not started). First move per process rule: live code/schema
-re-check of the three drift items before any change.
+**Phase 0 — Reconciliation Cleanups** (founder checkpoint). The legacy Vercel chat route is
+quarantined, CLAUDE.md and endpoint evidence now point to Python, and the conversation feeder is
+scoped deferred. Awaiting London's authority/read-path decision before phase closeout.
 
 ## Open Design Forks Carried Into Build-Planning
 
-- **O1 (Phase 0)** — Dead Vercel `api/vcso/chat.ts` vs. live Python `/api/vcso/chat`; CLAUDE.md
-  Rule #1 stale. Resolution direction set (retire Vercel, fix CLAUDE.md); execution pending.
-- **O2 (Phase 0)** — Authoritative query-time wiki: `ose_knowledge_pages` (VCSO-read) vs. `wiki_*`
-  claim/evidence system. Decision pending in Phase 0.
-- **O3 (Phase 0)** — Conversation→wiki feeder running? Verify or scope-as-deferred in Phase 0.
+- **O1 (Phase 0) — resolved.** Python is the live chat path; the Vercel route returns 410; CLAUDE.md
+  is corrected; production smoke passed with `virtual_cso` active and `ws5-chat` at zero.
+- **O2 (Phase 0) — founder decision pending.** Recommend `wiki_*` / `WikiReadService` as authority
+  for overlapping fixed Layer-1, and OSE / `DocWikiReadService` for emergent Layer-2; do not encode
+  until London confirms.
+- **O3 (Phase 0) — scoped deferred.** The thread adapter/endpoints exist, but 18 live threads were
+  pending and zero OSE pages had a thread origin. Upload-derived pages confirm only that feeder.
 - **F-open — planner physical shape** — extend `VcsoChatService` in place vs. a distinct planner
   module the VCSO route delegates to. Decide in Phase 1/4 planning against the live loop structure.
 - **F-open — freshness policy granularity** — per-data-class defaults vs. per-connector config.
@@ -63,7 +65,7 @@ re-check of the three drift items before any change.
 | Phase | Status |
 |---|---|
 | Seeding (5 workstream files) | **Done** (2026-07-13) |
-| 0. Reconciliation Cleanups | Not started |
+| 0. Reconciliation Cleanups | Founder checkpoint — CLEAN-3 decision pending |
 | 1. Working-State Memory + Bounded Assembly | Not started |
 | 2. Intent & Depth Read + Adaptive Triage | Not started |
 | 3. Tier-Escalating Source Router | Not started |
@@ -74,9 +76,6 @@ re-check of the three drift items before any change.
 
 ## Session Continuity Note
 
-The workstream was seeded on 2026-07-13 directly after the MA-06 cost-routing checkpoint, the North
-Star doc, the OpenClaw analysis, and the reconciliation pass — all of which are the inputs above.
-The immediate next action is to develop the `phases/00-reconciliation-cleanups/` plan (the first
-"planning file"). Nothing in this workstream has been committed to code; the last live change was
-MA-06's Haiku worker routing (v0.6.4). Honor the Phase 4 stop-and-review checkpoint before broadening
-sub-agent/tool-chain testing.
+Phase 0 evidence is in `phases/00-reconciliation-cleanups/00-COMPLETION.md`. Runtime cleanup shipped
+as v0.6.11 and documentation correction as v0.6.12. Resume only to record London's CLEAN-3 decision,
+update O2, and close Phase 0; do not begin Phase 1 in the same pass.
