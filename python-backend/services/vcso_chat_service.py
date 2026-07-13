@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import queue
 import re
 import uuid
 from dataclasses import dataclass
@@ -448,6 +449,7 @@ class VcsoChatService:
                     yield {"event": "done_waiting", "data": {"chat": _chat_payload(self._get_thread(thread_id, user_id)), "agentStatus": "waiting_for_user"}}
                     return
                 try:
+                    sub_agent_progress: queue.SimpleQueue[dict[str, Any]] = queue.SimpleQueue()
                     tool_context = ToolExecutionContext(
                         user_id=user_id,
                         store=self.store,
@@ -462,24 +464,33 @@ class VcsoChatService:
                             "deep_mode": deep_mode,
                             "parent_message_id": user_message["id"],
                             "parent_run_id": run_id,
+                            "sub_agent_progress_callback": sub_agent_progress.put,
                             "sandbox_execution_service": _optional_sandbox_execution_service(self.supabase),
                         },
                     )
                     tool_future = _TOOL_EXECUTOR.submit(registry.execute, tool_name, tool_context, tool_input)
                     elapsed = 0.0
+                    heartbeat_elapsed = 0.0
                     while True:
                         try:
-                            envelope = tool_future.result(timeout=TOOL_HEARTBEAT_SECONDS)
+                            envelope = tool_future.result(timeout=0.5)
                             break
                         except concurrent.futures.TimeoutError:
-                            elapsed += TOOL_HEARTBEAT_SECONDS
+                            elapsed += 0.5
+                            heartbeat_elapsed += 0.5
+                            while not sub_agent_progress.empty():
+                                yield {"event": "sub_agent_step", "data": {"parentStepIndex": next_step_index, **sub_agent_progress.get()}}
                             if elapsed >= max(float(self.settings.vcso_tool_max_seconds), TOOL_HEARTBEAT_SECONDS):
                                 tool_future.cancel()
                                 raise TimeoutError(f"{tool_name} exceeded the configured VCSO tool deadline.")
-                            yield {
-                                "event": "heartbeat",
-                                "data": {"stepIndex": next_step_index, "tool": tool_name, "elapsedSeconds": elapsed},
-                            }
+                            if heartbeat_elapsed >= TOOL_HEARTBEAT_SECONDS:
+                                heartbeat_elapsed = 0.0
+                                yield {
+                                    "event": "heartbeat",
+                                    "data": {"stepIndex": next_step_index, "tool": tool_name, "elapsedSeconds": elapsed},
+                                }
+                    while not sub_agent_progress.empty():
+                        yield {"event": "sub_agent_step", "data": {"parentStepIndex": next_step_index, **sub_agent_progress.get()}}
                     result_content = envelope.content
                     output_summary = _safe_output_summary(result_content)
                     raw_step_sources = [source.to_dict() for source in envelope.sources]

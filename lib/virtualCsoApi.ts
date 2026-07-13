@@ -443,6 +443,39 @@ export const sendUserMessage = async (
         });
         options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
       }
+      if (event === 'sub_agent_step' && typeof payload.parentStepIndex === 'number' && payload.step) {
+        const current = liveAgentSteps.get(payload.parentStepIndex);
+        if (current) {
+          const rawStep = payload.step as Record<string, any>;
+          const childStep: AgentStep = {
+            stepIndex: rawStep.step_index,
+            stepType: rawStep.step_type,
+            title: rawStep.title,
+            summary: rawStep.summary,
+            tool: rawStep.tool_name ?? rawStep.title ?? 'Sub-agent step',
+            input: rawStep.input_summary ?? {},
+            output: outputToString(rawStep.output_summary ?? rawStep.summary ?? ''),
+            status: rawStep.status ?? 'completed',
+            sourceRefs: rawStep.source_refs ?? [],
+          };
+          const children = [...(current.children ?? [])];
+          const existingIndex = children.findIndex((step) => step.stepIndex === childStep.stepIndex);
+          if (existingIndex >= 0) children[existingIndex] = childStep;
+          else children.push(childStep);
+          children.sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0));
+          liveAgentSteps.set(payload.parentStepIndex, {
+            ...current,
+            children,
+            subAgent: {
+              runId: payload.runId ?? current.subAgent?.runId,
+              capabilityKey: payload.capabilityKey ?? current.subAgent?.capabilityKey,
+              status: payload.status ?? current.subAgent?.status ?? 'running',
+              summary: current.subAgent?.summary,
+            },
+          });
+          options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
+        }
+      }
       if (event === 'tool_result' && typeof payload.stepIndex === 'number') {
         const current = liveAgentSteps.get(payload.stepIndex);
         const parsedOutput = (() => {
@@ -470,6 +503,7 @@ export const sendUserMessage = async (
                 summary: parsedOutput?.result_summary,
               }
             : undefined,
+          children: current?.children,
         });
         options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
       }

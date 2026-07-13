@@ -1,6 +1,8 @@
 from types import MethodType, SimpleNamespace
 
-from services.sub_agent_orchestrator import SubAgentOrchestrator
+from services.agent_capabilities import AgentCapability
+from services.agent_context import AgentContextBundle, AgentSourceRef
+from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
 from services.vcso_chat_service import VcsoChatService, _failure_trace_step, _safe_internal_error
 
 
@@ -11,6 +13,9 @@ class _UpdateQuery:
         self.values = values
 
     def eq(self, *_args):
+        return self
+
+    def in_(self, *_args):
         return self
 
     def execute(self):
@@ -26,6 +31,9 @@ class _SelectQuery:
         return self
 
     def eq(self, *_args):
+        return self
+
+    def in_(self, *_args):
         return self
 
     def order(self, *_args, **_kwargs):
@@ -61,14 +69,17 @@ class _Table:
         return _InsertQuery(self.client, self.name, values)
 
     def select(self, *_args):
-        rows = [{"step_index": 1}] if self.name == "agent_delegation_steps" else []
+        rows = self.client.rows_by_table.get(self.name)
+        if rows is None:
+            rows = [{"step_index": 1}] if self.name == "agent_delegation_steps" else []
         return _SelectQuery(rows)
 
 
 class _Client:
-    def __init__(self):
+    def __init__(self, rows_by_table=None):
         self.inserts = []
         self.updates = []
+        self.rows_by_table = rows_by_table or {}
 
     def table(self, name):
         return _Table(self, name)
@@ -184,3 +195,73 @@ def test_sub_agent_failure_marks_run_failed_and_adds_terminal_step():
     assert step_rows[0]["status"] == "failed"
     assert run_updates[-1]["status"] == "failed"
     assert run_updates[-1]["completed_at"] is not None
+
+
+def test_document_analysis_builds_scoped_progressive_steps_without_persisting_raw_content():
+    chunk = {
+        "id": "chunk-1",
+        "user_id": "user-1",
+        "document_id": "doc-1",
+        "chunk_index": 0,
+        "content": "Private founder evidence that must reach synthesis but not the visible step payload.",
+        "metadata": {"document_title": "Agency overview"},
+        "page_number": 1,
+    }
+    client = _Client({"document_chunks": [chunk]})
+    orchestrator = SubAgentOrchestrator.__new__(SubAgentOrchestrator)
+    orchestrator.store = SimpleNamespace(client=client)
+    orchestrator._synthesize_document_analysis = MethodType(
+        lambda _self, _context, _capability, _run_id, chunks, _thread_id: (
+            "Founder dependence is the primary constraint [Evidence 1]."
+            if chunks == [chunk]
+            else ""
+        ),
+        orchestrator,
+    )
+    capability = AgentCapability(
+        capability_key="document_analysis_agent",
+        label="Document analysis",
+        description="Scoped document analysis",
+        status="experimental",
+        allowed_surfaces=["virtual_cso"],
+        allowed_tools=["retrieve_document_chunks", "read_raw_document_metadata"],
+        allowed_source_kinds=["raw_document", "document_chunk"],
+        default_config={"max_sources": 8},
+    )
+    document = {"id": "doc-1", "file_name": "Agency overview", "status": "ingested", "parser_status": "complete"}
+    document_source = AgentSourceRef(source_kind="raw_document", source_id="doc-1", source_label="Agency overview")
+    context = AgentContextBundle(
+        user_id="user-1",
+        parent_surface="virtual_cso",
+        task_summary="Identify the operating constraint and support it with evidence.",
+        context_scope={"document_ids": ["doc-1"]},
+        documents=[document],
+        sources=[document_source],
+    )
+    progress = []
+    request = SubAgentRunRequest(
+        user_id="user-1",
+        parent_surface="virtual_cso",
+        capability_key="document_analysis_agent",
+        task_summary=context.task_summary,
+        context_scope=context.context_scope,
+        progress_callback=progress.append,
+    )
+
+    result = orchestrator._handle_document_analysis(context, capability, "run-1", request)
+
+    step_rows = [values for table, values in client.inserts if table == "agent_delegation_steps"]
+    assert [step["step_index"] for step in step_rows] == [2, 3, 4]
+    assert [step["tool_name"] for step in step_rows] == [
+        "plan_document_analysis",
+        "read_raw_document_metadata",
+        "retrieve_document_chunks",
+    ]
+    assert len(progress) == 7
+    assert [event["step"]["status"] for event in progress[:2]] == ["running", "completed"]
+    assert progress[-1]["step"]["title"] == "Synthesize document findings"
+    assert progress[-1]["step"]["status"] == "running"
+    assert result["_next_step_index"] == 5
+    assert result["structured_result"]["retrieval_strategy"][0] == "Review scoped document metadata"
+    assert "Founder dependence" in result["result_summary"]
+    assert "Private founder evidence" not in str(step_rows)

@@ -803,7 +803,10 @@ def _native_tool_definitions() -> list[ToolDefinition]:
                     },
                     "context_scope": {
                         "type": "object",
-                        "description": "Optional scoped context for the sub-agent.",
+                        "description": (
+                            "Scoped context for the sub-agent. document_analysis_agent requires "
+                            "document_ids as an array of exact founder-owned document UUIDs."
+                        ),
                         "additionalProperties": True,
                         "default": {},
                     },
@@ -1224,6 +1227,7 @@ def _execute_delegate_to_sub_agent(context: ToolExecutionContext, tool_input: di
             parent_thread_id=context.thread_id,
             parent_message_id=context.metadata.get("parent_message_id"),
             parent_run_id=context.metadata.get("parent_run_id"),
+            progress_callback=context.metadata.get("sub_agent_progress_callback"),
         )
     )
     content = {

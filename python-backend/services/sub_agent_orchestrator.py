@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
+import anthropic
+
+from core.config import get_settings
+from core.langsmith_tracing import trace_anthropic_client
 from services.agent_capabilities import AgentCapability, AgentCapabilityError, AgentCapabilityRegistry
 from services.agent_context import AgentContextBuilder, AgentContextBundle, AgentContextError, AgentSourceRef
 from services.doc_wiki_read_service import DocWikiReadError, DocWikiReadService
@@ -16,6 +20,7 @@ from services.sandbox_execution_service import SandboxExecutionService
 from services.structured_query import StructuredQueryRequest, StructuredQueryService
 from services.vector_store import VectorStore, VectorStoreError
 from services.wiki_read import WikiReadError, WikiReadService
+from services.usage_events import anthropic_usage, log_ai_usage_event
 
 
 class SubAgentError(RuntimeError):
@@ -33,6 +38,7 @@ class SubAgentRunRequest:
     parent_thread_id: str | None = None
     parent_message_id: str | None = None
     parent_run_id: str | None = None
+    progress_callback: Callable[[dict[str, Any]], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -83,11 +89,24 @@ class SubAgentOrchestrator:
                 output_summary={"source_count": len(context.sources)},
                 source_refs=[_source_public_dict(source) for source in context.sources],
             )
+            self._emit_progress(
+                request,
+                run_id,
+                capability,
+                step_index=1,
+                step_type="context_build",
+                title="Context prepared",
+                summary=f"Prepared {len(context.sources)} scoped source reference(s).",
+                status="completed",
+                input_summary={"requested_scope": context.context_scope},
+                output_summary={"source_count": len(context.sources)},
+                source_refs=[_source_public_dict(source) for source in context.sources],
+            )
             for source in context.sources:
                 self._create_source(run_id, request.user_id, source)
 
             if capability.capability_key == "document_analysis_agent":
-                result = self._handle_document_analysis(context)
+                result = self._handle_document_analysis(context, capability, run_id, request)
             elif capability.capability_key == "structured_data_agent":
                 result = self._handle_structured_data(context)
             elif capability.capability_key == "kb_explorer_agent":
@@ -103,13 +122,26 @@ class SubAgentOrchestrator:
             else:
                 raise SubAgentError("Capability handler is not available yet.")
 
+            result_step_index = int(result.pop("_next_step_index", 2))
             self._create_step(
                 run_id,
                 request.user_id,
-                2,
+                result_step_index,
                 step_type="result",
                 title="Result prepared",
                 summary=result["result_summary"],
+                output_summary=result["structured_result"],
+                source_refs=result["citations"],
+            )
+            self._emit_progress(
+                request,
+                run_id,
+                capability,
+                step_index=result_step_index,
+                step_type="result",
+                title="Result prepared",
+                summary=result["result_summary"],
+                status="completed",
                 output_summary=result["structured_result"],
                 source_refs=result["citations"],
             )
@@ -295,36 +327,235 @@ class SubAgentOrchestrator:
             }
         ).execute()
 
-    def _handle_document_analysis(self, context: AgentContextBundle) -> dict[str, Any]:
-        findings: list[dict[str, Any]] = []
-        for document in context.documents:
-            findings.append(
+    def _handle_document_analysis(
+        self,
+        context: AgentContextBundle,
+        capability: AgentCapability,
+        run_id: str,
+        request: SubAgentRunRequest,
+    ) -> dict[str, Any]:
+        if not context.documents and not context.chunks:
+            raise SubAgentError("Document analysis requires at least one scoped document or chunk.")
+
+        document_ids = [str(item.get("id")) for item in context.documents if item.get("id")]
+        strategy = [
+            "Review scoped document metadata",
+            "Retrieve bounded document evidence",
+            "Synthesize a cited finding",
+        ]
+        self._record_document_step(
+            request, capability, run_id, context.user_id, 2,
+            tool_name="plan_document_analysis",
+            title="Retrieval strategy",
+            summary="Prepared a bounded three-step document review strategy.",
+            input_summary={"document_ids": document_ids},
+            output_summary={"strategy": strategy},
+        )
+
+        metadata_findings = [
+            {
+                "type": "document_metadata",
+                "title": document.get("file_name"),
+                "summary": _document_summary(document),
+                "source_id": document.get("id"),
+            }
+            for document in context.documents
+        ]
+        self._record_document_step(
+            request, capability, run_id, context.user_id, 3,
+            tool_name="read_raw_document_metadata",
+            title="Document metadata reviewed",
+            summary=f"Reviewed metadata for {len(context.documents)} scoped document(s).",
+            input_summary={"document_ids": document_ids},
+            output_summary={"document_count": len(context.documents), "documents": metadata_findings},
+            source_refs=[_source_public_dict(source) for source in context.sources if source.source_kind == "raw_document"],
+        )
+
+        chunks = list(context.chunks)
+        if document_ids:
+            response = (
+                self.store.client.table("document_chunks")
+                .select("id,user_id,document_id,chunk_index,content,metadata,page_number")
+                .eq("user_id", context.user_id)
+                .in_("document_id", document_ids)
+                .order("chunk_index")
+                .limit(_safe_int(capability.default_config.get("max_sources"), default=8, minimum=1, maximum=20))
+                .execute()
+            )
+            seen = {str(item.get("id")) for item in chunks}
+            chunks.extend(item for item in (response.data or []) if str(item.get("id")) not in seen)
+
+        chunk_sources = [_chunk_source(chunk) for chunk in chunks]
+        for source in chunk_sources:
+            self._create_source(run_id, context.user_id, source)
+        evidence_findings = [
+            {
+                "type": "chunk_excerpt",
+                "title": f"Chunk {chunk.get('chunk_index')}",
+                "summary": "Scoped document evidence retrieved for analysis.",
+                "source_id": chunk.get("id"),
+                "document_id": chunk.get("document_id"),
+            }
+            for chunk in chunks
+        ]
+        self._record_document_step(
+            request, capability, run_id, context.user_id, 4,
+            tool_name="retrieve_document_chunks",
+            title="Document evidence retrieved",
+            summary=f"Retrieved {len(chunks)} scoped document chunk(s).",
+            input_summary={"document_ids": document_ids, "source_limit": len(chunks)},
+            output_summary={"result_count": len(chunks), "results": evidence_findings},
+            source_refs=[_source_public_dict(source) for source in chunk_sources],
+        )
+        if not chunks:
+            raise SubAgentError("No document evidence was available for the scoped analysis.")
+
+        self._emit_progress(
+            request, run_id, capability,
+            step_index=5,
+            step_type="result",
+            title="Synthesize document findings",
+            summary="Preparing the evidence-grounded document analysis.",
+            status="running",
+            input_summary={"evidence_count": len(chunks)},
+            output_summary={},
+            source_refs=[],
+        )
+        analysis = self._synthesize_document_analysis(context, capability, run_id, chunks, request.parent_thread_id)
+        all_sources = [*context.sources, *chunk_sources]
+        result = _handler_result(
+            analysis,
+            [*metadata_findings, *evidence_findings, {"type": "analysis", "summary": analysis}],
+            all_sources,
+            confidence=0.82,
+        )
+        result["structured_result"]["retrieval_strategy"] = strategy
+        result["_next_step_index"] = 5
+        return result
+
+    def _record_document_step(
+        self,
+        request: SubAgentRunRequest,
+        capability: AgentCapability,
+        run_id: str,
+        user_id: str,
+        step_index: int,
+        *,
+        tool_name: str,
+        title: str,
+        summary: str,
+        input_summary: dict[str, Any],
+        output_summary: dict[str, Any],
+        source_refs: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self._emit_progress(
+            request, run_id, capability,
+            step_index=step_index,
+            step_type="tool_call",
+            tool_name=tool_name,
+            title=title,
+            summary=summary,
+            status="running",
+            input_summary=input_summary,
+            output_summary={},
+            source_refs=[],
+        )
+        self._create_step(
+            run_id, user_id, step_index,
+            step_type="tool_call",
+            tool_name=tool_name,
+            title=title,
+            summary=summary,
+            input_summary=input_summary,
+            output_summary=output_summary,
+            source_refs=source_refs,
+        )
+        self._emit_progress(
+            request, run_id, capability,
+            step_index=step_index,
+            step_type="tool_call",
+            tool_name=tool_name,
+            title=title,
+            summary=summary,
+            status="completed",
+            input_summary=input_summary,
+            output_summary=output_summary,
+            source_refs=source_refs or [],
+        )
+
+    def _synthesize_document_analysis(
+        self,
+        context: AgentContextBundle,
+        capability: AgentCapability,
+        run_id: str,
+        chunks: list[dict[str, Any]],
+        thread_id: str | None,
+    ) -> str:
+        settings = get_settings()
+        resolved = self.store.resolve_platform_model(
+            setting_key=capability.model_setting_key or "document_analysis_agent",
+            fallback_model_name=settings.claude_synthesis_model,
+            fallback_provider="anthropic",
+        )
+        model = resolved.get("model_name") if resolved.get("provider") == "anthropic" else settings.claude_synthesis_model
+        client = trace_anthropic_client(anthropic.Anthropic(api_key=settings.anthropic_api_key_value))
+        evidence = "\n\n".join(
+            f"[Evidence {index}] document_id={chunk.get('document_id')} chunk_id={chunk.get('id')}\n{chunk.get('content') or ''}"
+            for index, chunk in enumerate(chunks, start=1)
+        )
+        response = client.messages.create(
+            model=model,
+            max_tokens=900,
+            system=(
+                "You are a bounded document-analysis specialist. Answer only from the supplied evidence. "
+                "Give a concise analytical conclusion, explain why it matters, and cite supporting evidence "
+                "as [Evidence N]. Do not reveal hidden reasoning or mention internal tooling."
+            ),
+            messages=[{"role": "user", "content": f"TASK\n{context.task_summary}\n\nSCOPED EVIDENCE\n{evidence}"}],
+        )
+        usage = anthropic_usage(response)
+        log_ai_usage_event(
+            self.store.client,
+            user_id=context.user_id,
+            surface=context.parent_surface,
+            model=str(model),
+            role="sub_agent",
+            provider="anthropic",
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            thread_id=thread_id,
+            capability_key=capability.capability_key,
+            run_id=run_id,
+        )
+        text = "\n".join(
+            str(block.text)
+            for block in getattr(response, "content", [])
+            if getattr(block, "type", None) == "text"
+        ).strip()
+        if not text:
+            raise SubAgentError("Document analysis returned no written result.")
+        return text
+
+    def _emit_progress(
+        self,
+        request: SubAgentRunRequest,
+        run_id: str,
+        capability: AgentCapability,
+        **step: Any,
+    ) -> None:
+        if request.progress_callback is None:
+            return
+        try:
+            request.progress_callback(
                 {
-                    "type": "document_metadata",
-                    "title": document.get("file_name"),
-                    "summary": _document_summary(document),
-                    "source_id": document.get("id"),
+                    "runId": run_id,
+                    "capabilityKey": capability.capability_key,
+                    "status": "running",
+                    "step": step,
                 }
             )
-        for chunk in context.chunks:
-            findings.append(
-                {
-                    "type": "chunk_excerpt",
-                    "title": f"Chunk {chunk.get('chunk_index')}",
-                    "summary": _excerpt(chunk.get("content") or ""),
-                    "source_id": chunk.get("id"),
-                }
-            )
-        if not findings:
-            findings.append(
-                {
-                    "type": "no_sources",
-                    "summary": "No scoped document sources were provided for review.",
-                    "source_id": None,
-                }
-            )
-        result_summary = f"Reviewed {len(context.documents)} document(s) and {len(context.chunks)} chunk(s)."
-        return _handler_result(result_summary, findings, context.sources, confidence=0.72)
+        except Exception:
+            pass
 
     def _handle_structured_data(self, context: AgentContextBundle) -> dict[str, Any]:
         findings = [
@@ -661,6 +892,25 @@ def _source_public_dict(source: AgentSourceRef) -> dict[str, Any]:
         "source_metadata": source.source_metadata,
         "citation_payload": source.citation_payload,
     }
+
+
+def _chunk_source(chunk: dict[str, Any]) -> AgentSourceRef:
+    metadata = chunk.get("metadata") or {}
+    return AgentSourceRef(
+        source_kind="document_chunk",
+        source_id=str(chunk.get("id")) if chunk.get("id") else None,
+        source_label=metadata.get("document_title") or f"Chunk {chunk.get('chunk_index')}",
+        source_metadata={
+            "document_id": chunk.get("document_id"),
+            "chunk_index": chunk.get("chunk_index"),
+            "page_number": chunk.get("page_number"),
+        },
+        citation_payload={
+            "chunk_id": chunk.get("id"),
+            "document_id": chunk.get("document_id"),
+            "page_number": chunk.get("page_number"),
+        },
+    )
 
 
 def _document_summary(document: dict[str, Any]) -> str:
