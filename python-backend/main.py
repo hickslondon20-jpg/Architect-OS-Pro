@@ -56,6 +56,7 @@ from services.structured_query import StructuredQueryService
 from services.sub_agent_orchestrator import SubAgentError
 from services.sub_agent_orchestrator import SubAgentRunRequest as SubAgentServiceRunRequest
 from services.sub_agent_orchestrator import SubAgentOrchestrator
+from services.tool_registry_sync import sync_native_tools
 from services.vector_store import VectorStore, VectorStoreError
 from services.vcso_chat_service import VcsoChatPayload, VcsoChatService
 from services.web_search import WebSearchService
@@ -744,6 +745,21 @@ async def start_sandbox_sweeper() -> None:
     global _sandbox_sweep_task
     if settings.gke_service_account_key and settings.supabase_url and settings.supabase_service_role_key:
         _sandbox_sweep_task = asyncio.create_task(_sandbox_sweep_loop())
+
+
+@app.on_event("startup")
+async def sync_tool_registry_catalog() -> None:
+    """Reconcile the tool_registry catalog against code-registered native tools (fail-open)."""
+    if not (settings.supabase_url and settings.supabase_service_role_key):
+        return
+    try:
+        store = VectorStore.from_env()
+        summary = await asyncio.to_thread(sync_native_tools, store.client)
+        logging.getLogger("architectos.tool_registry").info("tool_registry sync: %s", summary)
+    except Exception:
+        logging.getLogger("architectos.tool_registry").warning(
+            "tool_registry catalog sync skipped", exc_info=True
+        )
 
 
 @app.on_event("shutdown")
