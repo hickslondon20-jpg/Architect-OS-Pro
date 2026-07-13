@@ -125,6 +125,42 @@ def test_after_turn_failure_returns_prior_state_without_persisting():
     assert client.query.updated is None
 
 
+def test_after_turn_usage_uses_existing_utility_role(monkeypatch):
+    service = object.__new__(VcsoChatService)
+    service.supabase = object()
+    service.anthropic_client = object()
+    service.store = SimpleNamespace(
+        resolve_platform_model=lambda **_kwargs: {
+            "provider": "anthropic",
+            "model_name": "claude-haiku-4-5-20251001",
+        }
+    )
+    service._working_state_assembly_settings = lambda *_args: {"enabled": True, "settings": {}}
+    response = SimpleNamespace(usage=SimpleNamespace(input_tokens=12, output_tokens=4))
+    monkeypatch.setattr(
+        "services.vcso_chat_service.WorkingStateService.after_turn",
+        lambda _self, **_kwargs: ({"decisions": []}, response),
+    )
+    captured = {}
+    monkeypatch.setattr(
+        "services.vcso_chat_service.log_ai_usage_event",
+        lambda _client, **kwargs: captured.update(kwargs),
+    )
+
+    service._after_turn_working_state(
+        user_id="founder",
+        thread_id="thread",
+        current_state=None,
+        user_text="Question",
+        assistant_text="Answer",
+    )
+
+    assert captured["role"] == "utility"
+    assert captured["capability_key"] == "vcso_working_state_after_turn"
+    assert captured["input_tokens"] == 12
+    assert captured["output_tokens"] == 4
+
+
 def test_flag_off_returns_the_exact_legacy_context_object():
     service = object.__new__(VcsoChatService)
     legacy = {"prompt": "legacy"}

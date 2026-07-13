@@ -1269,7 +1269,9 @@ class VcsoChatService:
                 user_id=user_id,
                 surface="virtual_cso",
                 model=model,
-                role="worker",
+                # ai_usage_log's MA-06 role contract is main/sub_agent/utility.
+                # The capability key records the specific worker-tier operation.
+                role="utility",
                 provider="anthropic",
                 input_tokens=usage.input_tokens,
                 output_tokens=usage.output_tokens,
