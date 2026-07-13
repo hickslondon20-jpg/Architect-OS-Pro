@@ -16,7 +16,7 @@ import anthropic
 from supabase import Client, create_client
 
 from core.config import get_settings
-from core.langsmith_tracing import trace_anthropic_client
+from core.langsmith_tracing import trace_anthropic_client, trace_scope
 from services.citations.binding import (
     format_numbered_source_list,
     normalize_vcso_turn_sources,
@@ -309,6 +309,12 @@ class VcsoChatService:
             initial_trace_steps = [context_step]
         self._active_turn["run_id"] = run_id
         self._active_turn["trace_steps"] = initial_trace_steps
+        trace_metadata = {
+            "user_id": user_id,
+            "thread_id": thread_id,
+            "run_id": run_id,
+            "capability_key": "vcso_chat",
+        }
 
         self._active_turn["ready_emitted"] = True
         yield {
@@ -370,13 +376,14 @@ class VcsoChatService:
         round_cap = MAX_DEEP_ROUNDS if deep_mode else max_rounds
 
         for _round_num in range(round_cap):
-            response = self.anthropic_client.messages.create(
-                model=self.model,
-                max_tokens=MAX_TOKENS,
-                system=system_prompt,
-                tools=context["tools"],
-                messages=messages,
-            )
+            with trace_scope(trace_metadata):
+                response = self.anthropic_client.messages.create(
+                    model=self.model,
+                    max_tokens=MAX_TOKENS,
+                    system=system_prompt,
+                    tools=context["tools"],
+                    messages=messages,
+                )
             usage = anthropic_usage(response)
             if usage.input_tokens is not None:
                 main_input_peaks.append(usage.input_tokens)
@@ -630,21 +637,22 @@ class VcsoChatService:
         assistant_text = ""
         final_usage_input: int | None = None
         final_usage_output: int | None = None
-        with self.anthropic_client.messages.stream(
-            model=self.model,
-            max_tokens=MAX_TOKENS,
-            system=system_prompt,
-            messages=messages,
-        ) as stream:
-            for text in stream.text_stream:
-                assistant_text += text
-                yield {"event": "token", "data": {"text": text}}
-            final_message = stream.get_final_message()
-            final_usage = anthropic_usage(final_message)
-            final_usage_input = final_usage.input_tokens
-            final_usage_output = final_usage.output_tokens
-            if final_usage_input is not None:
-                main_input_peaks.append(final_usage_input)
+        with trace_scope(trace_metadata):
+            with self.anthropic_client.messages.stream(
+                model=self.model,
+                max_tokens=MAX_TOKENS,
+                system=system_prompt,
+                messages=messages,
+            ) as stream:
+                for text in stream.text_stream:
+                    assistant_text += text
+                    yield {"event": "token", "data": {"text": text}}
+                final_message = stream.get_final_message()
+                final_usage = anthropic_usage(final_message)
+                final_usage_input = final_usage.input_tokens
+                final_usage_output = final_usage.output_tokens
+                if final_usage_input is not None:
+                    main_input_peaks.append(final_usage_input)
 
         parsed_citations = parse_answer_citations(assistant_text, numbered_citations)
         assistant_text = parsed_citations.text
