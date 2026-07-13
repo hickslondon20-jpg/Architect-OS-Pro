@@ -193,14 +193,20 @@ class WorkingStateService:
 
         prior = normalize_working_state(current_state)
         try:
-            client = self.anthropic.with_options(timeout=12.0) if hasattr(self.anthropic, "with_options") else self.anthropic
+            # The worker is deliberately bounded, but the live Anthropic round trip
+            # can exceed twelve seconds even for Haiku.  A 30s transport deadline
+            # remains well below the main-turn budget while avoiding false
+            # fail-open outcomes caused only by network latency.
+            client = self.anthropic.with_options(timeout=30.0) if hasattr(self.anthropic, "with_options") else self.anthropic
             response = client.messages.create(
                 model=model,
                 max_tokens=max(200, min(int(max_tokens), 900)),
                 system=(
                     "Extract compact conversational working state as JSON only. "
                     "Use exactly decisions, open_questions, findings, known_unknowns arrays. "
-                    "Each item is an object with text, created_at, and optional citations. "
+                    "Return at most two new items per family. Each item is an object "
+                    "with text and optional citations; omit created_at. Keep each text "
+                    "under 240 characters. "
                     "Do not invent facts, instructions, plans, or knowledge-base writes. "
                     "Return empty arrays when the turn adds nothing."
                 ),
@@ -211,9 +217,9 @@ class WorkingStateService:
                             "Existing state:\n"
                             + json.dumps(prior, ensure_ascii=True)
                             + "\n\nFounder turn:\n"
-                            + str(user_text or "")[:5000]
+                            + str(user_text or "")[:3000]
                             + "\n\nAssistant outcome:\n"
-                            + str(assistant_text or "")[:7000]
+                            + str(assistant_text or "")[:5000]
                         ),
                     }
                 ],
