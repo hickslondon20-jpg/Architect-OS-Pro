@@ -4,13 +4,12 @@
 
 ## Current Focus
 
-**Phase 1 COMPLETE** (2026-07-13). CTX-1..5 are implemented and live-verified: bounded
-working state, fail-open assembly, worker-tier afterTurn, compaction fallback, and durable annotations.
-The matched live set reduced first-call assembled input 54.2% and full main-loop input 20.8% while
-preserving grounded decision quality. Stage 1 is active only for founder
-`cd490873-99aa-4533-9240-f0aa04deb54f`; global enablement and annotation re-injection remain off, and
-proof annotations were removed. Three scoped LangSmith traces are paired to their exact `ai_usage_log`
-records. Stage 2 awaits the canary observation gate; no Phase 2 work has started.
+**Phase 2 CODE COMPLETE; LIVE-DARK** (2026-07-13). INT-1..3 are implemented in commit `d2962d15`
+and deployed behind `vcso_intent_read`, which remains disabled with zero enrollment. The migration is
+live, focused tests and compile pass, and the post-deploy flag-off VCSO smoke returned and persisted
+`READY.` with `intent = null` and `surface=virtual_cso`. Phase 2's mixed-intent cost/quality proof and
+default flip remain founder-gated. Phase 1 Stage 1 remains active only for founder
+`cd490873-99aa-4533-9240-f0aa04deb54f`; its Stage 2 observation/flip gate is unchanged.
 
 ## Documents
 
@@ -42,8 +41,8 @@ records. Stage 2 awaits the canary observation gate; no Phase 2 work has started
 
 **Phase 0 — Done (2026-07-13).** Legacy Vercel chat route quarantined (410), CLAUDE.md + endpoint
 point to Python, conversation feeder scoped deferred, wiki authority resolved (layer-split + projection
-caveat). **Phase 1 — Working-State Memory + Bounded Assembly is complete; its Stage 1 founder canary
-is active.** Stage 2 remains gated on live observation.
+caveat). **Phase 1's Stage 1 founder canary remains active and Stage 2 remains observation-gated.**
+**Phase 2 code is deployed live-dark; its canary proof is pending and no flag was flipped.**
 
 ## Open Design Forks Carried Into Build-Planning
 
@@ -73,7 +72,7 @@ is active.** Stage 2 remains gated on live observation.
 | Seeding (5 workstream files) | **Done** (2026-07-13) |
 | 0. Reconciliation Cleanups | **Done** (2026-07-13; O1 resolved, O2 resolved w/ caveat, O3 deferred) |
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** (2026-07-13) — Stage 2 awaits observation |
-| 2. Intent & Depth Read + Adaptive Triage | Not started |
+| 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16, 2026-07-13) |
 | 3. Tier-Escalating Source Router | Not started |
 | 4. Planner (thin slice) — checkpoint | Not started |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started |
@@ -87,5 +86,19 @@ cleanups shipped as v0.6.11–v0.6.14. CLEAN-3 was founder-approved (layer-split
 caveat) and O2 is recorded resolved in `CONTEXT.md`, `ROADMAP.md`, and here. Two OS-Engine dependencies
 carry forward for Phase 3: (1) the conversation→wiki feeder (deferred), (2) the wiki_*→OSE-Layer-1
 projection (unverified; Phase 3 bypasses it by composing the seven fixed pages from `wiki_*` directly).
-**Next pass:** observe 5–10 real founder turns across at least two threads, or roughly 24 hours of
-normal use, then make the Stage 2 go/no-go decision. Do not enable annotations or start Phase 2.
+**Founder decision (2026-07-13):** defer the Stage 1 canary observation + Stage 2 flip to conserve
+usage/context; proceed with **Phase 2 planning** in parallel (the flip is a production-rollout gate,
+not a design gate for Phase 2). The canary stays enrolled (passive, fail-open) and accumulates data.
+
+**CARRY-FORWARD — must close before the workstream closes:** (1) Phase 1 Stage 1 observation, (2)
+Stage 2 `enabled_for_all` flip, (3) mark Phase 1 *fully* Done. Runbook: `phases/01-working-state-memory/
+01-STAGED-FLIP-RUNBOOK.md`. Also: when Phase 2 later *executes*, its production flip should land **after**
+Phase 1's flip (don't stack two unproven assembly changes live).
+
+**Phase 2 DEPLOYED DARK** (2026-07-13): `d2962d15` adds the locked five-move classifier, depth,
+confidence, deterministic response contract, conservative lean/full triage, per-turn intent JSONB,
+bounded timeout/circuit breaker, worker-tier usage accounting, and sanitized MA-05 step. The migration
+is applied live. Production health and a real flag-off VCSO turn passed; both feature flags retained
+their prior state. **Next action:** leave Phase 2 unenrolled until a separate founder-approved canary,
+then run the paired mixed-intent cost/quality proof. Do not advance Phase 1 or Phase 2 merely because
+the dark code is deployed. No Phase 3 work has started.

@@ -69,13 +69,20 @@ completed on legacy; worker-tier afterTurn usage, cross-thread untrusted annotat
 and cleanup were proven. The named founder is allowlisted behind the master gate; global enablement
 and annotation re-injection remain off.
 Three scoped LangSmith main-call traces are paired to the exact `ai_usage_log` rows and token counts in
-`01-COMPLETION.md`. Stage 2 remains blocked on the canary observation gate; no Phase 2 work has started.
+`01-COMPLETION.md`. Stage 2 remains blocked on the canary observation gate.
 
 ### Phase 2: Intent & Depth Read + Adaptive Triage
 A cheap worker-tier pre-pass (active-memory pattern) that reads the *kind* and *depth* of the move
 before any retrieval, sets the response contract, selects the initial terminal mode, and gates
 decomposition (simple lookups answer directly). Bounded timeout + circuit breaker + `NONE` sentinel;
 injection hygiene on injected founder data.
+
+**Status (2026-07-13): Code complete and live-dark; canary proof pending.** Commit `d2962d15`
+implements INT-1..3 behind the separate default-off `vcso_intent_read` flag and is deployed to main.
+The live flag has zero enrollment. A post-deploy flag-off VCSO smoke returned `READY.`, persisted with
+`intent = null`, and logged `surface=virtual_cso`; production health returned HTTP 200. The mixed-intent
+cost/quality proof and any default flip remain founder-gated and are not claimed complete. See
+`phases/02-intent-read/02-COMPLETION.md`.
 
 ### Phase 3: Tier-Escalating Source Router
 The cheapest-first source selector: Tier-0 records → Tier-1 wiki components → Tier-2 semantic →
@@ -119,7 +126,7 @@ runtime-enforced policy under adversarial prompts). Traces paired with DB/output
 |---|---|---|
 | 0. Reconciliation Cleanups | **Done** (v0.6.11–v0.6.14; O1 resolved, O2 resolved w/ projection caveat, O3 scoped deferred) | 2026-07-13 |
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** — live gates and paired-trace proof passed; Stage 2 awaits observation | 2026-07-13 |
-| 2. Intent & Depth Read + Adaptive Triage | Not started | — |
+| 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16) | — |
 | 3. Tier-Escalating Source Router | Not started | — |
 | 4. Planner (thin slice) — checkpoint | Not started | — |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started | — |
