@@ -112,6 +112,7 @@ class VcsoChatService:
         self.provider = "anthropic"
         self.model = self.settings.claude_synthesis_model
         self.context_window = self.settings.llm_context_window
+        self._active_turn: dict[str, Any] | None = None
 
     @classmethod
     def from_env(cls) -> "VcsoChatService":
@@ -122,6 +123,21 @@ class VcsoChatService:
         return cls(VectorStore(client, None, settings), client)
 
     def stream_chat(self, *, user_id: str, payload: VcsoChatPayload, max_rounds: int = 5) -> Iterator[dict[str, Any]]:
+        self._active_turn = None
+        try:
+            yield from self._stream_chat_impl(user_id=user_id, payload=payload, max_rounds=max_rounds)
+        except GeneratorExit as exc:
+            self._recover_failed_turn(exc, terminal_status="cancelled", emit_events=False)
+            raise
+        except Exception as exc:
+            recovery_events = self._recover_failed_turn(exc, terminal_status="failed", emit_events=True)
+            if recovery_events is None:
+                raise
+            yield from recovery_events
+        finally:
+            self._active_turn = None
+
+    def _stream_chat_impl(self, *, user_id: str, payload: VcsoChatPayload, max_rounds: int = 5) -> Iterator[dict[str, Any]]:
         if not payload.text.strip():
             raise ValueError("Message text is required.")
         self._resolve_model()
@@ -134,6 +150,19 @@ class VcsoChatService:
             user_message = self._insert_message(thread_id, user_id, "user", payload.text, deep_mode=True)
         else:
             user_message = self._insert_message(thread_id, user_id, "user", payload.text)
+        self._active_turn = {
+            "user_id": user_id,
+            "thread_id": thread_id,
+            "user_message": user_message,
+            "message_count_before": int(thread.get("message_count") or 0),
+            "deep_mode": deep_mode,
+            "run_id": None,
+            "assistant_message": None,
+            "trace_steps": [],
+            "ready_emitted": False,
+            "run_completed": False,
+            "completed": False,
+        }
         self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 1)
 
         agent_invocation = self._create_agent_invocation_task(
@@ -150,6 +179,7 @@ class VcsoChatService:
                 assistant_text,
                 deep_mode=deep_mode,
             )
+            self._active_turn["assistant_message"] = assistant_message
             self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 2)
             self._persist_agent_invocation_trace(
                 user_id=user_id,
@@ -159,6 +189,7 @@ class VcsoChatService:
                 invocation=agent_invocation,
             )
             fresh_thread = self._get_thread(thread_id, user_id)
+            self._active_turn["ready_emitted"] = True
             yield {
                 "event": "ready",
                 "data": {
@@ -232,6 +263,7 @@ class VcsoChatService:
                 allowed_tools=context["tool_names"],
                 deep_mode=deep_mode,
             )
+            self._active_turn["run_id"] = run_id
             context_step = _context_trace_step(
                 linked_folder=payload.linked_folder,
                 project_id=payload.project_id,
@@ -251,7 +283,10 @@ class VcsoChatService:
                 output_summary=json.loads(context_step["output"]),
             )
             initial_trace_steps = [context_step]
+        self._active_turn["run_id"] = run_id
+        self._active_turn["trace_steps"] = initial_trace_steps
 
+        self._active_turn["ready_emitted"] = True
         yield {
             "event": "ready",
             "data": {
@@ -304,6 +339,7 @@ class VcsoChatService:
             main_input_peaks: list[int] = []
             if deep_mode:
                 self._set_thread_agent_status(thread_id, user_id, "working")
+        self._active_turn["trace_steps"] = trace_steps
 
         system_prompt = VCSO_TOOL_LOOP_SYSTEM_PROMPT + ("\n\n" + VCSO_DEEP_MODE_SYSTEM_PROMPT if deep_mode else "")
         round_cap = MAX_DEEP_ROUNDS if deep_mode else max_rounds
@@ -437,6 +473,9 @@ class VcsoChatService:
                             break
                         except concurrent.futures.TimeoutError:
                             elapsed += TOOL_HEARTBEAT_SECONDS
+                            if elapsed >= max(float(self.settings.vcso_tool_max_seconds), TOOL_HEARTBEAT_SECONDS):
+                                tool_future.cancel()
+                                raise TimeoutError(f"{tool_name} exceeded the configured VCSO tool deadline.")
                             yield {
                                 "event": "heartbeat",
                                 "data": {"stepIndex": next_step_index, "tool": tool_name, "elapsedSeconds": elapsed},
@@ -609,8 +648,10 @@ class VcsoChatService:
                 token_count=final_usage_output,
                 citations=serialized_turn_citations,
             )
+        self._active_turn["assistant_message"] = assistant_message
         self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 2)
         self._complete_main_run(run_id, user_id, assistant_message["id"], assistant_text, serialized_turn_citations)
+        self._active_turn["run_completed"] = True
         result_step = _result_trace_step(
             step_index=next_step_index,
             answer_chars=len(assistant_text),
@@ -636,6 +677,7 @@ class VcsoChatService:
             getattr(self, "context_window", getattr(self.settings, "llm_context_window", 200000)),
         )
         yield {"event": "context", "data": context_signal}
+        self._active_turn["completed"] = True
         yield {
             "event": "done",
             "data": {
@@ -652,6 +694,144 @@ class VcsoChatService:
                 "agentStatus": "complete",
             },
         }
+
+    def _recover_failed_turn(
+        self,
+        exc: BaseException,
+        *,
+        terminal_status: str,
+        emit_events: bool,
+    ) -> list[dict[str, Any]] | None:
+        state = self._active_turn
+        if not state or state.get("completed"):
+            return None
+        try:
+            user_id = str(state["user_id"])
+            thread_id = str(state["thread_id"])
+            assistant_message = state.get("assistant_message")
+            if not assistant_message:
+                fallback_text = _failed_turn_message(terminal_status)
+                assistant_message = self._insert_message(
+                    thread_id,
+                    user_id,
+                    "assistant",
+                    fallback_text,
+                    deep_mode=bool(state.get("deep_mode")),
+                    citations=[],
+                )
+                state["assistant_message"] = assistant_message
+                try:
+                    self._update_thread_count(
+                        thread_id,
+                        user_id,
+                        int(state.get("message_count_before") or 0) + 2,
+                    )
+                except Exception:
+                    pass
+
+            trace_steps = list(state.get("trace_steps") or [])
+            run_id = state.get("run_id")
+            if run_id and not state.get("run_completed"):
+                error_step = _failure_trace_step(
+                    step_index=max(
+                        [int(step.get("stepIndex") or 0) for step in trace_steps] or [0]
+                    )
+                    + 1,
+                    terminal_status=terminal_status,
+                )
+                try:
+                    self._create_step(
+                        str(run_id),
+                        user_id,
+                        error_step["stepIndex"],
+                        step_type="error",
+                        title=error_step["title"],
+                        summary=error_step["summary"],
+                        output_summary=json.loads(error_step["output"]),
+                        status="failed",
+                        error_message=_safe_internal_error(exc),
+                    )
+                except Exception:
+                    pass
+                trace_steps.append(error_step)
+                self._fail_main_run(
+                    str(run_id),
+                    user_id,
+                    assistant_message_id=str(assistant_message["id"]),
+                    terminal_status=terminal_status,
+                    error_message=_safe_internal_error(exc),
+                )
+
+            if state.get("deep_mode"):
+                self._clear_deep_resume(thread_id, user_id, status="complete")
+            state["completed"] = True
+            if not emit_events:
+                return []
+
+            events: list[dict[str, Any]] = []
+            if not state.get("ready_emitted"):
+                events.append(
+                    {
+                        "event": "ready",
+                        "data": {
+                            "threadId": thread_id,
+                            "userMessage": _message_payload(state["user_message"]),
+                            "route": _failure_route_payload(),
+                            "assembledContext": _empty_assembled_context(),
+                            "agentSteps": trace_steps,
+                            "deepMode": bool(state.get("deep_mode")),
+                            "agentStatus": "complete",
+                        },
+                    }
+                )
+            events.append(
+                {
+                    "event": "done",
+                    "data": {
+                        "chat": _chat_payload(self._get_thread(thread_id, user_id)),
+                        "assistantMessage": {
+                            **_message_payload(assistant_message),
+                            "agentSteps": trace_steps,
+                        },
+                        "artifactId": None,
+                        "sources": [],
+                        "sourcePages": [],
+                        "usage": {"inputTokens": None, "outputTokens": None},
+                        "deepMode": bool(state.get("deep_mode")),
+                        "agentStatus": "complete",
+                        "recoveredFailure": True,
+                    },
+                }
+            )
+            return events
+        except Exception:
+            return None
+
+    def _fail_main_run(
+        self,
+        run_id: str,
+        user_id: str,
+        *,
+        assistant_message_id: str,
+        terminal_status: str,
+        error_message: str,
+    ) -> None:
+        status = "cancelled" if terminal_status == "cancelled" else "failed"
+        self.supabase.table("agent_delegation_runs").update(
+            {
+                "status": status,
+                "assistant_message_id": assistant_message_id,
+                "result_summary": _failed_turn_message(terminal_status)[:500],
+                "structured_result": {
+                    "schema_version": "vcso_tool_loop_v1",
+                    "status": status,
+                    "reasoning_visibility": "summary_only",
+                },
+                "error_message": error_message,
+                "completed_at": _now(),
+                "updated_at": _now(),
+            }
+        ).eq("id", run_id).eq("user_id", user_id).execute()
 
     def _resolve_model(self) -> None:
         resolved = self.store.resolve_platform_model(
@@ -1535,6 +1715,30 @@ def _result_trace_step(*, step_index: int, answer_chars: int, tool_step_count: i
     }
 
 
+def _failure_trace_step(*, step_index: int, terminal_status: str) -> dict[str, Any]:
+    return {
+        "stepIndex": step_index,
+        "stepType": "error",
+        "title": "Response interrupted",
+        "summary": _failed_turn_message(terminal_status),
+        "input": {},
+        "output": json.dumps({"status": "cancelled" if terminal_status == "cancelled" else "failed"}),
+        "status": "failed",
+        "sourceRefs": [],
+    }
+
+
+def _failed_turn_message(terminal_status: str) -> str:
+    if terminal_status == "cancelled":
+        return "This response was interrupted before it could finish. Please try again."
+    return "I couldn't complete that response. Your request was saved; please try again."
+
+
+def _safe_internal_error(exc: BaseException) -> str:
+    message = str(_redact_secret_text(str(exc) or exc.__class__.__name__))
+    return message[:2000]
+
+
 def _step_title_for_tool(tool_name: str, input_summary: dict[str, Any]) -> str:
     if tool_name == "delegate_to_sub_agent":
         capability = str(input_summary.get("capability_key") or "sub_agent")
@@ -1710,6 +1914,16 @@ def _agent_invocation_route_payload(invocation: dict[str, Any]) -> dict[str, Any
         "confidence": 1,
         "reason": f"Explicit Domain Agent invocation: @{agent.get('id') or agent.get('shortName') or 'agent'}"
         + (f" mapped to {workflow.get('name')}" if workflow else " captured as a free-form task"),
+    }
+
+
+def _failure_route_payload() -> dict[str, Any]:
+    return {
+        "primaryPackSlug": None,
+        "rankedPackSlugs": [],
+        "requiredPlatformContext": [],
+        "confidence": 0,
+        "reason": "The turn ended before routing completed.",
     }
 
 

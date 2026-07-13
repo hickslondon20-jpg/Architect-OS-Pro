@@ -60,6 +60,7 @@ class SubAgentOrchestrator:
         return [capability.public_dict() for capability in self.registry.list_active()]
 
     def start_run(self, request: SubAgentRunRequest) -> SubAgentRunResult:
+        run_id: str | None = None
         try:
             capability = self.registry.get_for_surface(request.capability_key, request.parent_surface)
             context = self.context_builder.build(
@@ -123,7 +124,12 @@ class SubAgentOrchestrator:
                 completed_at=_now(),
             )
             return self.get_run(run_id, request.user_id)
-        except (AgentCapabilityError, AgentContextError, VectorStoreError, SubAgentError) as exc:
+        except Exception as exc:
+            if run_id:
+                try:
+                    self._fail_run(run_id, request.user_id, exc)
+                except Exception:
+                    pass
             raise SubAgentError(str(exc)) from exc
 
     def get_run(self, run_id: str, user_id: str) -> SubAgentRunResult:
@@ -204,6 +210,44 @@ class SubAgentOrchestrator:
     def _update_run(self, run_id: str, user_id: str, **values: Any) -> None:
         values["updated_at"] = _now()
         self.store.client.table("agent_delegation_runs").update(values).eq("id", run_id).eq("user_id", user_id).execute()
+
+    def _fail_run(self, run_id: str, user_id: str, exc: Exception) -> None:
+        error_message = str(exc or "Sub-agent execution failed.")[:2000]
+        try:
+            steps = (
+                self.store.client.table("agent_delegation_steps")
+                .select("step_index")
+                .eq("run_id", run_id)
+                .eq("user_id", user_id)
+                .order("step_index", desc=True)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            next_step_index = int(steps[0].get("step_index") or 0) + 1 if steps else 1
+            self._create_step(
+                run_id,
+                user_id,
+                next_step_index,
+                step_type="error",
+                title="Sub-agent interrupted",
+                summary="The sub-agent could not complete its assigned work.",
+                output_summary={"status": "failed"},
+                status="failed",
+                error_message=error_message,
+            )
+        except Exception:
+            pass
+        self._update_run(
+            run_id,
+            user_id,
+            status="failed",
+            result_summary="The sub-agent could not complete its assigned work.",
+            structured_result={"status": "failed", "reasoning_visibility": "summary_only"},
+            error_message=error_message,
+            completed_at=_now(),
+        )
 
     def _create_step(
         self,

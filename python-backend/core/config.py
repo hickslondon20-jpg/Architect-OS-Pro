@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         validation_alias="ARCHITECTOS_CLAUDE_SYNTHESIS_MODEL",
     )
     llm_context_window: int = Field(default=200000, validation_alias="ARCHITECTOS_LLM_CONTEXT_WINDOW")
+    vcso_tool_max_seconds: float = Field(default=600.0, validation_alias="ARCHITECTOS_VCSO_TOOL_MAX_SECONDS")
 
     raw_document_bucket: str = Field(default="raw-documents", validation_alias="ARCHITECTOS_RAW_DOCUMENT_BUCKET")
     ingest_secret: str | None = Field(default=None, validation_alias="ARCHITECTOS_INGEST_SECRET")
