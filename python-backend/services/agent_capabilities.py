@@ -27,10 +27,19 @@ class AgentCapability:
     allowed_tools: list[str] = field(default_factory=list)
     allowed_source_kinds: list[str] = field(default_factory=list)
     model_setting_key: str | None = None
+    routing_tier: str | None = None
     output_schema: dict[str, Any] = field(default_factory=dict)
     default_config: dict[str, Any] = field(default_factory=dict)
     can_spawn_agents: bool = False
     id: str | None = None
+
+    @property
+    def effective_model_setting_key(self) -> str | None:
+        """Tier-based routing: resolve through the central tier row when a tier is set,
+        otherwise fall back to the capability's bespoke model_setting_key."""
+        if self.routing_tier:
+            return f"tier_{self.routing_tier}"
+        return self.model_setting_key
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -63,7 +72,7 @@ class AgentCapabilityRegistry:
                 self.store.client.table("agent_capabilities")
                 .select(
                     "id,capability_key,label,description,status,allowed_surfaces,"
-                    "allowed_tools,allowed_source_kinds,model_setting_key,output_schema,"
+                    "allowed_tools,allowed_source_kinds,model_setting_key,routing_tier,output_schema,"
                     "default_config,can_spawn_agents"
                 )
                 .in_("status", sorted(ACTIVE_STATUSES))
@@ -105,6 +114,7 @@ def _capability_from_row(row: dict[str, Any]) -> AgentCapability:
         allowed_tools=list(row.get("allowed_tools") or []),
         allowed_source_kinds=list(row.get("allowed_source_kinds") or []),
         model_setting_key=row.get("model_setting_key"),
+        routing_tier=row.get("routing_tier"),
         output_schema=row.get("output_schema") or {},
         default_config=row.get("default_config") or {},
         can_spawn_agents=bool(row.get("can_spawn_agents")),
@@ -122,6 +132,7 @@ def _fallback_capabilities() -> list[AgentCapability]:
             allowed_tools=["retrieve_document_chunks", "read_raw_document_metadata"],
             allowed_source_kinds=["raw_document", "document_chunk"],
             model_setting_key="document_analysis_agent",
+            routing_tier="worker",
             output_schema={"version": "agent_result_v1"},
             default_config={"max_sources": 8, "max_rounds": 1, "timeout_seconds": 20},
         ),

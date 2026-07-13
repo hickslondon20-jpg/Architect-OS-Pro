@@ -493,7 +493,7 @@ class SubAgentOrchestrator:
     ) -> str:
         settings = get_settings()
         resolved = self.store.resolve_platform_model(
-            setting_key=capability.model_setting_key or "document_analysis_agent",
+            setting_key=capability.effective_model_setting_key or "document_analysis_agent",
             fallback_model_name=settings.claude_synthesis_model,
             fallback_provider="anthropic",
         )
@@ -604,7 +604,7 @@ class SubAgentOrchestrator:
         parent_thread_id: str | None,
     ) -> dict[str, Any]:
         """Run the KB Explorer sub-agent tool-use loop."""
-        exploration = KbExplorerService(self.store, model_setting_key=capability.model_setting_key).run_exploration(
+        exploration = KbExplorerService(self.store, model_setting_key=capability.effective_model_setting_key).run_exploration(
             user_id=context.user_id,
             task_summary=context.task_summary,
             thread_id=parent_thread_id or context.context_scope.get("thread_id"),
@@ -666,7 +666,7 @@ class SubAgentOrchestrator:
         timeout_seconds = _safe_float(default_config.get("timeout_seconds"), default=90.0, minimum=1.0, maximum=180.0)
         skill_file_ids = _safe_string_list(context.context_scope.get("skill_file_ids"))
 
-        execution = SandboxExecutionService.from_env(model_setting_key=capability.model_setting_key).run_execution(
+        execution = SandboxExecutionService.from_env(model_setting_key=capability.effective_model_setting_key).run_execution(
             user_id=context.user_id,
             thread_id=thread_id,
             task_summary=context.task_summary,
