@@ -2,7 +2,8 @@
 
 **Date:** 2026-07-13  
 **Status:** Complete — CTX-1..5 and the live cost, quality, isolation, fail-open, and paired-trace
-acceptance gates passed. The production default remains off pending London's separate flip decision.
+acceptance gates passed. A founder-only Stage 1 canary is active; the production-wide default remains
+off pending the observation gate.
 
 ## Scope delivered
 
@@ -132,16 +133,17 @@ same-founder visibility and other-founder invisibility. The proof note was then 
 - Supabase advisor output contains pre-existing project-wide notices; no Phase 1 founder-isolation
   failure was found. Direct RLS replay is the acceptance evidence for this phase.
 
-## London default-flip checkpoint
+## Staged default-flip checkpoint
 
 Phase 1 evidence is complete, including the paired LangSmith and database records. The production
-state remains deliberately fail-safe:
+state entered the founder-only canary at 2026-07-13 19:09:21 UTC:
 
-- `is_enabled=false`
-- `test_user_ids=[]`
+- `is_enabled=true`
+- `test_user_ids=['cd490873-99aa-4533-9240-f0aa04deb54f']`
 - `enabled_for_all=false`
 - `annotations_enabled=false`
 - `assembly_token_budget=6000`
 
-London must decide whether to begin the staged default flip. Do not flip it implicitly, and do not
-start Phase 2 from this checkpoint.
+Stage 2 remains blocked until 5–10 real turns across at least two threads, or roughly 24 hours of
+normal founder use, show bounded cost, preserved quality, healthy working-state updates, and no
+fail-open spike. Do not enable annotations or start Phase 2 from this checkpoint.

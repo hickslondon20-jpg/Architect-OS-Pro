@@ -61,14 +61,15 @@ notes agents attach to reusable resources that persist across threads and re-inj
 opt-in) — the "learns and holds on" behavior beyond a single thread. This is the foundation the
 router and planner reason over, and the primary cost lever on long conversations.
 
-**Status (2026-07-13): Done; default flip deferred to London.** CTX-1..5 are implemented and
+**Status (2026-07-13): Done; Stage 1 founder canary active.** CTX-1..5 are implemented and
 live-verified. The matched
 live set reduced first-call assembled input from 55,922 to 25,590 tokens (54.2%) and total main-loop
 input from 178,476 to 141,415 tokens (20.8%) without a quality regression. Forced assembly failure
 completed on legacy; worker-tier afterTurn usage, cross-thread untrusted annotations, founder RLS,
-and cleanup were proven. The global flag and annotation re-injection are off with an empty allowlist.
+and cleanup were proven. The named founder is allowlisted behind the master gate; global enablement
+and annotation re-injection remain off.
 Three scoped LangSmith main-call traces are paired to the exact `ai_usage_log` rows and token counts in
-`01-COMPLETION.md`. The default flip remains a separate London decision; no Phase 2 work has started.
+`01-COMPLETION.md`. Stage 2 remains blocked on the canary observation gate; no Phase 2 work has started.
 
 ### Phase 2: Intent & Depth Read + Adaptive Triage
 A cheap worker-tier pre-pass (active-memory pattern) that reads the *kind* and *depth* of the move
@@ -117,7 +118,7 @@ runtime-enforced policy under adversarial prompts). Traces paired with DB/output
 | Phase | Status | Completed |
 |---|---|---|
 | 0. Reconciliation Cleanups | **Done** (v0.6.11–v0.6.14; O1 resolved, O2 resolved w/ projection caveat, O3 scoped deferred) | 2026-07-13 |
-| 1. Working-State Memory + Bounded Assembly | **Done** — live cost/quality/RLS/fail-open and paired-trace proof passed; default flip deferred to London | 2026-07-13 |
+| 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** — live gates and paired-trace proof passed; Stage 2 awaits observation | 2026-07-13 |
 | 2. Intent & Depth Read + Adaptive Triage | Not started | — |
 | 3. Tier-Escalating Source Router | Not started | — |
 | 4. Planner (thin slice) — checkpoint | Not started | — |
