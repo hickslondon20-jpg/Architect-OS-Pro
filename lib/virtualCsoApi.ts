@@ -412,6 +412,9 @@ export const sendUserMessage = async (
         userMessage = toMessage(payload.userMessage);
         route = payload.route;
         assembledContext = payload.assembledContext;
+        for (const step of payload.agentSteps ?? []) {
+          if (typeof step.stepIndex === 'number') liveAgentSteps.set(step.stepIndex, step);
+        }
         options.onUserMessage?.(userMessage);
         options.onReady?.({
           threadId: payload.threadId,

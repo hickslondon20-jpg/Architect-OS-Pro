@@ -1,4 +1,11 @@
-from services.vcso_chat_service import _safe_input_summary, _safe_output_summary
+import json
+
+from services.vcso_chat_service import (
+    _context_trace_step,
+    _result_trace_step,
+    _safe_input_summary,
+    _safe_output_summary,
+)
 
 
 def test_input_summary_preserves_search_args_and_recursively_redacts_secrets():
@@ -66,3 +73,39 @@ def test_output_summary_hides_rows_and_secret_text_tokens():
     assert summary["password"] == "[redacted]"
     assert "abc.def.secret" not in summary["message"]
     assert "sk-abcdefghijklmnop" not in summary["message"]
+
+
+def test_context_trace_step_matches_persisted_reload_shape():
+    step = _context_trace_step(
+        linked_folder="Financial",
+        project_id=None,
+        deep_mode=False,
+        tool_count=8,
+        founder_page_count=7,
+        selected_pack_slugs=["financial-patterns"],
+    )
+
+    assert step["stepIndex"] == 1
+    assert step["stepType"] == "context_build"
+    assert step["status"] == "completed"
+    assert step["input"] == {"linked_folder": "Financial", "project_id": None, "deep_mode": False}
+    assert json.loads(step["output"]) == {
+        "tool_count": 8,
+        "founder_page_count": 7,
+        "selected_pack_slugs": ["financial-patterns"],
+    }
+
+
+def test_result_trace_step_matches_persisted_reload_shape():
+    step = _result_trace_step(step_index=4, answer_chars=59, tool_step_count=2)
+
+    assert step == {
+        "stepIndex": 4,
+        "stepType": "result",
+        "title": "Answer prepared",
+        "summary": "Virtual CSO answer streamed to the founder.",
+        "input": {},
+        "output": json.dumps({"answer_chars": 59, "tool_step_count": 2}),
+        "status": "completed",
+        "sourceRefs": [],
+    }

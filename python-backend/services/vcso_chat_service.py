@@ -222,6 +222,7 @@ class VcsoChatService:
             run_id = str(resume_state.get("run_id") or "")
             if not run_id:
                 raise RuntimeError("Deep Mode resume state is missing its run id.")
+            initial_trace_steps = list(resume_state.get("trace_steps") or [])
         else:
             run_id = self._create_main_run(
                 user_id=user_id,
@@ -231,20 +232,25 @@ class VcsoChatService:
                 allowed_tools=context["tool_names"],
                 deep_mode=deep_mode,
             )
+            context_step = _context_trace_step(
+                linked_folder=payload.linked_folder,
+                project_id=payload.project_id,
+                deep_mode=deep_mode,
+                tool_count=len(context["tool_names"]),
+                founder_page_count=len(context["founder_pages"]),
+                selected_pack_slugs=[skill.get("slug") for skill in context["route"]["selected"]],
+            )
             self._create_step(
                 run_id,
                 user_id,
-                1,
+                context_step["stepIndex"],
                 step_type="context_build",
-                title="Context prepared",
-                summary="Prepared Virtual CSO context and scoped registry tools.",
-                input_summary={"linked_folder": payload.linked_folder, "project_id": payload.project_id, "deep_mode": deep_mode},
-                output_summary={
-                    "tool_count": len(context["tool_names"]),
-                    "founder_page_count": len(context["founder_pages"]),
-                    "selected_pack_slugs": [skill.get("slug") for skill in context["route"]["selected"]],
-                },
+                title=context_step["title"],
+                summary=context_step["summary"],
+                input_summary=context_step["input"],
+                output_summary=json.loads(context_step["output"]),
             )
+            initial_trace_steps = [context_step]
 
         yield {
             "event": "ready",
@@ -261,7 +267,7 @@ class VcsoChatService:
                     "requiredPlatformContext": context["route"]["required"],
                     "allowDraftIp": context["allow_draft_ip"],
                 },
-                "agentSteps": [],
+                "agentSteps": initial_trace_steps,
                 "deepMode": deep_mode,
                 "agentStatus": "working" if deep_mode else "complete",
             },
@@ -284,7 +290,7 @@ class VcsoChatService:
                 }
             )
             next_step_index = int(resume_state.get("next_step_index") or 2)
-            trace_steps = list(resume_state.get("trace_steps") or [])
+            trace_steps = list(initial_trace_steps)
             all_sources = list(resume_state.get("all_sources") or [])
             resume_citation_refs = list(resume_state.get("citation_refs") or [])
             main_input_peaks = list(resume_state.get("main_input_peaks") or [])
@@ -292,7 +298,7 @@ class VcsoChatService:
         else:
             messages = [{"role": "user", "content": context["prompt"]}]
             next_step_index = 2
-            trace_steps: list[dict[str, Any]] = []
+            trace_steps: list[dict[str, Any]] = list(initial_trace_steps)
             all_sources: list[dict[str, Any]] = []
             resume_citation_refs: list[dict[str, Any]] = []
             main_input_peaks: list[int] = []
@@ -605,15 +611,23 @@ class VcsoChatService:
             )
         self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 2)
         self._complete_main_run(run_id, user_id, assistant_message["id"], assistant_text, serialized_turn_citations)
+        result_step = _result_trace_step(
+            step_index=next_step_index,
+            answer_chars=len(assistant_text),
+            tool_step_count=sum(
+                1 for step in trace_steps if step.get("stepType") not in {"context_build", "result"}
+            ),
+        )
         self._create_step(
             run_id,
             user_id,
-            next_step_index,
+            result_step["stepIndex"],
             step_type="result",
-            title="Answer prepared",
-            summary="Virtual CSO answer streamed to the founder.",
-            output_summary={"answer_chars": len(assistant_text), "tool_step_count": len(trace_steps)},
+            title=result_step["title"],
+            summary=result_step["summary"],
+            output_summary=json.loads(result_step["output"]),
         )
+        trace_steps.append(result_step)
         if deep_mode:
             self._clear_deep_resume(thread_id, user_id, status="complete")
         fresh_thread = self._get_thread(thread_id, user_id)
@@ -1479,6 +1493,46 @@ def _step_type_for_tool(tool_name: str, input_summary: dict[str, Any]) -> str:
 def _stored_agent_step_type(step_type: str) -> str:
     allowed = {"context_build", "tool_call", "source_review", "result", "error"}
     return step_type if step_type in allowed else "tool_call"
+
+
+def _context_trace_step(
+    *,
+    linked_folder: str | None,
+    project_id: str | None,
+    deep_mode: bool,
+    tool_count: int,
+    founder_page_count: int,
+    selected_pack_slugs: list[Any],
+) -> dict[str, Any]:
+    return {
+        "stepIndex": 1,
+        "stepType": "context_build",
+        "title": "Context prepared",
+        "summary": "Prepared Virtual CSO context and scoped registry tools.",
+        "input": {"linked_folder": linked_folder, "project_id": project_id, "deep_mode": deep_mode},
+        "output": json.dumps(
+            {
+                "tool_count": tool_count,
+                "founder_page_count": founder_page_count,
+                "selected_pack_slugs": selected_pack_slugs,
+            }
+        ),
+        "status": "completed",
+        "sourceRefs": [],
+    }
+
+
+def _result_trace_step(*, step_index: int, answer_chars: int, tool_step_count: int) -> dict[str, Any]:
+    return {
+        "stepIndex": step_index,
+        "stepType": "result",
+        "title": "Answer prepared",
+        "summary": "Virtual CSO answer streamed to the founder.",
+        "input": {},
+        "output": json.dumps({"answer_chars": answer_chars, "tool_step_count": tool_step_count}),
+        "status": "completed",
+        "sourceRefs": [],
+    }
 
 
 def _step_title_for_tool(tool_name: str, input_summary: dict[str, Any]) -> str:
