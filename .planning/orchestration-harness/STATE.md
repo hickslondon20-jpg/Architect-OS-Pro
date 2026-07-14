@@ -4,12 +4,14 @@
 
 ## Current Focus
 
-**Phase 4 CODE COMPLETE; LIVE FLAG DARK; BATCHED PROOF/CHECKPOINT PENDING** (2026-07-14). v0.6.22 adds
-the distinct planner flow, runtime budget/depth enforcement, planner-scoped compact worker contract,
-worker-tier delegation with parent lineage, synthesis-tier findings-only compose, sanitized MA-05
-nesting, and fail-open return to the Phase 3/flat path. The live `vcso_planner` row is default-off with
-zero enrollment. The thin-slice question/evidence table is scaffolded but has not been run; no
-stop-and-review or feature-gate flip occurred. Phase 1–3 rollout states are unchanged.
+**PHASE 2 REMEDIATION DEPLOYED DARK; BATCHED VALIDATION RESTART PENDING LONDON** (2026-07-14).
+The first integrated pass halted correctly when the canonical capstone returned `NONE /
+low_confidence`; P2/P4 were rolled back. v0.6.23 (`e14f1f24`) now calibrates the five-move Haiku
+classifier generally and preserves its scoped LangSmith wrapper after timeout options. The balanced
+14-case eval passed at 100% should-decompose precision/recall; the capstone returned
+`strategic_synthesis/deep` at 0.97 with the threshold retained at 0.80. Paired production-backed trace
+and usage proof plus a dark smoke passed. P1/P3 remain founder canaries; P2/P4 remain off with zero
+enrollment. No validation restart or broad flip occurred.
 
 ## Documents
 
@@ -39,11 +41,10 @@ stop-and-review or feature-gate flip occurred. Phase 1–3 rollout states are un
 
 ## Current Phase
 
-**Phase 4 — code complete; live flag dark (2026-07-14).** PLAN-1..4 and the PLAN-2 contract are
-implemented; PLAN-5 remains the intentionally unexecuted batched proof/checkpoint. **Phase 1's Stage
-1 founder canary remains active and Stage 2 remains observation-gated. Phase 2 remains deployed
-live-dark. Phase 3's founder-only canary remains active with the global default off. Phase 4 is
-disabled with zero enrollment.**
+**Phase 2 remediation complete; Phase 4 code remains deployed dark (2026-07-14).** PLAN-5 and the
+integrated cost-routing checkpoint remain pending a fresh runbook restart. **Phase 1's founder canary
+remains active; remediated Phase 2 is disabled with zero enrollment; Phase 3's founder-only canary
+remains active with the global default off; Phase 4 is disabled with zero enrollment.**
 
 ## Open Design Forks Carried Into Build-Planning
 
@@ -96,13 +97,18 @@ Stage 2 `enabled_for_all` flip, (3) mark Phase 1 *fully* Done. Runbook: `phases/
 01-STAGED-FLIP-RUNBOOK.md`. Also: when Phase 2 later *executes*, its production flip should land **after**
 Phase 1's flip (don't stack two unproven assembly changes live).
 
-**Phase 2 DEPLOYED DARK** (2026-07-13): `d2962d15` adds the locked five-move classifier, depth,
+**Phase 2 DEPLOYED DARK; REMEDIATION COMPLETE** (2026-07-14): `d2962d15` adds the locked five-move classifier, depth,
 confidence, deterministic response contract, conservative lean/full triage, per-turn intent JSONB,
 bounded timeout/circuit breaker, worker-tier usage accounting, and sanitized MA-05 step. The migration
 is applied live. Production health and a real flag-off VCSO turn passed; both feature flags retained
-their prior state. **Next action:** leave Phase 2 unenrolled until a separate founder-approved canary,
-then run the paired mixed-intent cost/quality proof. Do not advance Phase 1 or Phase 2 merely because
-the dark code is deployed.
+their prior state. The first batched pass later exposed a low-confidence calibration defect on the
+canonical strategic prompt and rolled P2/P4 back. `e14f1f24` (`v0.6.23`) fixes calibration through a
+balanced 14-case eval and restores the scoped LangSmith wrapper lost after `with_options()`. The
+capstone is now `strategic_synthesis/deep/0.97`; should-decompose precision/recall are 100% at the
+unchanged 0.80 threshold. Trace `019f628a-d447-7d02-8c74-4135adc9e22f` exactly matches utility row
+`fdb39349-f8d1-4545-a9a6-323866246728` at 693/54 tokens. A post-deploy dark smoke returned `READY.`
+with `intent=null` and no intent utility call. **Next action:** leave P2/P4 unenrolled until London
+explicitly authorizes restarting the batched validation from a fresh matched control.
 
 **Phase 3 FOUNDER CANARY — PROVEN** (2026-07-14): `04222dbb` adds deterministic cheapest-first source
 routing over Tiers 0–3, compact two-source Tier-1 composition, Tier-0 live-schema record reads,

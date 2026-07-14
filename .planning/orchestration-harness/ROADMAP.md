@@ -77,11 +77,15 @@ before any retrieval, sets the response contract, selects the initial terminal m
 decomposition (simple lookups answer directly). Bounded timeout + circuit breaker + `NONE` sentinel;
 injection hygiene on injected founder data.
 
-**Status (2026-07-13): Code complete and live-dark; canary proof pending.** Commit `d2962d15`
-implements INT-1..3 behind the separate default-off `vcso_intent_read` flag and is deployed to main.
-The live flag has zero enrollment. A post-deploy flag-off VCSO smoke returned `READY.`, persisted with
-`intent = null`, and logged `surface=virtual_cso`; production health returned HTTP 200. The mixed-intent
-cost/quality proof and any default flip remain founder-gated and are not claimed complete. See
+**Status (2026-07-14): Code complete; calibration/observability remediation deployed live-dark;
+validation restart pending London.** `d2962d15` implements INT-1..3. After the first batched proof
+halted on a low-confidence capstone classification, `e14f1f24` (`v0.6.23`) calibrated the Haiku
+taxonomy generally and restored the scoped trace lost after `with_options()`. A balanced 14-case eval
+passed all labels; the exact capstone returned `strategic_synthesis/deep` at 0.97, with 100% precision
+and recall on should-decompose at the retained 0.80 threshold. A production-backed proof paired the
+intent LangSmith trace to its exact utility row (693/54 tokens). Health and a fresh flag-off smoke
+passed with `intent=null` and no intent utility call. The live flag remains disabled with zero
+enrollment. Restarting the batched validation and any flip remain separately founder-gated. See
 `phases/02-intent-read/02-COMPLETION.md`.
 
 ### Phase 3: Tier-Escalating Source Router
