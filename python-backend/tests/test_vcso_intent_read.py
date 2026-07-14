@@ -96,6 +96,38 @@ def test_high_confidence_lookup_is_compact_and_lean():
     assert "reason" not in result.to_dict()
 
 
+def test_bounded_client_is_rewrapped_for_scoped_langsmith_trace(monkeypatch):
+    response = _response(
+        {
+            "move_type": "strategic_synthesis",
+            "depth": "deep",
+            "confidence": 0.96,
+            "response_posture": "strategic_judgment",
+        }
+    )
+    anthropic = _Anthropic(response)
+    wrapped = []
+
+    def _rewrap(client):
+        wrapped.append(client)
+        return client
+
+    monkeypatch.setattr("services.vcso_intent_read.trace_anthropic_client", _rewrap)
+    result, _ = IntentReadService(anthropic).classify(
+        user_id="founder",
+        thread_id="thread",
+        run_id="run",
+        working_state=None,
+        latest_message="Margin is falling while pipeline grows; what should I prioritize?",
+        model="claude-haiku-4-5-20251001",
+        settings={},
+    )
+
+    assert wrapped == [anthropic]
+    assert result.move_type == "strategic_synthesis"
+    assert result.depth == "deep"
+
+
 def test_strategic_and_brainstorm_moves_are_always_full():
     for move_type, posture in (
         ("strategic_synthesis", "strategic_judgment"),
