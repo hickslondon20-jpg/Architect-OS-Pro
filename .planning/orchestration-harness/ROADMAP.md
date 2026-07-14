@@ -97,14 +97,16 @@ Layer-1 pages from `wiki_*` (claim/evidence = superior cited component) and emer
 is the retrieval half of the spine. *Dependencies:* authoring the new founder-operating pages, and
 confirming/owning the OSE-Layer-1 projection, are OS Engine's job; this phase designs to consume.
 
-**Status (2026-07-13): Code complete; founder canary active; default flip pending London.**
+**Status (2026-07-14): Done; founder canary proven; global default flip pending London.**
 Commit `04222dbb` (`v0.6.18`) implements ROUT-1..5 behind the separate
 `vcso_source_router` flag. The additive migration is live, global enablement remains off, and only the
 existing Phase 1 test founder is enrolled. Read-only live-data acceptance stopped at Tier 0 for a
 sprint-record question, Tier 1 for a strategic question, and Tier 3 for a named-document question.
 The fixed seven remain `wiki_*` reads and Layer 2 remains OSE. Focused/regression tests and backend
-compile pass. The paired authenticated production-turn cost/quality/LangSmith gate is still pending
-because no signed-in founder session was available; do not flip the default or begin Phase 4. See
+compile pass. The matched authenticated control/canary set reduced total main-model input from
+108,209 to 96,888 tokens (10.5%) without a quality regression; all 19 calls matched LangSmith traces
+to exact usage rows. Global enablement remains off and the default-flip decision is London-gated. Do
+not flip the router before the separate Phase 1/2 flip sequence or begin Phase 4 before direction. See
 `phases/03-source-router/03-COMPLETION.md`.
 
 ### Phase 4: Planner (Decompose→Delegate→Compose) — thin slice
@@ -137,7 +139,7 @@ runtime-enforced policy under adversarial prompts). Traces paired with DB/output
 | 0. Reconciliation Cleanups | **Done** (v0.6.11–v0.6.14; O1 resolved, O2 resolved w/ projection caveat, O3 scoped deferred) | 2026-07-13 |
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** — live gates and paired-trace proof passed; Stage 2 awaits observation | 2026-07-13 |
 | 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16) | — |
-| 3. Tier-Escalating Source Router | Not started | — |
+| 3. Tier-Escalating Source Router | **Done; founder canary proven; global flip pending London** (v0.6.18–v0.6.20) | 2026-07-14 |
 | 4. Planner (thin slice) — checkpoint | Not started | — |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started | — |
 | 6. Generalize + Strategic Workers | Not started | — |

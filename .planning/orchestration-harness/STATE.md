@@ -1,15 +1,16 @@
 # State: Orchestration Harness — VCSO Planner — ArchitectOS Pro
 
-**Updated:** 2026-07-13
+**Updated:** 2026-07-14
 
 ## Current Focus
 
-**Phase 3 CODE COMPLETE; FOUNDER CANARY ACTIVE** (2026-07-13). ROUT-1..5 are implemented in commit
-`04222dbb` (`v0.6.18`) and deployed behind `vcso_source_router`. The additive schema is live; the
-global default is off and only founder `cd490873-99aa-4533-9240-f0aa04deb54f` is enrolled. Live-data
-acceptance proved Tier 0, Tier 1, and Tier 3 stop behavior without exposing founder content. Phase 2
-remains disabled with zero enrollment and Phase 1's Stage 1 state is unchanged. Phase 3's paired
-authenticated production-turn cost/quality/LangSmith gate and any default flip remain London-gated.
+**Phase 3 DONE; FOUNDER CANARY PROVEN; GLOBAL FLIP PENDING LONDON** (2026-07-14). ROUT-1..5 are
+implemented in v0.6.18–v0.6.20 and deployed behind `vcso_source_router`. The authenticated matched
+control/canary set routed record/strategy/document prompts to Tiers 0/1/3, reduced total main-model
+input from 108,209 to 96,888 tokens (10.5%), preserved grounded answer quality, and matched all 19
+main calls to LangSmith and `ai_usage_log`. The global default remains off; only founder
+`cd490873-99aa-4533-9240-f0aa04deb54f` is enrolled. Phase 2 remains disabled with zero enrollment and
+Phase 1's Stage 1 state is unchanged. Only the global flag-flip decision remains London-gated.
 
 ## Documents
 
@@ -42,8 +43,8 @@ authenticated production-turn cost/quality/LangSmith gate and any default flip r
 **Phase 0 — Done (2026-07-13).** Legacy Vercel chat route quarantined (410), CLAUDE.md + endpoint
 point to Python, conversation feeder scoped deferred, wiki authority resolved (layer-split + projection
 caveat). **Phase 1's Stage 1 founder canary remains active and Stage 2 remains observation-gated.**
-**Phase 2 remains deployed live-dark. Phase 3 code is deployed with a founder-only canary; its
-authenticated cost/quality proof is pending and the global default remains off.**
+**Phase 2 remains deployed live-dark. Phase 3's founder-only canary has passed its authenticated
+cost/quality/trace gate; the global default remains off pending London.**
 
 ## Open Design Forks Carried Into Build-Planning
 
@@ -74,7 +75,7 @@ authenticated cost/quality proof is pending and the global default remains off.*
 | 0. Reconciliation Cleanups | **Done** (2026-07-13; O1 resolved, O2 resolved w/ caveat, O3 deferred) |
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** (2026-07-13) — Stage 2 awaits observation |
 | 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16, 2026-07-13) |
-| 3. Tier-Escalating Source Router | **Code complete; founder canary active; authenticated proof + default flip pending London** (v0.6.18, 2026-07-13) |
+| 3. Tier-Escalating Source Router | **Done; founder canary proven; global flip pending London** (v0.6.18–v0.6.20, 2026-07-14) |
 | 4. Planner (thin slice) — checkpoint | Not started |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started |
 | 6. Generalize + Strategic Workers | Not started |
@@ -104,12 +105,14 @@ their prior state. **Next action:** leave Phase 2 unenrolled until a separate fo
 then run the paired mixed-intent cost/quality proof. Do not advance Phase 1 or Phase 2 merely because
 the dark code is deployed.
 
-**Phase 3 FOUNDER CANARY** (2026-07-13): `04222dbb` adds deterministic cheapest-first source
+**Phase 3 FOUNDER CANARY — PROVEN** (2026-07-14): `04222dbb` adds deterministic cheapest-first source
 routing over Tiers 0–3, compact two-source Tier-1 composition, Tier-0 live-schema record reads,
 existing Tier-2 hybrid retrieval, existing Tier-3 KB reads, sanitized per-turn routing persistence,
 and a Phase-5 no-op hook. Forced-error and flag-off tests preserve the Phase-1/legacy fail-open seams;
 the registry tool bag remains unchanged for mid-turn escalation. Migration is live and the router is
 allowlisted only to the existing test founder (`enabled_for_all=false`). Read-only live-data acceptance
-returned Tier 0 for records, Tier 1 for strategy, and Tier 3 for a named document. **Next action:** use
-a signed-in founder session to run the mixed production-turn set and pair outputs with LangSmith plus
-`ai_usage_log`; bring that proof to London for the default-flip decision. Do not start Phase 4.
+returned Tier 0 for records, Tier 1 for strategy, and Tier 3 for a named document. London then ran a
+matched flag-off control and founder-only post-fix canary. Total main input fell 10.5% (108,209 to
+96,888), answers remained cited and complete, and all 19 main calls matched LangSmith to exact usage
+rows. **Next action:** London decides the global router flip, sequenced after the separate Phase 1/2
+flip decisions. `enabled_for_all=false`; do not start Phase 4 without direction.
