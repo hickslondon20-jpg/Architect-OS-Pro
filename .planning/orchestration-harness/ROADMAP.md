@@ -97,6 +97,16 @@ Layer-1 pages from `wiki_*` (claim/evidence = superior cited component) and emer
 is the retrieval half of the spine. *Dependencies:* authoring the new founder-operating pages, and
 confirming/owning the OSE-Layer-1 projection, are OS Engine's job; this phase designs to consume.
 
+**Status (2026-07-13): Code complete; founder canary active; default flip pending London.**
+Commit `04222dbb` (`v0.6.18`) implements ROUT-1..5 behind the separate
+`vcso_source_router` flag. The additive migration is live, global enablement remains off, and only the
+existing Phase 1 test founder is enrolled. Read-only live-data acceptance stopped at Tier 0 for a
+sprint-record question, Tier 1 for a strategic question, and Tier 3 for a named-document question.
+The fixed seven remain `wiki_*` reads and Layer 2 remains OSE. Focused/regression tests and backend
+compile pass. The paired authenticated production-turn cost/quality/LangSmith gate is still pending
+because no signed-in founder session was available; do not flip the default or begin Phase 4. See
+`phases/03-source-router/03-COMPLETION.md`.
+
 ### Phase 4: Planner (Decompose→Delegate→Compose) — thin slice
 The reasoning half of the spine: decompose a strategic ask into budget-bounded sub-questions, delegate
 gathering to bounded workers (incl. sandbox compute) returning compact cited findings, compose the
