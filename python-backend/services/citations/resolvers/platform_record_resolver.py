@@ -17,6 +17,8 @@ class PlatformRenderer:
     label_fields: tuple[str, ...]
     deep_link: str
     owner_column: str = "user_id"
+    id_column: str = "id"
+    owner_parent: tuple[str, str, str, str] | None = None
 
 
 PLATFORM_RECORD_RENDERERS: dict[str, PlatformRenderer] = {
@@ -26,23 +28,38 @@ PLATFORM_RECORD_RENDERERS: dict[str, PlatformRenderer] = {
         label_fields=("checkpoint_title", "checkpoint_id", "id"),
         deep_link="/pro/diagnostics/mra",
     ),
+    "gm_assessments": PlatformRenderer(
+        table="gm_assessments",
+        columns=("assessment_id", "respondent_user_id", "assessment_type", "status", "submitted_at", "scored_at", "agency_name", "updated_at"),
+        label_fields=("assessment_type", "agency_name", "assessment_id"),
+        deep_link="/pro/diagnostics/mra",
+        owner_column="respondent_user_id",
+        id_column="assessment_id",
+    ),
     "gm_assessment_checkpoint_scores": PlatformRenderer(
         table="gm_assessment_checkpoint_scores",
-        columns=("id", "user_id", "assessment_id", "checkpoint_id", "stage_id", "score", "notes", "updated_at"),
-        label_fields=("checkpoint_id", "assessment_id", "id"),
+        columns=("checkpoint_score_id", "assessment_id", "checkpoint_id", "maturity_pct", "readiness_pct", "criticality", "impact", "attention_posture", "updated_at"),
+        label_fields=("checkpoint_id", "assessment_id", "checkpoint_score_id"),
         deep_link="/pro/diagnostics/mra",
+        owner_column="",
+        id_column="checkpoint_score_id",
+        owner_parent=("gm_assessments", "assessment_id", "assessment_id", "respondent_user_id"),
     ),
     "ae_assessments": PlatformRenderer(
         table="ae_assessments",
-        columns=("id", "user_id", "stage_id", "status", "completed_at", "created_at", "updated_at"),
-        label_fields=("stage_id", "status", "id"),
+        columns=("ae_assessment_id", "user_id", "overall_score", "ae_frontend_stage_id", "ae_backend_stage_id", "submitted_at", "assessment_complete_flag", "created_at"),
+        label_fields=("ae_frontend_stage_id", "overall_score", "ae_assessment_id"),
         deep_link="/pro/diagnostics/ae-ladder",
+        id_column="ae_assessment_id",
     ),
     "ae_dimension_scores": PlatformRenderer(
         table="ae_dimension_scores",
-        columns=("id", "user_id", "assessment_id", "dimension_key", "score", "stage_id", "updated_at"),
-        label_fields=("dimension_key", "assessment_id", "id"),
+        columns=("ae_assessment_dimension_score_id", "ae_assessment_id", "ae_dimension_id", "avg_score", "ae_band_id", "ae_dimension_band_id", "created_at"),
+        label_fields=("ae_dimension_id", "ae_assessment_id", "ae_assessment_dimension_score_id"),
         deep_link="/pro/diagnostics/ae-ladder",
+        owner_column="",
+        id_column="ae_assessment_dimension_score_id",
+        owner_parent=("ae_assessments", "ae_assessment_id", "ae_assessment_id", "user_id"),
     ),
     "ae_assessment_insights": PlatformRenderer(
         table="ae_assessment_insights",
@@ -64,14 +81,14 @@ PLATFORM_RECORD_RENDERERS: dict[str, PlatformRenderer] = {
     ),
     "sp_sprint_milestones": PlatformRenderer(
         table="sp_sprint_milestones",
-        columns=("id", "user_id", "initiative_id", "description", "status", "target_date", "updated_at"),
+        columns=("id", "user_id", "initiative_id", "description", "status", "updated_at"),
         label_fields=("description", "status", "id"),
         deep_link="/pro/planning/sprint-planning",
     ),
     "quarter_map_selections": PlatformRenderer(
         table="quarter_map_selections",
-        columns=("id", "user_id", "quarter", "priority_area", "selected_capability", "selection_reason", "updated_at"),
-        label_fields=("priority_area", "selected_capability", "quarter", "id"),
+        columns=("id", "user_id", "quarter_name", "selections", "status", "synthesis_output", "updated_at"),
+        label_fields=("quarter_name", "status", "id"),
         deep_link="/pro/planning/quarter-map",
     ),
     "cc_versions": PlatformRenderer(
@@ -126,17 +143,27 @@ def resolve_platform_record(ref: CitationRef, user_id: str, store: "VectorStore"
     if table.startswith("founder_dataset_rows") and table not in APPROVED_SURFACES:
         return _error(ref, "unsupported_table", f"Structured-query safe surface is not approved: {table}")
 
-    response = (
-        store.client.table(renderer.table)
-        .select(",".join(renderer.columns))
-        .eq(renderer.owner_column, user_id)
-        .eq("id", row_id)
-        .maybe_single()
-        .execute()
-    )
+    query = store.client.table(renderer.table).select(",".join(renderer.columns)).eq(renderer.id_column, row_id)
+    if renderer.owner_column:
+        query = query.eq(renderer.owner_column, user_id)
+    response = query.maybe_single().execute()
     row = response.data
     if not row:
         return _error(ref, "unresolvable", "Platform record was not found for this user.")
+    if renderer.owner_parent:
+        parent_table, row_parent_column, parent_id_column, parent_owner_column = renderer.owner_parent
+        parent_id = row.get(row_parent_column)
+        parent = (
+            store.client.table(parent_table)
+            .select(parent_id_column)
+            .eq(parent_id_column, parent_id)
+            .eq(parent_owner_column, user_id)
+            .maybe_single()
+            .execute()
+            .data
+        )
+        if not parent:
+            return _error(ref, "unresolvable", "Platform record was not found for this user.")
 
     fields = _field_table(row, renderer.columns, field)
     return {

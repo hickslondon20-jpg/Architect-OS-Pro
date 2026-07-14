@@ -38,6 +38,7 @@ from services.vcso_intent_read import (
     response_contract_for,
 )
 from services.vcso_working_state import WorkingStateService, assemble, normalize_working_state
+from services.vcso_source_router import SourceRouter, TIER_LABELS
 from services.wiki_read import WikiReadError, WikiReadService
 from services.doc_wiki_read_service import DocWikiReadError, DocWikiReadService
 
@@ -48,6 +49,7 @@ COMPACTION_MAX_TOKENS = 1200
 COMPACTION_RECENT_MESSAGE_KEEP = 4
 WORKING_STATE_ASSEMBLY_FLAG = "vcso_working_state_assembly"
 INTENT_READ_FLAG = "vcso_intent_read"
+SOURCE_ROUTER_FLAG = "vcso_source_router"
 FIXED_WIKI_PAGE_KEYS = (
     "business_context",
     "client_market_position",
@@ -319,8 +321,12 @@ class VcsoChatService:
             )
             self._active_turn["run_id"] = run_id
             intent_step = _intent_trace_step(turn_intent, step_index=1) if turn_intent else None
-            context_step = _context_trace_step(
+            routing_step = _routing_trace_step(
+                context.get("routing_decision"),
                 step_index=2 if intent_step else 1,
+            )
+            context_step = _context_trace_step(
+                step_index=1 + int(bool(intent_step)) + int(bool(routing_step)),
                 linked_folder=payload.linked_folder,
                 project_id=payload.project_id,
                 deep_mode=deep_mode,
@@ -340,6 +346,18 @@ class VcsoChatService:
                     input_summary=intent_step["input"],
                     output_summary=json.loads(intent_step["output"]),
                 )
+            if routing_step:
+                self._create_step(
+                    run_id,
+                    user_id,
+                    routing_step["stepIndex"],
+                    step_type="source_review",
+                    title=routing_step["title"],
+                    summary=routing_step["summary"],
+                    input_summary=routing_step["input"],
+                    output_summary=json.loads(routing_step["output"]),
+                    source_refs=routing_step["sourceRefs"],
+                )
             self._create_step(
                 run_id,
                 user_id,
@@ -350,7 +368,7 @@ class VcsoChatService:
                 input_summary=context_step["input"],
                 output_summary=json.loads(context_step["output"]),
             )
-            initial_trace_steps = [step for step in (intent_step, context_step) if step]
+            initial_trace_steps = [step for step in (intent_step, routing_step, context_step) if step]
         self._active_turn["run_id"] = run_id
         self._active_turn["trace_steps"] = initial_trace_steps
         trace_metadata = {
@@ -409,7 +427,7 @@ class VcsoChatService:
             messages = [{"role": "user", "content": context["prompt"]}]
             next_step_index = len(initial_trace_steps) + 1
             trace_steps: list[dict[str, Any]] = list(initial_trace_steps)
-            all_sources: list[dict[str, Any]] = []
+            all_sources: list[dict[str, Any]] = list(context.get("prefetched_source_refs") or [])
             resume_citation_refs: list[dict[str, Any]] = []
             main_input_peaks: list[int] = []
             if deep_mode:
@@ -1074,6 +1092,20 @@ class VcsoChatService:
             "id", message_id
         ).eq("thread_id", thread_id).eq("user_id", user_id).execute()
 
+    def _persist_turn_routing(
+        self,
+        *,
+        user_id: str,
+        thread_id: str,
+        message_id: str,
+        routing: dict[str, Any],
+    ) -> None:
+        """Persist sanitized routing scaffolding under the founder-owned turn."""
+
+        self.supabase.table("vcso_chat_messages").update({"routing": routing}).eq(
+            "id", message_id
+        ).eq("thread_id", thread_id).eq("user_id", user_id).execute()
+
     def _intent_read_settings(self, user_id: str | None = None) -> dict[str, Any]:
         """Read the Phase 2 rollout flag fail-closed; absent or unreadable means off."""
 
@@ -1231,6 +1263,60 @@ class VcsoChatService:
         )
         return {"enabled": enabled, "settings": settings}
 
+    def _source_router_settings(self, user_id: str | None = None) -> dict[str, Any]:
+        """Read the Phase 3 flag fail-closed; absent or unreadable means off."""
+
+        try:
+            rows = (
+                self.supabase.table("platform_ai_settings")
+                .select("is_enabled,settings")
+                .eq("setting_key", SOURCE_ROUTER_FLAG)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+        except Exception as exc:
+            logger.warning("source-router flag read failed; retaining Phase 1 retrieval: %s", exc)
+            return {"enabled": False, "settings": {}}
+        if not rows:
+            return {"enabled": False, "settings": {}}
+        settings = rows[0].get("settings") or {}
+        rollout_enabled = bool(rows[0].get("is_enabled"))
+        test_user_ids = {str(value) for value in settings.get("test_user_ids") or []}
+        enabled = rollout_enabled and (
+            bool(settings.get("enabled_for_all")) or (bool(user_id) and str(user_id) in test_user_ids)
+        )
+        return {"enabled": enabled, "settings": settings}
+
+    def _load_turn_source_components(
+        self,
+        *,
+        user_id: str,
+        thread_id: str,
+        message_id: str,
+        message: str,
+        turn_intent: dict[str, Any] | None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any] | None]:
+        """Preserve Phase 1 reads when dark; let the outer seam quarantine errors."""
+
+        if not self._source_router_settings(user_id)["enabled"]:
+            return self._load_two_source_wiki_components(user_id, message), [], None
+
+        routed = SourceRouter(self.store).route(
+            user_id=user_id,
+            message=message,
+            intent=turn_intent,
+        )
+        routing_decision = routed.decision.to_dict()
+        self._persist_turn_routing(
+            user_id=user_id,
+            thread_id=thread_id,
+            message_id=message_id,
+            routing=routing_decision,
+        )
+        return routed.components, routed.source_refs, routing_decision
+
     def _build_working_state_context(
         self,
         user_id: str,
@@ -1256,7 +1342,15 @@ class VcsoChatService:
         tool_defs = registry.get_tools(surface=registry_surface, format="definition")
         tools = registry.get_tools(surface=registry_surface, format="anthropic")
 
-        wiki_components = self._load_two_source_wiki_components(user_id, payload.text)
+        # Do not catch here. The outer assembly seam quarantines a router error
+        # to the exact legacy flat-tool-bag path.
+        wiki_components, prefetched_source_refs, routing_decision = self._load_turn_source_components(
+            user_id=user_id,
+            thread_id=str(thread["id"]),
+            message_id=user_message_id,
+            message=payload.text,
+            turn_intent=turn_intent,
+        )
         assembly_profile = _intent_assembly_profile(turn_intent)
         if assembly_profile == "lean":
             wiki_components = _lean_assembly_components(
@@ -1334,6 +1428,8 @@ class VcsoChatService:
             "assembly_fallback": False,
             "estimated_tokens": result.estimated_tokens,
             "included_resources": result.included_resources,
+            "routing_decision": routing_decision,
+            "prefetched_source_refs": prefetched_source_refs,
             "user_message_id": user_message_id,
         }
 
@@ -2378,6 +2474,45 @@ def _intent_trace_step(intent: dict[str, Any], *, step_index: int) -> dict[str, 
         "output": json.dumps(output),
         "status": "completed",
         "sourceRefs": [],
+    }
+
+
+def _routing_trace_step(decision: dict[str, Any] | None, *, step_index: int) -> dict[str, Any] | None:
+    """Render curated source-selection facts, never hidden reasoning."""
+
+    if not decision:
+        return None
+    consulted = [int(value) for value in decision.get("tiers_consulted") or []]
+    stop_tier = decision.get("stop_tier")
+    selected = list(decision.get("selected_sources") or [])
+    labels = [TIER_LABELS.get(tier, f"Tier {tier}") for tier in consulted]
+    if stop_tier is None:
+        summary = "Checked the planned internal sources; the existing tool loop remains available for escalation."
+    else:
+        summary = (
+            f"Started at Tier {decision.get('start_tier')} and stopped at Tier {stop_tier} "
+            f"({TIER_LABELS.get(int(stop_tier), 'selected source')}) after finding the required source."
+        )
+    return {
+        "stepIndex": step_index,
+        "stepType": "source_review",
+        "title": "Sources selected",
+        "summary": summary,
+        "input": {},
+        "output": json.dumps(
+            {
+                "status": decision.get("status"),
+                "start_tier": decision.get("start_tier"),
+                "tiers_consulted": consulted,
+                "tier_labels": labels,
+                "stop_tier": stop_tier,
+                "reason_code": decision.get("reason_code"),
+                "source_count": len(selected),
+                "live_tier_hook": decision.get("live_tier_hook"),
+            }
+        ),
+        "status": "completed",
+        "sourceRefs": selected,
     }
 
 
