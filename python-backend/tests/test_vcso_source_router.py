@@ -4,7 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from services.vcso_chat_service import VcsoChatService, _routing_trace_step
+from services.vcso_chat_service import (
+    VcsoChatService,
+    _routing_trace_step,
+    _working_state_system_prefix,
+)
 from services.vcso_source_router import (
     SOURCE_ROUTING_SCHEMA_VERSION,
     SourceRouter,
@@ -194,3 +198,39 @@ def test_forced_router_error_propagates_to_outer_fail_open_seam(monkeypatch):
             message="What should I do?",
             turn_intent=None,
         )
+
+
+def test_selected_route_tells_model_to_use_prefetch_before_tools():
+    prefix = _working_state_system_prefix(
+        system_prompt="Answer safely.",
+        rules=[],
+        selected_packs=[],
+        tool_catalog=[{"name": "wiki_list", "description": "List wiki pages"}],
+        route={"primary": None, "required": []},
+        source_routing_decision={
+            "status": "selected",
+            "start_tier": 0,
+            "stop_tier": 0,
+            "reason_code": "structured_record_signal",
+            "selected_sources": [{"source_kind": "tier0_record"}],
+        },
+    )
+
+    assert "already selected and injected" in prefix
+    assert "Do not call list, search, read, or navigation tools merely to rediscover" in prefix
+    assert '"stop_tier":0' in prefix
+
+
+def test_dark_router_leaves_working_state_prefix_unchanged():
+    kwargs = {
+        "system_prompt": "Answer safely.",
+        "rules": [],
+        "selected_packs": [],
+        "tool_catalog": [{"name": "wiki_list", "description": "List wiki pages"}],
+        "route": {"primary": None, "required": []},
+    }
+
+    assert _working_state_system_prefix(**kwargs) == _working_state_system_prefix(
+        **kwargs,
+        source_routing_decision=None,
+    )
