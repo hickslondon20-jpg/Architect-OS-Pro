@@ -1,10 +1,11 @@
 # Phase 4 Completion — Planner (Decompose → Delegate → Compose)
 
-**Implementation status:** Code complete; live flag dark on 2026-07-14. The code commit is local and
-has not been pushed or deployed.
+**Implementation status:** Code complete and deployed on 2026-07-14; live capstone failed and P4 was
+rolled back to dark with zero enrollment.
 **Version:** v0.6.22.
-**Validation status:** Local implementation gates passed; PLAN-5 live thin-slice proof and founder
-stop-and-review intentionally pending the batched P1–P4 pass.
+**Validation status:** Local implementation gates passed. The remediated batched pass reached P4,
+but PLAN-5 failed because the sandbox child returned no valid computation and scoped LangSmith child
+traces were absent. The proof set halted before turn 2; founder stop-and-review remains open.
 
 ## Delivered
 
@@ -50,14 +51,18 @@ cleanly. No frontend files were changed, so the conditional frontend build was n
 not installed in the repository's `.venv-kb-nav` environment and was not added during this scoped
 phase.
 
-## Explicitly pending for the batched pass
+## Failed live capstone and remaining gates
 
-- Enable only the approved P1–P4 canary sequence and capture flag state.
-- Run the single hard founder question through intent → plan → at least two workers including
-  sandbox compute → cited compose.
+- The approved P1–P4 canary sequence and matched flat control were captured.
+- The hard founder question reached intent → plan → two workers, but the sandbox worker exhausted
+  six rounds after execution errors including missing `scipy`; it returned a bounded fallback rather
+  than a concentration/margin computation.
+- Parent/child DB lineage and Haiku usage attribution exist, but scoped LangSmith traces were not
+  found for either child run ID.
 - Run the live cap-hit and forced-error control gates, pair LangSmith/usage/delegation evidence, and
-  populate `04-THIN-SLICE-PROOF.md`.
+  complete `04-THIN-SLICE-PROOF.md` after remediation and a fresh London-authorized restart.
 - Deliver the cost/quality/transparency/attribution read-back and stop for London.
 
-No proof turn, stop-and-review, Phase 1/2/3/4 flip, later-phase work, new handler, external source,
-freshness policy, MCP integration, reflect-and-steer behavior, or generalization was performed.
+P4 is disabled and unenrolled. P1/P2/P3 remain founder canaries; global enablement and annotations
+remain off. No stop-and-review, later-phase work, new handler, external source, freshness policy, MCP
+integration, reflect-and-steer behavior, or generalization was performed.

@@ -4,14 +4,14 @@
 
 ## Current Focus
 
-**PHASE 2 REMEDIATION DEPLOYED DARK; BATCHED VALIDATION RESTART PENDING LONDON** (2026-07-14).
-The first integrated pass halted correctly when the canonical capstone returned `NONE /
-low_confidence`; P2/P4 were rolled back. v0.6.23 (`e14f1f24`) now calibrates the five-move Haiku
-classifier generally and preserves its scoped LangSmith wrapper after timeout options. The balanced
-14-case eval passed at 100% should-decompose precision/recall; the capstone returned
-`strategic_synthesis/deep` at 0.97 with the threshold retained at 0.80. Paired production-backed trace
-and usage proof plus a dark smoke passed. P1/P3 remain founder canaries; P2/P4 remain off with zero
-enrollment. No validation restart or broad flip occurred.
+**BATCHED VALIDATION HALTED AT P4 SANDBOX; P4 ROLLED BACK** (2026-07-14). The fresh matched
+control and remediated founder-canary capstone ran. P2 now passes the canonical prompt at
+`strategic_synthesis/deep/0.97`; P3 routes Tier 1; P4 creates two depth-1 parent-linked children.
+The sandbox child then exhausted six Haiku rounds after execution errors (including missing `scipy`)
+and returned no valid concentration/margin computation. Scoped LangSmith traces were also absent for
+both child run IDs. Per the runbook, P4 was immediately disabled and unenrolled and the proof set
+stopped before turn 2. P1/P2/P3 remain founder canaries; P4 is off; every global default and
+annotations remain off. Evidence: `phases/04-planner/04-THIN-SLICE-PROOF.md`.
 
 ## Documents
 
@@ -41,10 +41,11 @@ enrollment. No validation restart or broad flip occurred.
 
 ## Current Phase
 
-**Phase 2 remediation complete; Phase 4 code remains deployed dark (2026-07-14).** PLAN-5 and the
-integrated cost-routing checkpoint remain pending a fresh runbook restart. **Phase 1's founder canary
-remains active; remediated Phase 2 is disabled with zero enrollment; Phase 3's founder-only canary
-remains active with the global default off; Phase 4 is disabled with zero enrollment.**
+**Phase 4 live capstone failed and is rolled back (2026-07-14).** PLAN-5 and the integrated
+cost-routing checkpoint remain open. **Phase 1, remediated Phase 2, and Phase 3 are founder canaries
+with global defaults off; Phase 4 is disabled with zero enrollment.** Do not restart until the
+sandbox-compute and child-tracing defects are remediated and London explicitly authorizes a new
+matched control.
 
 ## Open Design Forks Carried Into Build-Planning
 
@@ -76,7 +77,7 @@ remains active with the global default off; Phase 4 is disabled with zero enroll
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** (2026-07-13) — Stage 2 awaits observation |
 | 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16, 2026-07-13) |
 | 3. Tier-Escalating Source Router | **Done; founder canary proven; global flip pending London** (v0.6.18–v0.6.20, 2026-07-14) |
-| 4. Planner (thin slice) — checkpoint | **Code complete; live flag dark; batched proof/checkpoint pending** (v0.6.22, 2026-07-14) — proof scaffolded only; no flag flip or stop-and-review |
+| 4. Planner (thin slice) — checkpoint | **Live capstone failed; P4 rolled back** (v0.6.22, 2026-07-14) — sandbox produced no computation; child traces absent; PLAN-5 open |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started |
 | 6. Generalize + Strategic Workers | Not started |
 | 7. Verification & Seams | Not started |
@@ -122,11 +123,13 @@ matched flag-off control and founder-only post-fix canary. Total main input fell
 rows. **Next action:** London decides the global router flip, sequenced after the separate Phase 1/2
 flip decisions. `enabled_for_all=false`; do not start Phase 4 without direction.
 
-**Phase 4 CODE COMPLETE — LIVE FLAG DARK** (2026-07-14): v0.6.22 adds the distinct planner entry branch,
+**Phase 4 CODE COMPLETE — LIVE CAPSTONE FAILED; ROLLED BACK** (2026-07-14): v0.6.22 adds the distinct planner entry branch,
 explicit revisable decomposition, P3-bound depth-1 delegation through existing handlers, planner-only
 worker-tier overrides, compact cited return contracts, findings-only Phase-1 assembly, synthesis-tier
 compose, runtime budget enforcement, parent/child attribution, and sanitized MA-05 nested steps.
-Focused lifecycle tests pass and backend compile is clean. The default-off live flag has zero
-enrollment. `04-THIN-SLICE-PROOF.md` contains the deferred question/route/evidence scaffold; no proof
-turn, cap-hit live run, stop-and-review, or flag flip occurred. **Next action:** on London's go, run
-the batched P1–P4 validation and populate the evidence table, then stop for the founder decision.
+Focused lifecycle tests pass and backend compile is clean. The fresh matched control and remediated
+canary capstone reached intent, Tier-1 routing, decomposition, and two parent-linked children. The
+sandbox child exhausted six Haiku rounds and returned a max-rounds fallback instead of the requested
+calculation; scoped LangSmith child traces were absent. P4 was immediately disabled and unenrolled.
+The remaining proof turns and stop-and-review did not run. **Next action:** remediate only those two
+P4 defects, redeploy dark, and seek London's explicit authorization for another matched restart.
