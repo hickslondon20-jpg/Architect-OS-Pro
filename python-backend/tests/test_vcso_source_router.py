@@ -45,6 +45,43 @@ def _reader(name: str, calls: list[int], tier: int, *, available: bool):
     return read
 
 
+class _DatasetQuery:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def select(self, *_args):
+        return self
+
+    def eq(self, *_args):
+        return self
+
+    def order(self, *_args, **_kwargs):
+        return self
+
+    def limit(self, *_args):
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=self.rows)
+
+
+class _DatasetClient:
+    def table(self, name):
+        assert name == "founder_datasets"
+        return _DatasetQuery(
+            [
+                {
+                    "id": "dataset-1",
+                    "dataset_name": "Q2 P&L",
+                    "dataset_type": "pnl",
+                    "status": "ready",
+                    "summary": "Revenue and margin by month",
+                    "source_document_id": "doc-1",
+                }
+            ]
+        )
+
+
 def test_record_question_starts_and_stops_at_tier_zero():
     calls: list[int] = []
     router = SourceRouter(
@@ -118,6 +155,33 @@ def test_named_document_question_goes_directly_to_tier_three():
     assert plan.start_tier == 3
     assert plan.escalation_plan == (3,)
     assert plan.reason_code == "raw_evidence_requested"
+
+
+def test_planner_worker_route_binds_founder_dataset_without_changing_normal_route():
+    calls: list[int] = []
+    router = SourceRouter(
+        SimpleNamespace(client=_DatasetClient()),
+        tier_readers={
+            0: _reader("record", calls, 0, available=False),
+            1: _reader("wiki", calls, 1, available=True),
+            2: _reader("semantic", calls, 2, available=True),
+            3: _reader("raw", calls, 3, available=True),
+        },
+    )
+
+    normal = router.route(user_id="founder", message="Calculate the margin trend from the dataset", intent=None)
+    bound = router.route_for_worker(
+        user_id="founder",
+        message="Calculate the margin trend from the dataset",
+        intent=None,
+        worker_hint="structured_data_agent",
+    )
+
+    assert normal.decision.reason_code != "planner_founder_dataset_binding"
+    assert bound.decision.reason_code == "planner_founder_dataset_binding"
+    assert bound.decision.stop_tier == 0
+    assert bound.source_refs[0]["source_kind"] == "founder_dataset"
+    assert bound.source_refs[0]["source_id"] == "dataset-1"
 
 
 def test_absent_founder_operating_page_degrades_to_other_available_components():

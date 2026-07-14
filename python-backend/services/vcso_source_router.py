@@ -260,6 +260,105 @@ class SourceRouter:
         )
         return SourceRoutingResult(decision=decision, components=components, source_refs=refs)
 
+    def route_for_worker(
+        self,
+        *,
+        user_id: str,
+        message: str,
+        intent: dict[str, Any] | None,
+        worker_hint: str | None,
+    ) -> SourceRoutingResult:
+        """Bind planner workers without changing the Phase 3 turn-level route.
+
+        Structured-data and sandbox sub-questions may need a founder dataset.
+        The planner-specific binding is founder-scoped, metadata-only, and still
+        represented as a Tier-0 source decision. Normal ``route()`` behavior is
+        untouched when the Phase 4 flag is dark.
+        """
+
+        base = self.route(user_id=user_id, message=message, intent=intent)
+        if worker_hint not in {"structured_data_agent", "sandbox_execution_agent"}:
+            return base
+        if not re.search(
+            r"\b(dataset|p&l|revenue|margin|client|concentration|ratio|trend|variance|calculate|compute)\b",
+            message,
+            re.IGNORECASE,
+        ):
+            return base
+        rows = (
+            self.supabase.table("founder_datasets")
+            .select("id,dataset_name,dataset_type,status,summary,confidence,source_document_id,updated_at")
+            .eq("user_id", user_id)
+            .eq("status", "ready")
+            .order("updated_at", desc=True)
+            .limit(8)
+            .execute()
+            .data
+            or []
+        )
+        if not rows:
+            return base
+        message_tokens = _tokens(message)
+        ranked = sorted(
+            rows,
+            key=lambda row: (
+                -len(message_tokens.intersection(_tokens(" ".join(str(row.get(key) or "") for key in ("dataset_name", "dataset_type", "summary"))))),
+                str(row.get("id")),
+            ),
+        )
+        selected_rows = ranked[:2]
+        components = [
+            {
+                "id": str(row.get("id")),
+                "resource_ref": f"founder_dataset/{row.get('id')}",
+                "title": row.get("dataset_name"),
+                "page_title": row.get("dataset_name"),
+                "page_kind": "tier0_founder_dataset",
+                "page_type": "tier0_founder_dataset",
+                "content": str(row.get("summary") or "")[:2000],
+                "source_service": "SourceRouter.PlannerDatasetBinding",
+            }
+            for row in selected_rows
+        ]
+        refs = [
+            {
+                "source_kind": "founder_dataset",
+                "source_id": str(row.get("id")),
+                "source_label": row.get("dataset_name"),
+                "source_metadata": {
+                    "dataset_type": row.get("dataset_type"),
+                    "status": row.get("status"),
+                    "source_document_id": row.get("source_document_id"),
+                },
+                "citation_payload": {
+                    "locator": {
+                        "kind": "record_path",
+                        "record_path": f"founder_datasets/{row.get('id')}",
+                    }
+                },
+            }
+            for row in selected_rows
+        ]
+        decision = SourceRoutingDecision(
+            schema_version=SOURCE_ROUTING_SCHEMA_VERSION,
+            status="selected",
+            start_tier=0,
+            escalation_plan=[0],
+            tiers_consulted=[0],
+            stop_tier=0,
+            reason_code="planner_founder_dataset_binding",
+            selected_sources=[
+                {
+                    "tier": 0,
+                    "source_kind": ref["source_kind"],
+                    "source_id": ref["source_id"],
+                    "source_label": ref["source_label"],
+                }
+                for ref in refs
+            ],
+        )
+        return SourceRoutingResult(decision=decision, components=components, source_refs=refs)
+
     def _read_tier_zero(self, user_id: str, message: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         domains = _record_domains(message.casefold())
         rows: list[tuple[str, str, str, dict[str, Any]]] = []

@@ -4,13 +4,12 @@
 
 ## Current Focus
 
-**Phase 3 DONE; FOUNDER CANARY PROVEN; GLOBAL FLIP PENDING LONDON** (2026-07-14). ROUT-1..5 are
-implemented in v0.6.18–v0.6.20 and deployed behind `vcso_source_router`. The authenticated matched
-control/canary set routed record/strategy/document prompts to Tiers 0/1/3, reduced total main-model
-input from 108,209 to 96,888 tokens (10.5%), preserved grounded answer quality, and matched all 19
-main calls to LangSmith and `ai_usage_log`. The global default remains off; only founder
-`cd490873-99aa-4533-9240-f0aa04deb54f` is enrolled. Phase 2 remains disabled with zero enrollment and
-Phase 1's Stage 1 state is unchanged. Only the global flag-flip decision remains London-gated.
+**Phase 4 CODE COMPLETE; LIVE FLAG DARK; BATCHED PROOF/CHECKPOINT PENDING** (2026-07-14). v0.6.22 adds
+the distinct planner flow, runtime budget/depth enforcement, planner-scoped compact worker contract,
+worker-tier delegation with parent lineage, synthesis-tier findings-only compose, sanitized MA-05
+nesting, and fail-open return to the Phase 3/flat path. The live `vcso_planner` row is default-off with
+zero enrollment. The thin-slice question/evidence table is scaffolded but has not been run; no
+stop-and-review or feature-gate flip occurred. Phase 1–3 rollout states are unchanged.
 
 ## Documents
 
@@ -40,11 +39,11 @@ Phase 1's Stage 1 state is unchanged. Only the global flag-flip decision remains
 
 ## Current Phase
 
-**Phase 0 — Done (2026-07-13).** Legacy Vercel chat route quarantined (410), CLAUDE.md + endpoint
-point to Python, conversation feeder scoped deferred, wiki authority resolved (layer-split + projection
-caveat). **Phase 1's Stage 1 founder canary remains active and Stage 2 remains observation-gated.**
-**Phase 2 remains deployed live-dark. Phase 3's founder-only canary has passed its authenticated
-cost/quality/trace gate; the global default remains off pending London.**
+**Phase 4 — code complete; live flag dark (2026-07-14).** PLAN-1..4 and the PLAN-2 contract are
+implemented; PLAN-5 remains the intentionally unexecuted batched proof/checkpoint. **Phase 1's Stage
+1 founder canary remains active and Stage 2 remains observation-gated. Phase 2 remains deployed
+live-dark. Phase 3's founder-only canary remains active with the global default off. Phase 4 is
+disabled with zero enrollment.**
 
 ## Open Design Forks Carried Into Build-Planning
 
@@ -76,7 +75,7 @@ cost/quality/trace gate; the global default remains off pending London.**
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** (2026-07-13) — Stage 2 awaits observation |
 | 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16, 2026-07-13) |
 | 3. Tier-Escalating Source Router | **Done; founder canary proven; global flip pending London** (v0.6.18–v0.6.20, 2026-07-14) |
-| 4. Planner (thin slice) — checkpoint | Not started |
+| 4. Planner (thin slice) — checkpoint | **Code complete; live flag dark; batched proof/checkpoint pending** (v0.6.22, 2026-07-14) — proof scaffolded only; no flag flip or stop-and-review |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started |
 | 6. Generalize + Strategic Workers | Not started |
 | 7. Verification & Seams | Not started |
@@ -116,3 +115,12 @@ matched flag-off control and founder-only post-fix canary. Total main input fell
 96,888), answers remained cited and complete, and all 19 main calls matched LangSmith to exact usage
 rows. **Next action:** London decides the global router flip, sequenced after the separate Phase 1/2
 flip decisions. `enabled_for_all=false`; do not start Phase 4 without direction.
+
+**Phase 4 CODE COMPLETE — LIVE FLAG DARK** (2026-07-14): v0.6.22 adds the distinct planner entry branch,
+explicit revisable decomposition, P3-bound depth-1 delegation through existing handlers, planner-only
+worker-tier overrides, compact cited return contracts, findings-only Phase-1 assembly, synthesis-tier
+compose, runtime budget enforcement, parent/child attribution, and sanitized MA-05 nested steps.
+Focused lifecycle tests pass and backend compile is clean. The default-off live flag has zero
+enrollment. `04-THIN-SLICE-PROOF.md` contains the deferred question/route/evidence scaffold; no proof
+turn, cap-hit live run, stop-and-review, or flag flip occurred. **Next action:** on London's go, run
+the batched P1–P4 validation and populate the evidence table, then stop for the founder decision.

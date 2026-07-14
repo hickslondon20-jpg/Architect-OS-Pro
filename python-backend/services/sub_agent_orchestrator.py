@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -38,6 +39,9 @@ class SubAgentRunRequest:
     parent_thread_id: str | None = None
     parent_message_id: str | None = None
     parent_run_id: str | None = None
+    delegation_depth: int = 0
+    routing_tier_override: str | None = None
+    enforce_compact_contract: bool = False
     progress_callback: Callable[[dict[str, Any]], None] | None = None
 
 
@@ -68,7 +72,15 @@ class SubAgentOrchestrator:
     def start_run(self, request: SubAgentRunRequest) -> SubAgentRunResult:
         run_id: str | None = None
         try:
+            if request.delegation_depth < 0 or request.delegation_depth > 1:
+                raise SubAgentError("Sub-agent delegation depth exceeds the one-level runtime cap.")
+            if request.routing_tier_override is not None and not request.enforce_compact_contract:
+                raise SubAgentError("Worker-tier override is restricted to compact planner delegations.")
             capability = self.registry.get_for_surface(request.capability_key, request.parent_surface)
+            if request.routing_tier_override is not None:
+                if request.routing_tier_override != "worker":
+                    raise SubAgentError("Planner sub-agent routing may only override to the worker tier.")
+                capability = replace(capability, routing_tier="worker")
             context = self.context_builder.build(
                 user_id=request.user_id,
                 parent_surface=request.parent_surface,
@@ -112,7 +124,7 @@ class SubAgentOrchestrator:
             elif capability.capability_key == "kb_explorer_agent":
                 result = self._handle_kb_explorer(context, capability, run_id, request.parent_thread_id)
             elif capability.capability_key == "sandbox_execution_agent":
-                result = self._handle_sandbox_execution(context, capability, run_id)
+                result = self._handle_sandbox_execution(context, capability, run_id, request)
             elif capability.capability_key == "per_user_wiki":
                 result = self._handle_per_user_wiki(context)
             elif capability.capability_key == "per_user_document_wiki":
@@ -122,6 +134,12 @@ class SubAgentOrchestrator:
             else:
                 raise SubAgentError("Capability handler is not available yet.")
 
+            if request.enforce_compact_contract:
+                result = _compact_worker_contract(
+                    result,
+                    capability_key=capability.capability_key,
+                    run_id=run_id,
+                )
             result_step_index = int(result.pop("_next_step_index", 2))
             self._create_step(
                 run_id,
@@ -231,6 +249,8 @@ class SubAgentOrchestrator:
             "metadata": {
                 "output_schema_version": capability.output_schema.get("version", "agent_result_v1"),
                 "can_spawn_agents": False,
+                "routing_tier": capability.routing_tier,
+                "delegation_depth": request.delegation_depth,
             },
         }
         response = self.store.client.table("agent_delegation_runs").insert(row).execute()
@@ -655,6 +675,7 @@ class SubAgentOrchestrator:
         context: AgentContextBundle,
         capability: AgentCapability,
         run_id: str,
+        request: SubAgentRunRequest | None = None,
     ) -> dict[str, Any]:
         """Run the Sandbox Execution sub-agent tool-use loop."""
         thread_id = str(context.context_scope.get("thread_id") or "").strip()
@@ -690,7 +711,23 @@ class SubAgentOrchestrator:
                 raise SubAgentError(f"Artifact delivery failed: {exc}") from exc
 
         findings: list[dict[str, Any]] = []
+        sandbox_sources: list[AgentSourceRef] = []
         for step in execution.tool_steps:
+            for source in (step.get("sources") or []) if request and request.enforce_compact_contract else []:
+                if not isinstance(source, dict):
+                    continue
+                sandbox_sources.append(
+                    AgentSourceRef(
+                        source_kind=str(source.get("source_kind") or "derived"),
+                        source_id=str(source.get("source_id") or "") or None,
+                        source_label=source.get("label") or source.get("source_label"),
+                        source_metadata=source.get("metadata") or source.get("source_metadata") or {},
+                        citation_payload={
+                            "verbatim": source.get("verbatim"),
+                            "locator": source.get("locator"),
+                        },
+                    )
+                )
             findings.append(
                 {
                     "type": "tool_step",
@@ -711,16 +748,27 @@ class SubAgentOrchestrator:
 
         result_summary = execution.summary[:500] if execution.summary else "Sandbox execution complete."
         confidence = 0.7 if execution.truncated else 0.82
-        result = _handler_result(result_summary, findings, [], confidence=confidence)
-        result["structured_result"].update(
-            {
-                "rounds_used": execution.rounds_used,
-                "truncated": execution.truncated,
-                "produced_file_path": execution.produced_file_path,
-                "artifact_id": artifact.id if artifact else None,
-                "artifact": artifact.to_dict() if artifact else None,
-            }
-        )
+        sandbox_sources = _dedupe_agent_sources(sandbox_sources)
+        result = _handler_result(result_summary, findings, sandbox_sources, confidence=confidence)
+        additions = {
+            "rounds_used": execution.rounds_used,
+            "truncated": execution.truncated,
+            "produced_file_path": execution.produced_file_path,
+            "artifact_id": artifact.id if artifact else None,
+            "artifact": artifact.to_dict() if artifact else None,
+        }
+        if request and request.enforce_compact_contract:
+            additions.update(
+                {
+                    "computed_result": result_summary,
+                    "derivation": [
+                        str(step.get("summary") or "")[:500]
+                        for step in execution.tool_steps[:8]
+                        if str(step.get("summary") or "").strip()
+                    ],
+                }
+            )
+        result["structured_result"].update(additions)
         return result
 
     def _handle_per_user_wiki(self, context: AgentContextBundle) -> dict[str, Any]:
@@ -850,6 +898,112 @@ def _handler_result(
         },
         "citations": citations,
     }
+
+
+def _compact_worker_contract(
+    result: dict[str, Any],
+    *,
+    capability_key: str,
+    run_id: str,
+    max_chars: int = 8000,
+) -> dict[str, Any]:
+    """Normalize every handler to the compact/cited Phase 4 handoff contract.
+
+    Compatibility fields remain available for existing callers, but large or raw
+    handler payloads are reduced before persistence and before the planner can see
+    them. The contract never contains hidden reasoning.
+    """
+
+    structured = result.get("structured_result") if isinstance(result.get("structured_result"), dict) else {}
+    citations = [item for item in (result.get("citations") or []) if isinstance(item, dict)][:16]
+    summary = " ".join(str(structured.get("summary") or result.get("result_summary") or "").split())[:900]
+    raw_findings = structured.get("findings") if isinstance(structured.get("findings"), list) else []
+    compact_findings: list[dict[str, Any]] = []
+    claims: list[dict[str, Any]] = []
+    for raw in raw_findings[:8]:
+        source = raw if isinstance(raw, dict) else {"summary": raw}
+        text = " ".join(str(source.get("text") or source.get("summary") or source.get("claim") or "").split())[:600]
+        if not text:
+            continue
+        compact = {
+            "type": str(source.get("type") or "finding")[:80],
+            "title": " ".join(str(source.get("title") or "").split())[:160] or None,
+            "summary": text,
+            "source_id": str(source.get("source_id") or "")[:160] or None,
+        }
+        compact_findings.append(compact)
+        claims.append({"text": text, "source_id": compact["source_id"]})
+    evidence = [
+        {
+            "source_kind": item.get("source_kind"),
+            "source_id": item.get("source_id"),
+            "source_label": " ".join(str(item.get("source_label") or item.get("label") or "").split())[:240],
+            "locator": (item.get("citation_payload") or {}).get("locator")
+            if isinstance(item.get("citation_payload"), dict)
+            else item.get("locator"),
+        }
+        for item in citations
+    ]
+    normalized = {
+        "schema_version": "worker_finding_v1",
+        "summary": summary,
+        "findings": compact_findings,
+        "claims": claims,
+        "evidence": evidence,
+        "provenance": {
+            "worker_run_id": run_id,
+            "capability_key": capability_key,
+            "source_count": len(citations),
+        },
+        "confidence": structured.get("confidence"),
+        "reasoning_visibility": "summary_only",
+        "source_count": len(citations),
+    }
+    for key in ("status", "needs_review", "contract_version", "rounds_used", "produced_file_path", "artifact_id"):
+        if key in structured:
+            normalized[key] = structured[key]
+    if isinstance(structured.get("retrieval_strategy"), list):
+        normalized["retrieval_strategy"] = [
+            " ".join(str(item).split())[:240] for item in structured["retrieval_strategy"][:6]
+        ]
+    if structured.get("computed_result") is not None:
+        normalized["computed_result"] = " ".join(str(structured.get("computed_result")).split())[:900]
+    if isinstance(structured.get("derivation"), list):
+        normalized["derivation"] = [
+            " ".join(str(item).split())[:500] for item in structured["derivation"][:8]
+        ]
+    if isinstance(structured.get("follow_up_questions"), list):
+        normalized["follow_up_questions"] = [
+            " ".join(str(item).split())[:600] for item in structured["follow_up_questions"][:4]
+        ]
+    if isinstance(structured.get("resolved_subquestion_ids"), list):
+        normalized["resolved_subquestion_ids"] = [
+            str(item)[:8] for item in structured["resolved_subquestion_ids"][:8]
+        ]
+    normalized["truncated"] = bool(structured.get("truncated"))
+    encoded = json.dumps(normalized, ensure_ascii=True, default=str)
+    if len(encoded) > max_chars:
+        normalized["findings"] = compact_findings[:3]
+        normalized["claims"] = claims[:3]
+        normalized["evidence"] = evidence[:6]
+        normalized["truncated"] = True
+        normalized.pop("retrieval_strategy", None)
+    result["result_summary"] = summary
+    result["structured_result"] = normalized
+    result["citations"] = citations
+    return result
+
+
+def _dedupe_agent_sources(sources: list[AgentSourceRef]) -> list[AgentSourceRef]:
+    result: list[AgentSourceRef] = []
+    seen: set[tuple[str, str]] = set()
+    for source in sources:
+        key = (source.source_kind, str(source.source_id or ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(source)
+    return result
 
 
 def _not_implemented_result(
