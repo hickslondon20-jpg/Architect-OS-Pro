@@ -1,10 +1,18 @@
 # State: Orchestration Harness — VCSO Planner — ArchitectOS Pro
 
-**Updated:** 2026-07-14
+**Updated:** 2026-07-15
 
 ## Current Focus
 
-**SECOND P4 VALIDATION RESTART HALTED; P4 ROLLED BACK** (2026-07-15). The remediated worker remains
+**04B PHASE A COMPLETE — SDK STREAMING GO; AWAITING LONDON** (2026-07-15). London approved the
+founder-gated Phase A spike. Commit `af970a2e` deployed dark, a forced flag-off `READY.` control stayed
+on the hand-rolled loop, and one founder-only canary completed through the Agent SDK with real
+`partial_text_delta` streaming, one curated `wiki_search` step, a cited persisted answer, and exact
+LangSmith/`ai_usage_log` pairing on run `0e3c41b8-9447-4894-8ad2-8577b7929473`. The SDK flag was then
+disabled and unenrolled; global remains off. Q1 is **GO**. Phase B has not started and awaits the Phase
+A read-back decision. Evidence: `phases/04B-vcso-sdk-migration/04B-A-COMPLETION.md`.
+
+The prior **SECOND P4 VALIDATION RESTART remains halted and P4 remains rolled back**. The remediated worker remains
 healthy, but the restarted capstone exposed a planner-coverage defect: Sonnet decomposition created
 only one structured-data child and omitted the mandatory sandbox compute child. Intent, Tier-1
 routing, working state, citations, and scoped main/decompose traces passed; the P1 `afterTurn` usage
@@ -41,7 +49,11 @@ annotations remain off. Evidence:
 
 ## Current Phase
 
-**Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
+**04B Phase A is complete at its founder go/no-go checkpoint; Phase B is not started.** The technical
+recommendation is GO because the SDK emitted clean incremental assistant deltas through the existing
+SSE contract and the hook/usage seam paired on live. `vcso_sdk_loop` is disabled with zero enrollment.
+
+The original **Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
 defects remain closed at worker level, but decomposition did not preserve the required structured-data
 → sandbox chain or minimum child count. PLAN-5 and the integrated cost-routing checkpoint remain open.
 **Phase 1, remediated Phase 2, and Phase 3 are founder canaries with global defaults off; Phase 4 is
