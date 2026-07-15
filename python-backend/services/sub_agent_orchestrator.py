@@ -10,14 +10,14 @@ from typing import Any, Callable
 import anthropic
 
 from core.config import get_settings
-from core.langsmith_tracing import trace_anthropic_client
+from core.langsmith_tracing import trace_anthropic_client, trace_scope
 from services.agent_capabilities import AgentCapability, AgentCapabilityError, AgentCapabilityRegistry
 from services.agent_context import AgentContextBuilder, AgentContextBundle, AgentContextError, AgentSourceRef
 from services.doc_wiki_read_service import DocWikiReadError, DocWikiReadService
 from services.global_ip_read import GlobalIpReadError, GlobalIpReadService
 from services.kb_explorer_service import KbExplorerService
 from services.artifact_service import ArtifactService, ArtifactServiceError
-from services.sandbox_execution_service import SandboxExecutionService
+from services.sandbox_execution_service import SANDBOX_WORKER_MAX_ROUNDS, SandboxExecutionService
 from services.structured_query import StructuredQueryRequest, StructuredQueryService
 from services.vector_store import VectorStore, VectorStoreError
 from services.wiki_read import WikiReadError, WikiReadService
@@ -523,16 +523,24 @@ class SubAgentOrchestrator:
             f"[Evidence {index}] document_id={chunk.get('document_id')} chunk_id={chunk.get('id')}\n{chunk.get('content') or ''}"
             for index, chunk in enumerate(chunks, start=1)
         )
-        response = client.messages.create(
-            model=model,
-            max_tokens=900,
-            system=(
-                "You are a bounded document-analysis specialist. Answer only from the supplied evidence. "
-                "Give a concise analytical conclusion, explain why it matters, and cite supporting evidence "
-                "as [Evidence N]. Do not reveal hidden reasoning or mention internal tooling."
-            ),
-            messages=[{"role": "user", "content": f"TASK\n{context.task_summary}\n\nSCOPED EVIDENCE\n{evidence}"}],
-        )
+        with trace_scope(
+            {
+                "user_id": context.user_id,
+                "thread_id": thread_id,
+                "run_id": run_id,
+                "capability_key": capability.capability_key,
+            }
+        ):
+            response = client.messages.create(
+                model=model,
+                max_tokens=900,
+                system=(
+                    "You are a bounded document-analysis specialist. Answer only from the supplied evidence. "
+                    "Give a concise analytical conclusion, explain why it matters, and cite supporting evidence "
+                    "as [Evidence N]. Do not reveal hidden reasoning or mention internal tooling."
+                ),
+                messages=[{"role": "user", "content": f"TASK\n{context.task_summary}\n\nSCOPED EVIDENCE\n{evidence}"}],
+            )
         usage = anthropic_usage(response)
         log_ai_usage_event(
             self.store.client,
@@ -587,6 +595,43 @@ class SubAgentOrchestrator:
             }
             for dataset in context.datasets
         ]
+        for dataset in context.datasets:
+            try:
+                rows = (
+                    self.store.client.table("founder_dataset_rows")
+                    .select("id,dataset_id,row_label,period_start,period_end,values,normalized_values,provenance")
+                    .eq("user_id", context.user_id)
+                    .eq("dataset_id", dataset.get("id"))
+                    .order("source_row_index")
+                    .limit(20)
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception:
+                findings.append(
+                    {
+                        "type": "dataset_row_error",
+                        "title": dataset.get("dataset_name"),
+                        "summary": "Could not load bounded dataset rows for this worker run.",
+                        "source_id": dataset.get("id"),
+                    }
+                )
+                continue
+            for row in rows:
+                values = row.get("normalized_values") or row.get("values") or {}
+                findings.append(
+                    {
+                        "type": "dataset_row",
+                        "title": row.get("row_label") or dataset.get("dataset_name"),
+                        "summary": (
+                            f"Dataset row period {row.get('period_start') or 'unknown'} to "
+                            f"{row.get('period_end') or 'unknown'}: "
+                            f"{json.dumps(values, sort_keys=True, default=str)[:450]}"
+                        ),
+                        "source_id": dataset.get("id"),
+                    }
+                )
         structured_query = context.context_scope.get("structured_query")
         if isinstance(structured_query, dict) and structured_query.get("generated_sql"):
             result = StructuredQueryService(self.store).execute(
@@ -613,7 +658,11 @@ class SubAgentOrchestrator:
                     "source_id": None,
                 }
             )
-        result_summary = f"Reviewed {len(context.datasets)} dataset(s)."
+        numeric_rows = sum(1 for finding in findings if finding.get("type") == "dataset_row")
+        result_summary = (
+            f"Reviewed {len(context.datasets)} dataset(s) and carried forward "
+            f"{numeric_rows} bounded numeric row(s)."
+        )
         return _handler_result(result_summary, findings, context.sources, confidence=0.7)
 
     def _handle_kb_explorer(
@@ -683,7 +732,12 @@ class SubAgentOrchestrator:
             raise SubAgentError("Sandbox execution requires context_scope.thread_id.")
 
         default_config = capability.default_config or {}
-        max_rounds = _safe_int(default_config.get("max_rounds"), default=6, minimum=1, maximum=12)
+        max_rounds = _safe_int(
+            default_config.get("max_rounds"),
+            default=SANDBOX_WORKER_MAX_ROUNDS,
+            minimum=1,
+            maximum=SANDBOX_WORKER_MAX_ROUNDS,
+        )
         timeout_seconds = _safe_float(default_config.get("timeout_seconds"), default=90.0, minimum=1.0, maximum=180.0)
         skill_file_ids = _safe_string_list(context.context_scope.get("skill_file_ids"))
 
@@ -751,13 +805,15 @@ class SubAgentOrchestrator:
         sandbox_sources = _dedupe_agent_sources(sandbox_sources)
         result = _handler_result(result_summary, findings, sandbox_sources, confidence=confidence)
         additions = {
+            "status": execution.status,
+            "needs_review": execution.status != "completed",
             "rounds_used": execution.rounds_used,
             "truncated": execution.truncated,
             "produced_file_path": execution.produced_file_path,
             "artifact_id": artifact.id if artifact else None,
             "artifact": artifact.to_dict() if artifact else None,
         }
-        if request and request.enforce_compact_contract:
+        if request and request.enforce_compact_contract and execution.status == "completed" and not execution.truncated:
             additions.update(
                 {
                     "computed_result": result_summary,

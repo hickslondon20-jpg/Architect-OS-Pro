@@ -12,7 +12,7 @@ import anthropic
 from supabase import Client, create_client
 
 from core.config import get_settings
-from core.langsmith_tracing import trace_anthropic_client
+from core.langsmith_tracing import trace_anthropic_client, trace_scope
 from services.agent_capabilities import AgentCapabilityError
 from services.sandbox_bridge import BridgeFulfiller
 from services.sandbox_service import SandboxService, SandboxServiceError, get_sandbox_service
@@ -27,6 +27,12 @@ from services.usage_events import anthropic_usage, log_ai_usage_event
 
 
 PRODUCED_FILE_PATTERN = re.compile(r"^PRODUCED_FILE:\s*(?P<path>/[^\r\n]+?)\s*$", re.MULTILINE)
+SANDBOX_WORKER_MAX_ROUNDS = 2
+SANDBOX_COMPUTE_ERROR_LIMIT = 2
+COULD_NOT_COMPUTE_SUMMARY = (
+    "Could not compute the requested result within the bounded sandbox retry budget. "
+    "No computed result is available; review the recorded tool errors before retrying."
+)
 
 SANDBOX_EXECUTION_SYSTEM_PROMPT = """You are a sandboxed code-execution agent for ArchitectOS Pro.
 Your job is to write and run Python code against founder/platform data to answer a calculation or
@@ -38,7 +44,11 @@ Available tools:
 - read_skill_file: Read the full content of a file attached to the skill guiding this task.
 
 Rules:
-- If code raises an error, read the error and fix it. Do not give up after one failed attempt.
+- Use the simplest sufficient library: prefer Python arithmetic, then numpy/pandas; use scipy or
+  statsmodels only when the requested method actually needs them.
+- If an import fails, adapt immediately to an available simpler library or equivalent calculation.
+  Never repeat the same failing import unchanged.
+- If code raises an error, make at most one materially different correction. Do not loop.
 - Prefer producing a real output file when the task calls for a document, spreadsheet, chart, or
   other downloadable deliverable.
 - Write deliverable files under /sandbox.
@@ -71,6 +81,7 @@ class SandboxExecutionResult:
     produced_file_path: str | None
     rounds_used: int
     truncated: bool = False
+    status: str = "completed"
 
 
 class SandboxExecutionService:
@@ -111,7 +122,7 @@ class SandboxExecutionService:
         task_summary: str,
         skill_file_ids: list[str] | None = None,
         run_id: str | None = None,
-        max_rounds: int = 6,
+        max_rounds: int = SANDBOX_WORKER_MAX_ROUNDS,
         timeout_seconds: float = 90,
         surface: str = "virtual_cso",
     ) -> SandboxExecutionResult:
@@ -136,15 +147,25 @@ class SandboxExecutionService:
             }
         ]
         tool_steps: list[dict[str, Any]] = []
+        bounded_rounds = max(1, min(int(max_rounds), SANDBOX_WORKER_MAX_ROUNDS))
+        compute_errors = 0
 
-        for round_num in range(max_rounds):
-            response = self.anthropic_client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=_build_system_prompt(code_mode_tool_names),
-                tools=SANDBOX_EXECUTION_TOOLS,
-                messages=messages,
-            )
+        for round_num in range(bounded_rounds):
+            with trace_scope(
+                {
+                    "user_id": user_id,
+                    "thread_id": thread_id,
+                    "run_id": run_id,
+                    "capability_key": self.model_setting_key,
+                }
+            ):
+                response = self.anthropic_client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    system=_build_system_prompt(code_mode_tool_names),
+                    tools=SANDBOX_EXECUTION_TOOLS,
+                    messages=messages,
+                )
             usage = anthropic_usage(response)
             log_ai_usage_event(
                 self._supabase,
@@ -190,6 +211,11 @@ class SandboxExecutionService:
                         bridge_fulfiller=bridge_fulfiller,
                     )
                     tool_steps.extend(steps)
+                    compute_errors += sum(
+                        1
+                        for step in steps
+                        if step.get("tool_name") == "execute_code" and step.get("error")
+                    )
                     tool_results.append(
                         {
                             "type": "tool_result",
@@ -198,14 +224,25 @@ class SandboxExecutionService:
                         }
                     )
 
+                if compute_errors >= SANDBOX_COMPUTE_ERROR_LIMIT:
+                    return SandboxExecutionResult(
+                        summary=COULD_NOT_COMPUTE_SUMMARY,
+                        tool_steps=tool_steps,
+                        produced_file_path=None,
+                        rounds_used=round_num + 1,
+                        truncated=True,
+                        status="could_not_compute",
+                    )
+
                 messages.append({"role": "user", "content": tool_results})
 
         return SandboxExecutionResult(
-            summary="The Sandbox Execution agent reached its maximum number of rounds without completing.",
+            summary=COULD_NOT_COMPUTE_SUMMARY,
             tool_steps=tool_steps,
             produced_file_path=None,
-            rounds_used=max_rounds,
+            rounds_used=bounded_rounds,
             truncated=True,
+            status="could_not_compute",
         )
 
     def _dispatch_tool(

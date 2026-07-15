@@ -1749,7 +1749,7 @@ def _sandbox_verify_codes(step: str) -> list[str]:
         return ["print(_architectos_phase5_probe)"]
     if step == "imports":
         return [
-            "import pandas, numpy, docx, pptx, openpyxl, matplotlib, IPython, ipykernel\n"
+            "import pandas, numpy, scipy, statsmodels, docx, pptx, openpyxl, matplotlib, IPython, ipykernel\n"
             "print('all imports OK')"
         ]
     return [

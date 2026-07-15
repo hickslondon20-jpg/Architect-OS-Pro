@@ -9,7 +9,7 @@ from typing import Any
 import anthropic
 
 from core.config import get_settings
-from core.langsmith_tracing import trace_anthropic_client
+from core.langsmith_tracing import trace_anthropic_client, trace_scope
 from services.folder_navigation import (
     KbNavigationError,
     KbNavigationService,
@@ -130,17 +130,25 @@ class KbExplorerService:
         referenced_doc_names: dict[str, str] = {}
 
         for round_num in range(max_rounds):
-            response = self.anthropic_client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=KB_EXPLORER_SYSTEM_PROMPT,
-                tools=self.tool_registry.get_tools(
-                    surface="virtual_cso",
-                    capability="kb_explorer_agent",
-                    format="anthropic",
-                ),  # type: ignore[arg-type]
-                messages=messages,
-            )
+            with trace_scope(
+                {
+                    "user_id": user_id,
+                    "thread_id": thread_id,
+                    "run_id": run_id,
+                    "capability_key": self.capability_key,
+                }
+            ):
+                response = self.anthropic_client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    system=KB_EXPLORER_SYSTEM_PROMPT,
+                    tools=self.tool_registry.get_tools(
+                        surface="virtual_cso",
+                        capability="kb_explorer_agent",
+                        format="anthropic",
+                    ),  # type: ignore[arg-type]
+                    messages=messages,
+                )
             usage = anthropic_usage(response)
             log_ai_usage_event(
                 self.store.client,

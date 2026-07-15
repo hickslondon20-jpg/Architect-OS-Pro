@@ -185,7 +185,7 @@ re-crawling raw source each turn.
 | # | Conflict | Resolution |
 |---|---|---|
 | O1 | Two VCSO implementations existed: live Python agentic loop (`/api/vcso/chat`, surface `virtual_cso`) vs. legacy Vercel single-shot (`api/vcso/chat.ts`, surface `ws5-chat`). CLAUDE.md Rule #1 was stale. | **Resolved 2026-07-13.** Frontend/config and live usage confirm Python. The Vercel route is quarantined with HTTP 410, CLAUDE.md is corrected, a production VCSO turn passed, `virtual_cso` remains active, and `ws5-chat` remains 0. `api/vcso/writeback.ts` was verified live and retained. |
-| O2 | Two wiki representations overlap on seven fixed Layer-1 keys: structured `wiki_*` claim/evidence/digest data and rendered copies in `ose_knowledge_pages`; OSE also holds emergent Layer-2 pages. | **Founder decision pending.** Recommendation: `wiki_*` / `WikiReadService` is authoritative for overlapping Layer-1 composition; OSE / `DocWikiReadService` is authoritative for emergent Layer-2, with the seven OSE Layer-1 rows treated as projections. No live read path changed. |
+| O2 | Two wiki representations overlap on seven fixed Layer-1 keys: structured `wiki_*` claim/evidence/digest data and rendered copies in `ose_knowledge_pages`; OSE also holds emergent Layer-2 pages. | **Resolved 2026-07-13 (founder-approved, with projection caveat).** Authority by layer: `wiki_*` / `WikiReadService` / `per_user_wiki` is authoritative for the seven fixed Layer-1 pages; `ose_knowledge_pages` / `DocWikiReadService` / `per_user_document_wiki` is authoritative for emergent Layer-2; the seven OSE Layer-1 rows are materialized projections, not a competing authority. **Caveat:** the wiki_*→OSE-Layer-1 projection is *not yet verified live* (both hold exactly 7 for the test founder — consistent with a projection *or* parallel authoring) → recorded as an OS-Engine dependency (see Named dependencies). **Phase 3 build directive:** the composer reads `wiki_*` *directly* for the seven fixed pages (claim/evidence = superior cited component) + `ose` for Layer-2 — a deliberate two-source read that does not depend on the unverified projection. No live read path changed in Phase 0. |
 | O3 | Conversation→synthesis→OS-Engine→wiki feeder (compounding Layer-2 from chat) was not confirmed running; wiki pages tracked uploads, not threads. | **Scoped deferred 2026-07-13.** The thread adapter and manual endpoints exist, but all 18 live threads were pending and zero OSE pages had `origin_thread_id`; upload-linked pages do exist. Do not treat conversation compounding as live until operational wiring and live evidence land. |
 
 Any execution agent that hits a **new** conflict stops and adds a row here rather than resolving it
@@ -219,6 +219,11 @@ silently.
 - **Feedback → OS-Engine re-synthesis loop** (Context Hub pattern): agent annotations/feedback on a
   wiki component become a signal OS Engine uses to re-synthesize that component. This build emits the
   signal; OS Engine acts on it (one-writer preserved). Ties to Conflict O3 (the conversation feeder).
+- **`wiki_*` → OSE-Layer-1 projection** (from O2 resolution): whether the seven OSE Layer-1 rows are a
+  live projection of `wiki_*` or independently authored is **unverified** — an OS-Engine dependency to
+  confirm/own. This build does **not** depend on it: Phase 3's composer reads `wiki_*` directly for the
+  seven fixed pages. If the projection is confirmed absent, the OSE Layer-1 rows are a legacy read-copy
+  the composer bypasses.
 - **The `chub` CLI / public docs registry / community-PR model** and the **Portfolio web-app
   interviewer / all ten pages / wiring guides** are **out of scope** — we mine the annotation,
   incremental-fetch, and modular-context *patterns*, not the products.
