@@ -41,10 +41,11 @@ from services.vcso_working_state import WorkingStateService, assemble, normalize
 from services.vcso_source_router import SourceRouter, TIER_LABELS
 from services.vcso_planner import PLANNER_FLAG, VcsoPlanner, planner_entry_allowed
 from services.vcso_sdk_loop import (
-    SDK_SPIKE_SCHEMA_VERSION,
+    SDK_STANDARD_SCHEMA_VERSION,
     VCSO_SDK_CAPABILITY_KEY,
+    VcsoSdkUsage,
     read_sdk_loop_settings,
-    stream_vcso_sdk_spike,
+    stream_vcso_sdk_turn,
 )
 from services.wiki_read import WikiReadError, WikiReadService
 from services.doc_wiki_read_service import DocWikiReadError, DocWikiReadService
@@ -387,8 +388,11 @@ class VcsoChatService:
 
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
+        planner_path_selected = bool(planner_flag.get("enabled")) and planner_entry_allowed(
+            turn_intent, planner_threshold
+        )
         planner_result = None
-        if planner_flag.get("enabled") and planner_entry_allowed(turn_intent, planner_threshold):
+        if planner_path_selected:
             planner_future = _TOOL_EXECUTOR.submit(
                 self._run_planner_or_none,
                 planner_flag=planner_flag,
@@ -469,8 +473,9 @@ class VcsoChatService:
                     "agentStatus": "complete",
                 },
             }
-            for chunk_start in range(0, len(planner_result.answer_text), 160):
-                yield {"event": "token", "data": {"text": planner_result.answer_text[chunk_start : chunk_start + 160]}}
+            # The planner is still the hand-rolled Phase-4 path and remains disabled.
+            # Do not counterfeit token streaming for its already-complete answer.
+            yield {"event": "token", "data": {"text": planner_result.answer_text}}
             assistant_message = self._insert_message(
                 thread_id,
                 user_id,
@@ -567,47 +572,69 @@ class VcsoChatService:
         }
 
         sdk_flag = self._sdk_loop_settings(user_id)
-        if sdk_flag.get("enabled") and not deep_mode and not is_deep_resume:
-            sdk_result = yield from stream_vcso_sdk_spike(
+        if sdk_flag.get("enabled") and not deep_mode and not is_deep_resume and not planner_path_selected:
+            sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
+            try:
+                sdk_max_turns = max(2, min(int(sdk_settings.get("max_turns", max_rounds + 1)), 12))
+            except (TypeError, ValueError):
+                sdk_max_turns = max_rounds + 1
+            sdk_max_budget_usd = max(0.01, min(_safe_float(sdk_settings.get("max_budget_usd"), 0.25), 1.0))
+
+            def record_sdk_usage(usage: VcsoSdkUsage) -> None:
+                log_ai_usage_event(
+                    self.supabase,
+                    user_id=user_id,
+                    surface="virtual_cso",
+                    model=self.model,
+                    role="main",
+                    provider=self.provider,
+                    input_tokens=usage.input_tokens,
+                    output_tokens=usage.output_tokens,
+                    thread_id=thread_id,
+                    capability_key=VCSO_SDK_CAPABILITY_KEY,
+                    run_id=run_id,
+                    cost_usd=usage.total_cost_usd,
+                )
+
+            sdk_result = yield from stream_vcso_sdk_turn(
                 prompt=context["prompt"],
+                system_prompt=VCSO_TOOL_LOOP_SYSTEM_PROMPT,
                 model=self.model,
                 api_key=self.settings.anthropic_api_key_value,
                 registry=context["registry"],
+                tool_names=context["tool_names"],
                 tool_context=ToolExecutionContext(
                     user_id=user_id,
                     store=self.store,
                     supabase_client=self.supabase,
+                    sandbox_service=_optional_sandbox_service(),
                     thread_id=thread_id,
-                    timeout_seconds=90,
+                    timeout_seconds=float(self.settings.vcso_tool_max_seconds),
                     metadata={
+                        "tool_registry": context["registry"],
                         "surface": "virtual_cso",
                         "tool_scope_surface": "virtual_cso",
+                        "deep_mode": False,
                         "parent_message_id": user_message["id"],
                         "parent_run_id": run_id,
+                        "sandbox_execution_service": _optional_sandbox_execution_service(self.supabase),
                     },
                 ),
                 trace_metadata={
                     **trace_metadata,
                     "capability_key": VCSO_SDK_CAPABILITY_KEY,
-                    "sdk_phase": "04B-A",
+                    "sdk_phase": "04B-B",
                 },
+                initial_sources=list(context.get("prefetched_source_refs") or []),
+                step_index_offset=len(initial_trace_steps),
+                max_turns=sdk_max_turns,
+                max_budget_usd=sdk_max_budget_usd,
+                tool_timeout_seconds=float(self.settings.vcso_tool_max_seconds),
+                heartbeat_seconds=TOOL_HEARTBEAT_SECONDS,
+                usage_sink=record_sdk_usage,
             )
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))
-            )
-            log_ai_usage_event(
-                self.supabase,
-                user_id=user_id,
-                surface="virtual_cso",
-                model=self.model,
-                role="main",
-                provider=self.provider,
-                input_tokens=sdk_result.input_tokens,
-                output_tokens=sdk_result.output_tokens,
-                thread_id=thread_id,
-                capability_key=VCSO_SDK_CAPABILITY_KEY,
-                run_id=run_id,
-                cost_usd=sdk_result.total_cost_usd,
             )
             assistant_message = self._insert_message(
                 thread_id,
@@ -625,11 +652,14 @@ class VcsoChatService:
                 assistant_message["id"],
                 sdk_result.answer_text,
                 sdk_citations,
-                result_schema_version=SDK_SPIKE_SCHEMA_VERSION,
+                result_schema_version=SDK_STANDARD_SCHEMA_VERSION,
                 metadata={
                     "sdk_session_id": sdk_result.session_id,
-                    "sdk_phase": "04B-A",
+                    "sdk_phase": "04B-B",
                     "streaming": "partial_text_delta",
+                    "sdk_compaction_count": sdk_result.compaction_count,
+                    "sdk_turn_trace_emitted": sdk_result.turn_trace_emitted,
+                    "sdk_usage_recorded": sdk_result.usage_recorded,
                 },
             )
             self._active_turn["run_completed"] = True
@@ -640,9 +670,23 @@ class VcsoChatService:
                 user_text=payload.text,
                 assistant_text=sdk_result.answer_text,
             )
-            trace_steps = list(initial_trace_steps)
+            trace_steps = [*initial_trace_steps, *sdk_result.tool_steps]
+            for step in sdk_result.tool_steps:
+                self._create_step(
+                    run_id,
+                    user_id,
+                    int(step.get("stepIndex") or 0),
+                    step_type=str(step.get("stepType") or "tool_call"),
+                    title=str(step.get("title") or "SDK step"),
+                    summary=str(step.get("summary") or "SDK step complete."),
+                    input_summary={},
+                    output_summary={},
+                    source_refs=step.get("sourceRefs") if isinstance(step.get("sourceRefs"), list) else [],
+                    tool_name=step.get("tool"),
+                    status="failed" if step.get("status") == "failed" else "completed",
+                )
             result_step = _result_trace_step(
-                step_index=len(trace_steps) + sdk_result.tool_step_count + 1,
+                step_index=max([int(step.get("stepIndex") or 0) for step in trace_steps] or [0]) + 1,
                 answer_chars=len(sdk_result.answer_text),
                 tool_step_count=sdk_result.tool_step_count,
             )

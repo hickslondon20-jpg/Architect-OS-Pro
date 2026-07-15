@@ -1,4 +1,4 @@
-"""Dark Phase-A Claude Agent SDK streaming proof for the Virtual CSO."""
+"""Feature-gated Claude Agent SDK loop for standard Virtual CSO turns."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import logging
 import queue
 import threading
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, AsyncIterator, Callable, Iterator
@@ -22,27 +23,42 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import StreamEvent
 
-from services.tool_registry import ToolExecutionContext, ToolRegistry
+from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
 
 
 logger = logging.getLogger(__name__)
 
 VCSO_SDK_LOOP_FLAG = "vcso_sdk_loop"
 VCSO_SDK_CAPABILITY_KEY = "vcso_sdk_loop"
-SDK_SPIKE_SCHEMA_VERSION = "vcso_sdk_spike_v1"
+SDK_STANDARD_SCHEMA_VERSION = "vcso_sdk_standard_v1"
 SDK_TOOL_SERVER_NAME = "architectos"
-SDK_WIKI_TOOL_NAME = f"mcp__{SDK_TOOL_SERVER_NAME}__wiki_search"
+SDK_TOOL_PREFIX = f"mcp__{SDK_TOOL_SERVER_NAME}__"
 
 
 @dataclass(frozen=True)
-class VcsoSdkSpikeResult:
+class VcsoSdkUsage:
+    input_tokens: int | None
+    output_tokens: int | None
+    total_cost_usd: Decimal | None
+    session_id: str | None
+
+
+@dataclass(frozen=True)
+class VcsoSdkTurnResult:
     answer_text: str
     input_tokens: int | None
     output_tokens: int | None
     total_cost_usd: Decimal | None
     session_id: str | None
     sources: list[dict[str, Any]] = field(default_factory=list)
-    tool_step_count: int = 0
+    tool_steps: list[dict[str, Any]] = field(default_factory=list)
+    compaction_count: int = 0
+    turn_trace_emitted: bool = False
+    usage_recorded: bool = False
+
+    @property
+    def tool_step_count(self) -> int:
+        return len([step for step in self.tool_steps if step.get("tool")])
 
 
 @dataclass(frozen=True)
@@ -50,8 +66,15 @@ class _WorkerFailure:
     error: BaseException
 
 
+@dataclass(frozen=True)
+class _ToolOutcome:
+    status: str
+    sources: list[dict[str, Any]]
+
+
 _WORKER_DONE = object()
 QueryImpl = Callable[..., AsyncIterator[Any]]
+UsageSink = Callable[[VcsoSdkUsage], None]
 
 
 def read_sdk_loop_settings(supabase: Any, user_id: str | None = None) -> dict[str, Any]:
@@ -80,32 +103,50 @@ def read_sdk_loop_settings(supabase: Any, user_id: str | None = None) -> dict[st
     return {"enabled": enabled, "settings": settings}
 
 
-def stream_vcso_sdk_spike(
+def stream_vcso_sdk_turn(
     *,
     prompt: str,
+    system_prompt: str,
     model: str,
     api_key: str,
     registry: ToolRegistry,
+    tool_names: list[str],
     tool_context: ToolExecutionContext,
     trace_metadata: dict[str, Any],
+    initial_sources: list[dict[str, Any]] | None = None,
+    step_index_offset: int = 0,
+    max_turns: int = 6,
+    max_budget_usd: float = 0.25,
+    tool_timeout_seconds: float = 600.0,
+    heartbeat_seconds: float = 10.0,
+    usage_sink: UsageSink | None = None,
     query_impl: QueryImpl = query,
 ) -> Iterator[dict[str, Any]]:
-    """Bridge the SDK async message stream into the synchronous VCSO SSE producer."""
+    """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
     events: queue.Queue[dict[str, Any] | _WorkerFailure | object] = queue.Queue()
-    result_box: list[VcsoSdkSpikeResult] = []
+    result_box: list[VcsoSdkTurnResult] = []
 
     def run() -> None:
         try:
             result_box.append(
                 asyncio.run(
-                    _run_sdk_spike(
+                    _run_sdk_turn(
                         prompt=prompt,
+                        system_prompt=system_prompt,
                         model=model,
                         api_key=api_key,
                         registry=registry,
+                        tool_names=tool_names,
                         tool_context=tool_context,
                         trace_metadata=trace_metadata,
+                        initial_sources=initial_sources or [],
+                        step_index_offset=step_index_offset,
+                        max_turns=max_turns,
+                        max_budget_usd=max_budget_usd,
+                        tool_timeout_seconds=tool_timeout_seconds,
+                        heartbeat_seconds=heartbeat_seconds,
+                        usage_sink=usage_sink,
                         events=events,
                         query_impl=query_impl,
                     )
@@ -116,7 +157,7 @@ def stream_vcso_sdk_spike(
         finally:
             events.put(_WORKER_DONE)
 
-    worker = threading.Thread(target=run, name="vcso-sdk-spike", daemon=True)
+    worker = threading.Thread(target=run, name="vcso-sdk-standard", daemon=True)
     worker.start()
     while True:
         item = events.get()
@@ -127,100 +168,175 @@ def stream_vcso_sdk_spike(
         yield item
     worker.join(timeout=1)
     if not result_box:
-        raise RuntimeError("Claude Agent SDK spike ended without a result.")
+        raise RuntimeError("Claude Agent SDK turn ended without a result.")
     return result_box[0]
 
 
-async def _run_sdk_spike(
+async def _run_sdk_turn(
     *,
     prompt: str,
+    system_prompt: str,
     model: str,
     api_key: str,
     registry: ToolRegistry,
+    tool_names: list[str],
     tool_context: ToolExecutionContext,
     trace_metadata: dict[str, Any],
+    initial_sources: list[dict[str, Any]],
+    step_index_offset: int,
+    max_turns: int,
+    max_budget_usd: float,
+    tool_timeout_seconds: float,
+    heartbeat_seconds: float,
+    usage_sink: UsageSink | None,
     events: queue.Queue[dict[str, Any] | _WorkerFailure | object],
     query_impl: QueryImpl,
-) -> VcsoSdkSpikeResult:
-    source_refs: list[dict[str, Any]] = []
+) -> VcsoSdkTurnResult:
+    source_refs: list[dict[str, Any]] = list(initial_sources)
+    trace_steps: list[dict[str, Any]] = []
     step_indexes: dict[str, int] = {}
-    tool_step_count = 0
+    running_steps: dict[str, deque[int]] = defaultdict(deque)
+    tool_outcomes: dict[str, deque[_ToolOutcome]] = defaultdict(deque)
+    compaction_count = 0
+    turn_trace_emitted = False
+    usage_recorded = False
+    next_step_index = step_index_offset + 1
 
-    definition = registry.get("wiki_search")
+    definitions = _selected_definitions(registry, tool_names)
 
-    @tool(
-        "wiki_search",
-        definition.description,
-        definition.json_schema,
-        annotations=ToolAnnotations(
-            title="Search founder wiki",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
-    async def sdk_wiki_search(args: dict[str, Any]) -> dict[str, Any]:
-        envelope = await asyncio.to_thread(registry.execute, "wiki_search", tool_context, args)
-        source_refs.extend(source.to_dict() for source in envelope.sources)
-        safe_content = json.dumps(envelope.to_dict(), default=str)
-        return {"content": [{"type": "text", "text": safe_content[:12000]}]}
+    def allocate_step(tool_use_id: str | None, sdk_tool_name: str) -> int:
+        nonlocal next_step_index
+        key = str(tool_use_id or sdk_tool_name)
+        if key not in step_indexes:
+            step_indexes[key] = next_step_index
+            next_step_index += 1
+        return step_indexes[key]
 
-    async def post_tool_use(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
-        nonlocal tool_step_count
-        tool_name = str(input_data.get("tool_name") or "tool")
-        key = str(tool_use_id or tool_name)
-        step_index = step_indexes.get(key)
-        if step_index is None:
-            tool_step_count += 1
-            step_index = tool_step_count
-            step_indexes[key] = step_index
-        _record_post_tool_trace(
-            metadata=trace_metadata,
-            tool_name=tool_name,
-            tool_use_id=tool_use_id,
-        )
+    def emit_tool_start(sdk_tool_name: str, tool_use_id: str | None) -> None:
+        registry_name = _registry_name(sdk_tool_name)
+        step_index = allocate_step(tool_use_id, sdk_tool_name)
+        running_steps[sdk_tool_name].append(step_index)
+        step_type, title, summary = _curated_tool_copy(registry_name, running=True)
         events.put(
             {
-                "event": "tool_result",
+                "event": "step",
                 "data": {
                     "stepIndex": step_index,
-                    "stepType": "source_review",
-                    "title": "Founder wiki reviewed",
-                    "tool": "wiki_search",
-                    "output": "{}",
-                    "summary": "Reviewed matching founder-wiki context.",
-                    "status": "completed",
-                    "sourceRefs": list(source_refs),
+                    "stepType": step_type,
+                    "title": title,
+                    "summary": summary,
+                    "status": "running",
+                    "sourceRefs": [],
                 },
             }
         )
+        events.put(
+            {
+                "event": "tool_call",
+                "data": {
+                    "stepIndex": step_index,
+                    "stepType": step_type,
+                    "title": title,
+                    "tool": registry_name,
+                    "input": {},
+                    "summary": summary,
+                    "status": "running",
+                    "sourceRefs": [],
+                },
+            }
+        )
+
+    async def post_tool_use(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
+        sdk_tool_name = str(input_data.get("tool_name") or "tool")
+        registry_name = _registry_name(sdk_tool_name)
+        step_index = step_indexes.get(str(tool_use_id or sdk_tool_name)) or allocate_step(tool_use_id, sdk_tool_name)
+        outcome = tool_outcomes[sdk_tool_name].popleft() if tool_outcomes[sdk_tool_name] else _ToolOutcome("completed", [])
+        if running_steps[sdk_tool_name]:
+            running_steps[sdk_tool_name].popleft()
+        step_type, title, summary = _curated_tool_copy(registry_name, running=False, failed=outcome.status == "failed")
+        step = {
+            "stepIndex": step_index,
+            "stepType": step_type,
+            "title": title,
+            "tool": registry_name,
+            "input": {},
+            "output": "{}",
+            "summary": summary,
+            "status": outcome.status,
+            "sourceRefs": outcome.sources,
+        }
+        trace_steps.append(step)
+        _record_post_tool_trace(metadata=trace_metadata, tool_name=sdk_tool_name, tool_use_id=tool_use_id)
+        events.put({"event": "tool_result", "data": step})
         return {}
 
-    server = create_sdk_mcp_server(
-        name=SDK_TOOL_SERVER_NAME,
-        version="1.0.0",
-        tools=[sdk_wiki_search],
-    )
+    async def stop_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
+        nonlocal turn_trace_emitted
+        _record_turn_trace(metadata=trace_metadata, status="completed")
+        turn_trace_emitted = True
+        return {}
+
+    async def pre_compact_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
+        nonlocal compaction_count, next_step_index
+        compaction_count += 1
+        step = {
+            "stepIndex": next_step_index,
+            "stepType": "context_build",
+            "title": "Context optimized",
+            "tool": None,
+            "input": {},
+            "output": "{}",
+            "summary": "The SDK compacted the active turn context within its bounded lifecycle.",
+            "status": "completed",
+            "sourceRefs": [],
+        }
+        next_step_index += 1
+        trace_steps.append(step)
+        events.put({"event": "step", "data": {key: value for key, value in step.items() if key not in {"tool", "input", "output"}}})
+        return {}
+
+    sdk_tools = [
+        _make_sdk_tool(
+            definition=definition,
+            registry=registry,
+            tool_context=tool_context,
+            events=events,
+            running_steps=running_steps,
+            tool_outcomes=tool_outcomes,
+            source_refs=source_refs,
+            timeout_seconds=tool_timeout_seconds,
+            heartbeat_seconds=heartbeat_seconds,
+        )
+        for definition in definitions
+    ]
+    server = create_sdk_mcp_server(name=SDK_TOOL_SERVER_NAME, version="1.0.0", tools=sdk_tools)
+    allowed_tools = [_sdk_tool_name(definition.name) for definition in definitions]
+    post_hooks = [HookMatcher(matcher=f"^{SDK_TOOL_PREFIX}.*$", hooks=[post_tool_use])]
     options = ClaudeAgentOptions(
         tools=[],
-        allowed_tools=[SDK_WIKI_TOOL_NAME],
-        disallowed_tools=["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Task"],
+        allowed_tools=allowed_tools,
+        disallowed_tools=["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent"],
         mcp_servers={SDK_TOOL_SERVER_NAME: server},
         strict_mcp_config=True,
         permission_mode="dontAsk",
         system_prompt=(
-            "You are the Virtual CSO Phase-A SDK streaming proof. Before answering, call wiki_search "
-            "exactly once with a short query derived from the founder's message. Then answer in two or "
-            "three concise sentences. Cite any factual founder-context claim using the source markers "
-            "returned by the tool. Do not reveal tool payloads, hidden reasoning, or chain-of-thought."
+            system_prompt
+            + "\n\nThe standard Virtual CSO loop is running through the Claude Agent SDK. Use only the "
+            "scoped ArchitectOS tools when additional evidence is needed. The selected founder context "
+            "in the prompt is authoritative pre-assembly. Keep tool results compact, cite factual founder "
+            "claims using source markers supplied in context or tool results, and never reveal raw tool "
+            "payloads, hidden reasoning, or chain-of-thought."
         ),
         model=model,
-        max_turns=3,
-        max_budget_usd=0.05,
+        max_turns=max(2, max_turns),
+        max_budget_usd=max_budget_usd,
         include_partial_messages=True,
         include_hook_events=False,
-        hooks={"PostToolUse": [HookMatcher(matcher=SDK_WIKI_TOOL_NAME, hooks=[post_tool_use])]},
+        hooks={
+            "PostToolUse": post_hooks,
+            "Stop": [HookMatcher(hooks=[stop_hook])],
+            "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
+        },
         setting_sources=[],
         env={"ANTHROPIC_API_KEY": api_key},
         thinking={"type": "disabled"},
@@ -236,45 +352,14 @@ async def _run_sdk_spike(
     async for message in query_impl(prompt=prompt, options=options):
         if isinstance(message, StreamEvent):
             event = message.event
-            event_type = event.get("type")
-            if event_type == "content_block_start":
+            if event.get("type") == "content_block_start":
                 block = event.get("content_block") or {}
                 if block.get("type") == "tool_use":
-                    tool_name = str(block.get("name") or "tool")
-                    tool_use_id = str(block.get("id") or tool_name)
-                    if tool_use_id not in step_indexes:
-                        tool_step_count += 1
-                        step_indexes[tool_use_id] = tool_step_count
-                    step_index = step_indexes[tool_use_id]
-                    events.put(
-                        {
-                            "event": "step",
-                            "data": {
-                                "stepIndex": step_index,
-                                "stepType": "source_review",
-                                "title": "Reviewing founder wiki",
-                                "summary": "Searching synthesized founder context.",
-                                "status": "running",
-                                "sourceRefs": [],
-                            },
-                        }
+                    emit_tool_start(
+                        str(block.get("name") or "tool"),
+                        str(block.get("id") or block.get("name") or "tool"),
                     )
-                    events.put(
-                        {
-                            "event": "tool_call",
-                            "data": {
-                                "stepIndex": step_index,
-                                "stepType": "source_review",
-                                "title": "Reviewing founder wiki",
-                                "tool": "wiki_search",
-                                "input": {},
-                                "summary": "Searching synthesized founder context.",
-                                "status": "running",
-                                "sourceRefs": [],
-                            },
-                        }
-                    )
-            elif event_type == "content_block_delta":
+            elif event.get("type") == "content_block_delta":
                 delta = event.get("delta") or {}
                 if delta.get("type") == "text_delta":
                     text = str(delta.get("text") or "")
@@ -285,11 +370,27 @@ async def _run_sdk_spike(
             session_id = message.session_id
             final_result_text = message.result
             usage = message.usage or {}
-            input_tokens = _usage_int(usage, "input_tokens", "inputTokens")
+            input_tokens = _usage_input_total(usage)
             output_tokens = _usage_int(usage, "output_tokens", "outputTokens")
             if message.total_cost_usd is not None:
                 total_cost_usd = Decimal(str(message.total_cost_usd))
+            if usage_sink is not None:
+                try:
+                    usage_sink(
+                        VcsoSdkUsage(
+                            input_tokens=input_tokens,
+                            output_tokens=output_tokens,
+                            total_cost_usd=total_cost_usd,
+                            session_id=session_id,
+                        )
+                    )
+                    usage_recorded = True
+                except Exception as exc:  # noqa: BLE001 - metering failure must not erase the founder answer
+                    logger.warning("SDK ResultMessage usage sink failed open: %s", exc)
 
+    if not turn_trace_emitted:
+        _record_turn_trace(metadata=trace_metadata, status="completed")
+        turn_trace_emitted = True
     answer_text = "".join(answer_parts).strip()
     if not answer_text and final_result_text:
         answer_text = final_result_text.strip()
@@ -297,19 +398,149 @@ async def _run_sdk_spike(
             events.put({"event": "token", "data": {"text": answer_text}})
     if not answer_text:
         raise RuntimeError("Claude Agent SDK returned no assistant text.")
-    return VcsoSdkSpikeResult(
+    return VcsoSdkTurnResult(
         answer_text=answer_text,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_cost_usd=total_cost_usd,
         session_id=session_id,
         sources=source_refs,
-        tool_step_count=tool_step_count,
+        tool_steps=sorted(trace_steps, key=lambda step: int(step.get("stepIndex") or 0)),
+        compaction_count=compaction_count,
+        turn_trace_emitted=turn_trace_emitted,
+        usage_recorded=usage_recorded,
     )
 
 
+def _make_sdk_tool(
+    *,
+    definition: ToolDefinition,
+    registry: ToolRegistry,
+    tool_context: ToolExecutionContext,
+    events: queue.Queue[dict[str, Any] | _WorkerFailure | object],
+    running_steps: dict[str, deque[int]],
+    tool_outcomes: dict[str, deque[_ToolOutcome]],
+    source_refs: list[dict[str, Any]],
+    timeout_seconds: float,
+    heartbeat_seconds: float,
+) -> Any:
+    sdk_name = _sdk_tool_name(definition.name)
+
+    async def execute(args: dict[str, Any]) -> dict[str, Any]:
+        task = asyncio.create_task(asyncio.to_thread(registry.execute, definition.name, tool_context, args))
+        elapsed = 0.0
+        try:
+            while True:
+                try:
+                    envelope = await asyncio.wait_for(asyncio.shield(task), timeout=max(0.01, heartbeat_seconds))
+                    break
+                except asyncio.TimeoutError:
+                    elapsed += max(0.01, heartbeat_seconds)
+                    step_index = running_steps[sdk_name][0] if running_steps[sdk_name] else 0
+                    events.put(
+                        {
+                            "event": "heartbeat",
+                            "data": {
+                                "stepIndex": step_index,
+                                "tool": definition.name,
+                                "elapsedSeconds": elapsed,
+                            },
+                        }
+                    )
+                    if elapsed >= max(timeout_seconds, heartbeat_seconds):
+                        task.cancel()
+                        raise TimeoutError(f"{definition.name} exceeded the configured VCSO tool deadline.")
+            sources = [source.to_dict() for source in envelope.sources]
+            source_refs.extend(sources)
+            tool_outcomes[sdk_name].append(_ToolOutcome("completed", sources))
+            safe_content = json.dumps(envelope.to_dict(), default=str)
+            return {"content": [{"type": "text", "text": safe_content[:12000]}]}
+        except Exception as exc:  # noqa: BLE001 - return a bounded tool error to the SDK loop
+            logger.warning("SDK registry tool %s failed: %s", definition.name, exc)
+            tool_outcomes[sdk_name].append(_ToolOutcome("failed", []))
+            return {
+                "content": [{"type": "text", "text": json.dumps({"error": "Tool failed safely."})}],
+                "is_error": True,
+            }
+
+    read_only_hint = _read_only_hint(definition.name)
+    decorated = tool(
+        definition.name,
+        definition.description,
+        definition.json_schema,
+        annotations=ToolAnnotations(
+            title=_humanize_tool_name(definition.name),
+            readOnlyHint=read_only_hint,
+            destructiveHint=False,
+            idempotentHint=True if read_only_hint else False,
+            openWorldHint=False,
+        ),
+    )(execute)
+    return decorated
+
+
+def _selected_definitions(registry: ToolRegistry, tool_names: list[str]) -> list[ToolDefinition]:
+    selected: list[ToolDefinition] = []
+    seen: set[str] = set()
+    for name in tool_names:
+        if name in seen:
+            continue
+        selected.append(registry.get(name))
+        seen.add(name)
+    return selected
+
+
+def _sdk_tool_name(registry_name: str) -> str:
+    return f"{SDK_TOOL_PREFIX}{registry_name}"
+
+
+def _registry_name(sdk_tool_name: str) -> str:
+    return sdk_tool_name[len(SDK_TOOL_PREFIX) :] if sdk_tool_name.startswith(SDK_TOOL_PREFIX) else sdk_tool_name
+
+
+def _humanize_tool_name(name: str) -> str:
+    return name.replace("_", " ").replace("-", " ").strip().title() or "ArchitectOS tool"
+
+
+def _read_only_hint(name: str) -> bool:
+    """Conservative Phase-B hint only; Phase C adds registry-enforced persistence semantics."""
+
+    lower = name.lower()
+    write_tokens = ("annotate", "write", "edit", "create", "update", "delete", "register", "persist")
+    return not any(token in lower for token in write_tokens)
+
+
+def _curated_tool_copy(name: str, *, running: bool, failed: bool = False) -> tuple[str, str, str]:
+    lower = name.lower()
+    step_type = "source_review" if any(token in lower for token in ("wiki", "kb_", "search", "read", "list")) else "tool_call"
+    title = _humanize_tool_name(name)
+    if failed:
+        return step_type, title, f"{title} could not complete; the turn continued safely."
+    if running:
+        return step_type, title, f"Using {title.lower()} for this answer."
+    return step_type, title, f"{title} completed."
+
+
+def _record_turn_trace(*, metadata: dict[str, Any], status: str) -> None:
+    """Emit one sanitized lifecycle trace per SDK standard turn."""
+
+    try:
+        from langsmith.run_helpers import trace
+
+        with trace(
+            "vcso_sdk_turn",
+            run_type="chain",
+            inputs={"surface": "virtual_cso"},
+            metadata={**metadata, "hook": "Stop", "sdk_phase": "04B-B"},
+            tags=[VCSO_SDK_CAPABILITY_KEY],
+        ) as run:
+            run.end(outputs={"status": status})
+    except Exception as exc:  # noqa: BLE001 - observability must remain fail-open
+        logger.warning("SDK lifecycle trace failed open: %s", exc)
+
+
 def _record_post_tool_trace(*, metadata: dict[str, Any], tool_name: str, tool_use_id: str | None) -> None:
-    """Emit a sanitized, fail-open LangSmith tool run from the SDK hook."""
+    """Emit a sanitized, fail-open child trace from the SDK PostToolUse hook."""
 
     try:
         from langsmith.run_helpers import trace
@@ -317,8 +548,8 @@ def _record_post_tool_trace(*, metadata: dict[str, Any], tool_name: str, tool_us
         with trace(
             "vcso_sdk_post_tool_use",
             run_type="tool",
-            inputs={"tool": tool_name},
-            metadata={**metadata, "tool_use_id": tool_use_id, "hook": "PostToolUse"},
+            inputs={"tool": _registry_name(tool_name)},
+            metadata={**metadata, "tool_use_id": tool_use_id, "hook": "PostToolUse", "sdk_phase": "04B-B"},
             tags=[VCSO_SDK_CAPABILITY_KEY],
         ) as run:
             run.end(outputs={"status": "completed"})
@@ -335,3 +566,15 @@ def _usage_int(usage: dict[str, Any], *keys: str) -> int | None:
         except (TypeError, ValueError):
             continue
     return None
+
+
+def _usage_input_total(usage: dict[str, Any]) -> int | None:
+    """Record the SDK's full input footprint, including prompt-cache reads/writes."""
+
+    values = [
+        _usage_int(usage, "input_tokens", "inputTokens"),
+        _usage_int(usage, "cache_read_input_tokens", "cacheReadInputTokens"),
+        _usage_int(usage, "cache_creation_input_tokens", "cacheCreationInputTokens"),
+    ]
+    present = [value for value in values if value is not None]
+    return sum(present) if present else None
