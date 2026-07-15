@@ -1,8 +1,8 @@
 # Roadmap: 04B — Proposed VCSO SDK Migration — ArchitectOS Pro
 
-**Status: PHASE A COMPLETE — GO; awaiting London at the Phase A checkpoint.** London approved Phase A
-on 2026-07-15. The SDK path remains dark after one founder-only live canary proof; Phase B has not
-started. Read `CONTEXT.md` first. The harness root `ROADMAP.md` is **not** edited until the separately
+**Status: PHASE B COMPLETE — standard-loop parity proven; awaiting London before Phase C.** London
+approved Phase B on 2026-07-15. The SDK path remains dark after a three-prompt matched founder canary;
+Phase C has not started. Read `CONTEXT.md` first. The harness root `ROADMAP.md` is **not** edited until the separately
 founder-gated Phase G roadmap update.
 
 ## Overview
@@ -137,7 +137,7 @@ root `ROADMAP.md` (founder-gated).
 | Phase | Status | Completed |
 |---|---|---|
 | A. Streaming spike + SDK proof-of-loop | **Done — GO at London checkpoint** | 2026-07-15 |
-| B. SDK loop for standard VCSO (parallel) | **Not started — awaiting London** | — |
+| B. SDK loop for standard VCSO (parallel) | **Done — matched canary parity proven** | 2026-07-15 |
 | C. Registry → SDK-config compiler + extensions | **Proposed — not started** | — |
 | D. Native subagents — P4 re-approach (checkpoint) | **Proposed — not started** | — |
 | E. Sessions + Deep Mode reconciliation | **Proposed — not started** | — |

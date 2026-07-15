@@ -4,13 +4,15 @@
 
 ## Current Focus
 
-**04B PHASE A COMPLETE — SDK STREAMING GO; AWAITING LONDON** (2026-07-15). London approved the
-founder-gated Phase A spike. Commit `af970a2e` deployed dark, a forced flag-off `READY.` control stayed
-on the hand-rolled loop, and one founder-only canary completed through the Agent SDK with real
-`partial_text_delta` streaming, one curated `wiki_search` step, a cited persisted answer, and exact
-LangSmith/`ai_usage_log` pairing on run `0e3c41b8-9447-4894-8ad2-8577b7929473`. The SDK flag was then
-disabled and unenrolled; global remains off. Q1 is **GO**. Phase B has not started and awaits the Phase
-A read-back decision. Evidence: `phases/04B-vcso-sdk-migration/04B-A-COMPLETION.md`.
+**04B PHASE B COMPLETE — STANDARD SDK LOOP PARITY PROVEN; AWAITING LONDON BEFORE PHASE C**
+(2026-07-15). Commit `ce6731f2` deployed the standard non-Deep, non-planner SDK path behind the
+founder-scoped flag. London ran a three-prompt authenticated control/canary set: all answers remained
+cited and complete, the record lookup improved by naming the missing initiative, combined main-model
+token footprint fell 38.6% (82,219 to 50,502), and exact SDK spend was `$0.11827045`. All three SDK
+runs have exact successful `vcso_sdk_turn`/`ai_usage_log` pairs; all three live registry tool calls
+have successful sanitized PostToolUse traces. The flag is disabled and unenrolled again; global and
+default remain off. Phase C has not started. Evidence:
+`phases/04B-vcso-sdk-migration/04B-B-COMPLETION.md`.
 
 The prior **SECOND P4 VALIDATION RESTART remains halted and P4 remains rolled back**. The remediated worker remains
 healthy, but the restarted capstone exposed a planner-coverage defect: Sonnet decomposition created
@@ -49,9 +51,9 @@ annotations remain off. Evidence:
 
 ## Current Phase
 
-**04B Phase A is complete at its founder go/no-go checkpoint; Phase B is not started.** The technical
-recommendation is GO because the SDK emitted clean incremental assistant deltas through the existing
-SSE contract and the hook/usage seam paired on live. `vcso_sdk_loop` is disabled with zero enrollment.
+**04B Phase B is complete; Phase C is not started.** The standard SDK loop passed its matched live
+cost/quality gate, preserved the existing SSE contract and context-selection boundary, and paired all
+SDK turn/tool hooks with DB/output evidence. `vcso_sdk_loop` is disabled with zero enrollment.
 
 The original **Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
 defects remain closed at worker level, but decomposition did not preserve the required structured-data
