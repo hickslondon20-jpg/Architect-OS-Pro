@@ -1,11 +1,12 @@
 # Phase 4 Completion — Planner (Decompose → Delegate → Compose)
 
-**Implementation status:** Code complete and deployed on 2026-07-14; live capstone failed and P4 was
-rolled back to dark with zero enrollment.
-**Version:** v0.6.22.
-**Validation status:** Local implementation gates passed. The remediated batched pass reached P4,
-but PLAN-5 failed because the sandbox child returned no valid computation and scoped LangSmith child
-traces were absent. The proof set halted before turn 2; founder stop-and-review remains open.
+**Implementation status:** Planner code remains complete; the bounded sandbox-worker remediation was
+deployed dark on 2026-07-14. P4 remains disabled with zero enrollment.
+**Version:** v0.6.22 planner; v0.6.26 sandbox/observability remediation.
+**Validation status:** The original batched pass remains halted before turn 2 and PLAN-5 remains open.
+The standalone remediation gates now pass: scientific imports, two-round successful compute, bounded
+forced failure, and exact child LangSmith/usage pairing. Restarting the founder validation remains a
+separate London-authorized action.
 
 ## Delivered
 
@@ -45,11 +46,36 @@ traces were absent. The proof set halted before turn 2; founder stop-and-review 
 | PLAN-4 | Runtime caps, non-recursion rejection, bounded partial compose, planner-error flat fallback, sanitized nesting | Passed locally |
 | PLAN-5 | Anchor question, expected route, and blank evidence table in `04-THIN-SLICE-PROOF.md` | Scaffolded; intentionally not run |
 
-Focused command result: **40 passed, 12 skipped**. The skips are existing environment-gated cases;
-one existing LangSmith deprecation warning was emitted. `python -m compileall python-backend` exited
-cleanly. No frontend files were changed, so the conditional frontend build was not required. Ruff is
-not installed in the repository's `.venv-kb-nav` environment and was not added during this scoped
-phase.
+Focused remediation/regression result: **46 passed**. `python -m compileall python-backend` exited
+cleanly. No frontend files were changed, so the conditional frontend build was not required.
+
+## Sandbox-worker remediation — v0.6.26
+
+- Restored the versioned sandbox image source and published
+  `sandbox-python:2026-07-14-p4-remediation`; `latest` resolves to digest
+  `sha256:6b726090f70ffb6801eeaa58f70f9eac37af3020e64c4fba4f755a34c78cda26`.
+- Added `scipy` and `statsmodels` alongside numpy/pandas. The protected production `imports` verify
+  returned `status=ok`, exit code 0, `all imports OK`, and no stderr.
+- Capped the sandbox model loop at two rounds in code and live `agent_capabilities.default_config`.
+  Repeated compute failures now return `status=could_not_compute`, `needs_review=true`, no
+  `computed_result`, and a clean bounded finding.
+- Carried a maximum of 20 founder-scoped numeric dataset rows into the existing compact structured
+  finding. The planner architecture, depth-1 boundary, and one-writer compose path are unchanged.
+- Scoped sandbox, KB Explorer, and document-analysis child LLM calls with user/thread/run/capability
+  metadata before the paired `ai_usage_log` write.
+- Successful production worker smoke `29063008-901a-459b-840c-e4055fc67637` completed in two rounds
+  and computed 40.0% concentration, 18.0% current margin, and -6.0 percentage points. LangSmith traces
+  `099019ce-1b9d-44dd-8c66-5c267dcb5a60` (1322/668) and
+  `dd50ef73-ff45-459e-a586-49536bf4f804` (2518/549) exactly match its two usage rows.
+- Forced-error smoke `2d86ac1d-9bc0-4a37-b186-1e2fb1f4e008` stopped after two rounds with the clean
+  `could_not_compute` finding. LangSmith traces `0dd4715c-db64-4f5a-bdb7-c0e79660b4df`
+  (1301/116) and `1dd8d17d-4067-43ef-bb4e-79ed663a310a` (1967/101) exactly match its two usage rows.
+- Focused tests additionally prove planner-scoped `computed_result` + derivation and inherited
+  founder-dataset citations. The standalone production worker smoke intentionally has no parent
+  finding, so live inherited-citation proof remains part of the London-authorized PLAN-5 restart.
+- Railway shows v0.6.26 active; production health is 200. `vcso_planner` reads back disabled,
+  `test_user_ids=[]`, and `enabled_for_all=false`. No validation turn or flag flip was performed.
+- Removed the two tracked `.pyc` artifacts; `__pycache__` remains ignored.
 
 ## Failed live capstone and remaining gates
 
@@ -59,10 +85,11 @@ phase.
   than a concentration/margin computation.
 - Parent/child DB lineage and Haiku usage attribution exist, but scoped LangSmith traces were not
   found for either child run ID.
-- Run the live cap-hit and forced-error control gates, pair LangSmith/usage/delegation evidence, and
-  complete `04-THIN-SLICE-PROOF.md` after remediation and a fresh London-authorized restart.
+- The worker-level forced-error and observability defects are closed by the evidence above. Re-run
+  the integrated capstone, inherited-citation/Haiku routing proof, cap-hit control, and remaining proof
+  set only after London authorizes the validation restart.
 - Deliver the cost/quality/transparency/attribution read-back and stop for London.
 
 P4 is disabled and unenrolled. P1/P2/P3 remain founder canaries; global enablement and annotations
-remain off. No stop-and-review, later-phase work, new handler, external source, freshness policy, MCP
-integration, reflect-and-steer behavior, or generalization was performed.
+remain off. No validation restart, stop-and-review, later-phase work, new handler, external source,
+freshness policy, MCP integration, reflect-and-steer behavior, or generalization was performed.

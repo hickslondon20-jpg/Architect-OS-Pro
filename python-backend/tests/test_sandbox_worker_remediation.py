@@ -9,9 +9,11 @@ from services.agent_context import AgentContextBundle, AgentSourceRef
 from services.sandbox_execution_service import (
     COULD_NOT_COMPUTE_SUMMARY,
     SANDBOX_WORKER_MAX_ROUNDS,
+    SandboxExecutionResult,
     SandboxExecutionService,
 )
-from services.sub_agent_orchestrator import SubAgentOrchestrator
+from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
+from services.vcso_planner import PlannerWorkerFinding, _inherit_sandbox_provenance
 
 
 @pytest.fixture(autouse=True)
@@ -196,3 +198,91 @@ def test_structured_worker_carries_bounded_numeric_rows_into_compact_finding():
     row_finding = next(item for item in result["structured_result"]["findings"] if item["type"] == "dataset_row")
     assert '"net_income": 18' in row_finding["summary"]
     assert row_finding["source_id"] == "dataset-1"
+
+
+def test_compact_planner_sandbox_result_keeps_computation_and_derivation(monkeypatch):
+    orchestrator = object.__new__(SubAgentOrchestrator)
+    execution = SandboxExecutionResult(
+        summary="Concentration is 40%; current margin is 18%; change is -6 pp.",
+        tool_steps=[
+            {
+                "tool_name": "execute_code",
+                "summary": "Computed concentration and margin from bounded numeric inputs.",
+                "error": None,
+                "sources": [],
+            }
+        ],
+        produced_file_path=None,
+        rounds_used=2,
+        truncated=False,
+        status="completed",
+    )
+    fake_service = SimpleNamespace(run_execution=lambda **_kwargs: execution)
+    monkeypatch.setattr(
+        "services.sub_agent_orchestrator.SandboxExecutionService.from_env",
+        lambda **_kwargs: fake_service,
+    )
+    context = AgentContextBundle(
+        user_id="founder-1",
+        parent_surface="virtual_cso",
+        task_summary="Compute the bounded quantities.",
+        context_scope={"thread_id": "thread-1"},
+    )
+    request = SubAgentRunRequest(
+        user_id="founder-1",
+        parent_surface="virtual_cso",
+        capability_key="sandbox_execution_agent",
+        task_summary=context.task_summary,
+        context_scope=context.context_scope,
+        enforce_compact_contract=True,
+    )
+    capability = SimpleNamespace(
+        default_config={"max_rounds": 6, "timeout_seconds": 90},
+        effective_model_setting_key="tier_worker",
+    )
+
+    result = orchestrator._handle_sandbox_execution(context, capability, "child-run-1", request)
+
+    structured = result["structured_result"]
+    assert structured["status"] == "completed"
+    assert structured["rounds_used"] == 2
+    assert structured["computed_result"].startswith("Concentration is 40%")
+    assert structured["derivation"] == ["Computed concentration and margin from bounded numeric inputs."]
+
+
+def test_planner_inherits_prior_citations_into_sandbox_finding():
+    citation = {
+        "source_kind": "founder_dataset",
+        "source_id": "dataset-1",
+        "citation_payload": {"locator": {"kind": "record_path", "record_path": "founder_datasets/dataset-1"}},
+    }
+    prior = PlannerWorkerFinding(
+        subquestion_id="sq-data",
+        capability_key="structured_data_agent",
+        run_id="data-run",
+        summary="Bounded numeric inputs gathered.",
+        claims=[{"text": "Bounded numeric inputs gathered.", "source_id": "dataset-1"}],
+        evidence=[{"source_id": "dataset-1"}],
+        provenance={"worker_run_id": "data-run"},
+        confidence=0.9,
+        citations=[citation],
+    )
+    sandbox = PlannerWorkerFinding(
+        subquestion_id="sq-compute",
+        capability_key="sandbox_execution_agent",
+        run_id="sandbox-run",
+        summary="Concentration is 40%.",
+        claims=[{"text": "Concentration is 40%."}],
+        evidence=[],
+        provenance={"worker_run_id": "sandbox-run"},
+        confidence=0.9,
+        citations=[],
+        computed_result="40%",
+        derivation=["40000 / 100000"],
+    )
+
+    inherited = _inherit_sandbox_provenance(sandbox, [prior])
+
+    assert inherited.citations == [citation]
+    assert inherited.evidence == [{"source_id": "dataset-1"}]
+    assert inherited.computed_result == "40%"
