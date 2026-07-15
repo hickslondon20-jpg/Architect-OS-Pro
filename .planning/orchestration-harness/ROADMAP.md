@@ -120,7 +120,7 @@ judgment on the synthesis tier over small inputs. Depth-bounded sub-delegation; 
 per-turn budget. **Prove on one hard strategic question end-to-end, plan + workers visible via MA-05,
 correct tiers.** **STOP-and-review checkpoint with the founder before broadening.**
 
-**Status (2026-07-14): Worker remediation deployed dark; validation restart/checkpoint pending.** v0.6.22
+**Status (2026-07-15): Restart 2 failed at planner coverage; P4 rolled back.** v0.6.22
 implements PLAN-1..4 and the PLAN-2 worker contract behind the default-off `vcso_planner` flag. The
 flag row is live with zero enrollment. The distinct planner gates on Phase 2
 `strategic_synthesis + deep`, decomposes and composes on the synthesis tier, delegates depth-1
@@ -131,8 +131,11 @@ stop-and-review, and every flag flip remain intentionally pending the batched va
 v0.6.26 hardens the existing worker seam: the scientific image includes scipy/statsmodels, numeric
 dataset rows reach the compact finding, compute/retry is capped at two rounds with a clean failure,
 and child provider calls carry scoped LangSmith metadata paired to usage rows. Production imports,
-successful compute, forced failure, health, and dark-state checks pass. London must still authorize
-the validation restart; no PLAN-5 claim or broadening is made here.
+successful compute, forced failure, health, and dark-state checks pass. No PLAN-5 claim or broadening
+was made from the worker-only evidence.
+The authorized 2026-07-15 restart then exposed a distinct coverage defect: Sonnet decomposition
+created only one structured-data child and omitted sandbox compute entirely. P4 was immediately
+disabled and unenrolled before turn 2. PLAN-5 and the cost-routing checkpoint remain open.
 
 ### Phase 5: Reflect-and-Steer + Freshness + First MCP
 Add the third terminal mode (surface-the-gap-and-ask), the freshness/authority policy the router
@@ -158,7 +161,7 @@ runtime-enforced policy under adversarial prompts). Traces paired with DB/output
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** — live gates and paired-trace proof passed; Stage 2 awaits observation | 2026-07-13 |
 | 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16) | — |
 | 3. Tier-Escalating Source Router | **Done; founder canary proven; global flip pending London** (v0.6.18–v0.6.20) | 2026-07-14 |
-| 4. Planner (thin slice) — checkpoint | **Worker remediation deployed dark; validation restart/checkpoint pending** (v0.6.22 + v0.6.26) | — |
+| 4. Planner (thin slice) — checkpoint | **Restart 2 failed; P4 rolled back** — planner omitted mandatory sandbox child (2026-07-15) | — |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started | — |
 | 6. Generalize + Strategic Workers | Not started | — |
 | 7. Verification & Seams | Not started | — |

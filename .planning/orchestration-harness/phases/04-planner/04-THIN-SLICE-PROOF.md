@@ -1,11 +1,11 @@
 # Phase 4 Thin-Slice Proof — Batched Pass Halted
 
-**Status:** **Failed live capstone; P4 rolled back** (2026-07-14). London ran the authorized matched
-control and founder-canary capstone. Intent, routing, bounded decomposition, parent/child lineage,
-working-state update, cited answer quality, and reduced Sonnet context passed. The mandatory sandbox
-worker did not return a computed result, and its scoped LangSmith trace evidence was absent. Per the
-spine runbook, `vcso_planner` was immediately disabled and unenrolled; the proof set halted before
-turn 2. P1–P3 remain founder canaries, all global defaults remain off, and annotations remain off.
+**Status:** **Second live capstone failed; P4 rolled back again** (2026-07-15). The sandbox/runtime
+remediation itself held, but the restarted planner generated only one structured-data child and never
+created the mandatory sandbox child. The answer therefore fell back to the ordinary tool loop without
+a computed result or derivation. Per the spine runbook, `vcso_planner` was immediately disabled and
+unenrolled; the proof set again halted before turn 2. P1–P3 remain founder canaries, all global
+defaults remain off, and annotations remain off.
 
 ## Anchor question
 
@@ -74,6 +74,52 @@ Phase 3 strategic-cost carry-forward.
 | Strategy-path total cost/context below flat control | 52,992 Sonnet input | 38,549 Sonnet input (-27.3%); 62,786 all-tier input; dollar cost unavailable | Partial; carry-forward open |
 | LangSmith traces paired to exact usage/run rows | 3/3 main rows paired | Intent, decompose, and 3 main rows paired; child traces absent | **Fail** |
 
+## Restart 2 evidence — 2026-07-15
+
+- **Thread:** `41397cbb-94b3-4211-af28-46a5e841881a`
+- **Parent VCSO run:** `69303f3d-27db-4da6-866a-544fbb1d7de6`
+- **User message:** `9bf5c2c9-dd1f-48b1-9597-df2471a355b7`
+- **Assistant message:** `f0d25d61-05bc-40ad-9967-64d76cd10ca3`
+
+The retained control remained valid: no post-control commit touched the flat assembly/retrieval path,
+and no founder dataset, dataset row, structured wiki page/claim, or OSE page changed after the control
+at 2026-07-14 22:12:10 UTC. The post-remediation smoke returned `READY.`, logged
+`surface=virtual_cso`, and created no planner run. All four flags were then read back founder-only,
+global-off, annotations-off before London sent the exact matched capstone.
+
+P2 again persisted `strategic_synthesis / deep / 0.97`; P3 persisted Tier 1 → stop. Sonnet
+decomposition used 383/509 tokens, but it generated only one child:
+`structured_data_agent` run `2efb36d6-62b7-405b-9ba1-267aeae42abf`, parent-linked at depth 1. That
+deterministic child returned the bounded June P&L row (`net_revenue=45000`, `net_income=8325`) and its
+dataset citation. No `sandbox_execution_agent` run exists for the turn, so the mandatory concentration
+and margin computation, derivation, inherited citation, Haiku worker attribution, and ≥2-child gate
+all fail. The parent resumed the ordinary Sonnet tool loop, made two wiki searches, and produced a
+cited answer with 50 persisted citation records. Working state populated all four families, but the
+answer was not composed from the required sandbox result.
+
+The retained flat control is 52,992 Sonnet input tokens. Restart 2 used 38,647 Sonnet input tokens
+(383 decompose + 38,264 ordinary main loop), 27.1% lower, but this does **not** close the strategic
+cost carry-forward because the required planner path did not complete. Total recorded input including
+intent and afterTurn utilities was 40,714 tokens; `cost_usd` remains null.
+
+Five scoped LangSmith traces exactly match five database rows for the turn:
+
+| Capability | LangSmith trace | DB usage row | In / out |
+|---|---|---|---:|
+| `vcso_intent_read` | `062ce7aa-d6d9-4bf9-bf5b-779defb73300` | `c6688a1f-e18d-4865-be91-0ff9ff796464` | 693 / 54 |
+| `vcso_planner_decompose` | `61683c59-85c1-41c3-a899-8aea2db0d173` | `40710eb3-ae0f-4d0b-a5c7-9fd82c52fb65` | 383 / 509 |
+| `vcso_chat` | `823ad80f-2c4b-4e47-8b1b-00ef74038ddc` | `b9cbe5c8-fb58-4e01-b892-25b157a46f37` | 8,762 / 102 |
+| `vcso_chat` | `61a9d5a6-dbf2-4b51-a1a2-cafa2809a79d` | `7d9e4b92-a86f-4746-af3f-d46a2080e3dc` | 13,461 / 1,259 |
+| `vcso_chat` | `faa75670-3ca7-4141-9230-679cd5db1609` | `cb2ebd1a-0e04-4de5-9bba-198845f731ac` | 16,041 / 1,184 |
+
+The working-state `afterTurn` database row `cf945053-a43f-4f81-bd8b-4b8acdd65592` recorded
+1,374/457 tokens and the state update succeeded, but no LangSmith run with those token counts was
+found in the configured project. The persisted P1 output is proven; full per-call trace pairing is
+therefore incomplete for this turn.
+
+At 2026-07-15 03:33:09 UTC, `vcso_planner` was set to `is_enabled=false`,
+`test_user_ids=[]`, and `enabled_for_all=false`. Read-back passed. No follow-up or mixed-path turn ran.
+
 ## Rollback state
 
 At 2026-07-14 22:22:39 UTC, `vcso_planner` was set to `is_enabled=false`,
@@ -84,5 +130,6 @@ layer and `annotations_enabled=false` on P1. No Phase 5+ work or broad rollout o
 ## Stop condition
 
 The run is halted. Do not re-enable `vcso_planner`, continue the remaining proof turns, generalize
-question types, enable disabled strategic workers, or begin Phase 5/6 until the sandbox compute and
-child-tracing defects are remediated and London explicitly authorizes a fresh matched restart.
+question types, enable disabled strategic workers, or begin Phase 5/6. The new blocking defect is
+planner coverage: the decomposition must deterministically preserve the mandatory structured-data →
+sandbox compute chain and minimum child count before another London-authorized restart.

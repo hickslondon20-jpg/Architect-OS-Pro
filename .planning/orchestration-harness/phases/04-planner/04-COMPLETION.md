@@ -3,10 +3,10 @@
 **Implementation status:** Planner code remains complete; the bounded sandbox-worker remediation was
 deployed dark on 2026-07-14. P4 remains disabled with zero enrollment.
 **Version:** v0.6.22 planner; v0.6.26 sandbox/observability remediation.
-**Validation status:** The original batched pass remains halted before turn 2 and PLAN-5 remains open.
-The standalone remediation gates now pass: scientific imports, two-round successful compute, bounded
-forced failure, and exact child LangSmith/usage pairing. Restarting the founder validation remains a
-separate London-authorized action.
+**Validation status:** The London-authorized restart ran on 2026-07-15 and halted again before turn 2.
+Intent, Tier-1 routing, working-state persistence, citations, and scoped main/decompose traces passed,
+but Sonnet decomposition generated only one structured-data child and omitted the mandatory sandbox
+child. PLAN-5 remains open and P4 is rolled back to dark with zero enrollment.
 
 ## Delivered
 
@@ -44,7 +44,7 @@ separate London-authorized action.
 | PLAN-2 | Existing orchestrator; depth-1 parent-linked children; worker-tier override; compact cited schema; sandbox compute fields | Passed locally and live substrate verified |
 | PLAN-3 | Phase 1 assembly over compact findings; tool-free synthesis-tier compose; citation requirement | Passed locally |
 | PLAN-4 | Runtime caps, non-recursion rejection, bounded partial compose, planner-error flat fallback, sanitized nesting | Passed locally |
-| PLAN-5 | Anchor question, expected route, and blank evidence table in `04-THIN-SLICE-PROOF.md` | Scaffolded; intentionally not run |
+| PLAN-5 | Integrated capstone and evidence table in `04-THIN-SLICE-PROOF.md` | Failed twice; restart 2 omitted mandatory sandbox child |
 
 Focused remediation/regression result: **46 passed**. `python -m compileall python-backend` exited
 cleanly. No frontend files were changed, so the conditional frontend build was not required.
@@ -90,6 +90,14 @@ cleanly. No frontend files were changed, so the conditional frontend build was n
   set only after London authorizes the validation restart.
 - Deliver the cost/quality/transparency/attribution read-back and stop for London.
 
+The 2026-07-15 restart is recorded in `04-THIN-SLICE-PROOF.md`. Parent run
+`69303f3d-27db-4da6-866a-544fbb1d7de6` used Sonnet for decomposition but created only child
+`2efb36d6-62b7-405b-9ba1-267aeae42abf` (`structured_data_agent`). No sandbox run exists. Five scoped
+LangSmith traces match the intent, decompose, and three main-loop database rows exactly; the P1
+`afterTurn` usage row has no matching trace. Sonnet input was 27.1% below the retained control, but
+the cost carry-forward remains open because the required
+planner path did not complete.
+
 P4 is disabled and unenrolled. P1/P2/P3 remain founder canaries; global enablement and annotations
-remain off. No validation restart, stop-and-review, later-phase work, new handler, external source,
-freshness policy, MCP integration, reflect-and-steer behavior, or generalization was performed.
+remain off. No stop-and-review, later-phase work, new handler, external source, freshness policy, MCP
+integration, reflect-and-steer behavior, or generalization was performed.

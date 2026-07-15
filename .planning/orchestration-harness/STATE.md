@@ -4,13 +4,14 @@
 
 ## Current Focus
 
-**P4 SANDBOX REMEDIATION DEPLOYED DARK; VALIDATION RESTART PENDING LONDON** (2026-07-14).
-v0.6.26 adds the scientific image, two-round fail-fast worker, bounded numeric handoff, and scoped
-child traces. The protected imports verify, successful compute smoke, forced-error smoke, exact
-LangSmith/usage pairing, health, and dark flag read-back all pass. The earlier batched proof remains
-halted before turn 2: no founder validation turn was restarted. P1/P2/P3 remain founder canaries; P4
-is off and unenrolled; every global default and annotations remain off. Evidence:
-`phases/04-planner/04-COMPLETION.md` and `04-THIN-SLICE-PROOF.md`.
+**SECOND P4 VALIDATION RESTART HALTED; P4 ROLLED BACK** (2026-07-15). The remediated worker remains
+healthy, but the restarted capstone exposed a planner-coverage defect: Sonnet decomposition created
+only one structured-data child and omitted the mandatory sandbox compute child. Intent, Tier-1
+routing, working state, citations, and scoped main/decompose traces passed; the P1 `afterTurn` usage
+row had no matching LangSmith trace, and PLAN-5 did not. The proof set halted before turn 2 and P4 was
+immediately disabled and unenrolled. P1/P2/P3 remain founder canaries; every global default and
+annotations remain off. Evidence:
+`phases/04-planner/04-THIN-SLICE-PROOF.md`.
 
 ## Documents
 
@@ -40,8 +41,9 @@ is off and unenrolled; every global default and annotations remain off. Evidence
 
 ## Current Phase
 
-**Phase 4 remediation is deployed dark (2026-07-14).** The sandbox-compute and child-tracing defects
-are closed at worker level; PLAN-5 and the integrated cost-routing checkpoint remain open.
+**Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
+defects remain closed at worker level, but decomposition did not preserve the required structured-data
+→ sandbox chain or minimum child count. PLAN-5 and the integrated cost-routing checkpoint remain open.
 **Phase 1, remediated Phase 2, and Phase 3 are founder canaries with global defaults off; Phase 4 is
 disabled with zero enrollment.** Do not restart until London explicitly authorizes it; apply the
 runbook's control-reuse rule at that time.
@@ -76,7 +78,7 @@ runbook's control-reuse rule at that time.
 | 1. Working-State Memory + Bounded Assembly | **Done; Stage 1 canary active** (2026-07-13) — Stage 2 awaits observation |
 | 2. Intent & Depth Read + Adaptive Triage | **Code complete; live-dark; canary proof pending** (v0.6.16, 2026-07-13) |
 | 3. Tier-Escalating Source Router | **Done; founder canary proven; global flip pending London** (v0.6.18–v0.6.20, 2026-07-14) |
-| 4. Planner (thin slice) — checkpoint | **Worker remediation deployed dark; validation restart pending London** (v0.6.22 + v0.6.26, 2026-07-14) — PLAN-5 open |
+| 4. Planner (thin slice) — checkpoint | **Restart 2 failed; P4 rolled back** (2026-07-15) — planner omitted sandbox child; PLAN-5 open |
 | 5. Reflect-and-Steer + Freshness + First MCP | Not started |
 | 6. Generalize + Strategic Workers | Not started |
 | 7. Verification & Seams | Not started |
@@ -134,5 +136,14 @@ v0.6.26 closes those worker defects without changing the planner: the sandbox im
 scientific stack; production compute and forced-error smokes both stop within two rounds; four scoped
 LangSmith calls exactly match four usage rows; numeric dataset rows now reach the compact handoff.
 Railway is healthy and P4 remains off with zero enrollment. The remaining proof turns and
-stop-and-review did not run. **Next action:** seek London's explicit authorization for the validation
-restart, reusing the control only if the runbook conditions still hold.
+stop-and-review did not run. London subsequently authorized restart 2, recorded below.
+
+**Phase 4 VALIDATION RESTART 2 — HALTED** (2026-07-15): the retained flat control remained eligible,
+the post-remediation `READY.` smoke passed, and all four flags were enrolled only for the founder.
+Capstone thread `41397cbb-94b3-4211-af28-46a5e841881a` persisted
+`strategic_synthesis/deep/0.97`, Tier 1 → stop, working state, 50 citations, and five exact
+LangSmith/usage pairs; the separate `afterTurn` usage row was unpaired. Parent run
+`69303f3d-27db-4da6-866a-544fbb1d7de6` decomposed on Sonnet but
+created only one structured-data child; no sandbox run exists. P4 was immediately disabled and
+unenrolled. **Next action:** bounded planner-coverage remediation and a separate London-authorized
+restart; do not continue turn 2 or begin Phase 5+.
