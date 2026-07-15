@@ -40,6 +40,12 @@ from services.vcso_intent_read import (
 from services.vcso_working_state import WorkingStateService, assemble, normalize_working_state
 from services.vcso_source_router import SourceRouter, TIER_LABELS
 from services.vcso_planner import PLANNER_FLAG, VcsoPlanner, planner_entry_allowed
+from services.vcso_sdk_loop import (
+    SDK_SPIKE_SCHEMA_VERSION,
+    VCSO_SDK_CAPABILITY_KEY,
+    read_sdk_loop_settings,
+    stream_vcso_sdk_spike,
+)
 from services.wiki_read import WikiReadError, WikiReadService
 from services.doc_wiki_read_service import DocWikiReadError, DocWikiReadService
 
@@ -559,6 +565,124 @@ class VcsoChatService:
                 "agentStatus": "working" if deep_mode else "complete",
             },
         }
+
+        sdk_flag = self._sdk_loop_settings(user_id)
+        if sdk_flag.get("enabled") and not deep_mode and not is_deep_resume:
+            sdk_result = yield from stream_vcso_sdk_spike(
+                prompt=context["prompt"],
+                model=self.model,
+                api_key=self.settings.anthropic_api_key_value,
+                registry=context["registry"],
+                tool_context=ToolExecutionContext(
+                    user_id=user_id,
+                    store=self.store,
+                    supabase_client=self.supabase,
+                    thread_id=thread_id,
+                    timeout_seconds=90,
+                    metadata={
+                        "surface": "virtual_cso",
+                        "tool_scope_surface": "virtual_cso",
+                        "parent_message_id": user_message["id"],
+                        "parent_run_id": run_id,
+                    },
+                ),
+                trace_metadata={
+                    **trace_metadata,
+                    "capability_key": VCSO_SDK_CAPABILITY_KEY,
+                    "sdk_phase": "04B-A",
+                },
+            )
+            sdk_citations = serialize_numbered_refs(
+                number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))
+            )
+            log_ai_usage_event(
+                self.supabase,
+                user_id=user_id,
+                surface="virtual_cso",
+                model=self.model,
+                role="main",
+                provider=self.provider,
+                input_tokens=sdk_result.input_tokens,
+                output_tokens=sdk_result.output_tokens,
+                thread_id=thread_id,
+                capability_key=VCSO_SDK_CAPABILITY_KEY,
+                run_id=run_id,
+                cost_usd=sdk_result.total_cost_usd,
+            )
+            assistant_message = self._insert_message(
+                thread_id,
+                user_id,
+                "assistant",
+                sdk_result.answer_text,
+                token_count=sdk_result.output_tokens,
+                citations=sdk_citations,
+            )
+            self._active_turn["assistant_message"] = assistant_message
+            self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 2)
+            self._complete_main_run(
+                run_id,
+                user_id,
+                assistant_message["id"],
+                sdk_result.answer_text,
+                sdk_citations,
+                result_schema_version=SDK_SPIKE_SCHEMA_VERSION,
+                metadata={
+                    "sdk_session_id": sdk_result.session_id,
+                    "sdk_phase": "04B-A",
+                    "streaming": "partial_text_delta",
+                },
+            )
+            self._active_turn["run_completed"] = True
+            self._after_turn_working_state(
+                user_id=user_id,
+                thread_id=thread_id,
+                current_state=thread.get("working_state"),
+                user_text=payload.text,
+                assistant_text=sdk_result.answer_text,
+            )
+            trace_steps = list(initial_trace_steps)
+            result_step = _result_trace_step(
+                step_index=len(trace_steps) + sdk_result.tool_step_count + 1,
+                answer_chars=len(sdk_result.answer_text),
+                tool_step_count=sdk_result.tool_step_count,
+            )
+            self._create_step(
+                run_id,
+                user_id,
+                result_step["stepIndex"],
+                step_type="result",
+                title=result_step["title"],
+                summary=result_step["summary"],
+                output_summary=json.loads(result_step["output"]),
+            )
+            trace_steps.append(result_step)
+            fresh_thread = self._get_thread(thread_id, user_id)
+            yield {
+                "event": "context",
+                "data": _context_signal(sdk_result.input_tokens, self.context_window),
+            }
+            self._active_turn["completed"] = True
+            yield {
+                "event": "done",
+                "data": {
+                    "chat": _chat_payload(fresh_thread),
+                    "assistantMessage": {
+                        **_message_payload(assistant_message),
+                        "agentSteps": trace_steps,
+                    },
+                    "artifactId": None,
+                    "sources": sdk_citations,
+                    "sourcePages": source_pages,
+                    "usage": {
+                        "inputTokens": sdk_result.input_tokens,
+                        "outputTokens": sdk_result.output_tokens,
+                    },
+                    "deepMode": False,
+                    "agentStatus": "complete",
+                    "sdkMode": True,
+                },
+            }
+            return
 
         registry: ToolRegistry = context["registry"]
         messages: list[dict[str, Any]]
@@ -1472,6 +1596,10 @@ class VcsoChatService:
             bool(settings.get("enabled_for_all")) or (bool(user_id) and str(user_id) in test_user_ids)
         )
         return {"enabled": enabled, "settings": settings}
+
+    def _sdk_loop_settings(self, user_id: str | None = None) -> dict[str, Any]:
+        """Read the 04B SDK flag fail-closed; absent or unreadable means off."""
+        return read_sdk_loop_settings(self.supabase, user_id)
 
     def _run_planner_or_none(
         self,
