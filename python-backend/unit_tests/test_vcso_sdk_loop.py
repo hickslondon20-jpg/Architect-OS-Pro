@@ -416,7 +416,12 @@ def test_native_runtime_manifest_exposes_lead_surface_and_prompt_conflict():
         options=SimpleNamespace(
             allowed_tools=["Task", handler],
             disallowed_tools=["Bash", "Agent"],
-            agents={"structured_data_agent": SimpleNamespace(tools=[handler])},
+            agents={
+                "structured_data_agent": SimpleNamespace(
+                    tools=[handler],
+                    mcpServers=["architectos"],
+                )
+            },
             system_prompt=(
                 "Use delegate_to_sub_agent for bounded research. "
                 "PHASE-D NATIVE SUBAGENT CONTRACT. Use only Task."
@@ -441,6 +446,50 @@ def test_native_runtime_manifest_exposes_lead_surface_and_prompt_conflict():
         "native_lead_registry_tools_registered",
         "native_prompt_contains_legacy_delegation_instruction",
     ]
+
+
+def test_native_runtime_manifest_violations_fail_before_sdk_query(monkeypatch):
+    handler = "mcp__architectos__run_structured_data_agent"
+    compiled = SimpleNamespace(
+        options=SimpleNamespace(
+            allowed_tools=["Task", handler],
+            disallowed_tools=[],
+            agents={
+                "structured_data_agent": SimpleNamespace(
+                    tools=[handler],
+                    mcpServers=["architectos"],
+                )
+            },
+            system_prompt="PHASE-D NATIVE SUBAGENT CONTRACT. Use only Task.",
+        ),
+        tool_names=["wiki_search"],
+        agent_handler_tools={"structured_data_agent": "run_structured_data_agent"},
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop.compile_founder_sdk_options", lambda **_kwargs: compiled)
+    query_called = False
+
+    async def fake_query(**_kwargs):
+        nonlocal query_called
+        query_called = True
+        if False:
+            yield None
+
+    with pytest.raises(RuntimeError, match="isolation invariant failed before query"):
+        _consume(
+            stream_vcso_sdk_turn(
+                prompt="P4 thin-slice prompt",
+                system_prompt="System",
+                model="claude-sonnet-test",
+                api_key="test-key",
+                registry=_Registry(),
+                tool_names=["wiki_search"],
+                tool_context=ToolExecutionContext(user_id="founder-1", store=_NativeStore()),
+                trace_metadata={"run_id": "lead-run"},
+                native_subagent_required_agents=("structured_data_agent",),
+                query_impl=fake_query,
+            )
+        )
+    assert query_called is False
 
 
 class _NativeClient:
@@ -548,17 +597,30 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
             "mcp__architectos__run_per_user_wiki",
         ]
         assert "Task" not in options.disallowed_tools
+        assert "delegate_to_sub_agent" not in options.system_prompt
         assert set(options.agents) == set(required)
         assert {agent.model for agent in options.agents.values()} == {"claude-haiku-test"}
         assert {agent.maxTurns for agent in options.agents.values()} == {2}
         assert all("Task" in agent.disallowedTools for agent in options.agents.values())
         assert all("Agent" in agent.disallowedTools for agent in options.agents.values())
+        assert all(agent.mcpServers == ["architectos"] for agent in options.agents.values())
         tools = {item.name: item for item in captured["tools"]}
+        assert set(tools) == {f"run_{capability_key}" for capability_key in required}
         pre_hook = options.hooks["PreToolUse"][0].hooks[0]
-        probe_hook = options.hooks["PreToolUse"][1].hooks[0]
+        worker_gate = options.hooks["PreToolUse"][1].hooks[0]
         post_hook = options.hooks["PostToolUse"][-1].hooks[0]
         subagent_start = options.hooks["SubagentStart"][0].hooks[0]
         subagent_stop = options.hooks["SubagentStop"][0].hooks[0]
+
+        direct_decision = await worker_gate(
+            {
+                "tool_name": "mcp__architectos__run_structured_data_agent",
+                "tool_input": {},
+            },
+            "lead-handler",
+            None,
+        )
+        assert direct_decision["hookSpecificOutput"]["permissionDecision"] == "deny"
 
         for index, capability_key in enumerate(required, start=1):
             task_id = f"task-{index}"
@@ -588,15 +650,17 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
             )
             assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
             handler_name = f"run_{capability_key}"
-            await probe_hook(
+            gate_decision = await worker_gate(
                 {
                     "tool_name": f"mcp__architectos__{handler_name}",
                     "agent_id": f"agent-{index}",
+                    "agent_type": capability_key,
                     "tool_input": task_contract,
                 },
                 f"handler-{index}",
                 None,
             )
+            assert gate_decision == {}
             await tools[handler_name].handler(task_contract)
             await post_hook({"tool_name": "Task", "tool_input": {}}, task_id, None)
             await subagent_stop(
@@ -648,7 +712,12 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
     events, result = _consume(
         stream_vcso_sdk_turn(
             prompt="P4 thin-slice prompt",
-            system_prompt="System",
+            system_prompt=(
+                "System\n\nYou may call tools mid-turn. Use tool_search to discover relevant tools or skill packs before\n"
+                "using specialized tools. Prefer direct registry tools for narrow reads/computations, and\n"
+                "delegate_to_sub_agent for bounded research or sandbox work that should run in a compact\n"
+                "sub-agent window.\n\nRules remain bounded."
+            ),
             model="claude-sonnet-test",
             api_key="test-key",
             registry=_Registry(),
@@ -696,10 +765,14 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
     ]
     assert [trace["run_id"] for trace in child_traces] == [f"run-{key}" for key in required]
     assert lifecycle_events[0]["event"] == "runtime_manifest"
+    assert lifecycle_events[0]["decision"] == "clean"
     assert len([event for event in lifecycle_events if event["event"] == "subagent_start"]) == 3
-    probes = [event for event in lifecycle_events if event["event"] == "mcp_pre_tool_use_probe"]
-    assert len(probes) == 3
-    assert all(event["agent_id_present"] is True for event in probes)
+    gates = [event for event in lifecycle_events if event["event"] == "worker_pre_tool_use_gate"]
+    assert len(gates) == 4
+    assert gates[0]["decision"] == "deny"
+    assert gates[0]["agent_id_present"] is False
+    assert all(event["decision"] == "allow" for event in gates[1:])
+    assert all(event["agent_id_present"] is True for event in gates[1:])
     completions = [event for event in lifecycle_events if event["event"] == "native_handler_completion"]
     assert [event["child_run_id"] for event in completions] == [f"run-{key}" for key in required]
     assert "objective" not in str(lifecycle_events)

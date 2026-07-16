@@ -65,6 +65,7 @@ def compile_founder_sdk_options(
     """
 
     client = getattr(store, "client", None)
+    native_subagent_tools = native_subagent_tools or {}
     enabled_catalog = _enabled_catalog_names(client) if client is not None else None
     connected_servers = _connected_sdk_servers(client, user_id=user_id) if client is not None else []
     selected, excluded = _select_definitions(
@@ -73,6 +74,10 @@ def compile_founder_sdk_options(
         enabled_catalog=enabled_catalog,
         connected_servers=set(connected_servers),
     )
+    if enable_native_subagents:
+        # Native leads coordinate through Task only. Do not register selected registry tools on
+        # their session MCP surface; handler-backed workers execute through their single handler.
+        selected = []
 
     capabilities = (
         [
@@ -83,11 +88,19 @@ def compile_founder_sdk_options(
         if store is not None
         else []
     )
+    if enable_native_subagents:
+        # Native mode exposes only the explicitly required Task agents. Registering every active
+        # capability here widens the lead's Task choices and pulls unrelated registry tools into
+        # the session even though handler-backed workers never call those tools directly.
+        capabilities = [
+            capability
+            for capability in capabilities
+            if capability.capability_key in native_subagent_tools
+        ]
     agents: dict[str, AgentDefinition] = {}
     agent_tool_grants: dict[str, list[str]] = {}
     agent_model_routes: dict[str, dict[str, str]] = {}
     agent_handler_tools: dict[str, str] = {}
-    native_subagent_tools = native_subagent_tools or {}
     selectable_names = (
         _grantable_names(
             registry,
@@ -114,6 +127,9 @@ def compile_founder_sdk_options(
             # tool and one turn to receive the result and return the compact finding.
             maxTurns=max(2, _capability_max_turns(capability)) if handler_name else _capability_max_turns(capability),
             permissionMode="dontAsk",
+            # The in-process server is registered once at session level for SDK transport, while
+            # the agent definition explicitly declares the only MCP server its worker may use.
+            mcpServers=[SDK_INTERNAL_SERVER] if handler_name else None,
         )
         agent_tool_grants[capability.capability_key] = grant_names
         agent_model_routes[capability.capability_key] = route
@@ -124,7 +140,11 @@ def compile_founder_sdk_options(
     for definition in registry.definitions() if hasattr(registry, "definitions") else []:
         definition_by_name.setdefault(definition.name, definition)
     used_names: list[str] = [definition.name for definition in selected]
-    for grant_names in agent_tool_grants.values():
+    for capability_key, grant_names in agent_tool_grants.items():
+        # A native handler is the worker's complete implementation surface. Its underlying
+        # registry grants remain audit metadata but must not be registered as session MCP tools.
+        if capability_key in agent_handler_tools:
+            continue
         used_names.extend(name for name in grant_names if name not in used_names)
     grouped_tools: dict[str, list[Any]] = {SDK_INTERNAL_SERVER: []}
     connected_set = set(connected_servers)

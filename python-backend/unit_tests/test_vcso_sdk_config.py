@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -200,8 +202,15 @@ def test_compiler_enables_task_only_for_lead_and_keeps_worker_recursion_blocked(
     )
     compiled = _compile_for("founder-12", native_subagents=True)
 
-    assert "Task" in compiled.options.allowed_tools
+    assert compiled.options.allowed_tools == ["Task"]
     assert "Task" not in compiled.options.disallowed_tools
+    assert compiled.tool_names == []
+    assert compiled.connector_names == []
+    assert set(compiled.options.mcp_servers) == {"architectos"}
+    assert {tool["name"] for tool in compiled.options.mcp_servers["architectos"]["tools"]} == {
+        "run_sandbox_agent",
+        "run_wiki_agent",
+    }
     assert compiled.agent_handler_tools == {
         "sandbox_agent": "run_sandbox_agent",
         "wiki_agent": "run_wiki_agent",
@@ -209,6 +218,17 @@ def test_compiler_enables_task_only_for_lead_and_keeps_worker_recursion_blocked(
     assert compiled.options.agents["sandbox_agent"].tools == [
         "mcp__architectos__run_sandbox_agent"
     ]
+    assert compiled.options.agents["sandbox_agent"].mcpServers == ["architectos"]
+    assert compiled.options.agents["sandbox_agent"].permissionMode == "dontAsk"
+    serialized_agents = json.loads(
+        json.dumps(
+            {
+                name: {key: value for key, value in asdict(agent).items() if value is not None}
+                for name, agent in compiled.options.agents.items()
+            }
+        )
+    )
+    assert serialized_agents["sandbox_agent"]["mcpServers"] == ["architectos"]
     assert "Task" in compiled.options.agents["sandbox_agent"].disallowedTools
     assert "Agent" in compiled.options.agents["sandbox_agent"].disallowedTools
     assert compiled.options.agents["sandbox_agent"].model == "claude-haiku-test"

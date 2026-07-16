@@ -56,6 +56,13 @@ P4_THIN_SLICE_SIGNALS = re.compile(
     r"(?=.*\b(?:financial|p&l|margin|revenue)\b)(?=.*\bconcentration\b)(?=.*\b90\s+days?\b)",
     re.IGNORECASE | re.DOTALL,
 )
+NATIVE_LEGACY_TOOL_PARAGRAPH = re.compile(
+    r"\n*You may call tools mid-turn\. Use tool_search to discover relevant tools or skill packs before\s+"
+    r"using specialized tools\. Prefer direct registry tools for narrow reads/computations, and\s+"
+    r"delegate_to_sub_agent for bounded research or sandbox work that should run in a compact\s+"
+    r"sub-agent window\.\n*",
+    re.DOTALL,
+)
 
 
 @dataclass(frozen=True)
@@ -222,10 +229,19 @@ def build_native_runtime_manifest(compiled: Any, *, required_agents: tuple[str, 
         for key, agent in (options.agents or {}).items()
         if key in required_agents
     }
-    handler_tools = {
+    worker_mcp_servers = {
+        key: list(getattr(agent, "mcpServers", None) or [])
+        for key, agent in (options.agents or {}).items()
+        if key in required_agents
+    }
+    registered_handler_tools = {
         key: f"mcp__{SDK_TOOL_SERVER_NAME}__{handler}"
         for key, handler in compiled.agent_handler_tools.items()
         if key in required_agents
+    }
+    handler_tools = {
+        key: f"{SDK_TOOL_PREFIX}run_{key}"
+        for key in required_agents
     }
     system_prompt = str(options.system_prompt or "")
     violations: list[str] = []
@@ -238,17 +254,24 @@ def build_native_runtime_manifest(compiled: Any, *, required_agents: tuple[str, 
     if "Task" not in allowed_tools:
         violations.append("native_lead_task_not_preapproved")
     for key, handler_tool in handler_tools.items():
+        if key not in (options.agents or {}):
+            violations.append(f"required_worker_agent_missing:{key}")
+        if registered_handler_tools.get(key) != handler_tool:
+            violations.append(f"worker_handler_not_registered:{key}")
         if handler_tool not in worker_tools.get(key, []):
             violations.append(f"worker_handler_surface_mismatch:{key}")
         if handler_tool not in allowed_tools:
             violations.append(f"worker_handler_not_preapproved:{key}")
+        if SDK_TOOL_SERVER_NAME not in worker_mcp_servers.get(key, []):
+            violations.append(f"worker_handler_server_not_scoped:{key}")
     return {
         "required_agents": list(required_agents),
         "lead_selected_registry_tools": selected_registry_tools,
         "lead_allowed_tools": allowed_tools,
         "lead_disallowed_tools": list(options.disallowed_tools or []),
-        "registered_worker_handlers": handler_tools,
+        "registered_worker_handlers": registered_handler_tools,
         "worker_tools": worker_tools,
+        "worker_mcp_servers": worker_mcp_servers,
         "prompt_contract_order": {
             "legacy_delegate_instruction_present": "delegate_to_sub_agent" in system_prompt,
             "native_contract_present": "PHASE-D NATIVE SUBAGENT CONTRACT" in system_prompt,
@@ -260,6 +283,15 @@ def build_native_runtime_manifest(compiled: Any, *, required_agents: tuple[str, 
         },
         "violations": violations,
     }
+
+
+def _native_base_system_prompt(system_prompt: str) -> str:
+    """Remove flat-loop tool advice so the native lead receives one unambiguous Task contract."""
+
+    cleaned = NATIVE_LEGACY_TOOL_PARAGRAPH.sub("\n\n", system_prompt).strip()
+    if "delegate_to_sub_agent" in cleaned:
+        raise RuntimeError("Native SDK prompt still contains legacy delegation instructions.")
+    return cleaned
 
 
 def stream_vcso_sdk_turn(
@@ -590,29 +622,54 @@ async def _run_sdk_turn(
             }
         }
 
-    async def pre_tool_probe(
+    async def pre_worker_handler_gate(
         input_data: dict[str, Any],
         tool_use_id: str | None,
         _context: Any,
     ) -> dict[str, Any]:
-        # Observe-only telemetry. Records whether PreToolUse fires for this call and whether
-        # agent_id is present in the hook input, so the next repro's logs resolve RC-alpha/RC-beta
-        # empirically. Returns no permission decision -- the handler grant stays with allowed_tools.
+        tool_name = str(input_data.get("tool_name") or "")
+        handler_prefix = f"{SDK_TOOL_PREFIX}run_"
+        capability_key = tool_name[len(handler_prefix):] if tool_name.startswith(handler_prefix) else ""
+        agent_id_present = bool(input_data.get("agent_id"))
+        agent_type = str(input_data.get("agent_type") or "")
+        delegated = (
+            agent_id_present
+            and agent_type == capability_key
+            and capability_key in task_contracts
+        )
         try:
             logger.info(
-                "vcso_sdk pretooluse probe fired tool=%s agent_id_present=%s tool_use_id=%s",
-                str(input_data.get("tool_name") or ""),
-                bool(input_data.get("agent_id")),
+                "vcso_sdk worker pretooluse gate tool=%s agent_id_present=%s agent_type=%s delegated=%s tool_use_id=%s",
+                tool_name,
+                agent_id_present,
+                agent_type,
+                delegated,
                 tool_use_id,
             )
             record_lifecycle(
-                "mcp_pre_tool_use_probe",
-                tool_name=str(input_data.get("tool_name") or ""),
+                "worker_pre_tool_use_gate",
+                tool_name=tool_name,
                 tool_use_id=tool_use_id,
-                agent_id_present=bool(input_data.get("agent_id")),
+                capability_key=capability_key,
+                agent_id_present=agent_id_present,
+                agent_type=agent_type,
+                decision="allow" if delegated else "deny",
+                reason_code="approved_task_subagent" if delegated else "lead_or_mismatched_subagent",
             )
-        except Exception:  # noqa: BLE001 - telemetry must never affect the turn
+        except Exception:  # noqa: BLE001 - logging/persistence must not weaken the gate
             pass
+        if not delegated:
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": (
+                        "Worker handlers are available only to their matching approved Task subagent."
+                    ),
+                }
+            }
+        # The global allowed_tools entry remains the SDK 0.2.118 permission grant. Returning no
+        # decision here avoids replacing that grant after the lead/subagent boundary is verified.
         return {}
 
     async def subagent_start_hook(
@@ -950,7 +1007,7 @@ async def _run_sdk_turn(
         )(execute)
 
     native_subagent_tools = (
-        {key: make_native_handler_tool(key) for key in P4_NATIVE_SUBAGENT_KEYS}
+        {key: make_native_handler_tool(key) for key in required_agents}
         if native_mode
         else {}
     )
@@ -966,13 +1023,18 @@ async def _run_sdk_turn(
     if native_mode:
         hooks["PreToolUse"] = [
             HookMatcher(matcher="Task", hooks=[pre_task_use]),
-            # Observe-only probe on the proven ^mcp__.*$ matcher: telemetry only, no permission
-            # decision. The handler grant comes from allowed_tools (Fix B), not from this hook.
-            HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
+            # SDK 0.2.118 registers in-process MCP servers at session scope. The global allow entry
+            # lets Task workers execute their handler, while this gate denies the same call from
+            # the lead (no agent_id) or from a mismatched subagent.
+            HookMatcher(
+                matcher=rf"^{re.escape(SDK_TOOL_PREFIX)}run_.*$",
+                hooks=[pre_worker_handler_gate],
+            ),
         ]
         hooks["SubagentStart"] = [HookMatcher(hooks=[subagent_start_hook])]
         hooks["SubagentStop"] = [HookMatcher(hooks=[subagent_stop_hook])]
     native_prompt = _native_lead_prompt(required_agents) if native_mode else ""
+    compiled_base_prompt = _native_base_system_prompt(system_prompt) if native_mode else system_prompt
     compiled = compile_founder_sdk_options(
         store=tool_context.store,
         user_id=tool_context.user_id,
@@ -980,7 +1042,7 @@ async def _run_sdk_turn(
         requested_tool_names=[definition.name for definition in definitions],
         sdk_tools_by_name=sdk_tools_by_name,
         system_prompt=(
-            system_prompt
+            compiled_base_prompt
             + "\n\nThe standard Virtual CSO loop is running through the Claude Agent SDK. Use only the "
             "scoped ArchitectOS tools when additional evidence is needed. The selected founder context "
             "in the prompt is authoritative pre-assembly. Keep tool results compact, cite factual founder "
@@ -1018,6 +1080,11 @@ async def _run_sdk_turn(
             decision="violations_detected" if runtime_manifest["violations"] else "clean",
             reason_code="|".join(runtime_manifest["violations"]) or "none",
         )
+        if runtime_manifest["violations"]:
+            raise RuntimeError(
+                "Native SDK isolation invariant failed before query: "
+                + ", ".join(runtime_manifest["violations"])
+            )
     trace_metadata.update(
         {
             "sdk_compiled_tool_count": len(compiled.tool_names),

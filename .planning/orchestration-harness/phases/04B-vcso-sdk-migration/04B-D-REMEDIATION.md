@@ -384,3 +384,68 @@ Focused local verification only: `13 passed` across `test_vcso_sdk_loop.py` and
 `test_vcso_sdk_config.py`; `py_compile` and `git diff --check` passed. No deployment, feature-flag
 mutation, live VCSO turn, child-row query, or production fix was attempted. The next decision remains
 London's: review this tranche, then separately authorize a deploy-dark + exactly-one-worker repro.
+
+## 14. Diagnostic single-worker live repro - FAILED, STOPPED FOR LONDON (2026-07-16)
+
+- Deployed commit: `685ffc9296443132af12f33477f8bd44373f1937` (`v0.6.55`); Railway commit
+  status succeeded and production health returned `ok=true` before enrollment.
+- Exactly one founder turn was sent through the retained Virtual CSO UI mechanism, with caps
+  confirmed at `max_budget_usd=0.25` and `max_turns=6`. Only `structured_data_agent` was enabled for
+  founder `cd490873-99aa-4533-9240-f0aa04deb54f`.
+- Parent run: `2ba931d7-c712-4a3c-85bb-eeb166751c13`.
+- **Child row created: no.** No `agent_delegation_runs` row was linked to the parent.
+- **Hook fired + `agent_id` present: yes / no.** The observe-only MCP PreToolUse probe fired twice
+  for `mcp__architectos__run_structured_data_agent`; both lifecycle records reported
+  `agent_id_present=false`.
+- **Handler allowed vs denied:** the native handler was reached twice, but both entries recorded
+  `delegated=false`; the delegation-first guard refused the direct lead calls. Each attempt then
+  recorded `post_tool_use_failure` with `reason_code=sdk_tool_failure`.
+- **Secondary/root symptom:** the runtime manifest recorded both
+  `native_lead_registry_tools_registered` and `native_prompt_contains_legacy_delegation_instruction`.
+  No `Task`/subagent lifecycle event preceded either worker-handler call, so the model invoked the
+  pre-approved worker handler directly from the lead context instead of spawning a Task subagent.
+- The canary was immediately re-darkened. Read-back confirmed `vcso_sdk_loop` and `vcso_planner`
+  both `is_enabled=false`, `test_user_ids=[]`, `enabled_for_all=false`, and `default=false`; diagnostic
+  enrollment is disabled and empty.
+
+**STOP. No retry, variation, code fix, or full gate-table proof was run.**
+
+## 15. Fix C no-credit isolation tranche - implemented locally, STOPPED FOR LONDON (2026-07-16)
+
+London authorized the structural troubleshooting tranche after the diagnostic repro proved that the
+lead called `mcp__architectos__run_structured_data_agent` directly with no `Task` event and no
+`agent_id`. No flag was changed and no live turn was run in this tranche.
+
+The preferred inline agent-scoped MCP-server shape was tested first against installed SDK `0.2.118`.
+It is not usable for an in-process SDK server: `AgentDefinition` serialization reaches the embedded
+MCP `Server` instance and fails with `TypeError: Object of type Server is not JSON serializable`.
+The supported implementation therefore keeps the in-process server registered once for transport and
+enforces the lead/worker boundary with the SDK hook input that the live diagnostic already proved is
+present on lead MCP calls.
+
+Implemented locally:
+
+- Native compilation now removes all selected lead registry tools, registers only the explicitly
+  required Task agents, creates only those workers' handler tools, and does not register their
+  underlying registry grants as session MCP tools.
+- Each handler-backed `AgentDefinition` declares `mcpServers=["architectos"]`, retains exactly its
+  own handler in `tools`, keeps built-in recursion tools disallowed, and remains under `dontAsk`.
+- The flat-loop `delegate_to_sub_agent` paragraph is stripped before native compilation. Any residual
+  legacy delegation instruction fails closed before SDK query construction.
+- The globally pre-approved handler grant remains because SDK `0.2.118` has no per-agent permission
+  allowlist. A closed `^mcp__architectos__run_.*$` PreToolUse gate now denies calls without a matching
+  Task-spawned `agent_id` + `agent_type` + registered Task contract, while returning no decision for
+  the matching worker so the proven global grant remains effective.
+- The runtime manifest now verifies Task-only lead selection, required worker presence, handler
+  registration/tool/server scope, prompt coherence, and handler preapproval. Any violation raises
+  before `query_impl` is called, preventing another paid canary on a statically invalid surface.
+
+Focused verification: `14 passed` across `test_vcso_sdk_loop.py` and `test_vcso_sdk_config.py`;
+`py_compile` and `git diff --check` passed. Tests prove the worker definitions JSON-serialize, the
+lead direct handler call is denied, the matching Task worker call passes the gate, only required
+handler tools are registered, the legacy prompt is removed, and manifest violations abort before the
+SDK query.
+
+**STOP FOR LONDON.** Changes are local and uncommitted. No deploy, feature-flag mutation, live turn,
+retry, or full gate-table proof was run. The next separately authorized step is deploy dark, confirm
+the exact Railway SHA, then run one single-worker canary and stop/re-dark on the first terminal signal.
