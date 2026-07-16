@@ -110,7 +110,9 @@ def compile_founder_sdk_options(
             tools=agent_tools,
             disallowedTools=list(DISALLOWED_SDK_BUILTINS),
             model=route["model_name"],
-            maxTurns=_capability_max_turns(capability),
+            # A handler-backed SDK subagent needs one turn to call its implementation
+            # tool and one turn to receive the result and return the compact finding.
+            maxTurns=max(2, _capability_max_turns(capability)) if handler_name else _capability_max_turns(capability),
             permissionMode="dontAsk",
         )
         agent_tool_grants[capability.capability_key] = grant_names

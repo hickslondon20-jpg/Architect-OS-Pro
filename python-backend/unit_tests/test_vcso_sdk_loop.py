@@ -484,6 +484,7 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
         assert "Task" not in options.disallowed_tools
         assert set(options.agents) == set(required)
         assert {agent.model for agent in options.agents.values()} == {"claude-haiku-test"}
+        assert {agent.maxTurns for agent in options.agents.values()} == {2}
         assert all("Task" in agent.disallowedTools for agent in options.agents.values())
         assert all("Agent" in agent.disallowedTools for agent in options.agents.values())
         tools = {item.name: item for item in captured["tools"]}
