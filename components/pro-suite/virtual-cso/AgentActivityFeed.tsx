@@ -42,7 +42,7 @@ const StepChip: React.FC<{ step: AgentStep }> = ({ step }) => {
       : 'Complete';
 
   return (
-    <details className="group rounded-[var(--radius-sm)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft-1)] open:border-[var(--aos-sage)]">
+    <details className="group min-w-0 rounded-[var(--radius-sm)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft-1)] open:border-[var(--aos-sage)]">
       <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2.5 text-left marker:content-none">
         <StepStatusIcon status={step.status} />
         <span className="min-w-0 flex-1">
@@ -102,7 +102,7 @@ export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({ items, ste
         }));
 
   return (
-    <div className="mb-5 space-y-3" aria-label="Virtual CSO activity">
+    <div className="mb-5 w-full min-w-0 space-y-3" aria-label="Virtual CSO activity">
       {activityItems.map((item) => {
         if (item.type === 'narration') {
           return (

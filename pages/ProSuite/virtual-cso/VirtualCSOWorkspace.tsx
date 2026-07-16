@@ -520,8 +520,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
         onUseSkill={useSkillInComposer}
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-hidden">{renderCenter()}</div>
+      <div className="flex min-w-0 flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden">{renderCenter()}</div>
 
         {showSources && (
           <SourcesPanel
