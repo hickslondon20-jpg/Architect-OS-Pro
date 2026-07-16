@@ -4,16 +4,17 @@
 
 ## Current Focus
 
-**04B PHASE C COMPLETE — REGISTRY COMPILER + PERSISTENCE GUARDRAILS LIVE-DARK; RETURNED TO LONDON**
-(2026-07-15). v0.6.33–v0.6.36 extend the existing registry with four persistence semantics, exact
-confirmation + quarantine enforcement, an absolute money-movement block, capability-grain
-tier/model resolution, and per-founder `ClaudeAgentOptions` compilation. QuickBooks availability is
-gated through the existing week-12 `feature_registry` row plus a founder-owned connected
-`mcp_connections` row; no connector table was added and zero live connections remain. The migration
-left `ai_usage_log` at 285 rows/15 columns. Focused guardrail/founder-isolation proof and the combined
-48-test VCSO regression set passed. The SDK flag is disabled and unenrolled; global/default remain off. Phase C2 and
-Phase D have not started. Evidence:
-`phases/04B-vcso-sdk-migration/04B-C-COMPLETION.md`.
+**04B PHASE C2 COMPLETE — NATIVE STREAMING SURFACE PROVEN LIVE-DARK; RETURNED TO LONDON**
+(2026-07-15). v0.6.38–v0.6.42 replace the SDK-only blocky transparency surface with flowing curated
+narration, compact drill-down step chips, token-by-token answer rendering, and a living right-hand
+plan panel. The one sanctioned backend change labels and persists only curated narration segments;
+the SSE contract is additive and the loop, retrieval, registry, and founder isolation are unchanged.
+Authenticated canary run `adb92222-0b32-4950-b60e-4aa73b11035d` streamed narration before a live
+`wiki_search`, advanced the plan to 5/5, restored identically after reload, paired successful
+LangSmith lifecycle/tool traces to usage row `a8ba6005-5eb6-4b44-8be7-220c47a91505`, and exposed no
+raw tool payload. The flag-off control retained the legacy surface. The SDK flag is disabled and
+unenrolled; global/default remain off. Phase D has not started. Evidence:
+`phases/04B-vcso-sdk-migration/04B-C2-COMPLETION.md`.
 
 The prior **SECOND P4 VALIDATION RESTART remains halted and P4 remains rolled back**. The remediated worker remains
 healthy, but the restarted capstone exposed a planner-coverage defect: Sonnet decomposition created
@@ -52,10 +53,11 @@ annotations remain off. Evidence:
 
 ## Current Phase
 
-**04B Phase C is complete; Phase C2 and Phase D are not started.** The live-dark SDK path now compiles
-founder-scoped tools, bounded agent definitions, models, and curated MCP proxies from the existing
-registries. Persistence guardrails are enforced only on the SDK seam, while the absolute money block
-applies everywhere. `vcso_sdk_loop` is disabled with zero enrollment.
+**04B Phase C2 is complete; Phase D is not started.** The live-dark SDK path now has the native
+streaming surface: curated narration and tool chips flow alongside real answer tokens, and the right
+rail reflects live plan state. Curated narration persists in the existing structured result and
+survives reload; raw inputs, outputs, and chain-of-thought do not render. `vcso_sdk_loop` is disabled
+with zero enrollment.
 
 The original **Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
 defects remain closed at worker level, but decomposition did not preserve the required structured-data

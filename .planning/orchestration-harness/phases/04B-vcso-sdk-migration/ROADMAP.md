@@ -1,8 +1,8 @@
 # Roadmap: 04B — Proposed VCSO SDK Migration — ArchitectOS Pro
 
-**Status: PHASE B COMPLETE — standard-loop parity proven; awaiting London before Phase C.** London
-approved Phase B on 2026-07-15. The SDK path remains dark after a three-prompt matched founder canary;
-Phase C has not started. Read `CONTEXT.md` first. The harness root `ROADMAP.md` is **not** edited until the separately
+**Status: PHASE C2 COMPLETE — native streaming surface proven; awaiting London before Phase D.** London
+approved Phase C2 execution on 2026-07-15. The SDK path is dark after the authenticated narration,
+tool-chip, plan-panel, reload, and flag-off proofs. Phase D has not started. Read `CONTEXT.md` first. The harness root `ROADMAP.md` is **not** edited until the separately
 founder-gated Phase G roadmap update.
 
 ## Overview
@@ -158,7 +158,7 @@ root `ROADMAP.md` (founder-gated).
 | A. Streaming spike + SDK proof-of-loop | **Done — GO at London checkpoint** | 2026-07-15 |
 | B. SDK loop for standard VCSO (parallel) | **Done — matched canary parity proven** | 2026-07-15 |
 | C. Registry → SDK-config compiler + extensions | **Done — live-dark; guardrail/compiler gate passed** | 2026-07-15 |
-| C2. Streaming surface redesign (UI/UX) | **Proposed — not started** | — |
+| C2. Streaming surface redesign (UI/UX) | **Done — live canary + reload gate passed; flag dark** | 2026-07-15 |
 | D. Native subagents — P4 re-approach (checkpoint) | **Proposed — not started** | — |
 | E. Sessions + Deep Mode reconciliation | **Proposed — not started** | — |
 | F. First live MCP (QuickBooks) | **Proposed — not started** | — |
