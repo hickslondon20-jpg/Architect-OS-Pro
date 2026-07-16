@@ -1,20 +1,19 @@
 # State: Orchestration Harness — VCSO Planner — ArchitectOS Pro
 
-**Updated:** 2026-07-15
+**Updated:** 2026-07-16
 
 ## Current Focus
 
-**04B PHASE C2 COMPLETE — NATIVE STREAMING SURFACE PROVEN LIVE-DARK; RETURNED TO LONDON**
-(2026-07-15). v0.6.38–v0.6.42 replace the SDK-only blocky transparency surface with flowing curated
-narration, compact drill-down step chips, token-by-token answer rendering, and a living right-hand
-plan panel. The one sanctioned backend change labels and persists only curated narration segments;
-the SSE contract is additive and the loop, retrieval, registry, and founder isolation are unchanged.
-Authenticated canary run `adb92222-0b32-4950-b60e-4aa73b11035d` streamed narration before a live
-`wiki_search`, advanced the plan to 5/5, restored identically after reload, paired successful
-LangSmith lifecycle/tool traces to usage row `a8ba6005-5eb6-4b44-8be7-220c47a91505`, and exposed no
-raw tool payload. The flag-off control retained the legacy surface. The SDK flag is disabled and
-unenrolled; global/default remain off. Phase D has not started. Evidence:
-`phases/04B-vcso-sdk-migration/04B-C2-COMPLETION.md`.
+**04B PHASE D CHECKPOINT BLOCKED — NATIVE WORKER PERMISSION FAILED LIVE PROOF; RETURNED TO LONDON**
+(2026-07-16). v0.6.46–v0.6.50 implement the bounded SDK-native subagent path, sandbox startup
+verification, child usage/trace attribution, delegation-only lead, and two-turn handler lifecycle.
+The exact-anchor founder canary persisted `strategic_synthesis / deep / 0.97` and displayed its
+four-step plan, but the SDK session denied all three handler-backed worker tools. Parent run
+`39d4ad4c-b273-4608-a2e1-7ac0a0d45940` created zero children, reached the six-turn cap, and persisted
+a safe failure. The mandatory sandbox compute, nested-worker rendering, sandbox-resolved answer,
+cost/context parity, and child/afterTurn trace pairing therefore remain open. Both `vcso_sdk_loop`
+and the retired `vcso_planner` are disabled and unenrolled with global/default off. Phase E has not
+started. Evidence: `phases/04B-vcso-sdk-migration/04B-D-COMPLETION.md`.
 
 The prior **SECOND P4 VALIDATION RESTART remains halted and P4 remains rolled back**. The remediated worker remains
 healthy, but the restarted capstone exposed a planner-coverage defect: Sonnet decomposition created
@@ -53,11 +52,10 @@ annotations remain off. Evidence:
 
 ## Current Phase
 
-**04B Phase C2 is complete; Phase D is not started.** The live-dark SDK path now has the native
-streaming surface: curated narration and tool chips flow alongside real answer tokens, and the right
-rail reflects live plan state. Curated narration persists in the existing structured result and
-survives reload; raw inputs, outputs, and chain-of-thought do not render. `vcso_sdk_loop` is disabled
-with zero enrollment.
+**04B Phase D is implemented but its live checkpoint proof failed; Phase E is not started.** The
+deployed path remains dark. A narrowly scoped remediation must make the handler-backed native worker
+tools callable inside the SDK Task lifecycle, after which London must authorize another exact-anchor
+proof. Do not broaden question types or start Phase E before the Phase D gate passes.
 
 The original **Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
 defects remain closed at worker level, but decomposition did not preserve the required structured-data

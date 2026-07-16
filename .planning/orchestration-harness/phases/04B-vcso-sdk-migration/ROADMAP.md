@@ -1,8 +1,11 @@
 # Roadmap: 04B — Proposed VCSO SDK Migration — ArchitectOS Pro
 
-**Status: PHASE C2 COMPLETE — native streaming surface proven; awaiting London before Phase D.** London
-approved Phase C2 execution on 2026-07-15. The SDK path is dark after the authenticated narration,
-tool-chip, plan-panel, reload, and flag-off proofs. Phase D has not started. Read `CONTEXT.md` first. The harness root `ROADMAP.md` is **not** edited until the separately
+**Status: PHASE D CHECKPOINT BLOCKED — native worker permission failed live proof; returned to London.**
+Phase D implementation is deployed through v0.6.50, but the 2026-07-16 exact-anchor canary created
+zero child rows because the SDK session denied all three handler-backed native worker tools. The
+parent hit its six-turn cap and persisted a safe failure. `vcso_sdk_loop` and the retired
+`vcso_planner` are dark and unenrolled; Phase E has not started. Evidence:
+`04B-D-COMPLETION.md`. Read `CONTEXT.md` first. The harness root `ROADMAP.md` is **not** edited until the separately
 founder-gated Phase G roadmap update.
 
 ## Overview
