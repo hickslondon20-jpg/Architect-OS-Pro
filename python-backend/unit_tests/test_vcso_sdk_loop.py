@@ -7,14 +7,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from claude_agent_sdk.types import AssistantMessage, ResultMessage, StreamEvent
+from claude_agent_sdk.types import ResultMessage, StreamEvent
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolResultEnvelope, ToolSourceRef
 from services.vcso_sdk_loop import (
-    build_native_runtime_manifest,
+    _native_synthesis_prompt,
     native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
@@ -410,86 +410,37 @@ def test_native_subagent_effort_scaling_is_limited_to_the_p4_thin_slice():
     ) == required
 
 
-def test_native_runtime_manifest_exposes_lead_surface_and_prompt_conflict():
-    handler = "mcp__architectos__run_structured_data_agent"
-    compiled = SimpleNamespace(
-        options=SimpleNamespace(
-            allowed_tools=["Task", handler],
-            disallowed_tools=["Bash", "Agent"],
-            agents={
-                "structured_data_agent": SimpleNamespace(
-                    tools=[handler],
-                    mcpServers=["architectos"],
-                )
-            },
-            system_prompt=(
-                "Use delegate_to_sub_agent for bounded research. "
-                "PHASE-D NATIVE SUBAGENT CONTRACT. Use only Task."
-            ),
-        ),
-        tool_names=["delegate_to_sub_agent", "wiki_search"],
-        agent_handler_tools={"structured_data_agent": "run_structured_data_agent"},
+def test_app_owned_synthesis_prompt_carries_compact_cited_findings():
+    prompt = _native_synthesis_prompt(
+        ("structured_data_agent",),
+        [
+            {
+                "capability_key": "structured_data_agent",
+                "run_id": "child-run-1",
+                "structured_result": {"margin": "18%"},
+                "citations": [{"source_id": "dataset-1", "label": "Latest P&L"}],
+            }
+        ],
     )
 
-    manifest = build_native_runtime_manifest(
-        compiled,
-        required_agents=("structured_data_agent",),
+    assert "PHASE-D APP-OWNED SYNTHESIS" in prompt
+    assert "child-run-1" in prompt
+    assert '"margin": "18%"' in prompt
+    assert "dataset-1" in prompt
+    assert "ONLY authoritative evidence" in prompt
+    assert "Do not call any tools" in prompt
+
+
+def test_app_owned_synthesis_prompt_bounds_worker_payload_size():
+    prompt = _native_synthesis_prompt(
+        ("structured_data_agent",),
+        [{"result_summary": "x" * 20000}],
     )
 
-    assert manifest["lead_selected_registry_tools"] == ["delegate_to_sub_agent", "wiki_search"]
-    assert manifest["prompt_contract_order"] == {
-        "legacy_delegate_instruction_present": True,
-        "native_contract_present": True,
-        "native_contract_after_legacy": True,
-    }
-    assert manifest["violations"] == [
-        "native_lead_registry_tools_registered",
-        "native_prompt_contains_legacy_delegation_instruction",
-    ]
-
-
-def test_native_runtime_manifest_violations_fail_before_sdk_query(monkeypatch):
-    handler = "mcp__architectos__run_structured_data_agent"
-    compiled = SimpleNamespace(
-        options=SimpleNamespace(
-            allowed_tools=["Task", handler],
-            disallowed_tools=[],
-            agents={
-                "structured_data_agent": SimpleNamespace(
-                    tools=[handler],
-                    mcpServers=["architectos"],
-                )
-            },
-            system_prompt="PHASE-D NATIVE SUBAGENT CONTRACT. Use only Task.",
-        ),
-        tool_names=["wiki_search"],
-        agent_handler_tools={"structured_data_agent": "run_structured_data_agent"},
-    )
-    monkeypatch.setattr("services.vcso_sdk_loop.compile_founder_sdk_options", lambda **_kwargs: compiled)
-    query_called = False
-
-    async def fake_query(**_kwargs):
-        nonlocal query_called
-        query_called = True
-        if False:
-            yield None
-
-    with pytest.raises(RuntimeError, match="isolation invariant failed before query"):
-        _consume(
-            stream_vcso_sdk_turn(
-                prompt="P4 thin-slice prompt",
-                system_prompt="System",
-                model="claude-sonnet-test",
-                api_key="test-key",
-                registry=_Registry(),
-                tool_names=["wiki_search"],
-                tool_context=ToolExecutionContext(user_id="founder-1", store=_NativeStore()),
-                trace_metadata={"run_id": "lead-run"},
-                native_subagent_required_agents=("structured_data_agent",),
-                query_impl=fake_query,
-            )
-        )
-    assert query_called is False
+    payload = prompt.split("WORKER FINDINGS (JSON)\n", 1)[1].split(
+        "\n\nCompose the founder's answer", 1
+    )[0]
+    assert len(payload) == 12000
 
 
 class _NativeClient:
@@ -523,12 +474,17 @@ def _native_capability(key: str) -> AgentCapability:
     )
 
 
-def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_events(monkeypatch):
-    captured = _capture_sdk_tools(monkeypatch)
+def test_app_owned_workers_run_before_synthesis_with_no_lead_delegation_surface(monkeypatch):
+    _capture_sdk_tools(monkeypatch)
     required = (
         "structured_data_agent",
         "sandbox_execution_agent",
         "per_user_wiki",
+    )
+    execution_order = (
+        "structured_data_agent",
+        "per_user_wiki",
+        "sandbox_execution_agent",
     )
     monkeypatch.setattr(
         "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
@@ -536,7 +492,6 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
     )
     calls = []
     usages = []
-    child_traces = []
     lifecycle_events = []
 
     class FakeOrchestrator:
@@ -572,120 +527,25 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
     monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", FakeOrchestrator)
     monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
     monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
-    monkeypatch.setattr(
-        "services.vcso_sdk_loop._record_native_child_trace",
-        lambda **kwargs: child_traces.append(kwargs),
-    )
-
-    def contract(capability_key: str, *, prior_findings=None):
-        scope = {"dataset_ids": ["dataset-1"]}
-        if prior_findings is not None:
-            scope["prior_findings"] = prior_findings
-        return {
-            "objective": f"Return the bounded {capability_key} finding.",
-            "output_format": "Compact cited finding",
-            "tools_sources": ["founder-scoped sources"],
-            "boundaries": ["Read only", "No recursive delegation"],
-            "context_scope": scope,
-        }
-
     async def fake_query(*, options, **_kwargs):
-        assert options.allowed_tools == [
-            "Task",
-            "mcp__architectos__run_structured_data_agent",
-            "mcp__architectos__run_sandbox_execution_agent",
-            "mcp__architectos__run_per_user_wiki",
-        ]
-        assert "Task" not in options.disallowed_tools
-        assert "delegate_to_sub_agent" not in options.system_prompt
-        assert set(options.agents) == set(required)
-        assert {agent.model for agent in options.agents.values()} == {"claude-haiku-test"}
-        assert {agent.maxTurns for agent in options.agents.values()} == {2}
-        assert all("Task" in agent.disallowedTools for agent in options.agents.values())
-        assert all("Agent" in agent.disallowedTools for agent in options.agents.values())
-        assert all(agent.mcpServers == ["architectos"] for agent in options.agents.values())
-        tools = {item.name: item for item in captured["tools"]}
-        assert set(tools) == {f"run_{capability_key}" for capability_key in required}
-        pre_hook = options.hooks["PreToolUse"][0].hooks[0]
-        worker_gate = options.hooks["PreToolUse"][1].hooks[0]
-        post_hook = options.hooks["PostToolUse"][-1].hooks[0]
-        subagent_start = options.hooks["SubagentStart"][0].hooks[0]
-        subagent_stop = options.hooks["SubagentStop"][0].hooks[0]
-
-        direct_decision = await worker_gate(
-            {
-                "tool_name": "mcp__architectos__run_structured_data_agent",
-                "tool_input": {},
-            },
-            "lead-handler",
-            None,
+        # App-owned workers must all finish before the paid synthesis query starts.
+        assert [request.capability_key for request in calls] == list(execution_order)
+        assert options.allowed_tools == []
+        assert options.agents == {}
+        assert all("Task" not in tool for tool in options.allowed_tools)
+        assert all("run_" not in tool for tool in options.allowed_tools)
+        assert all(
+            "run_" not in tool
+            for agent in options.agents.values()
+            for tool in (agent.tools or [])
         )
-        assert direct_decision["hookSpecificOutput"]["permissionDecision"] == "deny"
-
-        for index, capability_key in enumerate(required, start=1):
-            task_id = f"task-{index}"
-            await subagent_start(
-                {"agent_id": f"agent-{index}", "agent_type": capability_key},
-                task_id,
-                None,
-            )
-            task_contract = contract(
-                capability_key,
-                prior_findings=(
-                    {"structured_data_agent": "Bound founder dataset dataset-1."}
-                    if capability_key == "sandbox_execution_agent"
-                    else None
-                ),
-            )
-            decision = await pre_hook(
-                {
-                    "tool_name": "Task",
-                    "tool_input": {
-                        "subagent_type": capability_key,
-                        "prompt": json.dumps(task_contract),
-                    },
-                },
-                task_id,
-                None,
-            )
-            assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
-            handler_name = f"run_{capability_key}"
-            gate_decision = await worker_gate(
-                {
-                    "tool_name": f"mcp__architectos__{handler_name}",
-                    "agent_id": f"agent-{index}",
-                    "agent_type": capability_key,
-                    "tool_input": task_contract,
-                },
-                f"handler-{index}",
-                None,
-            )
-            assert gate_decision == {}
-            await tools[handler_name].handler(task_contract)
-            await post_hook({"tool_name": "Task", "tool_input": {}}, task_id, None)
-            await subagent_stop(
-                {"agent_id": f"agent-{index}", "agent_type": capability_key},
-                task_id,
-                None,
-            )
-
-            # Raw child model text is deliberately ignored by the UI stream.
-            yield StreamEvent(
-                uuid=f"child-{index}",
-                session_id="session-native",
-                parent_tool_use_id=task_id,
-                event={
-                    "type": "content_block_delta",
-                    "delta": {"type": "text_delta", "text": "PRIVATE CHILD TEXT"},
-                },
-            )
-            yield AssistantMessage(
-                content=[],
-                model="claude-haiku-test",
-                parent_tool_use_id=task_id,
-                usage={"input_tokens": 10 * index, "output_tokens": index},
-                session_id="session-native",
-            )
+        assert "delegate_to_sub_agent" not in options.system_prompt
+        assert "PHASE-D APP-OWNED SYNTHESIS" in options.system_prompt
+        assert "WORKER FINDINGS (JSON)" in options.system_prompt
+        assert all(f"run-{key}" in options.system_prompt for key in required)
+        assert all(key in options.system_prompt for key in required)
+        assert "PreToolUse" not in options.hooks
+        assert "SubagentStart" not in options.hooks
 
         stop = await options.hooks["Stop"][0].hooks[0]({}, None, None)
         assert stop == {}
@@ -702,7 +562,7 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
             duration_ms=25,
             duration_api_ms=20,
             is_error=False,
-            num_turns=4,
+            num_turns=1,
             session_id="session-native",
             total_cost_usd=0.02,
             usage={"input_tokens": 100, "output_tokens": 10},
@@ -741,107 +601,79 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
         )
     )
 
-    assert [request.capability_key for request in calls] == list(required)
+    assert [request.capability_key for request in calls] == list(execution_order)
     assert all(request.delegation_depth == 1 for request in calls)
     assert all(request.routing_tier_override == "worker" for request in calls)
     assert all(request.enforce_compact_contract is True for request in calls)
-    sandbox_call = calls[1]
+    assert all(request.parent_run_id == "lead-run" for request in calls)
+    sandbox_call = calls[2]
     assert "prior_findings" not in sandbox_call.context_scope
     assert "COMPACT PRIOR FINDINGS" in sandbox_call.task_summary
-    assert len([item for item in events if item["event"] == "tool_result"]) == 3
     assert len([item for item in events if item["event"] == "sub_agent_step"]) == 3
     assert len([item for item in events if item["event"] == "sources_updated"]) == 3
-    assert "PRIVATE CHILD TEXT" not in str(events)
     assert result.answer_text == "Cited 90-day recommendation."
-    assert [run["capability_key"] for run in result.worker_runs] == list(required)
-    child_usages = [usage for usage in usages if usage.role == "sub_agent"]
-    assert [usage.capability_key for usage in child_usages] == list(required)
-    assert [usage.run_id for usage in child_usages] == [f"run-{key}" for key in required]
-    assert [usage.model for usage in child_usages] == ["claude-haiku-test"] * 3
-    assert [(usage.input_tokens, usage.output_tokens) for usage in child_usages] == [
-        (10, 1),
-        (20, 2),
-        (30, 3),
-    ]
-    assert [trace["run_id"] for trace in child_traces] == [f"run-{key}" for key in required]
-    assert lifecycle_events[0]["event"] == "runtime_manifest"
-    assert lifecycle_events[0]["decision"] == "clean"
-    assert len([event for event in lifecycle_events if event["event"] == "subagent_start"]) == 3
-    gates = [event for event in lifecycle_events if event["event"] == "worker_pre_tool_use_gate"]
-    assert len(gates) == 4
-    assert gates[0]["decision"] == "deny"
-    assert gates[0]["agent_id_present"] is False
-    assert all(event["decision"] == "allow" for event in gates[1:])
-    assert all(event["agent_id_present"] is True for event in gates[1:])
+    assert [run["capability_key"] for run in result.worker_runs] == list(execution_order)
+    assert [usage.role for usage in usages] == ["main"]
+    manifest = next(event for event in lifecycle_events if event["event"] == "runtime_manifest")
+    assert manifest["decision"] == "app_owned"
+    assert not [event for event in lifecycle_events if event["event"] == "task_pre_tool_use"]
+    assert not [event for event in lifecycle_events if event["event"] == "subagent_start"]
+    entries = [event for event in lifecycle_events if event["event"] == "native_handler_entry"]
+    assert len(entries) == 3
+    assert all(event["delegated"] is True for event in entries)
     completions = [event for event in lifecycle_events if event["event"] == "native_handler_completion"]
-    assert [event["child_run_id"] for event in completions] == [f"run-{key}" for key in required]
+    assert [event["child_run_id"] for event in completions] == [f"run-{key}" for key in execution_order]
     assert "objective" not in str(lifecycle_events)
 
 
-def test_native_subagent_guard_blocks_sandbox_before_structured_data(monkeypatch):
-    captured = _capture_sdk_tools(monkeypatch)
-    required = ("structured_data_agent", "sandbox_execution_agent")
+def test_app_owned_worker_failure_fails_open_to_standard_flat_sdk_path(monkeypatch):
+    required = ("structured_data_agent",)
     lifecycle_events = []
-    monkeypatch.setattr(
-        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
-        lambda _self: [_native_capability(key) for key in required],
-    )
+    query_called = False
+
+    class FailingOrchestrator:
+        def __init__(self, _store):
+            pass
+
+        def start_run(self, _request):
+            raise RuntimeError("worker unavailable")
 
     async def fake_query(*, options, **_kwargs):
-        pre_hook = options.hooks["PreToolUse"][0].hooks[0]
-        decision = await pre_hook(
-            {
-                "tool_name": "Task",
-                "tool_input": {
-                    "subagent_type": "sandbox_execution_agent",
-                    "prompt": json.dumps(
-                        {
-                            "objective": "Compute concentration.",
-                            "output_format": "Compact finding",
-                            "tools_sources": ["structured data"],
-                            "boundaries": ["Read only"],
-                            "context_scope": {"prior_findings": {"value": "present"}},
-                        }
-                    ),
-                },
-            },
-            "task-sandbox",
-            None,
-        )
-        assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
-        assert "structured_data_agent" in decision["hookSpecificOutput"]["permissionDecisionReason"]
-        stop = await options.hooks["Stop"][0].hooks[0]({}, None, None)
-        assert stop["decision"] == "block"
-        assert "sandbox_execution_agent" in stop["reason"]
+        nonlocal query_called
+        query_called = True
+        assert "Task" not in options.allowed_tools
+        assert all("run_" not in tool for tool in options.allowed_tools)
+        assert "PHASE-D APP-OWNED SYNTHESIS" not in options.system_prompt
         yield ResultMessage(
             subtype="success",
             duration_ms=1,
             duration_api_ms=1,
             is_error=False,
             num_turns=1,
-            session_id="session-blocked",
-            result="Blocked safely.",
+            session_id="session-flat",
+            result="Flat fallback answer.",
         )
 
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", FailingOrchestrator)
     monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
-    with pytest.raises(RuntimeError, match="required workers completed"):
-        _consume(
-            stream_vcso_sdk_turn(
-                prompt="P4 thin-slice prompt",
-                system_prompt="System",
-                model="claude-sonnet-test",
-                api_key="test-key",
-                registry=_Registry(),
-                tool_names=[],
-                tool_context=ToolExecutionContext(user_id="founder-1", store=_NativeStore()),
-                trace_metadata={"run_id": "lead-run"},
-                native_subagent_required_agents=required,
-                native_lifecycle_sink=lifecycle_events.append,
-                query_impl=fake_query,
-            )
+    _events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="P4 thin-slice prompt",
+            system_prompt="System",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(user_id="founder-1", store=_NativeStore()),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=required,
+            native_lifecycle_sink=lifecycle_events.append,
+            query_impl=fake_query,
         )
-    denials = [event for event in lifecycle_events if event["event"] == "task_pre_tool_use"]
-    assert len(denials) == 1
-    assert denials[0]["decision"] == "deny"
-    assert denials[0]["capability_key"] == "sandbox_execution_agent"
-    assert "tool_input" not in str(lifecycle_events)
+    )
+    assert query_called is True
+    failures = [event for event in lifecycle_events if event["event"] == "native_handler_failure"]
+    assert len(failures) == 1
+    assert failures[0]["capability_key"] == "structured_data_agent"
+    assert failures[0]["delegated"] is True
+    assert result.answer_text == "Flat fallback answer."

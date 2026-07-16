@@ -449,3 +449,162 @@ SDK query.
 **STOP FOR LONDON.** Changes are local and uncommitted. No deploy, feature-flag mutation, live turn,
 retry, or full gate-table proof was run. The next separately authorized step is deploy dark, confirm
 the exact Railway SHA, then run one single-worker canary and stop/re-dark on the first terminal signal.
+
+## 16. Fix C single-worker live repro - FAILED, STOPPED FOR LONDON (2026-07-16)
+
+- Deployed commit: `9a1dc8947cd4a0bed368186bd2a12d04d0323826` (`v0.6.56`); Railway and
+  Vercel reported success for that exact SHA and production health returned `ok=true` before
+  enrollment.
+- Pre-run readback confirmed `vcso_sdk_loop` dark with `max_budget_usd=0.25` and `max_turns=6`, and
+  `vcso_planner` dark. Only founder `cd490873-99aa-4533-9240-f0aa04deb54f` and
+  `structured_data_agent` were enrolled for the diagnostic window.
+- Exactly one retained anchor turn was sent through the authenticated Virtual CSO UI.
+- Parent run: `9b305bb0-c2e9-4baf-a9de-6913a09e2987`.
+- **Runtime manifest:** clean (`reason_code=none`). The prompt/tool/worker isolation invariants passed
+  before the SDK query.
+- **Child row created: no.** No `agent_delegation_runs` row was linked to the parent.
+- **Terminal symptom:** the lead still attempted
+  `mcp__architectos__run_structured_data_agent` directly. The worker PreToolUse gate fired with
+  `agent_id_present=false`, classified it as `lead_or_mismatched_subagent`, and returned `deny`.
+  No `Task`, `SubagentStart`, or matching worker-handler allow event preceded the call.
+- The canary was immediately re-darkened. Readback confirmed `vcso_sdk_loop` and `vcso_planner`
+  both `is_enabled=false`, `test_user_ids=[]`, `enabled_for_all=false`, and `default=false`; diagnostic
+  enrollment is disabled and empty.
+
+**STOP. No retry, variation, code fix, downstream turn evaluation, or full gate-table proof was run.**
+
+## 17. Root cause of the persistent failure + recommended path (2026-07-16, read-only)
+
+Static SDK inspection only; no code, flag, or canary. `vcso_sdk_loop`/`vcso_planner` remain dark.
+
+### 17.1 One cause behind all three failures: lead tool VISIBILITY, not permission
+
+The worker handlers live on the in-process SDK MCP server `architectos`, which — being an in-process
+server — **must** be registered in top-level `options.mcp_servers`. The CLI exposes every tool of a
+top-level MCP server to the **lead's** tool schema (`_internal/query.py` `tools/list` returns all of a
+server's tools; there is no lead-side per-tool visibility filter). The three scoping levers cannot
+remove it from the lead:
+
+- `allowed_tools` controls **permission** (auto-approve), not visibility;
+- `AgentDefinition.tools` scopes the **subagent's** view, not the lead's;
+- `disallowed_tools` is **global** (`types.py:1813`) — removing a tool hides it from subagents too.
+
+So `mcp__architectos__run_<agent>` is unavoidably visible and selectable to the lead. Given a visible,
+direct tool that reaches the goal, the model calls it instead of the indirect Task path — exactly what
+§16 shows: clean manifest, no `Task`/`SubagentStart`, `agent_id_present=false`, direct handler call.
+
+### 17.2 Answers to the three investigation items
+
+1. **Delivery.** The SDK *sends* `Task` (built-in) + the `AgentDefinition`s in the initialize request
+   (`_internal/query.py:207`). Static source confirms they are sent, not that the CLI exposes a usable
+   Task subagent to the model — that needs init debug/`stderr` from a live process (open, but **moot
+   under 17.4**). The proven, dominant problem is not a missing Task; it is the competing *visible*
+   handler.
+2. **Effective lead schema.** The handler is selectable because it is a tool on a globally-registered
+   SDK MCP server (17.1); `allowed_tools`/`AgentDefinition` scoping cannot remove it from the lead's
+   schema. That is the "not just `allowed_tools`" answer.
+3. **Serializable worker-scoped MCP.** **Yes for external servers:** `McpStdioServerConfig` /
+   `McpSSEServerConfig` / `McpHttpServerConfig` are plain JSON dicts (`types.py:603–625`) and can be
+   inlined in `AgentDefinition.mcpServers`, scoping them to a subagent and keeping them **out** of
+   top-level `mcp_servers` (invisible to the lead). **No for the in-process server:**
+   `McpSdkServerConfig.instance: McpServer` is not JSON-serializable (`types.py:628–633`; matches §15's
+   `TypeError`). Native worker-scoping is therefore achievable **only** by re-implementing the handlers
+   as an external (stdio/HTTP) MCP server.
+
+### 17.3 The two remaining paths
+
+- **Path N — native, worker-scoped external MCP.** Re-expose the founder-scoped orchestrator handlers
+  as an external MCP server (stdio subprocess or MCP-over-HTTP on the FastAPI backend), referenced only
+  in each worker's `AgentDefinition.mcpServers` with per-turn scope via headers/env. Hides handlers
+  from the lead → forces Task. **Cost:** a new MCP transport + auth surface + per-turn scope injection
+  + a network hop — and it **still** relies on the model choosing to spawn the correct Task subagents
+  in the right order, the same non-determinism that dropped the mandatory sandbox child in the original
+  P4 failure.
+- **Path A — deterministic application-owned delegation (RECOMMENDED, = London #4).** The app performs
+  decomposition, not the model. The required workers are already known deterministically
+  (`native_subagent_requirements`). Run them in dependency order via the existing
+  `SubAgentOrchestrator.start_run` (already creates parent-linked child rows, worker tier = Haiku,
+  compact contract, citations — all proven), then invoke the SDK lead with the compact findings
+  pre-injected, for **synthesis only** (no worker tools, no Task).
+
+### 17.4 Recommendation: Path A
+
+Three native attempts failed on a fundamental SDK limitation; and even fixed visibility would not
+guarantee the mandatory-children invariant, because decomposition would still be a model decision.
+Path A makes decomposition deterministic (guaranteeing **both** required children — the original P4
+defect), removes the model's tool-selection from the critical path, and reuses every proven component
+(orchestrator, compact contract, worker tiers, citations, and the nested-worker streaming events the
+loop already emits from the handler path). It is a smaller, lower-risk change than Path N. The SDK lead
+still does the agentic compose + token streaming; only the fragile "model → Task → subagent → handler"
+chain is removed.
+
+**Implementation sketch (behind `vcso_sdk_loop`, dark; native path only):**
+
+- Before the SDK query, when native requirements are present: run each required worker via
+  `SubAgentOrchestrator` in dependency order (`structured_data` → `sandbox_execution`; wiki
+  independent), forwarding each prior compact finding (the existing `prior_findings` mechanism). Emit
+  the existing plan / `sub_agent_step` / `sources_updated` events so MA-05 renders unchanged.
+- Build the SDK lead options with **no** worker handler tools and **no** Task; inject the compact
+  worker findings + citations as authoritative pre-assembly. The lead streams the cited 90-day
+  synthesis.
+- The mandatory-children check becomes a deterministic pre-compose assertion on the app-run workers,
+  not a model gate. Guardrails (depth 1, founder isolation, tiers, caps, citations) are already
+  enforced inside `SubAgentOrchestrator` — no reliance on SDK permission/visibility.
+
+### 17.5 Status
+
+Investigation complete; no code changed, no flag touched, no canary run. **STOP for London** to choose
+Path A vs Path N. If Path A is authorized: implement behind the dark flag, deploy, confirm head == SHA,
+run the one-worker repro once (expect a deterministic child row), then STOP.
+
+## 18. Path A implemented (proposed v0.6.57) — py_compile-verified, needs test rewrite + deploy
+
+**London authorized Path A (2026-07-16).** Applied to `python-backend/services/vcso_sdk_loop.py` on the
+true v0.6.56 baseline (`git show HEAD:` — the bash working-tree view is an OneDrive placeholder).
+`config.py` unchanged. Diff: **+159 / −44**, contained to the native branch of `_run_sdk_turn`.
+
+**What changed:**
+
+1. **`run_app_owned_workers()`** (new inner async): for each required worker, in dependency order
+   (`structured_data_agent` → `per_user_wiki` → `sandbox_execution_agent`), the *app* calls the existing
+   `SubAgentOrchestrator.start_run` (depth 1, `routing_tier_override="worker"`, compact contract,
+   citations), forwarding the structured finding into the sandbox worker's `prior_findings`. It emits
+   the existing `emit_subagent_start` / `sub_agent_step` / `sources_updated` / plan events (MA-05
+   renders unchanged), marks `completed_agents`, and returns the compact findings. A worker failure
+   raises → the turn fails open to the flat path (preserved).
+2. **Synthesis-only lead.** In native mode the workers run *before* the query; then `native_prompt =
+   _native_synthesis_prompt(...)` injects the compact findings + citations as the only authoritative
+   evidence; the lead is compiled with `enable_native_subagents=False`, `native_subagent_tools={}`,
+   **no** Task / worker-handler tools / PreToolUse gate / Subagent hooks, and `options.allowed_tools =
+   []` (compose-only under `dontAsk`). The lead just streams the cited 90-day synthesis.
+3. **Deterministic invariant.** `completed_agents` is populated by the app run, so the existing
+   `stop_hook` and post-query mandatory-children checks pass deterministically — the model's
+   tool-selection is out of the critical path (the visibility trap is gone: no worker tool is
+   registered, so the lead cannot see or call one).
+4. Old native machinery (`pre_task_use`, `pre_worker_handler_gate`, subagent hooks,
+   `make_native_handler_tool`, `build_native_runtime_manifest`, `_native_lead_prompt`) is left defined
+   but unused, to keep the diff contained; it can be pruned in a follow-up.
+
+**Initial verification:** `py_compile` clean on the working-tree file; diff reviewed against the
+v0.6.56 blob. The handoff environment could not run the Windows venv/SDK tests.
+
+**REQUIRED before deploy (London's environment):** the Fix C tests assert the *native tool surface*
+(worker handlers registered, lead-direct call denied by the gate, manifest violations abort) — Path A
+**removes** that surface, so those assertions no longer apply and must be rewritten. New tests should
+assert: native mode runs each required worker through `SubAgentOrchestrator` before the query; the
+compiled lead exposes no Task and no `run_<agent>` tool and `allowed_tools == []`; the synthesis prompt
+contains the worker findings; `completed_agents` is satisfied without any SDK Task/child event; and a
+worker failure fails open to the flat path.
+
+**London pre-deploy verification (2026-07-16):** rewritten Path A coverage is green: `14 passed`
+across `test_vcso_sdk_loop.py` and `test_vcso_sdk_config.py`; `py_compile` and `git diff --check`
+also passed. Review caught and closed two pre-deploy gaps: native mode now explicitly clears
+`options.agents` (not only `allowed_tools`) so the lead has no Task schema, and an app-owned worker
+failure now continues through the standard flat SDK path instead of terminalizing the founder turn.
+
+**Handoff protocol:** update + run the focused tests → commit `v0.6.57 Deterministic app-owned Phase-D
+delegation` → deploy → **confirm deployed Railway head == SHA** → enroll only the founder + one worker →
+run the one-worker repro once. Pass = one `agent_delegation_runs` child row (correct `parent_run_id`,
+`tier_worker → claude-haiku-4-5`) created **before** the synthesis, and a cited answer composed from it;
+logs show `app-owned worker completed … run_id=…`. Then **STOP and re-darken.** Do **not** run the full
+three-worker anchor.

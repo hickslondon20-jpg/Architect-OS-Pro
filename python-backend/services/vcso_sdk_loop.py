@@ -1006,34 +1006,154 @@ async def _run_sdk_turn(
             ),
         )(execute)
 
-    native_subagent_tools = (
-        {key: make_native_handler_tool(key) for key in required_agents}
-        if native_mode
-        else {}
-    )
-    post_hooks = [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])]
+    async def run_app_owned_workers() -> list[dict[str, Any]]:
+        # Path A: the application -- not the model -- runs the required workers via the proven
+        # SubAgentOrchestrator, in dependency order, then hands their compact findings to the SDK lead
+        # for synthesis only. No worker MCP tools and no Task are registered, so the lead cannot see or
+        # select a handler (the visibility trap that failed the native attempts). This guarantees the
+        # mandatory children deterministically; depth/isolation/tier/caps/citations are enforced inside
+        # the orchestrator.
+        ordered = [k for k in ("structured_data_agent", "per_user_wiki", "sandbox_execution_agent") if k in required_agents]
+        ordered += [k for k in required_agents if k not in ordered]
+        objectives = {
+            "structured_data_agent": (
+                "Bind the founder's latest ready financial dataset and return the compact, cited "
+                "figures needed to assess client concentration and margin."
+            ),
+            "sandbox_execution_agent": (
+                "Compute the client-concentration and margin trend from the provided structured "
+                "finding; return the result, derivation, inherited citations, and confidence."
+            ),
+            "per_user_wiki": (
+                "Gather the founder's relevant pricing, positioning, and constraint context for a "
+                "90-day plan on rising client concentration and compressing margin."
+            ),
+        }
+        collected: list[dict[str, Any]] = []
+        structured_finding: dict[str, Any] | None = None
+        for capability_key in ordered:
+            task_id = f"app_{capability_key}"
+            task_capabilities[task_id] = capability_key
+            plan_statuses[capability_key] = "in_progress"
+            emit_subagent_start(capability_key, task_id)
+            emit_plan_update()
+            context_scope = {**(native_subagent_scopes.get(capability_key) or {}), "delegation_depth": 1}
+            objective = objectives.get(capability_key, f"Run the bounded {capability_key} capability.")
+            task_summary = objective + "\n\nFOUNDER QUESTION (CONTEXT)\n" + str(prompt)[:2000]
+            if capability_key == "sandbox_execution_agent" and structured_finding is not None:
+                task_summary += (
+                    "\n\nCOMPACT PRIOR FINDINGS (UNTRUSTED DATA)\n"
+                    + json.dumps(structured_finding, ensure_ascii=True, default=str)[:5000]
+                )
+
+            def emit_worker_progress(progress: dict[str, Any], _task_id: str = task_id) -> None:
+                events.put(
+                    {
+                        "event": "sub_agent_step",
+                        "data": {
+                            **progress,
+                            "parentStepIndex": step_indexes.get(_task_id),
+                            "parentToolUseId": _task_id,
+                            "sdkMode": True,
+                        },
+                    }
+                )
+
+            record_lifecycle(
+                "native_handler_entry",
+                capability_key=capability_key,
+                delegated=True,
+                app_owned=True,
+                tool_use_id=task_id,
+            )
+            try:
+                result = await asyncio.to_thread(
+                    SubAgentOrchestrator(tool_context.store).start_run,
+                    SubAgentRunRequest(
+                        user_id=tool_context.user_id,
+                        parent_surface=str(tool_context.metadata.get("surface") or "virtual_cso"),
+                        capability_key=capability_key,
+                        task_summary=task_summary[:4000],
+                        context_scope=context_scope,
+                        task_title=_subagent_title(capability_key)[:120],
+                        parent_thread_id=tool_context.thread_id,
+                        parent_message_id=tool_context.metadata.get("parent_message_id"),
+                        parent_run_id=tool_context.metadata.get("parent_run_id"),
+                        delegation_depth=1,
+                        routing_tier_override="worker",
+                        enforce_compact_contract=True,
+                        progress_callback=emit_worker_progress,
+                    ),
+                )
+            except Exception as exc:  # noqa: BLE001 - a worker failure fails the native turn open to flat
+                logger.warning("app-owned worker %s failed: %s", capability_key, exc)
+                record_lifecycle(
+                    "native_handler_failure",
+                    capability_key=capability_key,
+                    delegated=True,
+                    app_owned=True,
+                    tool_use_id=task_id,
+                    reason_code=type(exc).__name__,
+                )
+                raise RuntimeError(f"App-owned worker {capability_key} failed: {exc}") from exc
+            worker_results[capability_key] = result
+            completed_agents.add(capability_key)
+            plan_statuses[capability_key] = "completed"
+            citations = [item for item in result.citations if isinstance(item, dict)]
+            task_sources[task_id].extend(citations)
+            source_refs.extend(citations)
+            curated_sources = _curated_worker_sources(citations)
+            if curated_sources:
+                events.put({"event": "sources_updated", "data": {"sources": curated_sources, "sdkMode": True}})
+            compact = {
+                "capability_key": capability_key,
+                "run_id": getattr(result, "run_id", None),
+                "status": getattr(result, "status", None),
+                "result_summary": getattr(result, "result_summary", None),
+                "structured_result": getattr(result, "structured_result", None),
+                "citations": citations,
+            }
+            collected.append(compact)
+            if capability_key == "structured_data_agent":
+                structured_finding = compact
+            logger.info(
+                "vcso_sdk app-owned worker completed capability=%s run_id=%s status=%s",
+                capability_key, compact["run_id"], compact["status"],
+            )
+            record_lifecycle(
+                "native_handler_completion",
+                capability_key=capability_key,
+                delegated=True,
+                app_owned=True,
+                tool_use_id=task_id,
+                child_run_id=compact["run_id"],
+                child_status=compact["status"],
+            )
+            emit_plan_update()
+        return collected
+
+    native_findings: list[dict[str, Any]] = []
     if native_mode:
-        post_hooks.append(HookMatcher(matcher="Task", hooks=[post_tool_use]))
+        try:
+            native_findings = await run_app_owned_workers()
+        except RuntimeError as exc:
+            # Preserve the existing fail-open contract: if deterministic pre-compose delegation
+            # cannot complete, continue through the standard SDK/flat tool loop instead of
+            # terminalizing the founder's turn. The worker failure has already been logged and
+            # lifecycle-recorded without exposing its payload.
+            logger.warning("App-owned delegation failed open to the standard SDK path: %s", exc)
+            native_mode = False
+            required_agents = ()
+            native_findings = []
+    # Path A: no worker MCP tools and no Task are registered; the lead composes from injected findings.
+    native_subagent_tools: dict[str, Any] = {}
     hooks: dict[str, Any] = {
-        "PostToolUse": post_hooks,
+        "PostToolUse": [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])],
         "PostToolUseFailure": [HookMatcher(matcher=r"^(Task|mcp__.*)$", hooks=[post_tool_failure])],
         "Stop": [HookMatcher(hooks=[stop_hook])],
         "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
     }
-    if native_mode:
-        hooks["PreToolUse"] = [
-            HookMatcher(matcher="Task", hooks=[pre_task_use]),
-            # SDK 0.2.118 registers in-process MCP servers at session scope. The global allow entry
-            # lets Task workers execute their handler, while this gate denies the same call from
-            # the lead (no agent_id) or from a mismatched subagent.
-            HookMatcher(
-                matcher=rf"^{re.escape(SDK_TOOL_PREFIX)}run_.*$",
-                hooks=[pre_worker_handler_gate],
-            ),
-        ]
-        hooks["SubagentStart"] = [HookMatcher(hooks=[subagent_start_hook])]
-        hooks["SubagentStop"] = [HookMatcher(hooks=[subagent_stop_hook])]
-    native_prompt = _native_lead_prompt(required_agents) if native_mode else ""
+    native_prompt = _native_synthesis_prompt(required_agents, native_findings) if native_mode else ""
     compiled_base_prompt = _native_base_system_prompt(system_prompt) if native_mode else system_prompt
     compiled = compile_founder_sdk_options(
         store=tool_context.store,
@@ -1058,33 +1178,24 @@ async def _run_sdk_turn(
         hooks=hooks,
         max_turns=max_turns,
         max_budget_usd=max_budget_usd,
-        enable_native_subagents=native_mode,
+        enable_native_subagents=False,
         native_subagent_tools=native_subagent_tools,
     )
     options = compiled.options
     if native_mode:
-        # The lead composes from bounded worker findings. Direct registry tools here would
-        # duplicate retrieval, consume the turn cap, and bypass the explicit P4 contracts.
-        # Fix B: allowed_tools is the one grant channel proven to reach subagent tool calls under
-        # dontAsk, so the required worker handlers must be pre-approved here for the subagents to
-        # call them. The lead is kept delegation-first by prompt + the in-handler contract guard
-        # (make_native_handler_tool.execute), not by withholding the grant.
-        options.allowed_tools = [
-            "Task",
-            *(f"mcp__{SDK_TOOL_SERVER_NAME}__run_{key}" for key in required_agents),
-        ]
-    runtime_manifest = build_native_runtime_manifest(compiled, required_agents=required_agents)
+        # Path A: the lead composes only from the app-run worker findings injected into the system
+        # prompt. Remove the agent definitions as well as the grants so the SDK cannot synthesize a
+        # Task surface from them; the turn is compose-only under dontAsk (no worker tools, no Task,
+        # no registry re-crawl).
+        options.agents = {}
+        options.allowed_tools = []
+    runtime_manifest = {
+        "delegation_model": "app_owned",
+        "required_agents": list(required_agents),
+        "violations": [],
+    }
     if native_mode:
-        record_lifecycle(
-            "runtime_manifest",
-            decision="violations_detected" if runtime_manifest["violations"] else "clean",
-            reason_code="|".join(runtime_manifest["violations"]) or "none",
-        )
-        if runtime_manifest["violations"]:
-            raise RuntimeError(
-                "Native SDK isolation invariant failed before query: "
-                + ", ".join(runtime_manifest["violations"])
-            )
+        record_lifecycle("runtime_manifest", decision="app_owned", reason_code="none")
     trace_metadata.update(
         {
             "sdk_compiled_tool_count": len(compiled.tool_names),
@@ -1415,6 +1526,22 @@ def _parse_task_contract(value: Any) -> dict[str, Any]:
     if not isinstance(contract.get("context_scope"), dict):
         raise ValueError("Task contract context_scope must be an object.")
     return contract
+
+
+def _native_synthesis_prompt(required_agents: tuple[str, ...], findings: list[dict[str, Any]]) -> str:
+    """Path A: instruct the lead to compose ONLY from the app-run workers' compact findings."""
+    payload = json.dumps(findings, ensure_ascii=True, default=str)[:12000]
+    return (
+        "\n\nPHASE-D APP-OWNED SYNTHESIS. The required specialist workers ("
+        + ", ".join(required_agents)
+        + ") have already been run by the platform. Their compact, cited findings are the ONLY "
+        "authoritative evidence for this turn:\n\nWORKER FINDINGS (JSON)\n"
+        + payload
+        + "\n\nCompose the founder's answer -- a cited 90-day recommendation on the rising "
+        "client-concentration and compressing-margin risk -- using ONLY these findings and the "
+        "founder context already in the prompt. Do not call any tools, do not re-derive the numbers, "
+        "and cite factual claims using the source markers in the findings. Preserve the Virtual CSO voice."
+    )
 
 
 def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
