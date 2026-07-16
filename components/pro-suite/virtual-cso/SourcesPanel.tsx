@@ -18,11 +18,17 @@ interface ProgressItem {
   id: string;
   label: string;
   status: 'pending' | 'in_progress' | 'completed';
+  children?: AgentStep[];
 }
 
 const progressItems = ({ steps, todos, streaming }: TurnProgress): ProgressItem[] => {
   if (todos.length > 0) {
-    return todos.map((todo) => ({ id: todo.id, label: todo.content, status: todo.status }));
+    return todos.map((todo) => ({
+      id: todo.id,
+      label: todo.content,
+      status: todo.status,
+      children: steps.find((step) => step.subAgent?.capabilityKey === todo.id)?.children,
+    }));
   }
 
   const uniqueSteps = new Map<number, AgentStep>();
@@ -34,6 +40,7 @@ const progressItems = ({ steps, todos, streaming }: TurnProgress): ProgressItem[
   const items = [...uniqueSteps.values()].slice(0, 7).map((step) => ({
     id: `step-${step.stepIndex}`,
     label: step.title ?? step.summary ?? 'Review evidence',
+    children: step.children,
     status: step.status === 'running'
       ? 'in_progress' as const
       : step.status === 'failed'
@@ -63,32 +70,59 @@ const ProgressPanel: React.FC<{ progress: TurnProgress }> = ({ progress }) => {
       </div>
       <ol className="mt-3 space-y-2.5">
         {items.map((item, index) => (
-          <li key={item.id} className="flex gap-2.5">
-            <span
-              className={`aos-mono mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
-                item.status === 'completed'
-                  ? 'border-[var(--aos-success)] bg-[var(--aos-success-tint)] text-[var(--aos-success)]'
+          <li key={item.id}>
+            <div className="flex gap-2.5">
+              <span
+                className={`aos-mono mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
+                  item.status === 'completed'
+                    ? 'border-[var(--aos-success)] bg-[var(--aos-success-tint)] text-[var(--aos-success)]'
+                    : item.status === 'in_progress'
+                      ? 'border-[var(--aos-brass)] bg-[var(--bg-surface)] text-[var(--aos-brass)]'
+                      : 'border-[var(--aos-mist)] bg-[var(--bg-sunken)] text-[var(--fg-4)]'
+                }`}
+                aria-label={item.status.replace('_', ' ')}
+              >
+                {item.status === 'completed'
+                  ? <Check size={11} strokeWidth={3} />
                   : item.status === 'in_progress'
-                    ? 'border-[var(--aos-brass)] bg-[var(--bg-surface)] text-[var(--aos-brass)]'
-                    : 'border-[var(--aos-mist)] bg-[var(--bg-sunken)] text-[var(--fg-4)]'
-              }`}
-              aria-label={item.status.replace('_', ' ')}
-            >
-              {item.status === 'completed'
-                ? <Check size={11} strokeWidth={3} />
-                : item.status === 'in_progress'
-                  ? <LoaderCircle size={11} className="animate-spin" />
-                  : index + 1}
-            </span>
-            <span className={`text-xs leading-5 ${
-              item.status === 'completed'
-                ? 'text-[var(--fg-4)] line-through decoration-[var(--aos-mist)]'
-                : item.status === 'in_progress'
-                  ? 'font-medium text-[var(--fg-1)]'
-                  : 'text-[var(--fg-3)]'
-            }`}>
-              {item.label}
-            </span>
+                    ? <LoaderCircle size={11} className="animate-spin" />
+                    : index + 1}
+              </span>
+              <span className={`text-xs leading-5 ${
+                item.status === 'completed'
+                  ? 'text-[var(--fg-4)] line-through decoration-[var(--aos-mist)]'
+                  : item.status === 'in_progress'
+                    ? 'font-medium text-[var(--fg-1)]'
+                    : 'text-[var(--fg-3)]'
+              }`}>
+                {item.label}
+              </span>
+            </div>
+            {item.children && item.children.length > 0 && (
+              <details className="group ml-2.5 mt-1.5 border-l border-[var(--aos-mist)] pl-4">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--fg-4)] marker:content-none">
+                  <ChevronRight size={11} className="transition-transform group-open:rotate-90" />
+                  {item.children.length} worker {item.children.length === 1 ? 'step' : 'steps'}
+                </summary>
+                <ol className="mt-1 space-y-2 pb-1">
+                  {item.children.map((child, childIndex) => (
+                    <li key={`${child.parentToolUseId ?? item.id}-${child.stepIndex ?? childIndex}`} className="flex gap-2">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--aos-brass)]" />
+                      <span className="min-w-0">
+                        <span className="block text-[11px] font-medium leading-4 text-[var(--fg-2)]">
+                          {child.title ?? child.tool}
+                        </span>
+                        {child.summary && (
+                          <span className="mt-0.5 block text-[10px] leading-4 text-[var(--fg-4)]">
+                            {child.summary}
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
           </li>
         ))}
       </ol>

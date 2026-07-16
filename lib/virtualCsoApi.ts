@@ -52,6 +52,7 @@ export interface SendUserMessageOptions {
   onActivity?: (items: AgentActivityItem[]) => void;
   onAgentSteps?: (steps: AgentStep[]) => void;
   onPlanUpdate?: (todos: AgentTodo[]) => void;
+  onSourcesUpdate?: (sources: SourceRef[]) => void;
   onReady?: (meta: { threadId: string; route: Ws5RouteMeta; assembledContext: Ws5AssembledContextMeta; agentSteps?: AgentStep[]; sdkMode: boolean }) => void;
 }
 
@@ -360,7 +361,10 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
     for (const run of (runsResult.data ?? []) as AgentDelegationRunWithSteps[]) {
       if (!run.assistant_message_id) continue;
       runsByMessageId.set(run.assistant_message_id, run);
-      if (run.structured_result?.schema_version === 'vcso_sdk_standard_v1') {
+      if (
+        run.structured_result?.schema_version === 'vcso_sdk_standard_v1'
+        || run.structured_result?.schema_version === 'vcso_sdk_native_subagents_v1'
+      ) {
         sdkMessageIds.add(run.assistant_message_id);
       }
       const existing = stepsByMessageId.get(run.assistant_message_id) ?? [];
@@ -515,6 +519,23 @@ export const sendUserMessage = async (
       }))
       .sort((a: AgentTodo, b: AgentTodo) => a.position - b.position);
   };
+  const normalizeLiveSources = (payload: any): SourceRef[] => {
+    const rows = Array.isArray(payload?.sources) ? payload.sources : [];
+    const allowedKinds: SourceKind[] = ['wiki', 'platform', 'ip', 'context'];
+    return rows
+      .filter((row: any) => row && typeof row.label === 'string')
+      .map((row: any) => ({
+        kind: allowedKinds.includes(row.kind) ? row.kind : 'context',
+        label: String(row.label).slice(0, 160),
+        pageId: typeof row.pageId === 'string' ? row.pageId : undefined,
+      }));
+  };
+  const mergeLiveSources = (incoming: SourceRef[]) => {
+    const merged = new Map(sources.map((source) => [`${source.kind}:${source.label}`, source]));
+    incoming.forEach((source) => merged.set(`${source.kind}:${source.label}`, source));
+    sources = [...merged.values()];
+    options.onSourcesUpdate?.(sources);
+  };
 
   await parseSseStream(response, {
     onEvent: (event, payload) => {
@@ -573,13 +594,24 @@ export const sendUserMessage = async (
           input: current?.input ?? {},
           output: current?.output ?? '',
           status: payload.status ?? current?.status,
+          parentToolUseId: payload.parentToolUseId ?? current?.parentToolUseId,
           sourceRefs: payload.sourceRefs ?? current?.sourceRefs ?? [],
+          subAgent: payload.stepType === 'sub_agent'
+            ? {
+                ...current?.subAgent,
+                capabilityKey: payload.capabilityKey ?? current?.subAgent?.capabilityKey,
+                status: payload.status ?? current?.subAgent?.status ?? 'running',
+              }
+            : current?.subAgent,
+          children: current?.children,
         });
         ensureStepActivity(payload.stepIndex);
         publishSteps();
       }
       if (event === 'tool_call' && typeof payload.stepIndex === 'number') {
+        const current = liveAgentSteps.get(payload.stepIndex);
         liveAgentSteps.set(payload.stepIndex, {
+          ...current,
           stepIndex: payload.stepIndex,
           stepType: payload.stepType,
           title: payload.title,
@@ -588,10 +620,16 @@ export const sendUserMessage = async (
           input: payload.input ?? {},
           output: '',
           status: payload.status ?? 'running',
+          parentToolUseId: payload.parentToolUseId ?? current?.parentToolUseId,
           sourceRefs: payload.sourceRefs ?? [],
           subAgent: payload.stepType === 'sub_agent'
-            ? { capabilityKey: payload.input?.capability_key, status: 'running' }
-            : undefined,
+            ? {
+                ...current?.subAgent,
+                capabilityKey: payload.capabilityKey ?? payload.input?.capability_key,
+                status: 'running',
+              }
+            : current?.subAgent,
+          children: current?.children,
         });
         ensureStepActivity(payload.stepIndex);
         publishSteps();
@@ -609,6 +647,7 @@ export const sendUserMessage = async (
             input: rawStep.input_summary ?? {},
             output: outputToString(rawStep.output_summary ?? rawStep.summary ?? ''),
             status: rawStep.status ?? 'completed',
+            parentToolUseId: payload.parentToolUseId,
             sourceRefs: rawStep.source_refs ?? [],
           };
           const children = [...(current.children ?? [])];
@@ -647,11 +686,12 @@ export const sendUserMessage = async (
           input: current?.input ?? {},
           output: outputToString(payload.output ?? payload.summary ?? ''),
           status: payload.status ?? 'completed',
+          parentToolUseId: payload.parentToolUseId ?? current?.parentToolUseId,
           sourceRefs: payload.sourceRefs ?? current?.sourceRefs ?? [],
-          subAgent: current?.stepType === 'sub_agent'
+          subAgent: (payload.stepType ?? current?.stepType) === 'sub_agent'
             ? {
                 runId: childRunIdFromOutput(parsedOutput) ?? current.subAgent?.runId,
-                capabilityKey: current.subAgent?.capabilityKey,
+                capabilityKey: payload.capabilityKey ?? current.subAgent?.capabilityKey,
                 status: parsedOutput?.status ?? payload.status,
                 summary: parsedOutput?.result_summary,
               }
@@ -675,6 +715,9 @@ export const sendUserMessage = async (
       if (event === 'todos_updated') {
         options.onPlanUpdate?.(normalizeTodos(payload));
       }
+      if (event === 'sources_updated') {
+        mergeLiveSources(normalizeLiveSources(payload));
+      }
       if (event === 'done') {
         sdkMode = payload.sdkMode === true || sdkMode;
         chat = payload.chat;
@@ -692,7 +735,7 @@ export const sendUserMessage = async (
           sdkMode ? [...liveActivityItems].sort((a, b) => a.order - b.order) : undefined,
         );
         artifactId = typeof payload.artifactId === 'string' ? payload.artifactId : null;
-        sources = payload.sources ?? [];
+        sources = payload.sources?.length ? payload.sources : sources;
         sourcePages = payload.sourcePages ?? [];
         if (assistantMessage) rememberSources(assistantMessage.chatId, sources, sourcePages);
       }

@@ -33,6 +33,39 @@ const StepStatusIcon: React.FC<{ status?: string }> = ({ status }) => {
   );
 };
 
+const NestedWorkerSteps: React.FC<{ steps: AgentStep[] }> = ({ steps }) => (
+  <ol className="mt-3 space-y-2 border-l border-[var(--aos-mist)] pl-3" aria-label="Worker activity">
+    {steps.map((child, index) => {
+      const labels = sourceLabels(child);
+      return (
+        <li key={`${child.parentToolUseId ?? 'worker'}-${child.stepIndex ?? index}`} className="flex gap-2.5">
+          <span className="mt-0.5 shrink-0"><StepStatusIcon status={child.status} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-medium text-[var(--fg-2)]">
+              {child.title ?? child.tool}
+            </span>
+            {child.summary && (
+              <span className="mt-0.5 block text-xs leading-5 text-[var(--fg-3)]">{child.summary}</span>
+            )}
+            {labels.length > 0 && (
+              <span className="mt-1.5 flex flex-wrap gap-1.5" aria-label="Worker sources">
+                {labels.map((label) => (
+                  <span
+                    key={label}
+                    className="rounded-full border border-[var(--aos-sage)] bg-[var(--aos-sage-soft)] px-2 py-0.5 text-[10px] text-[var(--fg-3)]"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </span>
+            )}
+          </span>
+        </li>
+      );
+    })}
+  </ol>
+);
+
 const StepChip: React.FC<{ step: AgentStep }> = ({ step }) => {
   const labels = sourceLabels(step);
   const statusLabel = step.status === 'running'
@@ -79,6 +112,7 @@ const StepChip: React.FC<{ step: AgentStep }> = ({ step }) => {
             ))}
           </div>
         )}
+        {step.children && step.children.length > 0 && <NestedWorkerSteps steps={step.children} />}
       </div>
     </details>
   );

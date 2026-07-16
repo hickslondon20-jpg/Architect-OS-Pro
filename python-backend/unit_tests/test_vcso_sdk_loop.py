@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from claude_agent_sdk.types import ResultMessage, StreamEvent
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
+from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolResultEnvelope, ToolSourceRef
-from services.vcso_sdk_loop import read_sdk_loop_settings, stream_vcso_sdk_turn
+from services.vcso_sdk_loop import (
+    native_subagent_requirements,
+    read_sdk_loop_settings,
+    stream_vcso_sdk_turn,
+)
 
 
 class _Registry:
@@ -350,3 +358,288 @@ def test_sdk_stream_separates_curated_narration_from_persisted_answer(monkeypatc
         {"segmentId": 1, "text": "Now I'll review the margin record."}
     ]
     assert "<narration>" not in str(events)
+
+
+def test_native_subagent_effort_scaling_is_limited_to_the_p4_thin_slice():
+    required = native_subagent_requirements(
+        message=(
+            "Use our P&L and revenue data to identify client concentration and margin risk, "
+            "then recommend the next 90 days."
+        ),
+        intent={"move_type": "strategic_synthesis", "depth": "deep"},
+    )
+    assert required == (
+        "structured_data_agent",
+        "sandbox_execution_agent",
+        "per_user_wiki",
+    )
+    assert native_subagent_requirements(
+        message="What was last month's revenue?",
+        intent={"move_type": "strategic_synthesis", "depth": "standard"},
+    ) == ()
+    assert native_subagent_requirements(
+        message="Summarize the latest plan.",
+        intent={"move_type": "lookup", "depth": "deep"},
+    ) == ()
+
+
+class _NativeClient:
+    def table(self, _name):
+        return _FlagQuery(error=RuntimeError("not required by this unit test"))
+
+
+class _NativeStore:
+    client = _NativeClient()
+
+    def resolve_platform_model(self, *, setting_key, fallback_model_name, fallback_provider):
+        if setting_key == "tier_worker":
+            return {"provider": "anthropic", "model_name": "claude-haiku-test"}
+        return {"provider": fallback_provider, "model_name": fallback_model_name}
+
+
+def _native_capability(key: str) -> AgentCapability:
+    return AgentCapability(
+        capability_key=key,
+        label=key.replace("_", " ").title(),
+        description=f"Bounded {key} worker.",
+        status="experimental",
+        allowed_surfaces=["virtual_cso"],
+        allowed_tools=[],
+        allowed_source_kinds=[],
+        model_setting_key=key,
+        routing_tier="worker",
+        output_schema={"version": "agent_result_v1"},
+        default_config={"max_rounds": 1},
+        can_spawn_agents=False,
+    )
+
+
+def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_events(monkeypatch):
+    captured = _capture_sdk_tools(monkeypatch)
+    required = (
+        "structured_data_agent",
+        "sandbox_execution_agent",
+        "per_user_wiki",
+    )
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    calls = []
+
+    class FakeOrchestrator:
+        def __init__(self, _store):
+            pass
+
+        def start_run(self, request):
+            calls.append(request)
+            request.progress_callback(
+                {
+                    "stepIndex": 1,
+                    "stepType": "context_build",
+                    "title": "Context prepared",
+                    "summary": "Prepared founder-scoped evidence.",
+                    "status": "completed",
+                    "sourceRefs": [],
+                }
+            )
+            source = {
+                "source_kind": "founder_dataset" if request.capability_key != "per_user_wiki" else "wiki_page",
+                "source_id": f"source-{request.capability_key}",
+                "label": f"Evidence for {request.capability_key}",
+            }
+            return SimpleNamespace(
+                run_id=f"run-{request.capability_key}",
+                status="completed",
+                result_summary=f"Completed {request.capability_key}.",
+                structured_result={"finding": request.capability_key},
+                citations=[source],
+                trace=[],
+            )
+
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", FakeOrchestrator)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+
+    def contract(capability_key: str, *, prior_findings=None):
+        scope = {"dataset_ids": ["dataset-1"]}
+        if prior_findings is not None:
+            scope["prior_findings"] = prior_findings
+        return {
+            "objective": f"Return the bounded {capability_key} finding.",
+            "output_format": "Compact cited finding",
+            "tools_sources": ["founder-scoped sources"],
+            "boundaries": ["Read only", "No recursive delegation"],
+            "context_scope": scope,
+        }
+
+    async def fake_query(*, options, **_kwargs):
+        assert "Task" in options.allowed_tools
+        assert "Task" not in options.disallowed_tools
+        assert set(options.agents) == set(required)
+        assert {agent.model for agent in options.agents.values()} == {"claude-haiku-test"}
+        assert all("Task" in agent.disallowedTools for agent in options.agents.values())
+        assert all("Agent" in agent.disallowedTools for agent in options.agents.values())
+        tools = {item.name: item for item in captured["tools"]}
+        pre_hook = options.hooks["PreToolUse"][0].hooks[0]
+        post_hook = options.hooks["PostToolUse"][-1].hooks[0]
+
+        for index, capability_key in enumerate(required, start=1):
+            task_id = f"task-{index}"
+            task_contract = contract(
+                capability_key,
+                prior_findings=(
+                    {"structured_data_agent": "Bound founder dataset dataset-1."}
+                    if capability_key == "sandbox_execution_agent"
+                    else None
+                ),
+            )
+            decision = await pre_hook(
+                {
+                    "tool_name": "Task",
+                    "tool_input": {
+                        "subagent_type": capability_key,
+                        "prompt": json.dumps(task_contract),
+                    },
+                },
+                task_id,
+                None,
+            )
+            assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+            handler_name = f"run_{capability_key}"
+            await tools[handler_name].handler(task_contract)
+            await post_hook({"tool_name": "Task", "tool_input": {}}, task_id, None)
+
+            # Raw child model text is deliberately ignored by the UI stream.
+            yield StreamEvent(
+                uuid=f"child-{index}",
+                session_id="session-native",
+                parent_tool_use_id=task_id,
+                event={
+                    "type": "content_block_delta",
+                    "delta": {"type": "text_delta", "text": "PRIVATE CHILD TEXT"},
+                },
+            )
+
+        stop = await options.hooks["Stop"][0].hooks[0]({}, None, None)
+        assert stop == {}
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-native",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=25,
+            duration_api_ms=20,
+            is_error=False,
+            num_turns=4,
+            session_id="session-native",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 100, "output_tokens": 10},
+            result="Cited 90-day recommendation.",
+        )
+
+    events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="P4 thin-slice prompt",
+            system_prompt="System",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=_NativeStore(),
+                thread_id="thread-1",
+                metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+            ),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=required,
+            native_subagent_scopes={
+                "structured_data_agent": {"founder_dataset_ids": ["dataset-1"]},
+                "sandbox_execution_agent": {"thread_id": "thread-1"},
+                "per_user_wiki": {"query": "pricing constraint"},
+            },
+            query_impl=fake_query,
+        )
+    )
+
+    assert [request.capability_key for request in calls] == list(required)
+    assert all(request.delegation_depth == 1 for request in calls)
+    assert all(request.routing_tier_override == "worker" for request in calls)
+    assert all(request.enforce_compact_contract is True for request in calls)
+    sandbox_call = calls[1]
+    assert "prior_findings" not in sandbox_call.context_scope
+    assert "COMPACT PRIOR FINDINGS" in sandbox_call.task_summary
+    assert len([item for item in events if item["event"] == "tool_result"]) == 3
+    assert len([item for item in events if item["event"] == "sub_agent_step"]) == 3
+    assert len([item for item in events if item["event"] == "sources_updated"]) == 3
+    assert "PRIVATE CHILD TEXT" not in str(events)
+    assert result.answer_text == "Cited 90-day recommendation."
+    assert [run["capability_key"] for run in result.worker_runs] == list(required)
+
+
+def test_native_subagent_guard_blocks_sandbox_before_structured_data(monkeypatch):
+    captured = _capture_sdk_tools(monkeypatch)
+    required = ("structured_data_agent", "sandbox_execution_agent")
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+
+    async def fake_query(*, options, **_kwargs):
+        pre_hook = options.hooks["PreToolUse"][0].hooks[0]
+        decision = await pre_hook(
+            {
+                "tool_name": "Task",
+                "tool_input": {
+                    "subagent_type": "sandbox_execution_agent",
+                    "prompt": json.dumps(
+                        {
+                            "objective": "Compute concentration.",
+                            "output_format": "Compact finding",
+                            "tools_sources": ["structured data"],
+                            "boundaries": ["Read only"],
+                            "context_scope": {"prior_findings": {"value": "present"}},
+                        }
+                    ),
+                },
+            },
+            "task-sandbox",
+            None,
+        )
+        assert decision["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "structured_data_agent" in decision["hookSpecificOutput"]["permissionDecisionReason"]
+        stop = await options.hooks["Stop"][0].hooks[0]({}, None, None)
+        assert stop["decision"] == "block"
+        assert "sandbox_execution_agent" in stop["reason"]
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-blocked",
+            result="Blocked safely.",
+        )
+
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    with pytest.raises(RuntimeError, match="required workers completed"):
+        _consume(
+            stream_vcso_sdk_turn(
+                prompt="P4 thin-slice prompt",
+                system_prompt="System",
+                model="claude-sonnet-test",
+                api_key="test-key",
+                registry=_Registry(),
+                tool_names=[],
+                tool_context=ToolExecutionContext(user_id="founder-1", store=_NativeStore()),
+                trace_metadata={"run_id": "lead-run"},
+                native_subagent_required_agents=required,
+                query_impl=fake_query,
+            )
+        )

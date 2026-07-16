@@ -37,6 +37,7 @@ export interface AgentStep {
   output: string;
   status?: string;
   elapsedSeconds?: number;
+  parentToolUseId?: string;
   sourceRefs?: Array<Record<string, unknown>>;
   children?: AgentStep[];
   subAgent?: {

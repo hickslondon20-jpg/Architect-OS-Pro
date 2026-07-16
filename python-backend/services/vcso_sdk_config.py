@@ -36,6 +36,7 @@ class CompiledFounderSdkOptions:
     tool_names: list[str]
     agent_tool_grants: dict[str, list[str]] = field(default_factory=dict)
     agent_model_routes: dict[str, dict[str, str]] = field(default_factory=dict)
+    agent_handler_tools: dict[str, str] = field(default_factory=dict)
     connector_names: list[str] = field(default_factory=list)
     excluded_tool_names: list[str] = field(default_factory=list)
 
@@ -53,6 +54,8 @@ def compile_founder_sdk_options(
     hooks: dict[str, Any],
     max_turns: int,
     max_budget_usd: float,
+    enable_native_subagents: bool = False,
+    native_subagent_tools: dict[str, Any] | None = None,
 ) -> CompiledFounderSdkOptions:
     """Compile one founder's callable tools, bounded agents, models, and MCP servers.
 
@@ -83,6 +86,8 @@ def compile_founder_sdk_options(
     agents: dict[str, AgentDefinition] = {}
     agent_tool_grants: dict[str, list[str]] = {}
     agent_model_routes: dict[str, dict[str, str]] = {}
+    agent_handler_tools: dict[str, str] = {}
+    native_subagent_tools = native_subagent_tools or {}
     selectable_names = (
         _grantable_names(
             registry,
@@ -96,10 +101,13 @@ def compile_founder_sdk_options(
         grant_names = [name for name in capability.allowed_tools if name in selectable_names]
         sdk_grants = [_sdk_tool_name(registry.get(name)) for name in grant_names]
         route = resolve_capability_model(store, capability=capability, fallback_model=main_model)
+        handler_tool = native_subagent_tools.get(capability.capability_key)
+        handler_name = _native_handler_name(capability.capability_key) if handler_tool is not None else None
+        agent_tools = [f"mcp__{SDK_INTERNAL_SERVER}__{handler_name}"] if handler_name else sdk_grants
         agents[capability.capability_key] = AgentDefinition(
             description=capability.description or capability.label,
-            prompt=_capability_prompt(capability),
-            tools=sdk_grants,
+            prompt=_capability_prompt(capability, handler_name=handler_name),
+            tools=agent_tools,
             disallowedTools=list(DISALLOWED_SDK_BUILTINS),
             model=route["model_name"],
             maxTurns=_capability_max_turns(capability),
@@ -107,6 +115,8 @@ def compile_founder_sdk_options(
         )
         agent_tool_grants[capability.capability_key] = grant_names
         agent_model_routes[capability.capability_key] = route
+        if handler_name:
+            agent_handler_tools[capability.capability_key] = handler_name
 
     definition_by_name = {definition.name: definition for definition in selected}
     for definition in registry.definitions() if hasattr(registry, "definitions") else []:
@@ -125,15 +135,22 @@ def compile_founder_sdk_options(
         if server_name != SDK_INTERNAL_SERVER and server_name not in connected_set:
             continue
         grouped_tools.setdefault(server_name, []).append(sdk_tool)
+    grouped_tools[SDK_INTERNAL_SERVER].extend(native_subagent_tools.values())
     mcp_servers = {
         server_name: create_sdk_mcp_server(name=server_name, version="1.0.0", tools=server_tools)
         for server_name, server_tools in grouped_tools.items()
     }
     compiled_connectors = sorted(name for name in grouped_tools if name != SDK_INTERNAL_SERVER)
+    main_disallowed_tools = [
+        name for name in DISALLOWED_SDK_BUILTINS if not (enable_native_subagents and name == "Task")
+    ]
+    main_allowed_tools = [_sdk_tool_name(definition) for definition in selected]
+    if enable_native_subagents:
+        main_allowed_tools.append("Task")
     options = ClaudeAgentOptions(
         tools=[],
-        allowed_tools=[_sdk_tool_name(definition) for definition in selected],
-        disallowed_tools=list(DISALLOWED_SDK_BUILTINS),
+        allowed_tools=main_allowed_tools,
+        disallowed_tools=main_disallowed_tools,
         agents=agents,
         mcp_servers=mcp_servers,
         strict_mcp_config=True,
@@ -154,6 +171,7 @@ def compile_founder_sdk_options(
         tool_names=[definition.name for definition in selected],
         agent_tool_grants=agent_tool_grants,
         agent_model_routes=agent_model_routes,
+        agent_handler_tools=agent_handler_tools,
         connector_names=compiled_connectors,
         excluded_tool_names=excluded,
     )
@@ -268,12 +286,24 @@ def _connected_sdk_servers(client: Any, *, user_id: str) -> list[str]:
     return names
 
 
-def _capability_prompt(capability: AgentCapability) -> str:
-    return (
+def _capability_prompt(capability: AgentCapability, *, handler_name: str | None = None) -> str:
+    prompt = (
         f"You are the bounded {capability.label} capability. {capability.description} "
         "Use only the granted founder-scoped tools, never delegate recursively, keep outputs compact, "
         "and cite every factual insight from returned source metadata."
     )
+    if handler_name:
+        prompt += (
+            f" Your one implementation tool is {handler_name}. Read the lead's JSON task contract, "
+            "call that tool exactly once with its objective, output_format, tools_sources, boundaries, "
+            "and context_scope, then return only the compact cited handler result. Never expose the raw "
+            "task contract or tool payload."
+        )
+    return prompt
+
+
+def _native_handler_name(capability_key: str) -> str:
+    return f"run_{_safe_server_name(capability_key)}"
 
 
 def _capability_max_turns(capability: AgentCapability) -> int:

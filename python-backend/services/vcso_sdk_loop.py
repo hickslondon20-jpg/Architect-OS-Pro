@@ -24,6 +24,7 @@ from claude_agent_sdk.types import StreamEvent
 
 from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
 from services.vcso_sdk_config import compile_founder_sdk_options
+from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
 
 
 logger = logging.getLogger(__name__)
@@ -31,10 +32,29 @@ logger = logging.getLogger(__name__)
 VCSO_SDK_LOOP_FLAG = "vcso_sdk_loop"
 VCSO_SDK_CAPABILITY_KEY = "vcso_sdk_loop"
 SDK_STANDARD_SCHEMA_VERSION = "vcso_sdk_standard_v1"
+SDK_NATIVE_SUBAGENT_SCHEMA_VERSION = "vcso_sdk_native_subagents_v1"
 SDK_TOOL_SERVER_NAME = "architectos"
 SDK_TOOL_PREFIX = f"mcp__{SDK_TOOL_SERVER_NAME}__"
 NARRATION_OPEN = "<narration>"
 NARRATION_CLOSE = "</narration>"
+P4_NATIVE_SUBAGENT_KEYS = (
+    "document_analysis_agent",
+    "structured_data_agent",
+    "kb_explorer_agent",
+    "sandbox_execution_agent",
+    "per_user_wiki",
+    "per_user_document_wiki",
+    "global_ip",
+)
+P4_THIN_SLICE_REQUIRED_AGENTS = (
+    "structured_data_agent",
+    "sandbox_execution_agent",
+    "per_user_wiki",
+)
+P4_THIN_SLICE_SIGNALS = re.compile(
+    r"(?=.*\b(?:financial|p&l|margin|revenue)\b)(?=.*\bconcentration\b)(?=.*\b90\s+days?\b)",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 @dataclass(frozen=True)
@@ -55,6 +75,7 @@ class VcsoSdkTurnResult:
     sources: list[dict[str, Any]] = field(default_factory=list)
     tool_steps: list[dict[str, Any]] = field(default_factory=list)
     narration_segments: list[dict[str, Any]] = field(default_factory=list)
+    worker_runs: list[dict[str, Any]] = field(default_factory=list)
     compaction_count: int = 0
     turn_trace_emitted: bool = False
     usage_recorded: bool = False
@@ -155,6 +176,23 @@ def read_sdk_loop_settings(supabase: Any, user_id: str | None = None) -> dict[st
     return {"enabled": enabled, "settings": settings}
 
 
+def native_subagent_requirements(
+    *,
+    message: str,
+    intent: dict[str, Any] | None,
+) -> tuple[str, ...]:
+    """Return the single Phase-D delegation contract; do not generalize before London."""
+
+    intent = intent or {}
+    if str(intent.get("move_type") or intent.get("intent") or "") != "strategic_synthesis":
+        return ()
+    if str(intent.get("depth") or "") != "deep":
+        return ()
+    if not P4_THIN_SLICE_SIGNALS.search(message):
+        return ()
+    return P4_THIN_SLICE_REQUIRED_AGENTS
+
+
 def stream_vcso_sdk_turn(
     *,
     prompt: str,
@@ -173,6 +211,8 @@ def stream_vcso_sdk_turn(
     heartbeat_seconds: float = 10.0,
     usage_sink: UsageSink | None = None,
     query_impl: QueryImpl = query,
+    native_subagent_required_agents: tuple[str, ...] = (),
+    native_subagent_scopes: dict[str, dict[str, Any]] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -201,6 +241,8 @@ def stream_vcso_sdk_turn(
                         usage_sink=usage_sink,
                         events=events,
                         query_impl=query_impl,
+                        native_subagent_required_agents=native_subagent_required_agents,
+                        native_subagent_scopes=native_subagent_scopes or {},
                     )
                 )
             )
@@ -243,6 +285,8 @@ async def _run_sdk_turn(
     usage_sink: UsageSink | None,
     events: queue.Queue[dict[str, Any] | _WorkerFailure | object],
     query_impl: QueryImpl,
+    native_subagent_required_agents: tuple[str, ...],
+    native_subagent_scopes: dict[str, dict[str, Any]],
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -253,6 +297,47 @@ async def _run_sdk_turn(
     turn_trace_emitted = False
     usage_recorded = False
     next_step_index = step_index_offset + 1
+    native_mode = bool(native_subagent_required_agents)
+    required_agents = tuple(
+        key for key in native_subagent_required_agents if key in P4_NATIVE_SUBAGENT_KEYS
+    )
+    task_capabilities: dict[str, str] = {}
+    task_contracts: dict[str, dict[str, Any]] = {}
+    task_sources: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    worker_results: dict[str, Any] = {}
+    completed_agents: set[str] = set()
+    delegation_count = 0
+    max_delegations = len(required_agents)
+    plan_statuses = {key: "pending" for key in required_agents}
+
+    def emit_plan_update() -> None:
+        if not native_mode:
+            return
+        labels = {
+            "structured_data_agent": "Bind the latest founder financial dataset",
+            "sandbox_execution_agent": "Compute concentration and margin trend",
+            "per_user_wiki": "Review strategic pricing and constraint context",
+        }
+        todos = [
+            {
+                "id": key,
+                "content": labels.get(key, key.replace("_", " ").title()),
+                "status": plan_statuses[key],
+                "position": index,
+            }
+            for index, key in enumerate(required_agents)
+        ]
+        todos.append(
+            {
+                "id": "compose",
+                "content": "Compose the cited 90-day recommendation",
+                "status": "in_progress" if completed_agents.issuperset(required_agents) else "pending",
+                "position": len(todos),
+            }
+        )
+        events.put({"event": "todos_updated", "data": {"todos": todos, "sdkMode": True}})
+
+    emit_plan_update()
 
     definitions = _selected_definitions(registry, tool_names)
     tool_context.metadata["enforce_persistence_guardrail"] = True
@@ -299,8 +384,134 @@ async def _run_sdk_turn(
             }
         )
 
+    def emit_subagent_start(capability_key: str, tool_use_id: str) -> None:
+        step_index = allocate_step(tool_use_id, "Task")
+        title = _subagent_title(capability_key)
+        events.put(
+            {
+                "event": "step",
+                "data": {
+                    "stepIndex": step_index,
+                    "stepType": "sub_agent",
+                    "title": title,
+                    "summary": f"{title} is gathering a compact cited finding.",
+                    "status": "running",
+                    "sourceRefs": [],
+                    "capabilityKey": capability_key,
+                    "parentToolUseId": tool_use_id,
+                },
+            }
+        )
+        events.put(
+            {
+                "event": "tool_call",
+                "data": {
+                    "stepIndex": step_index,
+                    "stepType": "sub_agent",
+                    "title": title,
+                    "tool": "Task",
+                    "input": {},
+                    "summary": f"Delegated to {title.lower()} with a bounded task contract.",
+                    "status": "running",
+                    "sourceRefs": [],
+                    "capabilityKey": capability_key,
+                    "parentToolUseId": tool_use_id,
+                },
+            }
+        )
+
+    async def pre_task_use(
+        input_data: dict[str, Any],
+        tool_use_id: str | None,
+        _context: Any,
+    ) -> dict[str, Any]:
+        nonlocal delegation_count
+        tool_input = input_data.get("tool_input") if isinstance(input_data.get("tool_input"), dict) else {}
+        capability_key = str(tool_input.get("subagent_type") or "").strip()
+        task_id = str(tool_use_id or "")
+        try:
+            contract = _parse_task_contract(tool_input.get("prompt"))
+            if capability_key not in required_agents:
+                raise ValueError("This Phase-D canary may delegate only the approved thin-slice workers.")
+            if capability_key in task_capabilities.values():
+                raise ValueError("Each approved thin-slice worker may run only once per turn.")
+            if delegation_count >= max_delegations:
+                raise ValueError("The Phase-D per-turn delegation cap has been reached.")
+            if capability_key == "sandbox_execution_agent":
+                if "structured_data_agent" not in completed_agents:
+                    raise ValueError("Run structured_data_agent to completion before sandbox_execution_agent.")
+                prior = (contract.get("context_scope") or {}).get("prior_findings")
+                if not prior:
+                    raise ValueError("The sandbox contract must inherit the compact structured-data finding.")
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": str(exc),
+                }
+            }
+        delegation_count += 1
+        task_capabilities[task_id] = capability_key
+        task_contracts[capability_key] = contract
+        plan_statuses[capability_key] = "in_progress"
+        emit_subagent_start(capability_key, task_id)
+        emit_plan_update()
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "Approved bounded Phase-D delegation contract.",
+            }
+        }
+
     async def post_tool_use(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
         sdk_tool_name = str(input_data.get("tool_name") or "tool")
+        if sdk_tool_name.startswith(f"mcp__{SDK_TOOL_SERVER_NAME}__run_"):
+            _record_post_tool_trace(metadata=trace_metadata, tool_name=sdk_tool_name, tool_use_id=tool_use_id)
+            return {}
+        if sdk_tool_name == "Task":
+            task_id = str(tool_use_id or "")
+            capability_key = task_capabilities.get(task_id, "bounded_worker")
+            step_index = allocate_step(task_id, sdk_tool_name)
+            result = worker_results.get(capability_key)
+            status = "completed" if result is not None and result.status == "completed" else "failed"
+            sources = task_sources.get(task_id, [])
+            title = _subagent_title(capability_key)
+            summary = (
+                str(result.result_summary or f"{title} returned a compact finding.")[:500]
+                if result is not None
+                else f"{title} could not complete; the turn stayed bounded."
+            )
+            safe_output = {
+                "run_id": getattr(result, "run_id", None),
+                "capability_key": capability_key,
+                "status": status,
+                "result_summary": summary,
+            }
+            step = {
+                "stepIndex": step_index,
+                "stepType": "sub_agent",
+                "title": title,
+                "tool": "Task",
+                "input": {},
+                "output": json.dumps(safe_output),
+                "summary": summary,
+                "status": status,
+                "sourceRefs": sources,
+                "parentToolUseId": task_id,
+                "capabilityKey": capability_key,
+            }
+            trace_steps.append(step)
+            _record_post_tool_trace(metadata=trace_metadata, tool_name=sdk_tool_name, tool_use_id=tool_use_id)
+            events.put({"event": "tool_result", "data": step})
+            if status == "completed":
+                completed_agents.add(capability_key)
+                plan_statuses[capability_key] = "completed"
+            else:
+                plan_statuses[capability_key] = "pending"
+            emit_plan_update()
+            return {}
         registry_name = _registry_name(sdk_tool_name)
         step_index = step_indexes.get(str(tool_use_id or sdk_tool_name)) or allocate_step(tool_use_id, sdk_tool_name)
         outcome = tool_outcomes[sdk_tool_name].popleft() if tool_outcomes[sdk_tool_name] else _ToolOutcome("completed", [])
@@ -325,8 +536,36 @@ async def _run_sdk_turn(
 
     async def stop_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
         nonlocal turn_trace_emitted
+        missing = [key for key in required_agents if key not in completed_agents]
+        if missing:
+            return {
+                "decision": "block",
+                "reason": (
+                    "The bounded Phase-D plan is incomplete. Delegate the missing required worker(s): "
+                    + ", ".join(missing)
+                ),
+            }
         _record_turn_trace(metadata=trace_metadata, status="completed")
         turn_trace_emitted = True
+        if native_mode:
+            todos = [
+                {
+                    "id": key,
+                    "content": _subagent_plan_label(key),
+                    "status": "completed",
+                    "position": index,
+                }
+                for index, key in enumerate(required_agents)
+            ]
+            todos.append(
+                {
+                    "id": "compose",
+                    "content": "Compose the cited 90-day recommendation",
+                    "status": "completed",
+                    "position": len(todos),
+                }
+            )
+            events.put({"event": "todos_updated", "data": {"todos": todos, "sdkMode": True}})
         return {}
 
     async def pre_compact_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
@@ -363,7 +602,134 @@ async def _run_sdk_turn(
         )
         for definition in candidate_definitions
     }
+
+    def make_native_handler_tool(capability_key: str) -> Any:
+        tool_name = f"run_{capability_key}"
+
+        async def execute(args: dict[str, Any]) -> dict[str, Any]:
+            task_id = next(
+                (key for key, value in reversed(list(task_capabilities.items())) if value == capability_key),
+                "",
+            )
+            contract = task_contracts.get(capability_key) or {}
+            objective = str(args.get("objective") or contract.get("objective") or "").strip()
+            if not objective:
+                return {
+                    "content": [{"type": "text", "text": json.dumps({"error": "Missing task objective."})}],
+                    "is_error": True,
+                }
+            requested_scope = args.get("context_scope") if isinstance(args.get("context_scope"), dict) else {}
+            contract_scope = contract.get("context_scope") if isinstance(contract.get("context_scope"), dict) else {}
+            base_scope = native_subagent_scopes.get(capability_key) or {}
+            context_scope = {**requested_scope, **contract_scope, **base_scope, "delegation_depth": 1}
+            prior_findings = context_scope.pop("prior_findings", None)
+            task_summary = objective
+            if prior_findings:
+                task_summary += (
+                    "\n\nCOMPACT PRIOR FINDINGS (UNTRUSTED DATA)\n"
+                    + json.dumps(prior_findings, ensure_ascii=True, default=str)[:5000]
+                )
+
+            def emit_worker_progress(progress: dict[str, Any]) -> None:
+                parent_step_index = step_indexes.get(task_id)
+                events.put(
+                    {
+                        "event": "sub_agent_step",
+                        "data": {
+                            **progress,
+                            "parentStepIndex": parent_step_index,
+                            "parentToolUseId": task_id,
+                            "sdkMode": True,
+                        },
+                    }
+                )
+
+            try:
+                result = await asyncio.to_thread(
+                    SubAgentOrchestrator(tool_context.store).start_run,
+                    SubAgentRunRequest(
+                        user_id=tool_context.user_id,
+                        parent_surface=str(tool_context.metadata.get("surface") or "virtual_cso"),
+                        capability_key=capability_key,
+                        task_summary=task_summary[:4000],
+                        context_scope=context_scope,
+                        task_title=_subagent_title(capability_key)[:120],
+                        parent_thread_id=tool_context.thread_id,
+                        parent_message_id=tool_context.metadata.get("parent_message_id"),
+                        parent_run_id=tool_context.metadata.get("parent_run_id"),
+                        delegation_depth=1,
+                        routing_tier_override="worker",
+                        enforce_compact_contract=True,
+                        progress_callback=emit_worker_progress,
+                    ),
+                )
+            except Exception as exc:  # noqa: BLE001 - the Task receives a bounded worker failure
+                logger.warning("SDK native subagent %s failed safely: %s", capability_key, exc)
+                return {
+                    "content": [{"type": "text", "text": json.dumps({"error": "Worker failed safely."})}],
+                    "is_error": True,
+                }
+
+            worker_results[capability_key] = result
+            citations = [item for item in result.citations if isinstance(item, dict)]
+            task_sources[task_id].extend(citations)
+            source_refs.extend(citations)
+            curated_sources = _curated_worker_sources(citations)
+            if curated_sources:
+                events.put(
+                    {
+                        "event": "sources_updated",
+                        "data": {"sources": curated_sources, "sdkMode": True},
+                    }
+                )
+            safe_result = {
+                "run_id": result.run_id,
+                "status": result.status,
+                "result_summary": result.result_summary,
+                "structured_result": result.structured_result,
+                "citations": citations,
+            }
+            return {"content": [{"type": "text", "text": json.dumps(safe_result, default=str)[:12000]}]}
+
+        return tool(
+            tool_name,
+            f"Run the founder-scoped bounded {capability_key} implementation for an approved Task contract.",
+            {
+                "type": "object",
+                "properties": {
+                    "objective": {"type": "string"},
+                    "output_format": {"type": ["string", "object", "array"]},
+                    "tools_sources": {"type": "array", "items": {"type": "string"}},
+                    "boundaries": {"type": "array", "items": {"type": "string"}},
+                    "context_scope": {"type": "object", "additionalProperties": True},
+                },
+                "required": ["objective", "output_format", "tools_sources", "boundaries", "context_scope"],
+            },
+            annotations=ToolAnnotations(
+                title=_subagent_title(capability_key),
+                readOnlyHint=True,
+                destructiveHint=False,
+                idempotentHint=False,
+                openWorldHint=False,
+            ),
+        )(execute)
+
+    native_subagent_tools = (
+        {key: make_native_handler_tool(key) for key in P4_NATIVE_SUBAGENT_KEYS}
+        if native_mode
+        else {}
+    )
     post_hooks = [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])]
+    if native_mode:
+        post_hooks.append(HookMatcher(matcher="Task", hooks=[post_tool_use]))
+    hooks: dict[str, Any] = {
+        "PostToolUse": post_hooks,
+        "Stop": [HookMatcher(hooks=[stop_hook])],
+        "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
+    }
+    if native_mode:
+        hooks["PreToolUse"] = [HookMatcher(matcher="Task", hooks=[pre_task_use])]
+    native_prompt = _native_lead_prompt(required_agents) if native_mode else ""
     compiled = compile_founder_sdk_options(
         store=tool_context.store,
         user_id=tool_context.user_id,
@@ -380,16 +746,15 @@ async def _run_sdk_turn(
             "the founder one brief action-oriented progress line wrapped exactly in <narration> and "
             "</narration>. Narration says what you are doing next, never why you reasoned privately, and "
             "never contains tool inputs or results. Do not wrap the final answer in narration markers."
+            + native_prompt
         ),
         main_model=model,
         api_key=api_key,
-        hooks={
-            "PostToolUse": post_hooks,
-            "Stop": [HookMatcher(hooks=[stop_hook])],
-            "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
-        },
+        hooks=hooks,
         max_turns=max_turns,
         max_budget_usd=max_budget_usd,
+        enable_native_subagents=native_mode,
+        native_subagent_tools=native_subagent_tools,
     )
     options = compiled.options
     trace_metadata.update(
@@ -397,6 +762,9 @@ async def _run_sdk_turn(
             "sdk_compiled_tool_count": len(compiled.tool_names),
             "sdk_compiled_agent_count": len(compiled.agent_tool_grants),
             "sdk_compiled_connector_count": len(compiled.connector_names),
+            "sdk_native_subagent_mode": native_mode,
+            "sdk_required_subagents": list(required_agents),
+            "sdk_agent_model_routes": compiled.agent_model_routes if native_mode else {},
         }
     )
 
@@ -411,10 +779,16 @@ async def _run_sdk_turn(
 
     async for message in query_impl(prompt=prompt, options=options):
         if isinstance(message, StreamEvent):
+            if message.parent_tool_use_id:
+                # Child text/tool payloads stay inside the native subagent context. Curated handler
+                # progress is emitted separately through sub_agent_step events.
+                continue
             event = message.event
             if event.get("type") == "content_block_start":
                 block = event.get("content_block") or {}
                 if block.get("type") == "tool_use":
+                    if native_mode and str(block.get("name") or "") == "Task":
+                        continue
                     emit_tool_start(
                         str(block.get("name") or "tool"),
                         str(block.get("id") or block.get("name") or "tool"),
@@ -471,6 +845,13 @@ async def _run_sdk_turn(
             token_data["segmentId"] = segment_id
         events.put({"event": "token", "data": token_data})
 
+    missing_after_query = [key for key in required_agents if key not in completed_agents]
+    if missing_after_query:
+        _record_turn_trace(metadata=trace_metadata, status="failed")
+        raise RuntimeError(
+            "Claude Agent SDK native-subagent turn ended before required workers completed: "
+            + ", ".join(missing_after_query)
+        )
     if not turn_trace_emitted:
         _record_turn_trace(metadata=trace_metadata, status="completed")
         turn_trace_emitted = True
@@ -502,6 +883,15 @@ async def _run_sdk_turn(
             {"segmentId": segment_id, "text": text.strip()}
             for segment_id, text in sorted(narration_by_segment.items())
             if text.strip()
+        ],
+        worker_runs=[
+            {
+                "run_id": result.run_id,
+                "capability_key": capability_key,
+                "status": result.status,
+                "result_summary": result.result_summary,
+            }
+            for capability_key, result in worker_results.items()
         ],
         compaction_count=compaction_count,
         turn_trace_emitted=turn_trace_emitted,
@@ -614,6 +1004,94 @@ def _humanize_tool_name(name: str) -> str:
     return name.replace("_", " ").replace("-", " ").strip().title() or "ArchitectOS tool"
 
 
+def _subagent_title(capability_key: str) -> str:
+    labels = {
+        "structured_data_agent": "Structured data worker",
+        "sandbox_execution_agent": "Sandbox compute worker",
+        "per_user_wiki": "Strategic context worker",
+        "document_analysis_agent": "Document analysis worker",
+        "kb_explorer_agent": "Knowledge base worker",
+        "per_user_document_wiki": "Document wiki worker",
+        "global_ip": "ArchitectOS IP worker",
+    }
+    return labels.get(capability_key, _humanize_tool_name(capability_key))
+
+
+def _subagent_plan_label(capability_key: str) -> str:
+    labels = {
+        "structured_data_agent": "Bind the latest founder financial dataset",
+        "sandbox_execution_agent": "Compute concentration and margin trend",
+        "per_user_wiki": "Review strategic pricing and constraint context",
+    }
+    return labels.get(capability_key, _subagent_title(capability_key))
+
+
+def _parse_task_contract(value: Any) -> dict[str, Any]:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("Task prompt must be one JSON object containing the delegation contract.")
+    contract = json.loads(value)
+    if not isinstance(contract, dict):
+        raise ValueError("Task prompt must decode to a JSON object.")
+    required = ("objective", "output_format", "tools_sources", "boundaries", "context_scope")
+    missing = [key for key in required if key not in contract]
+    if missing:
+        raise ValueError("Task contract is missing: " + ", ".join(missing))
+    if not isinstance(contract.get("objective"), str) or not contract["objective"].strip():
+        raise ValueError("Task contract objective must be a non-empty string.")
+    if not isinstance(contract.get("tools_sources"), list) or not contract["tools_sources"]:
+        raise ValueError("Task contract tools_sources must be a non-empty list.")
+    if not isinstance(contract.get("boundaries"), list) or not contract["boundaries"]:
+        raise ValueError("Task contract boundaries must be a non-empty list.")
+    if not isinstance(contract.get("context_scope"), dict):
+        raise ValueError("Task contract context_scope must be an object.")
+    return contract
+
+
+def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
+    required = ", ".join(required_agents)
+    return (
+        "\n\nPHASE-D NATIVE SUBAGENT CONTRACT. This exact canary is a genuine multi-part synthesis; "
+        f"you must delegate exactly once to each approved worker: {required}. "
+        "Use the SDK Task tool. Run structured_data_agent first. Its compact Task result must then be "
+        "included under context_scope.prior_findings in the sandbox_execution_agent Task contract; "
+        "never send a raw dataset to the sandbox. The strategic-context worker may run before or after "
+        "structured data, but sandbox must wait for structured data to finish. Every Task prompt must be "
+        "exactly one JSON object with keys objective, output_format, tools_sources, boundaries, and "
+        "context_scope. Boundaries must require founder isolation, citations, compact output, no raw "
+        "payloads, no wiki writes, no recursion, and no external writes. Compose only after every required "
+        "Task completes. For all non-canary/simple turns, answer directly and do not use Task."
+    )
+
+
+def _curated_worker_sources(sources: list[dict[str, Any]]) -> list[dict[str, str]]:
+    curated: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for source in sources:
+        source_kind = str(source.get("source_kind") or source.get("kind") or "context")
+        label = str(
+            source.get("source_label")
+            or source.get("label")
+            or source.get("title")
+            or source.get("source_title")
+            or "Worker evidence"
+        )[:160]
+        kind = (
+            "wiki"
+            if "wiki" in source_kind
+            else "ip"
+            if "ip" in source_kind
+            else "platform"
+            if source_kind in {"founder_dataset", "dataset_row", "sub_agent_run"}
+            else "context"
+        )
+        key = (kind, label)
+        if key in seen:
+            continue
+        seen.add(key)
+        curated.append({"kind": kind, "label": label})
+    return curated[:16]
+
+
 def _curated_tool_copy(name: str, *, running: bool, failed: bool = False) -> tuple[str, str, str]:
     lower = name.lower()
     step_type = "source_review" if any(token in lower for token in ("wiki", "kb_", "search", "read", "list")) else "tool_call"
@@ -635,7 +1113,7 @@ def _record_turn_trace(*, metadata: dict[str, Any], status: str) -> None:
             "vcso_sdk_turn",
             run_type="chain",
             inputs={"surface": "virtual_cso"},
-            metadata={**metadata, "hook": "Stop", "sdk_phase": "04B-C"},
+            metadata={**metadata, "hook": "Stop", "sdk_phase": metadata.get("sdk_phase", "04B-C")},
             tags=[VCSO_SDK_CAPABILITY_KEY],
         ) as run:
             run.end(outputs={"status": status})
@@ -653,7 +1131,12 @@ def _record_post_tool_trace(*, metadata: dict[str, Any], tool_name: str, tool_us
             "vcso_sdk_post_tool_use",
             run_type="tool",
             inputs={"tool": _registry_name(tool_name)},
-            metadata={**metadata, "tool_use_id": tool_use_id, "hook": "PostToolUse", "sdk_phase": "04B-C"},
+            metadata={
+                **metadata,
+                "tool_use_id": tool_use_id,
+                "hook": "PostToolUse",
+                "sdk_phase": metadata.get("sdk_phase", "04B-C"),
+            },
             tags=[VCSO_SDK_CAPABILITY_KEY],
         ) as run:
             run.end(outputs={"status": "completed"})

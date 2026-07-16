@@ -41,9 +41,11 @@ from services.vcso_working_state import WorkingStateService, assemble, normalize
 from services.vcso_source_router import SourceRouter, TIER_LABELS
 from services.vcso_planner import PLANNER_FLAG, VcsoPlanner, planner_entry_allowed
 from services.vcso_sdk_loop import (
+    SDK_NATIVE_SUBAGENT_SCHEMA_VERSION,
     SDK_STANDARD_SCHEMA_VERSION,
     VCSO_SDK_CAPABILITY_KEY,
     VcsoSdkUsage,
+    native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
 )
@@ -386,10 +388,19 @@ class VcsoChatService:
             "capability_key": "vcso_chat",
         }
 
+        sdk_flag = self._sdk_loop_settings(user_id)
+        native_required_agents = (
+            native_subagent_requirements(message=payload.text, intent=turn_intent)
+            if bool(sdk_flag.get("enabled")) and not deep_mode and not is_deep_resume
+            else ()
+        )
+        sdk_native_subagent_mode = bool(native_required_agents)
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
-        planner_path_selected = bool(planner_flag.get("enabled")) and planner_entry_allowed(
-            turn_intent, planner_threshold
+        planner_path_selected = (
+            not sdk_native_subagent_mode
+            and bool(planner_flag.get("enabled"))
+            and planner_entry_allowed(turn_intent, planner_threshold)
         )
         planner_result = None
         if planner_path_selected:
@@ -548,7 +559,6 @@ class VcsoChatService:
             }
             return
 
-        sdk_flag = self._sdk_loop_settings(user_id)
         sdk_mode = bool(sdk_flag.get("enabled")) and not deep_mode and not is_deep_resume and not planner_path_selected
         self._active_turn["ready_emitted"] = True
         yield {
@@ -566,6 +576,7 @@ class VcsoChatService:
                     "requiredPlatformContext": context["route"]["required"],
                     "allowDraftIp": context["allow_draft_ip"],
                     **_assembly_ready_payload(context),
+                    "plannerMode": sdk_native_subagent_mode,
                 },
                 "agentSteps": initial_trace_steps,
                 "deepMode": deep_mode,
@@ -625,7 +636,7 @@ class VcsoChatService:
                 trace_metadata={
                     **trace_metadata,
                     "capability_key": VCSO_SDK_CAPABILITY_KEY,
-                    "sdk_phase": "04B-C",
+                    "sdk_phase": "04B-D" if sdk_native_subagent_mode else "04B-C",
                 },
                 initial_sources=list(context.get("prefetched_source_refs") or []),
                 step_index_offset=len(initial_trace_steps),
@@ -634,6 +645,17 @@ class VcsoChatService:
                 tool_timeout_seconds=float(self.settings.vcso_tool_max_seconds),
                 heartbeat_seconds=TOOL_HEARTBEAT_SECONDS,
                 usage_sink=record_sdk_usage,
+                native_subagent_required_agents=native_required_agents,
+                native_subagent_scopes=(
+                    self._sdk_native_subagent_scopes(
+                        user_id=user_id,
+                        thread_id=thread_id,
+                        message=payload.text,
+                        turn_intent=turn_intent,
+                    )
+                    if sdk_native_subagent_mode
+                    else {}
+                ),
             )
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))
@@ -654,15 +676,24 @@ class VcsoChatService:
                 assistant_message["id"],
                 sdk_result.answer_text,
                 sdk_citations,
-                result_schema_version=SDK_STANDARD_SCHEMA_VERSION,
+                result_schema_version=(
+                    SDK_NATIVE_SUBAGENT_SCHEMA_VERSION
+                    if sdk_native_subagent_mode
+                    else SDK_STANDARD_SCHEMA_VERSION
+                ),
                 metadata={
                     "sdk_session_id": sdk_result.session_id,
-                    "sdk_phase": "04B-C",
+                    "sdk_phase": "04B-D" if sdk_native_subagent_mode else "04B-C",
                     "streaming": "partial_text_delta",
                     "sdk_compaction_count": sdk_result.compaction_count,
                     "sdk_turn_trace_emitted": sdk_result.turn_trace_emitted,
                     "sdk_usage_recorded": sdk_result.usage_recorded,
                     "narration_segments": sdk_result.narration_segments,
+                    "native_subagent_mode": sdk_native_subagent_mode,
+                    "required_subagents": list(native_required_agents),
+                    "worker_runs": sdk_result.worker_runs,
+                    "delegation_depth_cap": 1,
+                    "delegation_count_cap": len(native_required_agents),
                 },
             )
             self._active_turn["run_completed"] = True
@@ -675,6 +706,10 @@ class VcsoChatService:
             )
             trace_steps = [*initial_trace_steps, *sdk_result.tool_steps]
             for step in sdk_result.tool_steps:
+                try:
+                    persisted_output = json.loads(step.get("output") or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    persisted_output = {}
                 self._create_step(
                     run_id,
                     user_id,
@@ -683,7 +718,7 @@ class VcsoChatService:
                     title=str(step.get("title") or "SDK step"),
                     summary=str(step.get("summary") or "SDK step complete."),
                     input_summary={},
-                    output_summary={},
+                    output_summary=persisted_output,
                     source_refs=step.get("sourceRefs") if isinstance(step.get("sourceRefs"), list) else [],
                     tool_name=step.get("tool"),
                     status="failed" if step.get("status") == "failed" else "completed",
@@ -727,6 +762,7 @@ class VcsoChatService:
                     "deepMode": False,
                     "agentStatus": "complete",
                     "sdkMode": True,
+                    "plannerMode": sdk_native_subagent_mode,
                 },
             }
             return
@@ -1647,6 +1683,39 @@ class VcsoChatService:
     def _sdk_loop_settings(self, user_id: str | None = None) -> dict[str, Any]:
         """Read the 04B SDK flag fail-closed; absent or unreadable means off."""
         return read_sdk_loop_settings(self.supabase, user_id)
+
+    def _sdk_native_subagent_scopes(
+        self,
+        *,
+        user_id: str,
+        thread_id: str,
+        message: str,
+        turn_intent: dict[str, Any] | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Select founder-scoped P4 worker inputs without handing selection authority to the SDK."""
+
+        routed = SourceRouter(self.store).route_for_worker(
+            user_id=user_id,
+            message=message,
+            intent=turn_intent,
+            worker_hint="structured_data_agent",
+        )
+        dataset_ids = [
+            str(ref.get("source_id"))
+            for ref in routed.source_refs[:20]
+            if ref.get("source_kind") == "founder_dataset" and ref.get("source_id")
+        ]
+        return {
+            "structured_data_agent": {
+                "dataset_ids": list(dict.fromkeys(dataset_ids)),
+                "router_decision": routed.decision.to_dict(),
+            },
+            "sandbox_execution_agent": {"thread_id": thread_id},
+            "per_user_wiki": {
+                "wiki_tool": "wiki_search",
+                "wiki_query": message[:1000],
+            },
+        }
 
     def _run_planner_or_none(
         self,

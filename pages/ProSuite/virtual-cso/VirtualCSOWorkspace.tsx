@@ -300,6 +300,10 @@ export const VirtualCSOWorkspace: React.FC = () => {
           );
         },
         onPlanUpdate: setLiveTodos,
+        onSourcesUpdate: (sources) => {
+          if (!targetChatId) return;
+          setSourcesByChat((current) => ({ ...current, [targetChatId!]: sources }));
+        },
       });
 
       targetChatId = result.chat.id;

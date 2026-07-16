@@ -88,7 +88,7 @@ def _capability(key, tools, *, routing_tier=None):
     }
 
 
-def _compile_for(user_id, *, connection_user_id=None):
+def _compile_for(user_id, *, connection_user_id=None, native_subagents=False):
     tables = {
         "tool_registry": [
             {"slug": "wiki_search", "enabled": True, "is_code_registered": True},
@@ -147,6 +147,15 @@ def _compile_for(user_id, *, connection_user_id=None):
         hooks={},
         max_turns=6,
         max_budget_usd=0.25,
+        enable_native_subagents=native_subagents,
+        native_subagent_tools=(
+            {
+                "wiki_agent": {"name": "run_wiki_agent"},
+                "sandbox_agent": {"name": "run_sandbox_agent"},
+            }
+            if native_subagents
+            else None
+        ),
     )
 
 
@@ -182,6 +191,27 @@ def test_compiler_scopes_connectors_grants_and_tier_models_per_founder(monkeypat
     assert locked.agent_tool_grants["wiki_agent"] == ["wiki_search"]
     assert other_founder.connector_names == []
     assert other_founder.options.allowed_tools == ["mcp__architectos__wiki_search"]
+
+
+def test_compiler_enables_task_only_for_lead_and_keeps_worker_recursion_blocked(monkeypatch):
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.create_sdk_mcp_server",
+        lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
+    )
+    compiled = _compile_for("founder-12", native_subagents=True)
+
+    assert "Task" in compiled.options.allowed_tools
+    assert "Task" not in compiled.options.disallowed_tools
+    assert compiled.agent_handler_tools == {
+        "sandbox_agent": "run_sandbox_agent",
+        "wiki_agent": "run_wiki_agent",
+    }
+    assert compiled.options.agents["sandbox_agent"].tools == [
+        "mcp__architectos__run_sandbox_agent"
+    ]
+    assert "Task" in compiled.options.agents["sandbox_agent"].disallowedTools
+    assert "Agent" in compiled.options.agents["sandbox_agent"].disallowedTools
+    assert compiled.options.agents["sandbox_agent"].model == "claude-haiku-test"
 
 
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():
