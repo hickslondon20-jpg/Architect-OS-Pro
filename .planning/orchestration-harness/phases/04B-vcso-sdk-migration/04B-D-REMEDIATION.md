@@ -608,3 +608,164 @@ run the one-worker repro once. Pass = one `agent_delegation_runs` child row (cor
 `tier_worker → claude-haiku-4-5`) created **before** the synthesis, and a cited answer composed from it;
 logs show `app-owned worker completed … run_id=…`. Then **STOP and re-darken.** Do **not** run the full
 three-worker anchor.
+
+## 19. Post-deploy no-credit verification + canary runbook (2026-07-16)
+
+**v0.6.57 is live and correct.** HEAD/origin = `0e2a90bfb1cbc09cf6fcc42aafd3a428699bc3fa`; Railway +
+Vercel report success for that SHA; 14 focused tests + compile/diff passed (other agent). The shipped
+`vcso_sdk_loop.py` contains Path A (`run_app_owned_workers`, `_native_synthesis_prompt`,
+`enable_native_subagents=False`, `options.allowed_tools = []`) plus two sound hardenings: (a) the
+app-owned run is wrapped so a worker failure sets `native_mode=False`/`required_agents=()` and **fails
+open to the standard SDK path** instead of raising; (b) `options.agents = {}` in native mode so the
+compose-only lead has **no** Task surface at all. Runtime review: the worker call reuses the proven
+`SubAgentOrchestrator.start_run` signature; the fail-open reassignment is closure-safe (`emit_plan_update`
+/`stop_hook`/`missing_after_query` all re-read the updated `native_mode`/`required_agents`); the child
+row + `tier_worker → claude-haiku-4-5` come deterministically from the orchestrator before synthesis.
+
+**Live flag state confirmed dark (read-only, no credits):** `vcso_sdk_loop` `is_enabled=false`,
+`test_user_ids=[]`, `enabled_for_all=false`, `default=false`, `diagnostic_user_ids=[]`,
+`diagnostic_single_worker_enabled=false`; `vcso_planner` `is_enabled=false`, empty allowlists.
+
+**Blocked:** the one-worker canary spends execution credits, which are currently limited — not run.
+
+**Canary runbook (execute when credits allow):**
+1. Re-confirm deployed Railway head == `0e2a90bf` and `/api/health` `ok=true`.
+2. Enroll via the same diagnostic single-worker mechanism used in §14/§16: founder
+   `cd490873-99aa-4533-9240-f0aa04deb54f` only, single worker `structured_data_agent`
+   (`diagnostic_single_worker_enabled=true`, founder in `diagnostic_user_ids`); caps `max_turns=6`,
+   `max_budget_usd=0.25`. `vcso_planner` stays off.
+3. Send exactly one retained anchor turn through the authenticated VCSO UI.
+4. **Pass criteria:** one `agent_delegation_runs` child row linked to the parent, `tier_worker →
+   claude-haiku-4-5`, created **before** synthesis; a cited answer composed from that finding; logs show
+   `app-owned worker completed capability=structured_data_agent run_id=…`; runtime-manifest lifecycle =
+   `app_owned`; **no** lead `run_<agent>`/Task attempt and no `agent_id`-gate denial.
+5. **Immediately re-darken** and read back all flags off. Do **not** run the full three-worker anchor.
+
+**Residual risk to watch in the canary:** the synthesis lead keeps the selected registry tools *visible*
+(compiled with `enable_native_subagents=False`) though `allowed_tools=[]` denies them under `dontAsk`. If
+the log shows the lead repeatedly attempting a registry tool → denied → exhausting `max_turns` without
+composing, harden by compiling the synthesis lead tool-free (pass `requested_tool_names=[]` for native,
+or clear `options.mcp_servers` after compile). Expected behavior is a clean compose from the injected
+findings, but this is the first thing to check if the answer fails to render.
+
+## 20. Path A single-worker canary — PASSED (2026-07-16)
+
+**First successful Phase-D delegation after Fixes A/B/C all failed.** Run under v0.6.57
+(`0e2a90bf`, Railway/Vercel green, `/api/health ok=true`), founder-only single-worker diagnostic
+(`structured_data_agent`); `vcso_planner` untouched. Founder sent one retained anchor turn.
+
+- **Parent run:** `2bcda40b-2003-4d4d-829f-4b633f8c4373` — status **completed** (not failed at the
+  six-turn cap), 15:02:55 → 15:03:28 UTC. Cited answer composed from the worker finding
+  (June P&L `$45,000` net revenue / `$8,325` net income / 18.5% margin, cited `[SEED — Q2 2026 P&L
+  Dataset]`).
+- **Child row:** `6d84569f-f59c-4f81-80c8-e0baf7d58790`, `capability_key=structured_data_agent`,
+  `parent_run_id=2bcda40b…`, status **completed**, created 15:02:56 — **~32s before** the parent
+  finished. Exactly one child (correct for single-worker mode). This is the deterministic child row
+  Path A was built to create; every prior fix produced zero.
+- **Lifecycle (parent metadata):** `native_handler_entry` → `native_handler_completion`
+  (`child_run_id=6d84569f…`, `child_status=completed`) → `runtime_manifest decision=app_owned,
+  reason_code=none`. `tool_use_id=app_structured_data_agent` (app-owned). **No** Task, SubagentStart,
+  `run_<agent>` lead call, or `agent_id`-absent gate denial — the tool-visibility trap is eliminated.
+- **Model/cost:** synthesis lead on `claude-sonnet-4-6` (role=main), 9,704 in / 1,137 out,
+  `cost_usd=$0.0597` — well under the `$0.25` cap and far below the prior failed runs' 73k-token
+  max-turn burns. Intent + after-turn utilities on Haiku. No Haiku *worker* row exists because
+  `structured_data_agent` is **deterministic** (binds the dataset, no LLM call) — consistent with prior
+  runs; the `tier_worker → haiku` check applies to LLM workers (e.g. sandbox), not this one.
+- **Re-darkened immediately:** `vcso_sdk_loop` read back `is_enabled=false`, empty
+  `test_user_ids`/`diagnostic_user_ids`, `diagnostic_single_worker_enabled=false`, diagnostic worker
+  key removed; `vcso_planner` still off.
+
+**Verdict:** Path A (deterministic application-owned delegation) works end-to-end for the single-worker
+slice — deterministic child creation, parent-linked, composed cited answer, bounded cost, clean
+lifecycle. **STOP.** The full three-worker anchor (adds the LLM sandbox-compute + wiki workers and
+exercises `tier_worker → claude-haiku-4-5` + the prior-findings chain) is the next, separately-gated
+step for London's authorization.
+
+## 21. Full three-worker anchor — BLOCKED by per_user_wiki embedding dependency (2026-07-16)
+
+Run under v0.6.57 (`0e2a90bf`, health ok), founder-only full Phase-D path (all three workers;
+`diagnostic_single_worker_enabled=false`); one anchor turn; `vcso_planner` untouched. Re-darkened
+immediately after (read back `is_enabled=false`, empty allowlists).
+
+**Outcome: not a pass, and not a Path A defect.** The app-owned delegation engine worked; a downstream
+worker has a pre-existing environment gap.
+
+- **Parent** `ca9fdd94-ac84-437b-a171-a02c21c4729f` — completed (via fail-open), cited answer,
+  15:11:25 → 15:12:12.
+- **Child 1** `4a35dbfb…` `structured_data_agent` — **completed** (deterministic, dataset bound).
+- **Child 2** `44829dfe…` `per_user_wiki` — **failed**, `error_message: "OPENAI_API_KEY is required for
+  embedding."` (`wiki_search` needs a vector-embedding key not provisioned in Railway).
+- **Child 3** `sandbox_execution_agent` — **never ran.**
+- **Parent lifecycle:** `native_handler_entry(structured)` → `native_handler_completion(structured,
+  child=4a35dbfb, completed)` → `native_handler_entry(per_user_wiki)` →
+  `native_handler_failure(per_user_wiki, SubAgentError)` → fail-open (schema reverts to
+  `vcso_tool_loop_v1`; no `app_owned` manifest). The runner raised on the wiki error, the v0.6.57
+  fail-open wrapper set `native_mode=False`, and the turn composed via the standard path — so sandbox
+  (ordered third, after wiki) was never reached and the compute chain did not execute.
+
+**Root cause:** `per_user_wiki` vector search requires `OPENAI_API_KEY` for embeddings, which is absent.
+Per CLAUDE.md ("openai package is dead code — remove it"; Claude-locked stack), the sanctioned fix is
+to migrate wiki embeddings off OpenAI to the approved embedding path; the fast unblock is provisioning
+`OPENAI_API_KEY` in the Railway backend. Either way this is a **pre-existing wiki-infrastructure gap,
+independent of Phase-D delegation** — the single-worker canary (§20) already proved the engine.
+
+**Two Path A robustness improvements this surfaced (for London's decision — not yet implemented):**
+1. **Worker ordering:** run the mandatory compute chain first — `structured_data_agent →
+   sandbox_execution_agent → per_user_wiki` — so a supplementary-worker failure cannot pre-empt the
+   sandbox compute.
+2. **Failure granularity:** treat `structured_data_agent` + `sandbox_execution_agent` as **mandatory**
+   (fail-open only if one of those fails) and `per_user_wiki` as **best-effort** (log + continue to
+   the app-owned synthesis with the completed mandatory findings, marking wiki unavailable). Today any
+   worker failure hard-fails the whole turn open — which discards even completed compute results. This
+   matches the thin-slice spec (mandatory = the two compute workers; wiki = strategic context).
+
+**Sandbox worker remains unproven via Path A** (wiki failed before it). It cannot be cleanly isolated
+under the current single-worker diagnostic (sandbox depends on the structured finding). Recommended
+sequence: (a) fix the wiki embedding dependency **and/or** apply improvements #1–#2; (b) re-run the
+full anchor. **STOP for London.**
+
+## 22. Wiki root cause + Path A robustness improvements (proposed v0.6.58) — 2026-07-16
+
+### 22.1 per_user_wiki failure is environment, not code (and not Phase-D)
+
+`services/vector_store.py:43` builds the OpenAI client whenever `settings.openai_api_key` is present
+(`core/config.py` reads env alias `OPENAI_API_KEY`) and uses it freely; the
+`"OPENAI_API_KEY is required for embedding"` guard (`:414`) only fires when that key resolves **empty in
+the running backend process**. There is **no code rule** blocking OpenAI — the wiki failure means the
+deployed `architectos-ingestion` process didn't see the key.
+
+- **Confirm via** `GET /api/debug/provider-config` (needs `ARCHITECTOS_INGEST_SECRET`): returns
+  `openai_env_present` (process env) + `openai_settings_present` (settings loader). Both false → the var
+  isn't on the deployed backend service env (set on a different Railway service/env, added after the
+  last deploy without a redeploy, or a name typo). Fix: set exactly `OPENAI_API_KEY` on the backend
+  service and redeploy; re-check the endpoint shows both true. No code change needed to "allow" OpenAI.
+
+### 22.2 CLAUDE.md rule updated (London's call)
+
+Rule #2 retired/rewritten: Claude for founder-facing synthesis; **OpenAI required (no substitute) for
+embeddings (`text-embedding-3-small`), metadata (`gpt-4o-mini`), RAG**; Cohere for rerank; agents may
+use cheaper models **case-by-case via the MA-06 tier map** (not user-facing). Intelligence-Layer provider
+row split into "Synthesis LLM = Claude" / "Embeddings/RAG/rerank = OpenAI + Cohere." (Working-tree edit,
+normalized to LF so the diff is just the two content hunks.)
+
+### 22.3 Path A robustness (v0.6.58) — implemented, py_compile-verified
+
+`run_app_owned_workers` (`vcso_sdk_loop.py`), +38/−2:
+1. **Ordering:** mandatory compute chain first — `structured_data_agent → sandbox_execution_agent →
+   per_user_wiki` — so a supplementary-worker failure cannot pre-empt sandbox.
+2. **Failure granularity:** `structured_data_agent` + `sandbox_execution_agent` are **mandatory** (their
+   failure raises → fail-open, as before); `per_user_wiki` is **best-effort** — on failure it is logged,
+   recorded (`native_handler_failure … mandatory=false`), dropped from `required_agents` (so the
+   downstream invariant + `stop_hook` pass), a `sub_agent_step status=failed` is emitted, and the turn
+   continues to synthesis with the completed mandatory findings.
+
+**Verified here:** `py_compile` clean; `git diff` = exactly the two hunks. **Focused tests not run
+in-sandbox.** Test updates needed before deploy: assert the new ordering; assert a `per_user_wiki`
+failure yields a completed turn from `structured + sandbox` (not fail-open); assert a mandatory failure
+still fails open.
+
+**Handoff:** update/run focused tests → commit `v0.6.58 Path A worker ordering + best-effort wiki`
+(CLAUDE.md same or a separate doc commit) → deploy → confirm head == SHA. Then, once Railway
+`OPENAI_API_KEY` is confirmed on the backend, re-run the full three-worker anchor (same
+enroll/turn/verify/re-darken split) — a wiki hiccup will no longer block `structured → sandbox`, so
+sandbox (the last unproven worker, and the original P4 defect) finally gets exercised.

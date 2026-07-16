@@ -56,8 +56,12 @@ Every commit to this repo is version-tagged so the `git` history reads as an ord
 
 When adding new synthesis, ask: does this live inside a Python service, does it need token-by-token streaming to the browser, or does it need external scheduling/retries? That answers which lane it belongs to — N8N is no longer the fallback answer for "everything else."
 
-### 2. openai package is dead code — remove it
-The `openai` npm package is a legacy remnant. All synthesis has migrated to Claude (via N8N or direct Python-backend calls, including the Virtual CSO streaming service — see Rule #1). Remove the package and any import that references it.
+### 2. Model provider policy — Claude for synthesis, OpenAI for embeddings/RAG, agent model flexibility
+**Revised 2026-07-16.** The earlier "remove all OpenAI / Claude-only" rule was written before the full RAG scope was known. It is **too restrictive and is retired.** The policy now:
+- **Founder-facing synthesis** (Virtual CSO compose, planner/decompose/compose, domain-agent answers) runs on **Claude** — e.g. `claude-sonnet-4-6` for synthesis, `claude-haiku-4-5` for workers/utilities.
+- **The retrieval / embedding / RAG stack requires OpenAI and there is no substitute.** Query + document **embeddings** use OpenAI (`text-embedding-3-small`, `OPENAI_EMBEDDING_MODEL`); wiki/document **metadata enrichment** uses an OpenAI model (`gpt-4o-mini`, `OPENAI_METADATA_MODEL`); **Cohere** (`rerank-v4.0-pro`) handles reranking. Do **not** remove the backend `openai`/`cohere` packages or their imports — they are load-bearing for embeddings, vector search, retrieval, and ingestion. `OPENAI_API_KEY` (and `COHERE_API_KEY`) are required backend runtime secrets.
+- **Agents may use a different or cheaper model where it makes sense**, allocated **case-by-case** via the MA-06 per-capability tier map — not a user-facing model switcher. Keep model choice at the capability grain.
+- Still forbidden: **client-side (browser) model/API calls** for any provider (see Rule #1) — keys stay server-side.
 
 ### 3. MRA checkpoint content is in Supabase — not a config file
 125 checkpoints × 5 AE Ladder stages = 500 stage-calibrated definitions live in the `mra_checkpoints` table (or similar) in Supabase. Do not create a config file for this content. Verify the table, don't recreate it.
@@ -212,19 +216,4 @@ See `../ArchitectOS Beta Launch/ArchitectOS Design System/uploads/ArchitectOS-de
 |---|---|---|
 | Backend for ingestion | TBD — evaluate Ep1 | Weigh Python/FastAPI vs. extending N8N or Vercel serverless |
 | Doc processing | TBD — evaluate Ep1 | Weigh Docling vs. N8N-native processing |
-| Vector search | Supabase pgvector (already in use) | Confirmed — matches their stack |
-| Hybrid search / reranking | TBD — evaluate Ep1 | Their approach is a clear upgrade over static KB |
-| LLM provider | Claude Sonnet (locked) | Our stack constraint — never swap for OpenAI-compatible |
-| Observability | LangSmith adopted 2026-07-06; instrumentation rebuilt + outcome-verified 2026-07-10 | Standing bar: any Python-backend LLM call on an episode's critical path emits a LangSmith trace as evidence; traces are necessary, not sufficient, and must be paired with DB/output checks. |
-
-### Intelligence Layer Vision
-
-See `.planning/INTELLIGENCE-VISION.md` for the canonical architecture document — four-tier
-retrieval model, the question types the platform must answer, the compiled wiki design, the
-retrieval router, and the beta launch target state. **Read this before scoping any new
-intelligence layer phase or episode.**
-
-### Progress Tracking
-
-See `Pro-Suite-Progress.md` (repo root) for the live episode-by-episode status tracker.
-See `.planning/ROADMAP.md` for the KB Explorer build phase tracker (Phases 1–9).
+| Vector search 

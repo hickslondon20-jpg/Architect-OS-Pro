@@ -1013,8 +1013,15 @@ async def _run_sdk_turn(
         # select a handler (the visibility trap that failed the native attempts). This guarantees the
         # mandatory children deterministically; depth/isolation/tier/caps/citations are enforced inside
         # the orchestrator.
-        ordered = [k for k in ("structured_data_agent", "per_user_wiki", "sandbox_execution_agent") if k in required_agents]
+        nonlocal required_agents
+        # Improvement #1 (ordering): run the mandatory compute chain first (structured -> sandbox),
+        # then the best-effort strategic-context worker, so a wiki failure cannot pre-empt sandbox.
+        ordered = [k for k in ("structured_data_agent", "sandbox_execution_agent", "per_user_wiki") if k in required_agents]
         ordered += [k for k in required_agents if k not in ordered]
+        # Improvement #2 (failure granularity): the two compute workers are mandatory; per_user_wiki is
+        # best-effort. A mandatory failure fails the turn open to flat; a best-effort failure is logged
+        # and the turn continues to synthesis with the completed mandatory findings.
+        mandatory_workers = {"structured_data_agent", "sandbox_execution_agent"}
         objectives = {
             "structured_data_agent": (
                 "Bind the founder's latest ready financial dataset and return the compact, cited "
@@ -1085,8 +1092,9 @@ async def _run_sdk_turn(
                         progress_callback=emit_worker_progress,
                     ),
                 )
-            except Exception as exc:  # noqa: BLE001 - a worker failure fails the native turn open to flat
+            except Exception as exc:  # noqa: BLE001 - mandatory fails open; best-effort continues
                 logger.warning("app-owned worker %s failed: %s", capability_key, exc)
+                is_mandatory = capability_key in mandatory_workers
                 record_lifecycle(
                     "native_handler_failure",
                     capability_key=capability_key,
@@ -1094,8 +1102,32 @@ async def _run_sdk_turn(
                     app_owned=True,
                     tool_use_id=task_id,
                     reason_code=type(exc).__name__,
+                    mandatory=is_mandatory,
                 )
-                raise RuntimeError(f"App-owned worker {capability_key} failed: {exc}") from exc
+                if is_mandatory:
+                    # A missing compute worker leaves nothing to compose from -> fail open to flat.
+                    raise RuntimeError(f"App-owned worker {capability_key} failed: {exc}") from exc
+                # Best-effort worker (per_user_wiki): drop it from the required set so the downstream
+                # invariant passes and the turn composes from the completed mandatory findings, then
+                # continue to the next worker instead of terminalizing the turn.
+                logger.warning("app-owned best-effort worker %s unavailable; continuing", capability_key)
+                required_agents = tuple(k for k in required_agents if k != capability_key)
+                plan_statuses.pop(capability_key, None)
+                events.put(
+                    {
+                        "event": "sub_agent_step",
+                        "data": {
+                            "parentToolUseId": task_id,
+                            "capabilityKey": capability_key,
+                            "status": "failed",
+                            "title": _subagent_title(capability_key),
+                            "summary": f"{_subagent_title(capability_key)} was unavailable; continued without it.",
+                            "sdkMode": True,
+                        },
+                    }
+                )
+                emit_plan_update()
+                continue
             worker_results[capability_key] = result
             completed_agents.add(capability_key)
             plan_statuses[capability_key] = "completed"
