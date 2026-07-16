@@ -471,6 +471,37 @@ async def _run_sdk_turn(
             }
         }
 
+    async def pre_worker_handler(
+        input_data: dict[str, Any],
+        _tool_use_id: str | None,
+        _context: Any,
+    ) -> dict[str, Any]:
+        # Each approved worker's sole implementation tool is mcp__architectos__run_<capability>.
+        # Under permissionMode="dontAsk" the global allowed_tools grant is Task-only, so the handler
+        # call would be denied as un-pre-approved. Pre-approve it here - but only when it originates
+        # inside a Task-spawned subagent (agent_id present) and targets an approved required worker.
+        # A direct lead call (no agent_id) is denied so pre_task_use stays the only delegation entry
+        # path and its contract/ordering/cap guardrails cannot be bypassed.
+        tool_name = str(input_data.get("tool_name") or "")
+        capability_key = tool_name.split(f"mcp__{SDK_TOOL_SERVER_NAME}__run_", 1)[-1]
+        if bool(input_data.get("agent_id")) and capability_key in required_agents:
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                    "permissionDecisionReason": "Approved bounded Phase-D worker handler.",
+                }
+            }
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    "Worker handler tools run only inside an approved Phase-D subagent delegation."
+                ),
+            }
+        }
+
     async def post_tool_use(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
         sdk_tool_name = str(input_data.get("tool_name") or "tool")
         if sdk_tool_name.startswith(f"mcp__{SDK_TOOL_SERVER_NAME}__run_"):
@@ -734,7 +765,13 @@ async def _run_sdk_turn(
         "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
     }
     if native_mode:
-        hooks["PreToolUse"] = [HookMatcher(matcher="Task", hooks=[pre_task_use])]
+        hooks["PreToolUse"] = [
+            HookMatcher(matcher="Task", hooks=[pre_task_use]),
+            HookMatcher(
+                matcher=rf"^mcp__{SDK_TOOL_SERVER_NAME}__run_",
+                hooks=[pre_worker_handler],
+            ),
+        ]
     native_prompt = _native_lead_prompt(required_agents) if native_mode else ""
     compiled = compile_founder_sdk_options(
         store=tool_context.store,
