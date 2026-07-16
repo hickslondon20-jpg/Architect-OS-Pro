@@ -235,8 +235,12 @@ def _looks_like_money_movement(tool_name: str, description: str, annotations: An
     text = f"{tool_name} {description}".lower()
     money_actions = (
         "create_payment",
+        "record_payment",
+        "delete_payment",
+        "void_payment",
         "send_payment",
         "make_payment",
+        "pay_bill",
         "transfer_funds",
         "bank_transfer",
         "issue_refund",

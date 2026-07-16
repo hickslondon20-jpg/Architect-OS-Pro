@@ -421,10 +421,10 @@ def _enforce_persistence_guardrail(definition: ToolDefinition, context: ToolExec
     context as quarantined before a later write can run.
     """
 
-    if not bool(context.metadata.get("enforce_persistence_guardrail")):
-        return
     if bool((definition.mcp_metadata or {}).get("moves_money")):
         raise MoneyMovementBlocked(f"Tool {definition.name!r} is blocked: ArchitectOS never moves money.")
+    if not bool(context.metadata.get("enforce_persistence_guardrail")):
+        return
     if definition.persistence_semantics == "read_only":
         return
 

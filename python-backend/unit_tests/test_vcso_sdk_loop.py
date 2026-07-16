@@ -77,7 +77,7 @@ def _capture_sdk_tools(monkeypatch):
         captured.update({"name": name, "version": version, "tools": tools})
         return {"type": "sdk", "name": name, "tools": tools}
 
-    monkeypatch.setattr("services.vcso_sdk_loop.create_sdk_mcp_server", fake_server)
+    monkeypatch.setattr("services.vcso_sdk_config.create_sdk_mcp_server", fake_server)
     return captured
 
 

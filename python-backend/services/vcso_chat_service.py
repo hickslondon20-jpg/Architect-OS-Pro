@@ -623,7 +623,7 @@ class VcsoChatService:
                 trace_metadata={
                     **trace_metadata,
                     "capability_key": VCSO_SDK_CAPABILITY_KEY,
-                    "sdk_phase": "04B-B",
+                    "sdk_phase": "04B-C",
                 },
                 initial_sources=list(context.get("prefetched_source_refs") or []),
                 step_index_offset=len(initial_trace_steps),
@@ -655,7 +655,7 @@ class VcsoChatService:
                 result_schema_version=SDK_STANDARD_SCHEMA_VERSION,
                 metadata={
                     "sdk_session_id": sdk_result.session_id,
-                    "sdk_phase": "04B-B",
+                    "sdk_phase": "04B-C",
                     "streaming": "partial_text_delta",
                     "sdk_compaction_count": sdk_result.compaction_count,
                     "sdk_turn_trace_emitted": sdk_result.turn_trace_emitted,

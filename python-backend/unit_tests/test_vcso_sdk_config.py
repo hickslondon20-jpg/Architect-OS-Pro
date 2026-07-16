@@ -88,7 +88,7 @@ def _capability(key, tools, *, routing_tier=None):
     }
 
 
-def _compile_for(user_id):
+def _compile_for(user_id, *, connection_user_id=None):
     tables = {
         "tool_registry": [
             {"slug": "wiki_search", "enabled": True, "is_code_registered": True},
@@ -104,11 +104,12 @@ def _compile_for(user_id):
         ],
         "beta_user_access": [
             {"user_id": "founder-12", "beta_cohort_week": 12, "is_beta": True, "status": "active"},
+            {"user_id": "founder-other", "beta_cohort_week": 12, "is_beta": True, "status": "active"},
             {"user_id": "founder-1", "beta_cohort_week": 1, "is_beta": True, "status": "active"},
         ],
         "mcp_connections": [
             {
-                "user_id": user_id,
+                "user_id": connection_user_id or user_id,
                 "server_name": "quickbooks",
                 "transport": "http",
                 "config": {"url": "https://mcp.example.test/quickbooks"},
@@ -136,7 +137,10 @@ def _compile_for(user_id):
         user_id=user_id,
         registry=registry,
         requested_tool_names=["wiki_search", "mcp_quickbooks_read_report"],
-        internal_mcp_server={"type": "sdk", "name": "architectos"},
+        sdk_tools_by_name={
+            name: {"name": name}
+            for name in ("wiki_search", "execute_code", "mcp_quickbooks_read_report")
+        },
         system_prompt="VCSO",
         main_model="claude-sonnet-test",
         api_key="test-key",
@@ -146,11 +150,20 @@ def _compile_for(user_id):
     )
 
 
-def test_compiler_scopes_connectors_grants_and_tier_models_per_founder():
+def test_compiler_scopes_connectors_grants_and_tier_models_per_founder(monkeypatch):
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.create_sdk_mcp_server",
+        lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
+    )
     unlocked = _compile_for("founder-12")
     locked = _compile_for("founder-1")
+    other_founder = _compile_for("founder-other", connection_user_id="founder-12")
 
     assert unlocked.tool_names == ["wiki_search", "mcp_quickbooks_read_report"]
+    assert unlocked.options.allowed_tools == [
+        "mcp__architectos__wiki_search",
+        "mcp__quickbooks__mcp_quickbooks_read_report",
+    ]
     assert unlocked.connector_names == ["quickbooks"]
     assert set(unlocked.options.mcp_servers) == {"architectos", "quickbooks"}
     assert unlocked.agent_tool_grants["wiki_agent"] == ["wiki_search", "mcp_quickbooks_read_report"]
@@ -163,9 +176,12 @@ def test_compiler_scopes_connectors_grants_and_tier_models_per_founder():
     assert unlocked.agent_model_routes["wiki_agent"]["setting_key"] == "wiki_agent"
 
     assert locked.tool_names == ["wiki_search"]
+    assert locked.options.allowed_tools == ["mcp__architectos__wiki_search"]
     assert locked.connector_names == []
     assert set(locked.options.mcp_servers) == {"architectos"}
     assert locked.agent_tool_grants["wiki_agent"] == ["wiki_search"]
+    assert other_founder.connector_names == []
+    assert other_founder.options.allowed_tools == ["mcp__architectos__wiki_search"]
 
 
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():

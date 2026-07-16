@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import queue
+import re
 import threading
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
@@ -16,7 +17,6 @@ from claude_agent_sdk import (
     HookMatcher,
     ResultMessage,
     ToolAnnotations,
-    create_sdk_mcp_server,
     query,
     tool,
 )
@@ -296,8 +296,9 @@ async def _run_sdk_turn(
         events.put({"event": "step", "data": {key: value for key, value in step.items() if key not in {"tool", "input", "output"}}})
         return {}
 
-    sdk_tools = [
-        _make_sdk_tool(
+    candidate_definitions = registry.definitions() if hasattr(registry, "definitions") else definitions
+    sdk_tools_by_name = {
+        definition.name: _make_sdk_tool(
             definition=definition,
             registry=registry,
             tool_context=tool_context,
@@ -308,16 +309,15 @@ async def _run_sdk_turn(
             timeout_seconds=tool_timeout_seconds,
             heartbeat_seconds=heartbeat_seconds,
         )
-        for definition in definitions
-    ]
-    server = create_sdk_mcp_server(name=SDK_TOOL_SERVER_NAME, version="1.0.0", tools=sdk_tools)
-    post_hooks = [HookMatcher(matcher=f"^{SDK_TOOL_PREFIX}.*$", hooks=[post_tool_use])]
+        for definition in candidate_definitions
+    }
+    post_hooks = [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])]
     compiled = compile_founder_sdk_options(
         store=tool_context.store,
         user_id=tool_context.user_id,
         registry=registry,
         requested_tool_names=[definition.name for definition in definitions],
-        internal_mcp_server=server,
+        sdk_tools_by_name=sdk_tools_by_name,
         system_prompt=(
             system_prompt
             + "\n\nThe standard Virtual CSO loop is running through the Claude Agent SDK. Use only the "
@@ -427,7 +427,7 @@ def _make_sdk_tool(
     timeout_seconds: float,
     heartbeat_seconds: float,
 ) -> Any:
-    sdk_name = _sdk_tool_name(definition.name)
+    sdk_name = _sdk_tool_name(definition)
 
     async def execute(args: dict[str, Any]) -> dict[str, Any]:
         task = asyncio.create_task(asyncio.to_thread(registry.execute, definition.name, tool_context, args))
@@ -466,7 +466,7 @@ def _make_sdk_tool(
                 "is_error": True,
             }
 
-    read_only_hint = _read_only_hint(definition.name)
+    read_only_hint = getattr(definition, "persistence_semantics", "read_only") == "read_only"
     decorated = tool(
         definition.name,
         definition.description,
@@ -493,24 +493,24 @@ def _selected_definitions(registry: ToolRegistry, tool_names: list[str]) -> list
     return selected
 
 
-def _sdk_tool_name(registry_name: str) -> str:
-    return f"{SDK_TOOL_PREFIX}{registry_name}"
+def _sdk_tool_name(definition: ToolDefinition) -> str:
+    if getattr(definition, "source", "native") == "mcp":
+        raw_server = str((getattr(definition, "mcp_metadata", {}) or {}).get("server_name") or "connector")
+        server_name = re.sub(r"[^a-z0-9_-]+", "-", raw_server.lower()).strip("-") or "connector"
+        return f"mcp__{server_name}__{definition.name}"
+    return f"{SDK_TOOL_PREFIX}{definition.name}"
 
 
 def _registry_name(sdk_tool_name: str) -> str:
-    return sdk_tool_name[len(SDK_TOOL_PREFIX) :] if sdk_tool_name.startswith(SDK_TOOL_PREFIX) else sdk_tool_name
+    if sdk_tool_name.startswith("mcp__"):
+        parts = sdk_tool_name.split("__", 2)
+        if len(parts) == 3:
+            return parts[2]
+    return sdk_tool_name
 
 
 def _humanize_tool_name(name: str) -> str:
     return name.replace("_", " ").replace("-", " ").strip().title() or "ArchitectOS tool"
-
-
-def _read_only_hint(name: str) -> bool:
-    """Conservative Phase-B hint only; Phase C adds registry-enforced persistence semantics."""
-
-    lower = name.lower()
-    write_tokens = ("annotate", "write", "edit", "create", "update", "delete", "register", "persist")
-    return not any(token in lower for token in write_tokens)
 
 
 def _curated_tool_copy(name: str, *, running: bool, failed: bool = False) -> tuple[str, str, str]:
@@ -534,7 +534,7 @@ def _record_turn_trace(*, metadata: dict[str, Any], status: str) -> None:
             "vcso_sdk_turn",
             run_type="chain",
             inputs={"surface": "virtual_cso"},
-            metadata={**metadata, "hook": "Stop", "sdk_phase": "04B-B"},
+            metadata={**metadata, "hook": "Stop", "sdk_phase": "04B-C"},
             tags=[VCSO_SDK_CAPABILITY_KEY],
         ) as run:
             run.end(outputs={"status": status})
@@ -552,7 +552,7 @@ def _record_post_tool_trace(*, metadata: dict[str, Any], tool_name: str, tool_us
             "vcso_sdk_post_tool_use",
             run_type="tool",
             inputs={"tool": _registry_name(tool_name)},
-            metadata={**metadata, "tool_use_id": tool_use_id, "hook": "PostToolUse", "sdk_phase": "04B-B"},
+            metadata={**metadata, "tool_use_id": tool_use_id, "hook": "PostToolUse", "sdk_phase": "04B-C"},
             tags=[VCSO_SDK_CAPABILITY_KEY],
         ) as run:
             run.end(outputs={"status": "completed"})

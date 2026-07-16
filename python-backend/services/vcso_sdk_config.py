@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from claude_agent_sdk import ClaudeAgentOptions
+from claude_agent_sdk import ClaudeAgentOptions, create_sdk_mcp_server
 from claude_agent_sdk.types import AgentDefinition
 
 from services.agent_capabilities import AgentCapability, AgentCapabilityRegistry
@@ -15,7 +15,6 @@ from services.tool_registry import ToolDefinition, ToolRegistry
 
 
 SDK_INTERNAL_SERVER = "architectos"
-SDK_INTERNAL_PREFIX = f"mcp__{SDK_INTERNAL_SERVER}__"
 CLAUDE_PROVIDER = "anthropic"
 DISALLOWED_SDK_BUILTINS = [
     "Bash",
@@ -47,7 +46,7 @@ def compile_founder_sdk_options(
     user_id: str,
     registry: ToolRegistry,
     requested_tool_names: list[str],
-    internal_mcp_server: Any,
+    sdk_tools_by_name: dict[str, Any],
     system_prompt: str,
     main_model: str,
     api_key: str,
@@ -64,9 +63,7 @@ def compile_founder_sdk_options(
 
     client = getattr(store, "client", None)
     enabled_catalog = _enabled_catalog_names(client) if client is not None else None
-    connected_servers, external_mcp_servers = (
-        _connected_sdk_servers(client, user_id=user_id) if client is not None else ([], {})
-    )
+    connected_servers = _connected_sdk_servers(client, user_id=user_id) if client is not None else []
     selected, excluded = _select_definitions(
         registry,
         requested_tool_names,
@@ -97,7 +94,7 @@ def compile_founder_sdk_options(
     )
     for capability in capabilities:
         grant_names = [name for name in capability.allowed_tools if name in selectable_names]
-        sdk_grants = [_internal_tool_name(name) for name in grant_names]
+        sdk_grants = [_sdk_tool_name(registry.get(name)) for name in grant_names]
         route = resolve_capability_model(store, capability=capability, fallback_model=main_model)
         agents[capability.capability_key] = AgentDefinition(
             description=capability.description or capability.label,
@@ -111,10 +108,31 @@ def compile_founder_sdk_options(
         agent_tool_grants[capability.capability_key] = grant_names
         agent_model_routes[capability.capability_key] = route
 
-    mcp_servers = {SDK_INTERNAL_SERVER: internal_mcp_server, **external_mcp_servers}
+    definition_by_name = {definition.name: definition for definition in selected}
+    for definition in registry.definitions() if hasattr(registry, "definitions") else []:
+        definition_by_name.setdefault(definition.name, definition)
+    used_names: list[str] = [definition.name for definition in selected]
+    for grant_names in agent_tool_grants.values():
+        used_names.extend(name for name in grant_names if name not in used_names)
+    grouped_tools: dict[str, list[Any]] = {SDK_INTERNAL_SERVER: []}
+    connected_set = set(connected_servers)
+    for name in used_names:
+        definition = definition_by_name.get(name)
+        sdk_tool = sdk_tools_by_name.get(name)
+        if definition is None or sdk_tool is None:
+            continue
+        server_name = _definition_server_name(definition)
+        if server_name != SDK_INTERNAL_SERVER and server_name not in connected_set:
+            continue
+        grouped_tools.setdefault(server_name, []).append(sdk_tool)
+    mcp_servers = {
+        server_name: create_sdk_mcp_server(name=server_name, version="1.0.0", tools=server_tools)
+        for server_name, server_tools in grouped_tools.items()
+    }
+    compiled_connectors = sorted(name for name in grouped_tools if name != SDK_INTERNAL_SERVER)
     options = ClaudeAgentOptions(
         tools=[],
-        allowed_tools=[_internal_tool_name(definition.name) for definition in selected],
+        allowed_tools=[_sdk_tool_name(definition) for definition in selected],
         disallowed_tools=list(DISALLOWED_SDK_BUILTINS),
         agents=agents,
         mcp_servers=mcp_servers,
@@ -136,7 +154,7 @@ def compile_founder_sdk_options(
         tool_names=[definition.name for definition in selected],
         agent_tool_grants=agent_tool_grants,
         agent_model_routes=agent_model_routes,
-        connector_names=connected_servers,
+        connector_names=compiled_connectors,
         excluded_tool_names=excluded,
     )
 
@@ -227,7 +245,7 @@ def _grantable_names(
     return names
 
 
-def _connected_sdk_servers(client: Any, *, user_id: str) -> tuple[list[str], dict[str, Any]]:
+def _connected_sdk_servers(client: Any, *, user_id: str) -> list[str]:
     try:
         rows = (
             client.table("mcp_connections")
@@ -239,23 +257,15 @@ def _connected_sdk_servers(client: Any, *, user_id: str) -> tuple[list[str], dic
             or []
         )
     except Exception:
-        return [], {}
+        return []
 
     names: list[str] = []
-    servers: dict[str, Any] = {}
     for row in rows:
         server_name = str(row.get("server_name") or "").strip().lower()
         if not server_name or not sdk_connector_available(client, user_id=user_id, server_name=server_name):
             continue
-        config = row.get("config") if isinstance(row.get("config"), dict) else {}
-        transport = str(row.get("transport") or "").lower()
-        url = str(config.get("url") or "").strip()
-        if transport != "http" or not url.startswith("https://"):
-            continue
-        sdk_name = _safe_server_name(server_name)
-        servers[sdk_name] = {"type": "http", "url": url}
-        names.append(server_name)
-    return names, servers
+        names.append(_safe_server_name(server_name))
+    return names
 
 
 def _capability_prompt(capability: AgentCapability) -> str:
@@ -274,8 +284,15 @@ def _capability_max_turns(capability: AgentCapability) -> int:
         return 1
 
 
-def _internal_tool_name(name: str) -> str:
-    return f"{SDK_INTERNAL_PREFIX}{name}"
+def _sdk_tool_name(definition: ToolDefinition) -> str:
+    return f"mcp__{_definition_server_name(definition)}__{definition.name}"
+
+
+def _definition_server_name(definition: ToolDefinition) -> str:
+    if getattr(definition, "source", "native") != "mcp":
+        return SDK_INTERNAL_SERVER
+    server_name = str((getattr(definition, "mcp_metadata", {}) or {}).get("server_name") or "")
+    return _safe_server_name(server_name)
 
 
 def _safe_server_name(name: str) -> str:
