@@ -1,8 +1,11 @@
 # 04B Phase C2 Completion — Streaming Surface Redesign
 
-**Completed:** 2026-07-15  
-**Decision:** **PASS — native SDK streaming surface and reload lifecycle proven on live.**  
-**Checkpoint:** Phase C2 complete; return to London. Phase D has not started.  
+**Completed:** 2026-07-15
+
+**Decision:** **PASS — native SDK streaming surface and reload lifecycle proven on live.**
+
+**Checkpoint:** Phase C2 complete; return to London. Phase D has not started.
+
 **Production state:** `vcso_sdk_loop` disabled, `enabled_for_all=false`, `default=false`, zero enrolled founders.
 
 ## Shipped behind the existing SDK flag
