@@ -45,7 +45,8 @@ commits per `CLAUDE.md`. **Decisive unknown gated first:** SDK token-streaming g
 |---|---|---|
 | A | Streaming spike + SDK proof-of-loop | Real token stream renders natively through SSE on one trivial VCSO turn (dark flag); a hook emits a LangSmith trace paired to a usage row. **Resolves Q1.** |
 | B | SDK loop for standard VCSO (parallel) | One real standard VCSO turn end-to-end on the SDK path (canary founder), SSE contract unchanged, 160-char fake deleted, matched-set cost/quality at parity-or-better, traces paired to usage rows. |
-| C | Registry → SDK-config compiler + extensions | Per-founder `ClaudeAgentOptions` compiled from `tool_registry` × `agent_capabilities` × active `mcp_connections`; `persistence_semantics` live and enforcing read-only-vs-write guardrails; Q2 + tier→model resolver resolved. |
+| C | Registry → SDK-config compiler + extensions | Per-founder `ClaudeAgentOptions` compiled from `tool_registry` × `agent_capabilities` × active `mcp_connections`; `persistence_semantics` live and enforcing read-only-vs-write guardrails; tier→model resolver resolved (Q2 resolved — see detail). |
+| C2 | Streaming surface redesign (UI/UX) | The transparency/streaming surface matches the target screenshots: token-by-token answer + streamed curated narration, drill-down step chips (not blocky accordions), living right-hand plan panel. Visual-only against the stable SSE schema (one normalizer tweak). The migration's first `src/` phase. |
 | D | Native subagents — the P4 re-approach | The P4 thin-slice strategic question decomposes **correctly** (spawns the mandatory structured-data **and** sandbox children), plan + workers visible via MA-05, correct tiers, budget/depth caps enforced. **STOP-and-review checkpoint** — the one P4 never reached. |
 | E | Sessions + Deep Mode reconciliation | A Deep Mode thread pauses on `ask_user` and resumes with full context via SDK sessions; `agent_todos` plan + workspace persist with no double-bookkeeping against resume-state. |
 | F | First live MCP (QuickBooks) | Live QuickBooks P&L pull through a bounded worker, cited, **read-only**, founder-scoped via vault auth, ephemeral; freshness policy chose the live source; write/privileged blocked at runtime. Ties to harness Phase 5. |
@@ -73,12 +74,28 @@ authenticated control/canary set (cost + quality), SSE contract byte-stable for 
 ### Phase C — Registry → SDK-config compiler + extensions
 Make the registry compile the per-founder SDK config. Add `persistence_semantics`
 (`read_only`/`persist_artifact`/`write_external`/`privileged`) to `tool_registry` + `ToolDefinition`
-and enforce the guardrail (read-only auto-approves; write/privileged confirm + quarantine). Resolve
-**Q2** (connector catalog: reuse `feature_registry` vs. new `connectors` table) and the tier→model
-resolver. Emit `ClaudeAgentOptions` (`allowed_tools`, `agents`, `mcp_servers`) from
+and enforce the guardrail (read-only auto-approves; write/privileged confirm + quarantine). Resolve the
+tier→model resolver. **Q2 resolved (2026-07-15):** for the pilot, gate connector availability via
+`feature_registry` (`beta_unlock_week`) and keep minimal connector config in code + `mcp_connections`;
+**defer a dedicated `connectors` table until connector #2.** Emit `ClaudeAgentOptions`
+(`allowed_tools`, `agents`, `mcp_servers`) from
 `agent_capabilities` × `tool_registry` × active `mcp_connections`. Curate any third-party MCP tool
 descriptions to the ACI standard. **Gate:** generated options scope correctly per founder; per-agent
 tool grants hold; guardrail enforced; `ai_usage_log` untouched.
+
+### Phase C2 — Streaming Surface Redesign (UI/UX)
+The migration's **first `src/` phase** and its first explicit UX phase. Phases A–B upgraded the *data*
+(real tokens + curated steps over the stable SSE schema) but reused the old MA-05 transparency
+components, so the surface still feels blocky and templated. C2 redesigns the frontend that consumes the
+stable event stream to match the approved screenshots: **token-by-token streaming of the answer *and*
+the curated interstitial narration** (the "now I'll…" lines — curated, never raw CoT), **drill-down
+step chips** instead of heavy accordions, and the **living right-hand plan/scratchpad panel**. One small
+backend piece: ensure the normalizer streams interstitial assistant narration as tokens rather than
+folding it into blocky step summaries. **Visual-only otherwise** — no change to loop logic, retrieval,
+registry, or the SSE contract. Sequenced after C so the config work is settled; extends as D (subagent
+steps) and E (Deep Mode plan) enrich the event stream. **Gate:** the surface matches the approved
+screenshots on the canary; no backend logic regressed; SSE contract byte-stable; locks intact (no raw
+payloads / no raw CoT).
 
 ### Phase D — Native subagents (the P4 re-approach)
 Replace the planner futures/heartbeats and generic orchestration plumbing with **SDK-native
@@ -118,7 +135,7 @@ root `ROADMAP.md` (founder-gated).
 | Move | Change | Drives |
 |---|---|---|
 | `persistence_semantics` | New attribute on `tool_registry` + `ToolDefinition`: `read_only`/`persist_artifact`/`write_external`/`privileged` | Guardrails: auto-approve reads; confirm + quarantine writes; never move money |
-| Connector catalog (Q2) | Reuse `feature_registry` (`beta_unlock_week`) for availability/gating **or** add `connectors` table | Skimmable "what connectors exist + which beta week"; SDK `mcp_servers` compile |
+| Connector catalog (Q2 — resolved) | Pilot: gate via `feature_registry` (`beta_unlock_week`); connector config in code + `mcp_connections`. Defer a `connectors` table until connector #2 | Skimmable availability + gating; SDK `mcp_servers` compile |
 | Tier→model resolver | Confirm/formalize `routing_tier`→`ai_models` resolution | Per-agent model in compiled SDK options; tier authority stays at capability grain |
 
 ## Relationship to harness Phases 4–7
@@ -131,6 +148,8 @@ root `ROADMAP.md` (founder-gated).
 - **Phase 5 (Reflect-and-steer + freshness + first MCP):** 04B Phase F delivers the first live MCP on
   the SDK path; reflect-and-steer is preserved as a first-class terminal mode inside the SDK loop.
 - **Phases 6–7 (generalize + verify):** 04B Phase G, on the SDK engine.
+- **Native legible UX** — previously folded into Phase G's gate; now **built explicitly in Phase C2**
+  (streaming surface redesign) and only *verified* in G.
 
 ## Progress tracker
 
@@ -138,7 +157,8 @@ root `ROADMAP.md` (founder-gated).
 |---|---|---|
 | A. Streaming spike + SDK proof-of-loop | **Done — GO at London checkpoint** | 2026-07-15 |
 | B. SDK loop for standard VCSO (parallel) | **Done — matched canary parity proven** | 2026-07-15 |
-| C. Registry → SDK-config compiler + extensions | **Proposed — not started** | — |
+| C. Registry → SDK-config compiler + extensions | **Done — live-dark; guardrail/compiler gate passed** | 2026-07-15 |
+| C2. Streaming surface redesign (UI/UX) | **Proposed — not started** | — |
 | D. Native subagents — P4 re-approach (checkpoint) | **Proposed — not started** | — |
 | E. Sessions + Deep Mode reconciliation | **Proposed — not started** | — |
 | F. First live MCP (QuickBooks) | **Proposed — not started** | — |

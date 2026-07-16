@@ -4,15 +4,16 @@
 
 ## Current Focus
 
-**04B PHASE B COMPLETE — STANDARD SDK LOOP PARITY PROVEN; AWAITING LONDON BEFORE PHASE C**
-(2026-07-15). Commit `ce6731f2` deployed the standard non-Deep, non-planner SDK path behind the
-founder-scoped flag. London ran a three-prompt authenticated control/canary set: all answers remained
-cited and complete, the record lookup improved by naming the missing initiative, combined main-model
-token footprint fell 38.6% (82,219 to 50,502), and exact SDK spend was `$0.11827045`. All three SDK
-runs have exact successful `vcso_sdk_turn`/`ai_usage_log` pairs; all three live registry tool calls
-have successful sanitized PostToolUse traces. The flag is disabled and unenrolled again; global and
-default remain off. Phase C has not started. Evidence:
-`phases/04B-vcso-sdk-migration/04B-B-COMPLETION.md`.
+**04B PHASE C COMPLETE — REGISTRY COMPILER + PERSISTENCE GUARDRAILS LIVE-DARK; RETURNED TO LONDON**
+(2026-07-15). v0.6.33–v0.6.36 extend the existing registry with four persistence semantics, exact
+confirmation + quarantine enforcement, an absolute money-movement block, capability-grain
+tier/model resolution, and per-founder `ClaudeAgentOptions` compilation. QuickBooks availability is
+gated through the existing week-12 `feature_registry` row plus a founder-owned connected
+`mcp_connections` row; no connector table was added and zero live connections remain. The migration
+left `ai_usage_log` at 285 rows/15 columns. Focused guardrail/founder-isolation proof and the combined
+48-test VCSO regression set passed. The SDK flag is disabled and unenrolled; global/default remain off. Phase C2 and
+Phase D have not started. Evidence:
+`phases/04B-vcso-sdk-migration/04B-C-COMPLETION.md`.
 
 The prior **SECOND P4 VALIDATION RESTART remains halted and P4 remains rolled back**. The remediated worker remains
 healthy, but the restarted capstone exposed a planner-coverage defect: Sonnet decomposition created
@@ -51,9 +52,10 @@ annotations remain off. Evidence:
 
 ## Current Phase
 
-**04B Phase B is complete; Phase C is not started.** The standard SDK loop passed its matched live
-cost/quality gate, preserved the existing SSE contract and context-selection boundary, and paired all
-SDK turn/tool hooks with DB/output evidence. `vcso_sdk_loop` is disabled with zero enrollment.
+**04B Phase C is complete; Phase C2 and Phase D are not started.** The live-dark SDK path now compiles
+founder-scoped tools, bounded agent definitions, models, and curated MCP proxies from the existing
+registries. Persistence guardrails are enforced only on the SDK seam, while the absolute money block
+applies everywhere. `vcso_sdk_loop` is disabled with zero enrollment.
 
 The original **Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
 defects remain closed at worker level, but decomposition did not preserve the required structured-data
