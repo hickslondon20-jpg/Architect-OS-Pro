@@ -763,6 +763,10 @@ async def _run_sdk_turn(
         native_subagent_tools=native_subagent_tools,
     )
     options = compiled.options
+    if native_mode:
+        # The lead composes from bounded worker findings. Direct registry tools here would
+        # duplicate retrieval, consume the turn cap, and bypass the explicit P4 contracts.
+        options.allowed_tools = ["Task"]
     trace_metadata.update(
         {
             "sdk_compiled_tool_count": len(compiled.tool_names),
@@ -1099,14 +1103,16 @@ def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
     return (
         "\n\nPHASE-D NATIVE SUBAGENT CONTRACT. This exact canary is a genuine multi-part synthesis; "
         f"you must delegate exactly once to each approved worker: {required}. "
-        "Use the SDK Task tool. Run structured_data_agent first. Its compact Task result must then be "
+        "Use only the SDK Task tool; do not call evidence, wiki, registry, or MCP tools directly. "
+        "Delegate before drafting any answer. Run structured_data_agent first. Its compact Task result must then be "
         "included under context_scope.prior_findings in the sandbox_execution_agent Task contract; "
         "never send a raw dataset to the sandbox. The strategic-context worker may run before or after "
         "structured data, but sandbox must wait for structured data to finish. Every Task prompt must be "
         "exactly one JSON object with keys objective, output_format, tools_sources, boundaries, and "
         "context_scope. Boundaries must require founder isolation, citations, compact output, no raw "
-        "payloads, no wiki writes, no recursion, and no external writes. Compose only after every required "
-        "Task completes. For all non-canary/simple turns, answer directly and do not use Task."
+        "payloads, no wiki writes, no recursion, and no external writes. Compose only from the compact Task "
+        "findings after every required Task completes; do not re-crawl sources. For all non-canary/simple turns, "
+        "answer directly and do not use Task."
     )
 
 

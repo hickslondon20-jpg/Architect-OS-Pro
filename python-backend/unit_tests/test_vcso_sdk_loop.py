@@ -480,7 +480,7 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
         }
 
     async def fake_query(*, options, **_kwargs):
-        assert "Task" in options.allowed_tools
+        assert options.allowed_tools == ["Task"]
         assert "Task" not in options.disallowed_tools
         assert set(options.agents) == set(required)
         assert {agent.model for agent in options.agents.values()} == {"claude-haiku-test"}
