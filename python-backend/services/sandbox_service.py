@@ -63,6 +63,31 @@ class SandboxBridgeExecutionResult:
 
 
 class KubernetesInteractiveSandboxSession(InteractiveSandboxSession):
+    _EXEC_READY_TIMEOUT_SECONDS = 20.0
+    _EXEC_READY_POLL_SECONDS = 1.0
+
+    def _bootstrap_runtime(self) -> None:
+        self._wait_for_exec_channel()
+        super()._bootstrap_runtime()
+
+    def _wait_for_exec_channel(self) -> None:
+        """Wait until GKE's pod exec proxy is ready after the pod enters Running."""
+
+        deadline = time.monotonic() + self._EXEC_READY_TIMEOUT_SECONDS
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            try:
+                result = self.execute_command("true")
+                if result.exit_code == 0:
+                    return
+                last_error = SandboxServiceError(result.stderr or result.stdout or "Pod exec probe failed.")
+            except Exception as exc:  # noqa: BLE001 - GKE may transiently reject exec during startup
+                last_error = exc
+            time.sleep(self._EXEC_READY_POLL_SECONDS)
+        raise SandboxServiceError(
+            "Sandbox pod reached Running but its exec channel did not become ready."
+        ) from last_error
+
     def _ensure_runtime_dependencies(self) -> None:
         self.execute_commands([
             (f"mkdir -p {self._commands_dir}", None),

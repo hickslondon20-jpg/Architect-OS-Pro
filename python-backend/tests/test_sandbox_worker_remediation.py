@@ -12,6 +12,7 @@ from services.sandbox_execution_service import (
     SandboxExecutionResult,
     SandboxExecutionService,
 )
+from services.sandbox_service import KubernetesInteractiveSandboxSession
 from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
 from services.vcso_planner import PlannerWorkerFinding, _inherit_sandbox_provenance
 
@@ -112,6 +113,30 @@ def test_successful_compute_finishes_within_two_rounds_and_scopes_trace(monkeypa
             "capability_key": "tier_worker",
         },
     ]
+
+
+def test_interactive_sandbox_waits_for_exec_channel_before_bootstrap(monkeypatch):
+    session = object.__new__(KubernetesInteractiveSandboxSession)
+    session._EXEC_READY_TIMEOUT_SECONDS = 5.0
+    session._EXEC_READY_POLL_SECONDS = 0.0
+    attempts = iter(
+        [
+            RuntimeError("GKE exec proxy is still starting"),
+            SimpleNamespace(exit_code=1, stderr="not ready", stdout=""),
+            SimpleNamespace(exit_code=0, stderr="", stdout=""),
+        ]
+    )
+
+    def execute_probe(_command):
+        outcome = next(attempts)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    session.execute_command = execute_probe
+    monkeypatch.setattr("services.sandbox_service.time.sleep", lambda _seconds: None)
+
+    session._wait_for_exec_channel()
 
 
 def test_repeated_compute_errors_fail_fast_with_clean_finding(monkeypatch):
