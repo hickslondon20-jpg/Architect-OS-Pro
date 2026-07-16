@@ -26,6 +26,7 @@ import {
   sendUserMessage,
   setThreadPinned,
   type Chat,
+  type AgentTodo,
   type ArtifactDelivery,
   type Message,
   type Project,
@@ -109,6 +110,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [sdkSurfaceActive, setSdkSurfaceActive] = useState(false);
+  const [liveTodos, setLiveTodos] = useState<AgentTodo[]>([]);
   const [awaitingFirstToken, setAwaitingFirstToken] = useState(false);
   const [sourcesByChat, setSourcesByChat] = useState<Record<string, ReturnType<typeof getSourceRefsForChat>>>({});
   const [loading, setLoading] = useState(true);
@@ -136,6 +139,9 @@ export const VirtualCSOWorkspace: React.FC = () => {
     }
     const nextMessages = await getMessagesForChat(chatId);
     setMessages(nextMessages);
+    const latestAssistant = [...nextMessages].reverse().find((message) => message.role === 'assistant');
+    setSdkSurfaceActive(latestAssistant?.surfaceMode === 'sdk');
+    setLiveTodos([]);
   };
 
   useEffect(() => {
@@ -180,6 +186,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setActiveChatId(null);
     setActiveProjectId(null);
     setMessages([]);
+    setSdkSurfaceActive(false);
+    setLiveTodos([]);
     setReaderPageId(null);
     setReaderArtifact(null);
     setNotice(null);
@@ -247,23 +255,39 @@ export const VirtualCSOWorkspace: React.FC = () => {
             },
           ]);
         },
-        onReady: ({ route, assembledContext, agentSteps }) => {
-          const packs = route.rankedPackSlugs.length > 0 ? route.rankedPackSlugs.join(', ') : 'base prompt';
-          setNotice(`Routing: ${packs} · loaded ${assembledContext.loadedFounderPageTitles.length} founder pages.`);
+        onReady: ({ route, assembledContext, agentSteps, sdkMode }) => {
+          setSdkSurfaceActive(sdkMode);
+          if (!sdkMode) {
+            const packs = route.rankedPackSlugs.length > 0 ? route.rankedPackSlugs.join(', ') : 'base prompt';
+            setNotice(`Routing: ${packs} · loaded ${assembledContext.loadedFounderPageTitles.length} founder pages.`);
+          }
           if (agentSteps && agentSteps.length > 0) {
             setMessages((current) =>
               current.map((message) =>
-                message.id === assistantTempId ? { ...message, agentSteps } : message,
+                message.id === assistantTempId
+                  ? { ...message, agentSteps, surfaceMode: sdkMode ? 'sdk' : undefined }
+                  : message,
               ),
             );
           }
         },
-        onToken: (chunk) => {
+        onToken: (chunk, meta) => {
           if (chunk) setAwaitingFirstToken(false);
+          if (meta.sdkMode) setSdkSurfaceActive(true);
+          if (meta.channel === 'narration') return;
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantTempId
                 ? { ...message, content: `${message.content}${chunk}` }
+                : message,
+            ),
+          );
+        },
+        onActivity: (activityItems) => {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantTempId
+                ? { ...message, activityItems, surfaceMode: 'sdk' }
                 : message,
             ),
           );
@@ -275,6 +299,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
             ),
           );
         },
+        onPlanUpdate: setLiveTodos,
       });
 
       targetChatId = result.chat.id;
@@ -283,9 +308,12 @@ export const VirtualCSOWorkspace: React.FC = () => {
       setMessages((current) =>
         current.map((message) => (message.id === assistantTempId ? result.assistantMessage : message)),
       );
+      setSdkSurfaceActive(result.sdkMode);
       setSourcesByChat((current) => ({ ...current, [result.chat.id]: result.sources }));
       await refreshLists();
-      setNotice('Response saved. Founder-page sources are available in the Sources panel.');
+      if (!result.sdkMode) {
+        setNotice('Response saved. Founder-page sources are available in the Sources panel.');
+      }
     } catch (err) {
       setMessages((current) => current.filter((message) => message.id !== assistantTempId));
       if (!targetChatId) setActiveChatId(null);
@@ -365,6 +393,9 @@ export const VirtualCSOWorkspace: React.FC = () => {
     ? `Artifact · ${readerArtifact.mime_type || 'file'}`
     : readerPage?.meta;
   const readerContent = readerArtifact?.content ?? readerPage?.content;
+  const latestSdkMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.surfaceMode === 'sdk');
 
   const crumbs =
     view === 'chat' && activeChat
@@ -500,6 +531,11 @@ export const VirtualCSOWorkspace: React.FC = () => {
               setReaderArtifact(null);
               setReaderPageId(pageId);
             }}
+            progress={sdkSurfaceActive ? {
+              steps: latestSdkMessage?.agentSteps ?? [],
+              todos: liveTodos,
+              streaming,
+            } : undefined}
           />
         )}
 

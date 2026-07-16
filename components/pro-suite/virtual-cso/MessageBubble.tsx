@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { Message } from '../../../lib/virtualCsoApi';
+import { AgentActivityFeed } from './AgentActivityFeed';
 import { AgentStepsPanel } from './AgentStepsPanel';
 import { ArtifactDeliveryCard } from './ArtifactDeliveryCard';
 
@@ -37,15 +38,19 @@ export const MessageBubble: React.FC<{ message: Message; onOpenArtifact?: (artif
   return (
     <div className="group flex w-full flex-col items-start">
       {message.agentSteps && message.agentSteps.length > 0 && (
-        <AgentStepsPanel steps={message.agentSteps} />
+        message.surfaceMode === 'sdk'
+          ? <AgentActivityFeed items={message.activityItems} steps={message.agentSteps} />
+          : <AgentStepsPanel steps={message.agentSteps} />
       )}
       {message.artifactDeliveries?.map((artifact) => (
         <ArtifactDeliveryCard key={artifact.id} artifact={artifact} onOpen={onOpenArtifact} />
       ))}
-      <div className="os-reader-markdown w-full text-sm">
-        <ReactMarkdown>{message.content}</ReactMarkdown>
-      </div>
-      <button
+      {message.content && (
+        <div className="os-reader-markdown w-full max-w-[76ch] text-sm leading-6">
+          <ReactMarkdown>{message.content}</ReactMarkdown>
+        </div>
+      )}
+      {message.content && <button
         onClick={onCopy}
         className="mt-1.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-[var(--fg-3)] opacity-0 transition-all hover:bg-[var(--bg-canvas)] hover:text-[var(--fg-1)] focus:opacity-100 group-hover:opacity-100"
         title="Copy message"
@@ -53,7 +58,7 @@ export const MessageBubble: React.FC<{ message: Message; onOpenArtifact?: (artif
       >
         {copied ? <Check size={13} /> : <Copy size={13} />}
         {copied ? 'Copied' : 'Copy'}
-      </button>
+      </button>}
     </div>
   );
 };

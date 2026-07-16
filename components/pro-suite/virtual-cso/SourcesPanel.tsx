@@ -1,10 +1,100 @@
 import React from 'react';
-import { BookOpen, Layers, Library, FolderInput, ChevronRight } from 'lucide-react';
+import { BookOpen, Check, ChevronRight, FolderInput, Layers, Library, LoaderCircle } from 'lucide-react';
 import {
   SOURCE_KIND_LABELS,
+  type AgentStep,
+  type AgentTodo,
   type SourceKind,
   type SourceRef,
 } from '../../../lib/virtualCsoApi';
+
+interface TurnProgress {
+  steps: AgentStep[];
+  todos: AgentTodo[];
+  streaming: boolean;
+}
+
+interface ProgressItem {
+  id: string;
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+const progressItems = ({ steps, todos, streaming }: TurnProgress): ProgressItem[] => {
+  if (todos.length > 0) {
+    return todos.map((todo) => ({ id: todo.id, label: todo.content, status: todo.status }));
+  }
+
+  const uniqueSteps = new Map<number, AgentStep>();
+  steps.forEach((step) => {
+    if (typeof step.stepIndex === 'number' && step.stepType !== 'result') {
+      uniqueSteps.set(step.stepIndex, step);
+    }
+  });
+  const items = [...uniqueSteps.values()].slice(0, 7).map((step) => ({
+    id: `step-${step.stepIndex}`,
+    label: step.title ?? step.summary ?? 'Review evidence',
+    status: step.status === 'running'
+      ? 'in_progress' as const
+      : step.status === 'failed'
+        ? 'pending' as const
+        : 'completed' as const,
+  }));
+  const hasRunningStep = items.some((item) => item.status === 'in_progress');
+  items.push({
+    id: 'prepare-response',
+    label: 'Prepare the strategic response',
+    status: streaming ? (hasRunningStep ? 'pending' : 'in_progress') : 'completed',
+  });
+  return items;
+};
+
+const ProgressPanel: React.FC<{ progress: TurnProgress }> = ({ progress }) => {
+  const items = progressItems(progress);
+  const completeCount = items.filter((item) => item.status === 'completed').length;
+
+  return (
+    <section className="border-b border-[var(--aos-mist)] bg-[var(--bg-surface)] px-4 py-4" aria-label="Turn progress">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-medium text-[var(--fg-1)]">Progress</h2>
+        <span className="aos-mono text-[10px] uppercase tracking-wide text-[var(--fg-4)]">
+          {completeCount}/{items.length}
+        </span>
+      </div>
+      <ol className="mt-3 space-y-2.5">
+        {items.map((item, index) => (
+          <li key={item.id} className="flex gap-2.5">
+            <span
+              className={`aos-mono mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${
+                item.status === 'completed'
+                  ? 'border-[var(--aos-success)] bg-[var(--aos-success-tint)] text-[var(--aos-success)]'
+                  : item.status === 'in_progress'
+                    ? 'border-[var(--aos-brass)] bg-[var(--bg-surface)] text-[var(--aos-brass)]'
+                    : 'border-[var(--aos-mist)] bg-[var(--bg-sunken)] text-[var(--fg-4)]'
+              }`}
+              aria-label={item.status.replace('_', ' ')}
+            >
+              {item.status === 'completed'
+                ? <Check size={11} strokeWidth={3} />
+                : item.status === 'in_progress'
+                  ? <LoaderCircle size={11} className="animate-spin" />
+                  : index + 1}
+            </span>
+            <span className={`text-xs leading-5 ${
+              item.status === 'completed'
+                ? 'text-[var(--fg-4)] line-through decoration-[var(--aos-mist)]'
+                : item.status === 'in_progress'
+                  ? 'font-medium text-[var(--fg-1)]'
+                  : 'text-[var(--fg-3)]'
+            }`}>
+              {item.label}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+};
 
 const KIND_ORDER: SourceKind[] = ['wiki', 'platform', 'ip', 'context'];
 
@@ -24,11 +114,13 @@ export const SourcesPanel: React.FC<{
   sources: SourceRef[];
   hasActiveChat: boolean;
   onOpenSource: (pageId: string) => void;
-}> = ({ sources, hasActiveChat, onOpenSource }) => (
+  progress?: TurnProgress;
+}> = ({ sources, hasActiveChat, onOpenSource, progress }) => (
   <aside
-    className="flex w-[260px] flex-shrink-0 flex-col border-l border-[var(--aos-mist)] bg-[var(--bg-canvas)]"
-    aria-label="Sources"
+    className={`flex flex-shrink-0 flex-col border-l border-[var(--aos-mist)] bg-[var(--bg-canvas)] ${progress ? 'w-[300px]' : 'w-[260px]'}`}
+    aria-label={progress ? 'Progress and sources' : 'Sources'}
   >
+    {progress && <ProgressPanel progress={progress} />}
     <div className="border-b border-[var(--aos-mist)] px-4 py-3.5">
       <p className="aos-eyebrow">Sources</p>
       <p className="mt-1 text-xs text-[var(--fg-3)]">What this conversation is drawing on.</p>

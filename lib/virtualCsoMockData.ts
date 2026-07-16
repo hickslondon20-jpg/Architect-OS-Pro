@@ -28,6 +28,7 @@ export interface Chat {
 
 export interface AgentStep {
   stepIndex?: number;
+  activityOrder?: number;
   stepType?: string;
   title?: string;
   summary?: string;
@@ -35,6 +36,7 @@ export interface AgentStep {
   input: Record<string, unknown>;
   output: string;
   status?: string;
+  elapsedSeconds?: number;
   sourceRefs?: Array<Record<string, unknown>>;
   children?: AgentStep[];
   subAgent?: {
@@ -43,6 +45,21 @@ export interface AgentStep {
     status?: string;
     summary?: string;
   };
+}
+
+export interface AgentActivityItem {
+  id: string;
+  type: 'narration' | 'step';
+  order: number;
+  text?: string;
+  stepIndex?: number;
+}
+
+export interface AgentTodo {
+  id: string;
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  position: number;
 }
 
 export interface ArtifactDelivery {
@@ -63,6 +80,8 @@ export interface Message {
   content: string;
   createdAt: string;
   agentSteps?: AgentStep[];
+  activityItems?: AgentActivityItem[];
+  surfaceMode?: 'sdk';
   artifactDeliveries?: ArtifactDelivery[];
 }
 

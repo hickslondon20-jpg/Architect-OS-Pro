@@ -12,12 +12,14 @@ import {
   type SourcePage,
   type SourceRef,
   type AgentStep,
+  type AgentActivityItem,
+  type AgentTodo,
   type ArtifactDelivery,
 } from './virtualCsoMockData';
 import { getArtifact } from './artifactsApi';
 
 export { INSIGHT_STARTERS, MOCK_SOURCE_REFS, SOURCE_KIND_LABELS };
-export type { AgentStep, ArtifactDelivery, Chat, InsightStarter, Message, Project, SourceKind, SourcePage, SourceRef };
+export type { AgentActivityItem, AgentStep, AgentTodo, ArtifactDelivery, Chat, InsightStarter, Message, Project, SourceKind, SourcePage, SourceRef };
 
 export interface VirtualCsoData {
   projects: Project[];
@@ -46,9 +48,11 @@ export interface SendUserMessageOptions {
   linkedFolder?: string | null;
   projectId?: string | null;
   onUserMessage?: (message: Message) => void;
-  onToken?: (text: string) => void;
+  onToken?: (text: string, meta: { channel: 'answer' | 'narration'; sdkMode: boolean }) => void;
+  onActivity?: (items: AgentActivityItem[]) => void;
   onAgentSteps?: (steps: AgentStep[]) => void;
-  onReady?: (meta: { threadId: string; route: Ws5RouteMeta; assembledContext: Ws5AssembledContextMeta; agentSteps?: AgentStep[] }) => void;
+  onPlanUpdate?: (todos: AgentTodo[]) => void;
+  onReady?: (meta: { threadId: string; route: Ws5RouteMeta; assembledContext: Ws5AssembledContextMeta; agentSteps?: AgentStep[]; sdkMode: boolean }) => void;
 }
 
 export interface SendUserMessageResult {
@@ -59,6 +63,7 @@ export interface SendUserMessageResult {
   sourcePages: SourcePage[];
   route: Ws5RouteMeta | null;
   assembledContext: Ws5AssembledContextMeta | null;
+  sdkMode: boolean;
 }
 
 const sourceRefsByChat = new Map<string, SourceRef[]>();
@@ -164,15 +169,33 @@ const toAgentStep = (step: AgentDelegationStepRow, childRun?: AgentDelegationRun
       : undefined,
 });
 
-const toMessage = (row: any, agentSteps?: AgentStep[], artifactDeliveries?: ArtifactDelivery[]): Message => ({
+const toMessage = (
+  row: any,
+  agentSteps?: AgentStep[],
+  artifactDeliveries?: ArtifactDelivery[],
+  surfaceMode?: 'sdk',
+  activityItems?: AgentActivityItem[],
+): Message => ({
   id: row.id,
   chatId: row.thread_id ?? row.chatId,
   role: row.role,
   content: row.content,
   createdAt: row.created_at ?? row.createdAt,
   agentSteps,
+  activityItems,
+  surfaceMode,
   artifactDeliveries,
 });
+
+const activityItemsFromSteps = (steps: AgentStep[] = []): AgentActivityItem[] =>
+  steps
+    .filter((step) => typeof step.stepIndex === 'number')
+    .map((step, order) => ({
+      id: `step-${step.stepIndex}`,
+      type: 'step' as const,
+      order,
+      stepIndex: step.stepIndex,
+    }));
 
 const artifactIdFromRun = (run: AgentDelegationRunWithSteps): string | null => {
   const structuredId = run.structured_result?.artifact_id;
@@ -266,6 +289,7 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
   const artifactIdsByMessageId = new Map<string, string>();
   const artifactsById = new Map<string, ArtifactDelivery>();
   const childRunsById = new Map<string, AgentDelegationRunWithSteps>();
+  const sdkMessageIds = new Set<string>();
 
   if (assistantMessageIds.length > 0) {
     const runsResult = await supabase
@@ -297,6 +321,9 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
 
     for (const run of (runsResult.data ?? []) as AgentDelegationRunWithSteps[]) {
       if (!run.assistant_message_id) continue;
+      if (run.structured_result?.schema_version === 'vcso_sdk_standard_v1') {
+        sdkMessageIds.add(run.assistant_message_id);
+      }
       const existing = stepsByMessageId.get(run.assistant_message_id) ?? [];
       stepsByMessageId.set(run.assistant_message_id, [
         ...existing,
@@ -325,7 +352,15 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
   return messageRows.map((row) => {
     const artifactId = artifactIdsByMessageId.get(row.id);
     const artifact = artifactId ? artifactsById.get(artifactId) : undefined;
-    return toMessage(row, stepsByMessageId.get(row.id), artifact ? [artifact] : undefined);
+    const steps = stepsByMessageId.get(row.id);
+    const isSdkMessage = sdkMessageIds.has(row.id);
+    return toMessage(
+      row,
+      steps,
+      artifact ? [artifact] : undefined,
+      isSdkMessage ? 'sdk' : undefined,
+      isSdkMessage ? activityItemsFromSteps(steps) : undefined,
+    );
   });
 };
 
@@ -404,16 +439,51 @@ export const sendUserMessage = async (
   let assembledContext: Ws5AssembledContextMeta | null = null;
   let artifactId: string | null = null;
   let artifactDelivery: ArtifactDelivery | null = null;
+  let sdkMode = false;
   const liveAgentSteps = new Map<number, AgentStep>();
+  const liveActivityItems: AgentActivityItem[] = [];
+  const stepActivityOrders = new Map<number, number>();
+  let nextActivityOrder = 0;
+
+  const orderedSteps = () =>
+    [...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0));
+  const publishSteps = () => options.onAgentSteps?.(orderedSteps());
+  const publishActivity = () =>
+    options.onActivity?.([...liveActivityItems].sort((a, b) => a.order - b.order));
+  const ensureStepActivity = (stepIndex: number) => {
+    if (!sdkMode || stepActivityOrders.has(stepIndex)) return;
+    const order = nextActivityOrder++;
+    stepActivityOrders.set(stepIndex, order);
+    liveActivityItems.push({ id: `step-${stepIndex}`, type: 'step', order, stepIndex });
+    publishActivity();
+  };
+  const normalizeTodos = (payload: any): AgentTodo[] => {
+    const rows = Array.isArray(payload?.todos) ? payload.todos : Array.isArray(payload) ? payload : [];
+    return rows
+      .filter((row: any) => row && typeof row.content === 'string')
+      .map((row: any, index: number) => ({
+        id: String(row.id ?? `todo-${index}`),
+        content: String(row.content),
+        status: ['pending', 'in_progress', 'completed'].includes(row.status)
+          ? row.status
+          : 'pending',
+        position: typeof row.position === 'number' ? row.position : index,
+      }))
+      .sort((a: AgentTodo, b: AgentTodo) => a.position - b.position);
+  };
 
   await parseSseStream(response, {
     onEvent: (event, payload) => {
       if (event === 'ready') {
+        sdkMode = payload.sdkMode === true;
         userMessage = toMessage(payload.userMessage);
         route = payload.route;
         assembledContext = payload.assembledContext;
         for (const step of payload.agentSteps ?? []) {
-          if (typeof step.stepIndex === 'number') liveAgentSteps.set(step.stepIndex, step);
+          if (typeof step.stepIndex === 'number') {
+            liveAgentSteps.set(step.stepIndex, step);
+            ensureStepActivity(step.stepIndex);
+          }
         }
         options.onUserMessage?.(userMessage);
         options.onReady?.({
@@ -421,10 +491,48 @@ export const sendUserMessage = async (
           route,
           assembledContext,
           agentSteps: payload.agentSteps ?? undefined,
+          sdkMode,
         });
+        publishActivity();
       }
       if (event === 'token') {
-        options.onToken?.(payload.text ?? '');
+        const text = payload.text ?? '';
+        const channel = payload.channel === 'narration' ? 'narration' : 'answer';
+        const tokenSdkMode = payload.sdkMode === true || sdkMode;
+        options.onToken?.(text, { channel, sdkMode: tokenSdkMode });
+        if (tokenSdkMode && channel === 'narration' && text) {
+          sdkMode = true;
+          const segmentId = String(payload.segmentId ?? 'current');
+          const itemId = `narration-${segmentId}`;
+          const existing = liveActivityItems.find((item) => item.id === itemId);
+          if (existing) existing.text = `${existing.text ?? ''}${text}`;
+          else {
+            liveActivityItems.push({
+              id: itemId,
+              type: 'narration',
+              order: nextActivityOrder++,
+              text,
+            });
+          }
+          publishActivity();
+        }
+      }
+      if (event === 'step' && typeof payload.stepIndex === 'number') {
+        const current = liveAgentSteps.get(payload.stepIndex);
+        liveAgentSteps.set(payload.stepIndex, {
+          ...current,
+          stepIndex: payload.stepIndex,
+          stepType: payload.stepType ?? current?.stepType,
+          title: payload.title ?? current?.title,
+          summary: payload.summary ?? current?.summary,
+          tool: current?.tool ?? payload.title ?? 'Agent step',
+          input: current?.input ?? {},
+          output: current?.output ?? '',
+          status: payload.status ?? current?.status,
+          sourceRefs: payload.sourceRefs ?? current?.sourceRefs ?? [],
+        });
+        ensureStepActivity(payload.stepIndex);
+        publishSteps();
       }
       if (event === 'tool_call' && typeof payload.stepIndex === 'number') {
         liveAgentSteps.set(payload.stepIndex, {
@@ -441,7 +549,8 @@ export const sendUserMessage = async (
             ? { capabilityKey: payload.input?.capability_key, status: 'running' }
             : undefined,
         });
-        options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
+        ensureStepActivity(payload.stepIndex);
+        publishSteps();
       }
       if (event === 'sub_agent_step' && typeof payload.parentStepIndex === 'number' && payload.step) {
         const current = liveAgentSteps.get(payload.parentStepIndex);
@@ -473,7 +582,7 @@ export const sendUserMessage = async (
               summary: current.subAgent?.summary,
             },
           });
-          options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
+          publishSteps();
         }
       }
       if (event === 'tool_result' && typeof payload.stepIndex === 'number') {
@@ -505,13 +614,38 @@ export const sendUserMessage = async (
             : undefined,
           children: current?.children,
         });
-        options.onAgentSteps?.([...liveAgentSteps.values()].sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0)));
+        ensureStepActivity(payload.stepIndex);
+        publishSteps();
+      }
+      if (event === 'heartbeat' && typeof payload.stepIndex === 'number') {
+        const current = liveAgentSteps.get(payload.stepIndex);
+        if (current) {
+          liveAgentSteps.set(payload.stepIndex, {
+            ...current,
+            status: 'running',
+            elapsedSeconds: typeof payload.elapsedSeconds === 'number' ? payload.elapsedSeconds : current.elapsedSeconds,
+          });
+          publishSteps();
+        }
+      }
+      if (event === 'todos_updated') {
+        options.onPlanUpdate?.(normalizeTodos(payload));
       }
       if (event === 'done') {
+        sdkMode = payload.sdkMode === true || sdkMode;
         chat = payload.chat;
+        for (const step of payload.assistantMessage?.agentSteps ?? []) {
+          if (typeof step.stepIndex === 'number') {
+            liveAgentSteps.set(step.stepIndex, step);
+            ensureStepActivity(step.stepIndex);
+          }
+        }
         assistantMessage = toMessage(
           payload.assistantMessage,
           payload.assistantMessage?.agentSteps,
+          undefined,
+          sdkMode ? 'sdk' : undefined,
+          sdkMode ? [...liveActivityItems].sort((a, b) => a.order - b.order) : undefined,
         );
         artifactId = typeof payload.artifactId === 'string' ? payload.artifactId : null;
         sources = payload.sources ?? [];
@@ -537,7 +671,7 @@ export const sendUserMessage = async (
     }
   }
 
-  return { chat, userMessage, assistantMessage, sources, sourcePages, route, assembledContext };
+  return { chat, userMessage, assistantMessage, sources, sourcePages, route, assembledContext, sdkMode };
 };
 
 export const requestThreadWriteback = async (threadId: string): Promise<{ webhookPosted: boolean }> => {
