@@ -346,4 +346,7 @@ def test_sdk_stream_separates_curated_narration_from_persisted_answer(monkeypatc
     assert narration == "Now I'll review the margin record."
     assert answer == "Margin is stable."
     assert result.answer_text == "Margin is stable."
+    assert result.narration_segments == [
+        {"segmentId": 1, "text": "Now I'll review the margin record."}
+    ]
     assert "<narration>" not in str(events)

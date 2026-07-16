@@ -662,6 +662,7 @@ class VcsoChatService:
                     "sdk_compaction_count": sdk_result.compaction_count,
                     "sdk_turn_trace_emitted": sdk_result.turn_trace_emitted,
                     "sdk_usage_recorded": sdk_result.usage_recorded,
+                    "narration_segments": sdk_result.narration_segments,
                 },
             )
             self._active_turn["run_completed"] = True

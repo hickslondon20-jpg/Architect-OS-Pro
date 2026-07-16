@@ -187,15 +187,52 @@ const toMessage = (
   artifactDeliveries,
 });
 
-const activityItemsFromSteps = (steps: AgentStep[] = []): AgentActivityItem[] =>
-  steps
-    .filter((step) => typeof step.stepIndex === 'number')
-    .map((step, order) => ({
-      id: `step-${step.stepIndex}`,
-      type: 'step' as const,
-      order,
-      stepIndex: step.stepIndex,
-    }));
+const persistedNarrationSegments = (run?: AgentDelegationRunWithSteps): Array<{ segmentId: number; text: string }> => {
+  const segments = run?.structured_result?.narration_segments;
+  if (!Array.isArray(segments)) return [];
+  return segments
+    .map((segment, index) => {
+      if (!segment || typeof segment !== 'object') return null;
+      const record = segment as Record<string, unknown>;
+      const text = typeof record.text === 'string' ? record.text.trim() : '';
+      const segmentId = typeof record.segmentId === 'number' ? record.segmentId : index + 1;
+      return text ? { segmentId, text } : null;
+    })
+    .filter((segment): segment is { segmentId: number; text: string } => Boolean(segment));
+};
+
+const activityItemsFromSteps = (
+  steps: AgentStep[] = [],
+  narrationSegments: Array<{ segmentId: number; text: string }> = [],
+): AgentActivityItem[] => {
+  const orderedSteps = steps.filter((step) => typeof step.stepIndex === 'number');
+  const toolSteps = orderedSteps.filter((step) =>
+    ['tool_call', 'source_review', 'sub_agent', 'code_execution'].includes(step.stepType ?? ''),
+  );
+  const narrationBeforeStep = new Map<number, Array<{ segmentId: number; text: string }>>();
+  narrationSegments.forEach((segment, index) => {
+    const target = toolSteps[Math.min(index, Math.max(toolSteps.length - 1, 0))];
+    if (!target || typeof target.stepIndex !== 'number') return;
+    const current = narrationBeforeStep.get(target.stepIndex) ?? [];
+    narrationBeforeStep.set(target.stepIndex, [...current, segment]);
+  });
+
+  const items: AgentActivityItem[] = [];
+  let order = 0;
+  orderedSteps.forEach((step) => {
+    const stepIndex = step.stepIndex as number;
+    for (const segment of narrationBeforeStep.get(stepIndex) ?? []) {
+      items.push({
+        id: `narration-${segment.segmentId}`,
+        type: 'narration',
+        order: order++,
+        text: segment.text,
+      });
+    }
+    items.push({ id: `step-${stepIndex}`, type: 'step', order: order++, stepIndex });
+  });
+  return items;
+};
 
 const artifactIdFromRun = (run: AgentDelegationRunWithSteps): string | null => {
   const structuredId = run.structured_result?.artifact_id;
@@ -290,6 +327,7 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
   const artifactsById = new Map<string, ArtifactDelivery>();
   const childRunsById = new Map<string, AgentDelegationRunWithSteps>();
   const sdkMessageIds = new Set<string>();
+  const runsByMessageId = new Map<string, AgentDelegationRunWithSteps>();
 
   if (assistantMessageIds.length > 0) {
     const runsResult = await supabase
@@ -321,6 +359,7 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
 
     for (const run of (runsResult.data ?? []) as AgentDelegationRunWithSteps[]) {
       if (!run.assistant_message_id) continue;
+      runsByMessageId.set(run.assistant_message_id, run);
       if (run.structured_result?.schema_version === 'vcso_sdk_standard_v1') {
         sdkMessageIds.add(run.assistant_message_id);
       }
@@ -359,7 +398,12 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
       steps,
       artifact ? [artifact] : undefined,
       isSdkMessage ? 'sdk' : undefined,
-      isSdkMessage ? activityItemsFromSteps(steps) : undefined,
+      isSdkMessage
+        ? activityItemsFromSteps(
+            steps,
+            persistedNarrationSegments(runsByMessageId.get(row.id)),
+          )
+        : undefined,
     );
   });
 };

@@ -54,6 +54,7 @@ class VcsoSdkTurnResult:
     session_id: str | None
     sources: list[dict[str, Any]] = field(default_factory=list)
     tool_steps: list[dict[str, Any]] = field(default_factory=list)
+    narration_segments: list[dict[str, Any]] = field(default_factory=list)
     compaction_count: int = 0
     turn_trace_emitted: bool = False
     usage_recorded: bool = False
@@ -400,6 +401,7 @@ async def _run_sdk_turn(
     )
 
     answer_parts: list[str] = []
+    narration_by_segment: dict[int, str] = {}
     text_normalizer = _NarrationStreamNormalizer()
     input_tokens: int | None = None
     output_tokens: int | None = None
@@ -425,6 +427,10 @@ async def _run_sdk_turn(
                         for channel, visible_text, segment_id in text_normalizer.feed(text):
                             if channel == "answer":
                                 answer_parts.append(visible_text)
+                            elif segment_id is not None:
+                                narration_by_segment[segment_id] = (
+                                    narration_by_segment.get(segment_id, "") + visible_text
+                                )
                             token_data: dict[str, Any] = {
                                 "text": visible_text,
                                 "channel": channel,
@@ -458,6 +464,8 @@ async def _run_sdk_turn(
     for channel, visible_text, segment_id in text_normalizer.finish():
         if channel == "answer":
             answer_parts.append(visible_text)
+        elif segment_id is not None:
+            narration_by_segment[segment_id] = narration_by_segment.get(segment_id, "") + visible_text
         token_data = {"text": visible_text, "channel": channel, "sdkMode": True}
         if segment_id is not None:
             token_data["segmentId"] = segment_id
@@ -490,6 +498,11 @@ async def _run_sdk_turn(
         session_id=session_id,
         sources=source_refs,
         tool_steps=sorted(trace_steps, key=lambda step: int(step.get("stepIndex") or 0)),
+        narration_segments=[
+            {"segmentId": segment_id, "text": text.strip()}
+            for segment_id, text in sorted(narration_by_segment.items())
+            if text.strip()
+        ],
         compaction_count=compaction_count,
         turn_trace_emitted=turn_trace_emitted,
         usage_recorded=usage_recorded,
