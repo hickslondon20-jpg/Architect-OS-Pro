@@ -559,7 +559,17 @@ class VcsoChatService:
             }
             return
 
-        sdk_mode = bool(sdk_flag.get("enabled")) and not deep_mode and not is_deep_resume and not planner_path_selected
+        sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
+        forced_sdk_fail_open = _sdk_force_fail_open(sdk_settings, user_id)
+        sdk_mode = (
+            bool(sdk_flag.get("enabled"))
+            and not deep_mode
+            and not is_deep_resume
+            and not planner_path_selected
+            and not forced_sdk_fail_open
+        )
+        if forced_sdk_fail_open:
+            logger.warning("SDK canary forced fail-open engaged; using the hand-rolled P3/flat path.")
         self._active_turn["ready_emitted"] = True
         yield {
             "event": "ready",
@@ -586,7 +596,6 @@ class VcsoChatService:
         }
 
         if sdk_mode:
-            sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
             try:
                 sdk_max_turns = max(2, min(int(sdk_settings.get("max_turns", max_rounds + 1)), 12))
             except (TypeError, ValueError):
@@ -598,14 +607,14 @@ class VcsoChatService:
                     self.supabase,
                     user_id=user_id,
                     surface="virtual_cso",
-                    model=self.model,
-                    role="main",
+                    model=usage.model or self.model,
+                    role="sub_agent" if usage.role == "sub_agent" else "main",
                     provider=self.provider,
                     input_tokens=usage.input_tokens,
                     output_tokens=usage.output_tokens,
                     thread_id=thread_id,
-                    capability_key=VCSO_SDK_CAPABILITY_KEY,
-                    run_id=run_id,
+                    capability_key=usage.capability_key or VCSO_SDK_CAPABILITY_KEY,
+                    run_id=usage.run_id or run_id,
                     cost_usd=usage.total_cost_usd,
                 )
 
@@ -2745,6 +2754,12 @@ def _safe_float(value: Any, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _sdk_force_fail_open(settings: dict[str, Any], user_id: str) -> bool:
+    """Founder-scoped diagnostic seam for proving SDK-to-flat fail-open behavior."""
+
+    return user_id in {str(value) for value in settings.get("force_fail_open_user_ids") or []}
 
 
 def _thread_compacted_summary(thread: dict[str, Any]) -> dict[str, Any] | None:

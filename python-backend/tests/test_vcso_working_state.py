@@ -4,7 +4,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from services.vcso_chat_service import VcsoChatPayload, VcsoChatService, _working_state_system_prefix
+from services.vcso_chat_service import (
+    VcsoChatPayload,
+    VcsoChatService,
+    _sdk_force_fail_open,
+    _working_state_system_prefix,
+)
 from services.tool_registry import ToolExecutionContext, ToolRegistry
 from services.vcso_working_state import (
     FAMILY_CAPS,
@@ -142,6 +147,36 @@ def test_after_turn_failure_returns_prior_state_without_persisting():
     assert state["decisions"][0]["text"] == "Preserve focus"
     assert response is None
     assert client.query.updated is None
+
+
+def test_after_turn_rewraps_timeout_client_for_langsmith(monkeypatch):
+    response = SimpleNamespace(
+        content=[SimpleNamespace(text='{"decisions": [], "open_questions": [], "findings": [], "known_unknowns": []}')],
+    )
+    timeout_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_kwargs: response))
+    base_client = SimpleNamespace(with_options=lambda **_kwargs: timeout_client)
+    wrapped = []
+    monkeypatch.setattr(
+        "services.vcso_working_state.trace_anthropic_client",
+        lambda client: wrapped.append(client) or client,
+    )
+
+    WorkingStateService(_Client(), base_client).after_turn(
+        user_id="user",
+        thread_id="thread",
+        current_state=None,
+        user_text="Question",
+        assistant_text="Answer",
+        model="claude-haiku-4-5-20251001",
+    )
+
+    assert wrapped == [timeout_client]
+
+
+def test_sdk_force_fail_open_is_founder_scoped():
+    settings = {"force_fail_open_user_ids": ["founder-a"]}
+    assert _sdk_force_fail_open(settings, "founder-a") is True
+    assert _sdk_force_fail_open(settings, "founder-b") is False
 
 
 def test_after_turn_usage_uses_existing_utility_role(monkeypatch):

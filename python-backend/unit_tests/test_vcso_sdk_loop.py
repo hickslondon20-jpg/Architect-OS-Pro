@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from claude_agent_sdk.types import ResultMessage, StreamEvent
+from claude_agent_sdk.types import AssistantMessage, ResultMessage, StreamEvent
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -426,6 +426,8 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
         lambda _self: [_native_capability(key) for key in required],
     )
     calls = []
+    usages = []
+    child_traces = []
 
     class FakeOrchestrator:
         def __init__(self, _store):
@@ -460,6 +462,10 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
     monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", FakeOrchestrator)
     monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
     monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        "services.vcso_sdk_loop._record_native_child_trace",
+        lambda **kwargs: child_traces.append(kwargs),
+    )
 
     def contract(capability_key: str, *, prior_findings=None):
         scope = {"dataset_ids": ["dataset-1"]}
@@ -520,6 +526,13 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
                     "delta": {"type": "text_delta", "text": "PRIVATE CHILD TEXT"},
                 },
             )
+            yield AssistantMessage(
+                content=[],
+                model="claude-haiku-test",
+                parent_tool_use_id=task_id,
+                usage={"input_tokens": 10 * index, "output_tokens": index},
+                session_id="session-native",
+            )
 
         stop = await options.hooks["Stop"][0].hooks[0]({}, None, None)
         assert stop == {}
@@ -564,6 +577,7 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
                 "sandbox_execution_agent": {"thread_id": "thread-1"},
                 "per_user_wiki": {"query": "pricing constraint"},
             },
+            usage_sink=usages.append,
             query_impl=fake_query,
         )
     )
@@ -581,6 +595,16 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
     assert "PRIVATE CHILD TEXT" not in str(events)
     assert result.answer_text == "Cited 90-day recommendation."
     assert [run["capability_key"] for run in result.worker_runs] == list(required)
+    child_usages = [usage for usage in usages if usage.role == "sub_agent"]
+    assert [usage.capability_key for usage in child_usages] == list(required)
+    assert [usage.run_id for usage in child_usages] == [f"run-{key}" for key in required]
+    assert [usage.model for usage in child_usages] == ["claude-haiku-test"] * 3
+    assert [(usage.input_tokens, usage.output_tokens) for usage in child_usages] == [
+        (10, 1),
+        (20, 2),
+        (30, 3),
+    ]
+    assert [trace["run_id"] for trace in child_traces] == [f"run-{key}" for key in required]
 
 
 def test_native_subagent_guard_blocks_sandbox_before_structured_data(monkeypatch):

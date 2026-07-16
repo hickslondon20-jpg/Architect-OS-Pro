@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any, AsyncIterator, Callable, Iterator
 
 from claude_agent_sdk import (
+    AssistantMessage,
     HookMatcher,
     ResultMessage,
     ToolAnnotations,
@@ -63,6 +64,10 @@ class VcsoSdkUsage:
     output_tokens: int | None
     total_cost_usd: Decimal | None
     session_id: str | None
+    model: str | None = None
+    role: str = "main"
+    capability_key: str | None = None
+    run_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -305,6 +310,7 @@ async def _run_sdk_turn(
     task_contracts: dict[str, dict[str, Any]] = {}
     task_sources: dict[str, list[dict[str, Any]]] = defaultdict(list)
     worker_results: dict[str, Any] = {}
+    child_usage_records: list[dict[str, Any]] = []
     completed_agents: set[str] = set()
     delegation_count = 0
     max_delegations = len(required_agents)
@@ -834,6 +840,16 @@ async def _run_sdk_turn(
                     usage_recorded = True
                 except Exception as exc:  # noqa: BLE001 - metering failure must not erase the founder answer
                     logger.warning("SDK ResultMessage usage sink failed open: %s", exc)
+        elif isinstance(message, AssistantMessage) and native_mode and message.parent_tool_use_id:
+            usage = message.usage or {}
+            child_usage_records.append(
+                {
+                    "task_id": str(message.parent_tool_use_id),
+                    "model": str(message.model or ""),
+                    "input_tokens": _usage_input_total(usage),
+                    "output_tokens": _usage_int(usage, "output_tokens", "outputTokens"),
+                }
+            )
 
     for channel, visible_text, segment_id in text_normalizer.finish():
         if channel == "answer":
@@ -851,6 +867,37 @@ async def _run_sdk_turn(
         raise RuntimeError(
             "Claude Agent SDK native-subagent turn ended before required workers completed: "
             + ", ".join(missing_after_query)
+        )
+    for child_usage in child_usage_records:
+        capability_key = task_capabilities.get(child_usage["task_id"])
+        result = worker_results.get(capability_key or "")
+        if not capability_key or result is None:
+            continue
+        child_run_id = str(result.run_id)
+        if usage_sink is not None:
+            try:
+                usage_sink(
+                    VcsoSdkUsage(
+                        input_tokens=child_usage["input_tokens"],
+                        output_tokens=child_usage["output_tokens"],
+                        total_cost_usd=None,
+                        session_id=session_id,
+                        model=child_usage["model"],
+                        role="sub_agent",
+                        capability_key=capability_key,
+                        run_id=child_run_id,
+                    )
+                )
+                usage_recorded = True
+            except Exception as exc:  # noqa: BLE001 - child attribution must remain fail-open
+                logger.warning("SDK child usage sink failed open: %s", exc)
+        _record_native_child_trace(
+            metadata=trace_metadata,
+            capability_key=capability_key,
+            run_id=child_run_id,
+            model=child_usage["model"],
+            input_tokens=child_usage["input_tokens"],
+            output_tokens=child_usage["output_tokens"],
         )
     if not turn_trace_emitted:
         _record_turn_trace(metadata=trace_metadata, status="completed")
@@ -1142,6 +1189,44 @@ def _record_post_tool_trace(*, metadata: dict[str, Any], tool_name: str, tool_us
             run.end(outputs={"status": "completed"})
     except Exception as exc:  # noqa: BLE001 - observability must remain fail-open
         logger.warning("SDK PostToolUse trace failed open: %s", exc)
+
+
+def _record_native_child_trace(
+    *,
+    metadata: dict[str, Any],
+    capability_key: str,
+    run_id: str,
+    model: str,
+    input_tokens: int | None,
+    output_tokens: int | None,
+) -> None:
+    """Pair one sanitized SDK child-message usage record with a scoped LangSmith run."""
+
+    try:
+        from langsmith.run_helpers import trace
+
+        with trace(
+            "vcso_sdk_native_subagent_message",
+            run_type="llm",
+            inputs={"surface": "virtual_cso", "capability_key": capability_key},
+            metadata={
+                **metadata,
+                "run_id": run_id,
+                "capability_key": capability_key,
+                "model": model,
+                "sdk_phase": "04B-D",
+            },
+            tags=[capability_key],
+        ) as run:
+            run.set(
+                usage_metadata={
+                    "input_tokens": input_tokens or 0,
+                    "output_tokens": output_tokens or 0,
+                }
+            )
+            run.end(outputs={"status": "completed"})
+    except Exception as exc:  # noqa: BLE001 - observability must remain fail-open
+        logger.warning("SDK native child trace failed open: %s", exc)
 
 
 def _usage_int(usage: dict[str, Any], *keys: str) -> int | None:

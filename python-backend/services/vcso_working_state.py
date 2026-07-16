@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from core.langsmith_tracing import trace_scope
+from core.langsmith_tracing import trace_anthropic_client, trace_scope
 
 
 WORKING_STATE_SCHEMA_VERSION = "vcso_working_state_v1"
@@ -211,6 +211,8 @@ class WorkingStateService:
             # remains well below the main-turn budget while avoiding false
             # fail-open outcomes caused only by network latency.
             client = self.anthropic.with_options(timeout=30.0) if hasattr(self.anthropic, "with_options") else self.anthropic
+            if client is not self.anthropic:
+                client = trace_anthropic_client(client)
             with trace_scope(
                 {
                     "user_id": user_id,
