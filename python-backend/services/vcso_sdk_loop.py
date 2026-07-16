@@ -13,7 +13,6 @@ from decimal import Decimal
 from typing import Any, AsyncIterator, Callable, Iterator
 
 from claude_agent_sdk import (
-    ClaudeAgentOptions,
     HookMatcher,
     ResultMessage,
     ToolAnnotations,
@@ -24,6 +23,7 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import StreamEvent
 
 from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
+from services.vcso_sdk_config import compile_founder_sdk_options
 
 
 logger = logging.getLogger(__name__)
@@ -203,6 +203,7 @@ async def _run_sdk_turn(
     next_step_index = step_index_offset + 1
 
     definitions = _selected_definitions(registry, tool_names)
+    tool_context.metadata["enforce_persistence_guardrail"] = True
 
     def allocate_step(tool_use_id: str | None, sdk_tool_name: str) -> int:
         nonlocal next_step_index
@@ -310,15 +311,13 @@ async def _run_sdk_turn(
         for definition in definitions
     ]
     server = create_sdk_mcp_server(name=SDK_TOOL_SERVER_NAME, version="1.0.0", tools=sdk_tools)
-    allowed_tools = [_sdk_tool_name(definition.name) for definition in definitions]
     post_hooks = [HookMatcher(matcher=f"^{SDK_TOOL_PREFIX}.*$", hooks=[post_tool_use])]
-    options = ClaudeAgentOptions(
-        tools=[],
-        allowed_tools=allowed_tools,
-        disallowed_tools=["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent"],
-        mcp_servers={SDK_TOOL_SERVER_NAME: server},
-        strict_mcp_config=True,
-        permission_mode="dontAsk",
+    compiled = compile_founder_sdk_options(
+        store=tool_context.store,
+        user_id=tool_context.user_id,
+        registry=registry,
+        requested_tool_names=[definition.name for definition in definitions],
+        internal_mcp_server=server,
         system_prompt=(
             system_prompt
             + "\n\nThe standard Virtual CSO loop is running through the Claude Agent SDK. Use only the "
@@ -327,19 +326,23 @@ async def _run_sdk_turn(
             "claims using source markers supplied in context or tool results, and never reveal raw tool "
             "payloads, hidden reasoning, or chain-of-thought."
         ),
-        model=model,
-        max_turns=max(2, max_turns),
-        max_budget_usd=max_budget_usd,
-        include_partial_messages=True,
-        include_hook_events=False,
+        main_model=model,
+        api_key=api_key,
         hooks={
             "PostToolUse": post_hooks,
             "Stop": [HookMatcher(hooks=[stop_hook])],
             "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
         },
-        setting_sources=[],
-        env={"ANTHROPIC_API_KEY": api_key},
-        thinking={"type": "disabled"},
+        max_turns=max_turns,
+        max_budget_usd=max_budget_usd,
+    )
+    options = compiled.options
+    trace_metadata.update(
+        {
+            "sdk_compiled_tool_count": len(compiled.tool_names),
+            "sdk_compiled_agent_count": len(compiled.agent_tool_grants),
+            "sdk_compiled_connector_count": len(compiled.connector_names),
+        }
     )
 
     answer_parts: list[str] = []
