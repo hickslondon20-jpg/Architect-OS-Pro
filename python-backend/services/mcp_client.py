@@ -12,7 +12,7 @@ import inspect
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,8 @@ class DiscoveredMCPTool:
     surface_tags: list[str] = field(default_factory=list)
     capability_hints: list[str] = field(default_factory=list)
     read_only: bool = True
+    persistence_semantics: Literal["read_only", "write_external", "privileged"] = "read_only"
+    moves_money: bool = False
 
 
 class MCPClientManager:
@@ -179,7 +181,7 @@ def _normalize_discovered_tool(server: MCPServerConfig, raw_tool: Any) -> Discov
     name = _get_attr(raw_tool, "name")
     if not name:
         return None
-    description = _get_attr(raw_tool, "description") or f"{server.server_name} MCP tool {name}"
+    vendor_description = _get_attr(raw_tool, "description") or ""
     input_schema = _get_attr(raw_tool, "inputSchema") or _get_attr(raw_tool, "input_schema") or {}
     if not isinstance(input_schema, dict) or not input_schema:
         input_schema = {"type": "object", "properties": {}, "required": []}
@@ -189,17 +191,61 @@ def _normalize_discovered_tool(server: MCPServerConfig, raw_tool: Any) -> Discov
         read_only = False
     server_slug = _slug(server.server_name)
     tool_slug = _slug(str(name))
+    persistence_semantics = "read_only" if read_only else "write_external"
+    moves_money = _looks_like_money_movement(str(name), str(vendor_description), annotations)
+    if moves_money:
+        persistence_semantics = "privileged"
     return DiscoveredMCPTool(
         registry_name=f"mcp_{server_slug}_{tool_slug}",
         server_name=server.server_name,
         tool_name=str(name),
-        description=str(description),
+        description=_curated_mcp_description(
+            server_name=server.server_name,
+            tool_name=str(name),
+            read_only=read_only,
+        ),
         input_schema=input_schema,
         keywords=[server.server_name, str(name), "mcp", "connector"],
         surface_tags=["virtual_cso", "domain_agent"],
         capability_hints=["mcp_connector"],
         read_only=read_only,
+        persistence_semantics=persistence_semantics,
+        moves_money=moves_money,
     )
+
+
+def _curated_mcp_description(*, server_name: str, tool_name: str, read_only: bool) -> str:
+    """Emit compact ArchitectOS ACI copy; never pass vendor prose into the model."""
+
+    action = str(tool_name).replace("_", " ").replace("-", " ").strip()
+    if read_only:
+        return (
+            f"Read founder-scoped {server_name} data for {action}. "
+            "Use only when current external evidence is required; return source and as-of metadata and do not persist it."
+        )
+    return (
+        f"Request the founder-scoped {server_name} action {action}. "
+        "This external write requires exact founder confirmation and quarantine release before execution."
+    )
+
+
+def _looks_like_money_movement(tool_name: str, description: str, annotations: Any) -> bool:
+    if isinstance(annotations, dict) and annotations.get("architectosMovesMoney") is True:
+        return True
+    text = f"{tool_name} {description}".lower()
+    money_actions = (
+        "create_payment",
+        "send_payment",
+        "make_payment",
+        "transfer_funds",
+        "bank_transfer",
+        "issue_refund",
+        "create_charge",
+        "send_payout",
+        "disburse",
+    )
+    normalized = re.sub(r"[^a-z0-9]+", "_", text)
+    return any(action in normalized for action in money_actions)
 
 
 def _coerce_tool_list(payload: Any) -> list[Any]:

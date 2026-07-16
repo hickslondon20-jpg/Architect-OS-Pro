@@ -18,6 +18,7 @@ from services.mcp_client import DiscoveredMCPTool, MCPClientManager
 ToolSource = Literal["native", "skill", "mcp"]
 ToolLoading = Literal["always", "deferred"]
 ExecutorKind = Literal["native", "skill", "mcp"]
+PersistenceSemantics = Literal["read_only", "persist_artifact", "write_external", "privileged"]
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,7 @@ class ToolDefinition:
     json_schema: dict[str, Any]
     source: ToolSource
     executor_kind: ExecutorKind
+    persistence_semantics: PersistenceSemantics = "read_only"
     executor: ToolExecutor | None = None
     loading: ToolLoading = "always"
     citation: dict[str, Any] = field(default_factory=dict)
@@ -103,6 +105,18 @@ class ToolDefinition:
 
 class ToolRegistryError(RuntimeError):
     pass
+
+
+class ToolConfirmationRequired(ToolRegistryError):
+    """The requested tool has a write or privileged effect and needs exact approval."""
+
+
+class ToolQuarantined(ToolRegistryError):
+    """Untrusted external content cannot flow into a write without an explicit release."""
+
+
+class MoneyMovementBlocked(ToolRegistryError):
+    """ArchitectOS never executes a tool that can move money."""
 
 
 class ToolScopeSource(Protocol):
@@ -234,15 +248,22 @@ class ToolRegistry:
         tool_input: dict[str, Any],
     ) -> ToolResultEnvelope:
         definition = self.get(name)
+        _enforce_persistence_guardrail(definition, context)
         if definition.executor_kind == "skill":
-            return _load_skill_body(definition)
+            result = _load_skill_body(definition)
+            _record_external_quarantine(definition, context, result)
+            return result
         if definition.executor_kind == "mcp":
             if definition.executor is None:
                 raise ToolRegistryError(f"MCP tool {name!r} has no executor.")
-            return definition.executor(context, tool_input)
+            result = definition.executor(context, tool_input)
+            _record_external_quarantine(definition, context, result)
+            return result
         if definition.executor is None:
             raise ToolRegistryError(f"Tool {name!r} has no executor.")
-        return definition.executor(context, tool_input)
+        result = definition.executor(context, tool_input)
+        _record_external_quarantine(definition, context, result)
+        return result
 
     def compact_catalog(
         self,
@@ -375,6 +396,7 @@ def _tool_definition_from_mcp(manager: MCPClientManager, discovered: DiscoveredM
         json_schema=discovered.input_schema,
         source="mcp",
         executor_kind="mcp",
+        persistence_semantics=discovered.persistence_semantics,
         executor=_execute_mcp,
         loading="deferred",
         citation={"source_kind": "mcp", "mode": "tool_result"},
@@ -385,8 +407,57 @@ def _tool_definition_from_mcp(manager: MCPClientManager, discovered: DiscoveredM
             "server_name": discovered.server_name,
             "tool_name": discovered.tool_name,
             "read_only": discovered.read_only,
+            "moves_money": discovered.moves_money,
         },
     )
+
+
+def _enforce_persistence_guardrail(definition: ToolDefinition, context: ToolExecutionContext) -> None:
+    """Fail closed before any non-read tool executor can produce a side effect.
+
+    Confirmation and quarantine releases are exact tool-name grants. A broad boolean can never
+    approve a write, which keeps prompt content and third-party payloads from manufacturing their
+    own authorization. Reads execute automatically. Any external read marks the shared turn
+    context as quarantined before a later write can run.
+    """
+
+    if not bool(context.metadata.get("enforce_persistence_guardrail")):
+        return
+    if bool((definition.mcp_metadata or {}).get("moves_money")):
+        raise MoneyMovementBlocked(f"Tool {definition.name!r} is blocked: ArchitectOS never moves money.")
+    if definition.persistence_semantics == "read_only":
+        return
+
+    confirmed = {str(value) for value in context.metadata.get("confirmed_tool_names") or []}
+    if definition.name not in confirmed:
+        raise ToolConfirmationRequired(
+            f"Tool {definition.name!r} requires explicit founder confirmation before execution."
+        )
+
+    quarantined_sources = context.metadata.get("quarantined_external_sources") or []
+    if quarantined_sources:
+        released = {str(value) for value in context.metadata.get("quarantine_released_tool_names") or []}
+        if definition.name not in released:
+            raise ToolQuarantined(
+                f"Tool {definition.name!r} is quarantined after external content; a separate explicit release is required."
+            )
+
+
+def _record_external_quarantine(
+    definition: ToolDefinition,
+    context: ToolExecutionContext,
+    result: ToolResultEnvelope,
+) -> None:
+    if definition.source != "mcp" or definition.persistence_semantics != "read_only":
+        return
+    source = {
+        "tool": definition.name,
+        "server_name": (definition.mcp_metadata or {}).get("server_name"),
+        "source_ids": [source.source_id for source in result.sources if source.source_id],
+    }
+    quarantined = context.metadata.setdefault("quarantined_external_sources", [])
+    if source not in quarantined:
+        quarantined.append(source)
 
 
 def _mcp_result_envelope(discovered: DiscoveredMCPTool, result: dict[str, Any]) -> ToolResultEnvelope:
@@ -406,7 +477,11 @@ def _mcp_result_envelope(discovered: DiscoveredMCPTool, result: dict[str, Any]) 
                 },
             )
         ],
-        provenance={"source": "mcp", "read_only": discovered.read_only},
+        provenance={
+            "source": "mcp",
+            "read_only": discovered.read_only,
+            "persistence_semantics": discovered.persistence_semantics,
+        },
     )
 
 
@@ -721,6 +796,7 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             },
             source="native",
             executor_kind="native",
+            persistence_semantics="privileged",
             executor=_execute_code,
             citation={"source_kind": "computation", "mode": "provenance"},
             capability_hints=["sandbox_execution_agent"],
@@ -800,6 +876,7 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             },
             source="native",
             executor_kind="native",
+            persistence_semantics="persist_artifact",
             executor=_execute_annotate,
             citation={"source_kind": "agent_annotation", "mode": "metadata"},
             surface_tags=["virtual_cso", "domain_agent"],
@@ -841,6 +918,7 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             },
             source="native",
             executor_kind="native",
+            persistence_semantics="privileged",
             executor=_execute_delegate_to_sub_agent,
             citation={"source_kind": "sub_agent_run", "mode": "summary"},
             surface_tags=["virtual_cso", "domain_agent"],
@@ -879,6 +957,7 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             },
             source="native",
             executor_kind="native",
+            persistence_semantics="persist_artifact",
             executor=_execute_write_todos,
             citation={"source_kind": "agent_todos", "mode": "metadata"},
             surface_tags=["virtual_cso_deep"],
@@ -923,6 +1002,7 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             },
             source="native",
             executor_kind="native",
+            persistence_semantics="persist_artifact",
             executor=_execute_write_file,
             citation={"source_kind": "workspace_file", "mode": "verbatim"},
             surface_tags=["virtual_cso_deep"],
@@ -942,6 +1022,7 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             },
             source="native",
             executor_kind="native",
+            persistence_semantics="persist_artifact",
             executor=_execute_edit_file,
             citation={"source_kind": "workspace_file", "mode": "verbatim"},
             surface_tags=["virtual_cso_deep"],
@@ -970,6 +1051,7 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             },
             source="native",
             executor_kind="native",
+            persistence_semantics="privileged",
             executor=_execute_deep_task,
             citation={"source_kind": "sub_agent_run", "mode": "summary"},
             surface_tags=["virtual_cso_deep"],

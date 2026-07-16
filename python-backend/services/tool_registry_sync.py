@@ -92,6 +92,7 @@ def sync_registry_catalog(
                 "description": defn.description,
                 "tool_type": defn.source,
                 "source_ref": _source_ref(defn),
+                "persistence_semantics": defn.persistence_semantics,
                 "is_code_registered": True,
                 "last_synced_at": _now_iso(),
             }
