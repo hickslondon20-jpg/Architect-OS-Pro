@@ -769,3 +769,69 @@ still fails open.
 `OPENAI_API_KEY` is confirmed on the backend, re-run the full three-worker anchor (same
 enroll/turn/verify/re-darken split) — a wiki hiccup will no longer block `structured → sandbox`, so
 sandbox (the last unproven worker, and the original P4 defect) finally gets exercised.
+
+## 23. Full three-worker anchor on v0.6.58 — improvements validated; two data/env gaps remain (2026-07-16)
+
+Run under v0.6.58 (redeployed), founder-only full path, one anchor turn; re-darkened after (read back
+`is_enabled=false`, empty allowlists; `vcso_planner` off).
+
+**v0.6.58 improvements confirmed working.** Parent `721f7d9a…` **completed** with a cited answer; three
+children in the **new order** `structured → sandbox → wiki`:
+- `96e6ed4b…` `structured_data_agent` — **completed** (bound `SEED — Q2 2026 P&L`, carried June row
+  `net_revenue=45000, net_income=8325`).
+- `eeeddb25…` `sandbox_execution_agent` — **completed — first time sandbox has ever run under Path A.**
+  Ordering fix proven (sandbox ran *before* wiki).
+- `0181d8b7…` `per_user_wiki` — **failed**, but the turn **continued** to synthesis (best-effort fix
+  proven — no fail-open, parent completed).
+
+**Two remaining gaps — neither is the delegation engine:**
+
+1. **Wiki `OPENAI_API_KEY is required for embedding` persists** despite the pre-turn debug check showing
+   the key present. `get_settings()` is process-cached, so a same-process worker must see whatever the
+   debug endpoint sees — therefore the debug check (on v0.6.57) and this turn (on v0.6.58) hit
+   **different deployments**, and the **v0.6.58 deployment lacks an effective `OPENAI_API_KEY`**.
+   Action: re-run `GET /api/debug/provider-config` against the current deploy; if false, set the var on
+   the backend service env and redeploy. (Wiki is best-effort now, so this no longer blocks the turn —
+   but wiki content won't be included until fixed.)
+2. **Sandbox completed but did not compute — a data-readiness gap.** `structured_data_agent` surfaced
+   only a **single aggregate monthly P&L row** (no client-level revenue for concentration, no
+   multi-period series for margin trend), so sandbox correctly returned "insufficient data to compute"
+   (confidence 0.82, `rounds_used=1`) rather than a derived concentration/margin result. The parent's
+   cited concentration figures came from founder working-state context, **not** a sandbox computation.
+   For a true compute pass the thin slice needs a founder dataset with client-level + multi-period rows,
+   or the `structured_data_agent` objective/query scoped to surface them. This is P4 data-readiness, not
+   a Path A defect.
+
+**Net:** the Phase-D delegation architecture (engine, ordering, mandatory/best-effort granularity,
+deterministic children, cited compose) is proven end-to-end. Closing to a clean full pass now depends
+on (a) the OpenAI key on the v0.6.58 deploy, and (b) a compute-ready dataset for the sandbox. **STOP for
+London.**
+
+## 24. Wiki embedding root cause = unwired OpenAI client (fix v0.6.59) — 2026-07-16
+
+**The env key was never the problem.** Debug endpoint on v0.6.58 showed `openai_env_present=true` and
+`openai_settings_present=true`. Since `get_settings()` is process-cached, a same-process worker sees the
+same key — so the failure had to be a client-wiring issue, and it is:
+
+- `VectorStore.__init__(self, client, openai_client: OpenAI | None, settings)` — the **second arg is the
+  OpenAI client**. `VectorStore.from_env()` builds it: `OpenAI(api_key=settings.openai_api_key) if
+  settings.openai_api_key else None`.
+- **`VcsoChatService.from_env()` constructed `VectorStore(client, None, settings)` — passing `None`.**
+  So the VCSO path's store (and every sub-agent spawned from it via `tool_context.store`, including
+  `per_user_wiki`) had `openai_client=None` regardless of the env key, and `_embed_texts` (`:414`)
+  raised "OPENAI_API_KEY is required for embedding." `VcsoChatService.from_env()` is the only VCSO-store
+  path (`main.py:1200/1230`).
+
+**Fix (v0.6.59, working tree, py_compile-verified, +6/−2):** `VcsoChatService.from_env()` now builds the
+store via `VectorStore.from_env()` (which wires `openai_client` from `OPENAI_API_KEY`) and reuses
+`store.client` — instead of passing `None`.
+
+- **Sibling site (out of Phase-D scope, flagged):** `harness_engine.py:110` also does
+  `VectorStore(client, None, settings)`; if any domain-agent/harness worker embeds, it will hit the same
+  bug. Left for a separate pass.
+
+**Handoff:** review → focused tests → commit `v0.6.59 Wire OpenAI client into VCSO VectorStore` → deploy
+→ confirm head == SHA. Then re-run the full anchor: `per_user_wiki` should now **complete** (its wiki
+context feeding the compose). **Still separate and open:** §23 issue #2 — the sandbox needs a
+compute-ready founder dataset (client-level + multi-period rows) to produce a real concentration/margin
+computation; with the current single-aggregate-row seed it will keep returning "insufficient data."

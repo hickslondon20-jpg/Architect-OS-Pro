@@ -157,8 +157,12 @@ class VcsoChatService:
         settings = get_settings()
         if not settings.supabase_url or not settings.supabase_service_role_key:
             raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for VCSO chat.")
-        client = create_client(settings.supabase_url, settings.supabase_service_role_key)
-        return cls(VectorStore(client, None, settings), client)
+        # The VCSO path (and its sub-agent workers, e.g. per_user_wiki) performs vector search, which
+        # needs the OpenAI embedding client. Build the store via from_env() so openai_client is wired
+        # from OPENAI_API_KEY instead of passing None -- passing None made wiki_search fail
+        # "OPENAI_API_KEY is required for embedding" even when the key was present.
+        store = VectorStore.from_env()
+        return cls(store, store.client)
 
     def stream_chat(self, *, user_id: str, payload: VcsoChatPayload, max_rounds: int = 5) -> Iterator[dict[str, Any]]:
         self._active_turn = None
