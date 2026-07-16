@@ -7,6 +7,7 @@ import json
 import logging
 import queue
 import re
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -390,7 +391,12 @@ class VcsoChatService:
 
         sdk_flag = self._sdk_loop_settings(user_id)
         native_required_agents = (
-            native_subagent_requirements(message=payload.text, intent=turn_intent)
+            native_subagent_requirements(
+                message=payload.text,
+                intent=turn_intent,
+                settings=sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {},
+                user_id=user_id,
+            )
             if bool(sdk_flag.get("enabled")) and not deep_mode and not is_deep_resume
             else ()
         )
@@ -601,6 +607,30 @@ class VcsoChatService:
             except (TypeError, ValueError):
                 sdk_max_turns = max_rounds + 1
             sdk_max_budget_usd = max(0.01, min(_safe_float(sdk_settings.get("max_budget_usd"), 0.25), 1.0))
+            sdk_lifecycle_events: list[dict[str, Any]] = []
+            sdk_lifecycle_lock = threading.Lock()
+
+            def persist_sdk_lifecycle(event: dict[str, Any]) -> None:
+                if not sdk_native_subagent_mode:
+                    return
+                with sdk_lifecycle_lock:
+                    sdk_lifecycle_events.append(dict(event))
+                    del sdk_lifecycle_events[:-60]
+                    snapshot = list(sdk_lifecycle_events)
+                try:
+                    self.supabase.table("agent_delegation_runs").update(
+                        {
+                            "metadata": {
+                                "output_schema_version": "vcso_tool_loop_v1",
+                                "reasoning_visibility": "summary_only",
+                                "deep_mode": False,
+                                "sdk_native_lifecycle": snapshot,
+                            },
+                            "updated_at": _now(),
+                        }
+                    ).eq("id", run_id).eq("user_id", user_id).execute()
+                except Exception as exc:  # noqa: BLE001 - diagnostics must remain fail-open
+                    logger.warning("SDK lifecycle snapshot persistence failed open: %s", exc)
 
             def record_sdk_usage(usage: VcsoSdkUsage) -> None:
                 log_ai_usage_event(
@@ -665,6 +695,7 @@ class VcsoChatService:
                     if sdk_native_subagent_mode
                     else {}
                 ),
+                native_lifecycle_sink=persist_sdk_lifecycle if sdk_native_subagent_mode else None,
             )
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))

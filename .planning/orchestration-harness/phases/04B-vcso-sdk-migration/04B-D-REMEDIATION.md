@@ -336,3 +336,51 @@ GitHub-linked repo. Diff vs deployed `v0.6.53` (four changes, native path only):
    three-worker anchor.
 4. If it still fails: the `pre_tool_probe` log lines now disambiguate RC-α (did it fire for the
    subagent call?) and RC-β (was `agent_id` present?) without further guesswork.
+
+## 12. Fix B minimal live repro — FAILED, STOPPED FOR LONDON (2026-07-16)
+
+- Deployment precondition passed: local `main`, `origin/main`, and Railway's successful deployment
+  status all referenced `2e09c8d6ce3f788b4f851f8f1cb94e9fa442f1b5` (`v0.6.54`); live
+  `/api/health` returned `ok=true`.
+- Exactly one founder turn was sent with the retained Phase-D anchor prompt. Pre-run SDK caps read
+  back as `max_budget_usd=0.25` and `max_turns=6`.
+- Parent run: `33e84477-1cfd-4d2a-8098-12a6163c1a51`.
+- **Child row created: no.** No `agent_delegation_runs` row was linked to the parent.
+- **Terminal symptom:** the parent failed with
+  `Claude Code returned an error result: Reached maximum number of turns (6)`.
+- The live activity stream showed `Run Structured Data Agent` and `Delegate To Sub Agent` enter
+  in-progress states, but neither produced a child row before the cap.
+- **Probe / handler logs:** not confirmed from the available session. The Railway deployment status
+  and health endpoint were readable, but the runtime log view could not be read reliably; therefore
+  `pre_tool_probe` firing, `agent_id_present`, and handler `delegated=...` remain unresolved.
+- The canary was immediately re-darkened. Read-back confirmed `vcso_sdk_loop` and `vcso_planner`
+  both `is_enabled=false`, `test_user_ids=[]`, `enabled_for_all=false`, `default=false`.
+
+**STOP. No retry, variation, fix, or full gate-table proof was run.**
+
+## 13. Read-only root-cause tranche + diagnostic substrate (2026-07-16)
+
+London approved the no-credit troubleshooting tranche after Fix B's failed repro. Static inspection
+found that the live failures do not prove the worker permission boundary was reached: the standard
+lead prompt still recommends `delegate_to_sub_agent`, the native contract later requires `Task`, and
+the compiled native MCP surface still registers selected lead registry tools alongside the worker
+handlers. The mocked unit path manually invoked a valid `Task` hook and then the handler, so it could
+not exercise this real model/CLI tool-selection boundary. It also retained the stale pre-Fix-B
+`allowed_tools == ["Task"]` assertion.
+
+Implemented locally, still undeployed and dark:
+
+- a sanitized native runtime manifest reporting selected lead tools, global approvals, worker tool
+  grants, prompt ordering, and invariant violations before the SDK query;
+- durable bounded lifecycle snapshots on the existing parent `agent_delegation_runs.metadata` row for
+  Task allow/deny, SubagentStart/Stop + `agent_id_present`, MCP PreToolUse probe, handler entry and
+  completion, child run id/status, and PostToolUseFailure category (no prompts or tool payloads);
+- an explicit default-off `vcso_sdk_loop` diagnostic setting pair
+  (`diagnostic_single_worker_enabled`, `diagnostic_single_worker`) plus
+  `diagnostic_user_ids`, allowing one worker only for an explicitly listed founder; the normal
+  Phase-D path still requires all three workers.
+
+Focused local verification only: `13 passed` across `test_vcso_sdk_loop.py` and
+`test_vcso_sdk_config.py`; `py_compile` and `git diff --check` passed. No deployment, feature-flag
+mutation, live VCSO turn, child-row query, or production fix was attempted. The next decision remains
+London's: review this tranche, then separately authorize a deploy-dark + exactly-one-worker repro.

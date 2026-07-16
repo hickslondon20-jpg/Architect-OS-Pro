@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolResultEnvelope, ToolSourceRef
 from services.vcso_sdk_loop import (
+    build_native_runtime_manifest,
     native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
@@ -381,6 +382,65 @@ def test_native_subagent_effort_scaling_is_limited_to_the_p4_thin_slice():
         message="Summarize the latest plan.",
         intent={"move_type": "lookup", "depth": "deep"},
     ) == ()
+    assert native_subagent_requirements(
+        message=(
+            "Use our P&L and revenue data to identify client concentration and margin risk, "
+            "then recommend the next 90 days."
+        ),
+        intent={"move_type": "strategic_synthesis", "depth": "deep"},
+        user_id="founder-1",
+        settings={
+            "diagnostic_single_worker_enabled": True,
+            "diagnostic_single_worker": "structured_data_agent",
+            "diagnostic_user_ids": ["founder-1"],
+        },
+    ) == ("structured_data_agent",)
+    assert native_subagent_requirements(
+        message=(
+            "Use our P&L and revenue data to identify client concentration and margin risk, "
+            "then recommend the next 90 days."
+        ),
+        intent={"move_type": "strategic_synthesis", "depth": "deep"},
+        user_id="founder-other",
+        settings={
+            "diagnostic_single_worker_enabled": True,
+            "diagnostic_single_worker": "structured_data_agent",
+            "diagnostic_user_ids": ["founder-1"],
+        },
+    ) == required
+
+
+def test_native_runtime_manifest_exposes_lead_surface_and_prompt_conflict():
+    handler = "mcp__architectos__run_structured_data_agent"
+    compiled = SimpleNamespace(
+        options=SimpleNamespace(
+            allowed_tools=["Task", handler],
+            disallowed_tools=["Bash", "Agent"],
+            agents={"structured_data_agent": SimpleNamespace(tools=[handler])},
+            system_prompt=(
+                "Use delegate_to_sub_agent for bounded research. "
+                "PHASE-D NATIVE SUBAGENT CONTRACT. Use only Task."
+            ),
+        ),
+        tool_names=["delegate_to_sub_agent", "wiki_search"],
+        agent_handler_tools={"structured_data_agent": "run_structured_data_agent"},
+    )
+
+    manifest = build_native_runtime_manifest(
+        compiled,
+        required_agents=("structured_data_agent",),
+    )
+
+    assert manifest["lead_selected_registry_tools"] == ["delegate_to_sub_agent", "wiki_search"]
+    assert manifest["prompt_contract_order"] == {
+        "legacy_delegate_instruction_present": True,
+        "native_contract_present": True,
+        "native_contract_after_legacy": True,
+    }
+    assert manifest["violations"] == [
+        "native_lead_registry_tools_registered",
+        "native_prompt_contains_legacy_delegation_instruction",
+    ]
 
 
 class _NativeClient:
@@ -428,6 +488,7 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
     calls = []
     usages = []
     child_traces = []
+    lifecycle_events = []
 
     class FakeOrchestrator:
         def __init__(self, _store):
@@ -480,7 +541,12 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
         }
 
     async def fake_query(*, options, **_kwargs):
-        assert options.allowed_tools == ["Task"]
+        assert options.allowed_tools == [
+            "Task",
+            "mcp__architectos__run_structured_data_agent",
+            "mcp__architectos__run_sandbox_execution_agent",
+            "mcp__architectos__run_per_user_wiki",
+        ]
         assert "Task" not in options.disallowed_tools
         assert set(options.agents) == set(required)
         assert {agent.model for agent in options.agents.values()} == {"claude-haiku-test"}
@@ -489,10 +555,18 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
         assert all("Agent" in agent.disallowedTools for agent in options.agents.values())
         tools = {item.name: item for item in captured["tools"]}
         pre_hook = options.hooks["PreToolUse"][0].hooks[0]
+        probe_hook = options.hooks["PreToolUse"][1].hooks[0]
         post_hook = options.hooks["PostToolUse"][-1].hooks[0]
+        subagent_start = options.hooks["SubagentStart"][0].hooks[0]
+        subagent_stop = options.hooks["SubagentStop"][0].hooks[0]
 
         for index, capability_key in enumerate(required, start=1):
             task_id = f"task-{index}"
+            await subagent_start(
+                {"agent_id": f"agent-{index}", "agent_type": capability_key},
+                task_id,
+                None,
+            )
             task_contract = contract(
                 capability_key,
                 prior_findings=(
@@ -514,8 +588,22 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
             )
             assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
             handler_name = f"run_{capability_key}"
+            await probe_hook(
+                {
+                    "tool_name": f"mcp__architectos__{handler_name}",
+                    "agent_id": f"agent-{index}",
+                    "tool_input": task_contract,
+                },
+                f"handler-{index}",
+                None,
+            )
             await tools[handler_name].handler(task_contract)
             await post_hook({"tool_name": "Task", "tool_input": {}}, task_id, None)
+            await subagent_stop(
+                {"agent_id": f"agent-{index}", "agent_type": capability_key},
+                task_id,
+                None,
+            )
 
             # Raw child model text is deliberately ignored by the UI stream.
             yield StreamEvent(
@@ -579,6 +667,7 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
                 "per_user_wiki": {"query": "pricing constraint"},
             },
             usage_sink=usages.append,
+            native_lifecycle_sink=lifecycle_events.append,
             query_impl=fake_query,
         )
     )
@@ -606,11 +695,20 @@ def test_native_subagents_enforce_all_children_order_depth_tiers_and_curated_eve
         (30, 3),
     ]
     assert [trace["run_id"] for trace in child_traces] == [f"run-{key}" for key in required]
+    assert lifecycle_events[0]["event"] == "runtime_manifest"
+    assert len([event for event in lifecycle_events if event["event"] == "subagent_start"]) == 3
+    probes = [event for event in lifecycle_events if event["event"] == "mcp_pre_tool_use_probe"]
+    assert len(probes) == 3
+    assert all(event["agent_id_present"] is True for event in probes)
+    completions = [event for event in lifecycle_events if event["event"] == "native_handler_completion"]
+    assert [event["child_run_id"] for event in completions] == [f"run-{key}" for key in required]
+    assert "objective" not in str(lifecycle_events)
 
 
 def test_native_subagent_guard_blocks_sandbox_before_structured_data(monkeypatch):
     captured = _capture_sdk_tools(monkeypatch)
     required = ("structured_data_agent", "sandbox_execution_agent")
+    lifecycle_events = []
     monkeypatch.setattr(
         "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
         lambda _self: [_native_capability(key) for key in required],
@@ -665,6 +763,12 @@ def test_native_subagent_guard_blocks_sandbox_before_structured_data(monkeypatch
                 tool_context=ToolExecutionContext(user_id="founder-1", store=_NativeStore()),
                 trace_metadata={"run_id": "lead-run"},
                 native_subagent_required_agents=required,
+                native_lifecycle_sink=lifecycle_events.append,
                 query_impl=fake_query,
             )
         )
+    denials = [event for event in lifecycle_events if event["event"] == "task_pre_tool_use"]
+    assert len(denials) == 1
+    assert denials[0]["decision"] == "deny"
+    assert denials[0]["capability_key"] == "sandbox_execution_agent"
+    assert "tool_input" not in str(lifecycle_events)

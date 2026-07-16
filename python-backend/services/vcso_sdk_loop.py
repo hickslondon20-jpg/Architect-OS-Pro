@@ -153,6 +153,7 @@ class _NarrationStreamNormalizer:
 _WORKER_DONE = object()
 QueryImpl = Callable[..., AsyncIterator[Any]]
 UsageSink = Callable[[VcsoSdkUsage], None]
+LifecycleSink = Callable[[dict[str, Any]], None]
 
 
 def read_sdk_loop_settings(supabase: Any, user_id: str | None = None) -> dict[str, Any]:
@@ -185,6 +186,8 @@ def native_subagent_requirements(
     *,
     message: str,
     intent: dict[str, Any] | None,
+    settings: dict[str, Any] | None = None,
+    user_id: str | None = None,
 ) -> tuple[str, ...]:
     """Return the single Phase-D delegation contract; do not generalize before London."""
 
@@ -195,7 +198,68 @@ def native_subagent_requirements(
         return ()
     if not P4_THIN_SLICE_SIGNALS.search(message):
         return ()
+    settings = settings or {}
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    diagnostic_worker = str(settings.get("diagnostic_single_worker") or "").strip()
+    if (
+        bool(settings.get("diagnostic_single_worker_enabled"))
+        and bool(user_id)
+        and str(user_id) in diagnostic_user_ids
+        and diagnostic_worker in P4_THIN_SLICE_REQUIRED_AGENTS
+    ):
+        return (diagnostic_worker,)
     return P4_THIN_SLICE_REQUIRED_AGENTS
+
+
+def build_native_runtime_manifest(compiled: Any, *, required_agents: tuple[str, ...]) -> dict[str, Any]:
+    """Describe the native SDK surface without exposing prompts, credentials, or tool payloads."""
+
+    options = compiled.options
+    selected_registry_tools = list(compiled.tool_names)
+    allowed_tools = list(options.allowed_tools or [])
+    worker_tools = {
+        key: list(getattr(agent, "tools", None) or [])
+        for key, agent in (options.agents or {}).items()
+        if key in required_agents
+    }
+    handler_tools = {
+        key: f"mcp__{SDK_TOOL_SERVER_NAME}__{handler}"
+        for key, handler in compiled.agent_handler_tools.items()
+        if key in required_agents
+    }
+    system_prompt = str(options.system_prompt or "")
+    violations: list[str] = []
+    if selected_registry_tools:
+        violations.append("native_lead_registry_tools_registered")
+    if "delegate_to_sub_agent" in system_prompt:
+        violations.append("native_prompt_contains_legacy_delegation_instruction")
+    if "PHASE-D NATIVE SUBAGENT CONTRACT" not in system_prompt:
+        violations.append("native_prompt_missing_phase_d_contract")
+    if "Task" not in allowed_tools:
+        violations.append("native_lead_task_not_preapproved")
+    for key, handler_tool in handler_tools.items():
+        if handler_tool not in worker_tools.get(key, []):
+            violations.append(f"worker_handler_surface_mismatch:{key}")
+        if handler_tool not in allowed_tools:
+            violations.append(f"worker_handler_not_preapproved:{key}")
+    return {
+        "required_agents": list(required_agents),
+        "lead_selected_registry_tools": selected_registry_tools,
+        "lead_allowed_tools": allowed_tools,
+        "lead_disallowed_tools": list(options.disallowed_tools or []),
+        "registered_worker_handlers": handler_tools,
+        "worker_tools": worker_tools,
+        "prompt_contract_order": {
+            "legacy_delegate_instruction_present": "delegate_to_sub_agent" in system_prompt,
+            "native_contract_present": "PHASE-D NATIVE SUBAGENT CONTRACT" in system_prompt,
+            "native_contract_after_legacy": (
+                system_prompt.find("PHASE-D NATIVE SUBAGENT CONTRACT")
+                > system_prompt.find("delegate_to_sub_agent")
+                >= 0
+            ),
+        },
+        "violations": violations,
+    }
 
 
 def stream_vcso_sdk_turn(
@@ -218,6 +282,7 @@ def stream_vcso_sdk_turn(
     query_impl: QueryImpl = query,
     native_subagent_required_agents: tuple[str, ...] = (),
     native_subagent_scopes: dict[str, dict[str, Any]] | None = None,
+    native_lifecycle_sink: LifecycleSink | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -248,6 +313,7 @@ def stream_vcso_sdk_turn(
                         query_impl=query_impl,
                         native_subagent_required_agents=native_subagent_required_agents,
                         native_subagent_scopes=native_subagent_scopes or {},
+                        native_lifecycle_sink=native_lifecycle_sink,
                     )
                 )
             )
@@ -292,6 +358,7 @@ async def _run_sdk_turn(
     query_impl: QueryImpl,
     native_subagent_required_agents: tuple[str, ...],
     native_subagent_scopes: dict[str, dict[str, Any]],
+    native_lifecycle_sink: LifecycleSink | None,
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -315,6 +382,40 @@ async def _run_sdk_turn(
     delegation_count = 0
     max_delegations = len(required_agents)
     plan_statuses = {key: "pending" for key in required_agents}
+    lifecycle_sequence = 0
+
+    def record_lifecycle(event: str, **details: Any) -> None:
+        """Persist bounded lifecycle facts without prompts, tool inputs, or model output."""
+
+        nonlocal lifecycle_sequence
+        if not native_mode or native_lifecycle_sink is None:
+            return
+        lifecycle_sequence += 1
+        safe: dict[str, Any] = {
+            "sequence": lifecycle_sequence,
+            "event": str(event)[:80],
+        }
+        for key in (
+            "tool_name",
+            "tool_use_id",
+            "capability_key",
+            "agent_type",
+            "decision",
+            "reason_code",
+            "child_run_id",
+            "child_status",
+        ):
+            value = details.get(key)
+            if value not in (None, ""):
+                safe[key] = str(value)[:200]
+        if "agent_id_present" in details:
+            safe["agent_id_present"] = bool(details["agent_id_present"])
+        if "delegated" in details:
+            safe["delegated"] = bool(details["delegated"])
+        try:
+            native_lifecycle_sink(safe)
+        except Exception as exc:  # noqa: BLE001 - diagnostics must never affect the turn
+            logger.warning("SDK lifecycle persistence failed open: %s", exc)
 
     def emit_plan_update() -> None:
         if not native_mode:
@@ -450,6 +551,15 @@ async def _run_sdk_turn(
                 if not prior:
                     raise ValueError("The sandbox contract must inherit the compact structured-data finding.")
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            record_lifecycle(
+                "task_pre_tool_use",
+                tool_name="Task",
+                tool_use_id=task_id,
+                capability_key=capability_key,
+                agent_id_present=bool(input_data.get("agent_id")),
+                decision="deny",
+                reason_code=str(exc),
+            )
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
@@ -463,6 +573,15 @@ async def _run_sdk_turn(
         plan_statuses[capability_key] = "in_progress"
         emit_subagent_start(capability_key, task_id)
         emit_plan_update()
+        record_lifecycle(
+            "task_pre_tool_use",
+            tool_name="Task",
+            tool_use_id=task_id,
+            capability_key=capability_key,
+            agent_id_present=bool(input_data.get("agent_id")),
+            decision="allow",
+            reason_code="approved_bounded_contract",
+        )
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
@@ -486,8 +605,49 @@ async def _run_sdk_turn(
                 bool(input_data.get("agent_id")),
                 tool_use_id,
             )
+            record_lifecycle(
+                "mcp_pre_tool_use_probe",
+                tool_name=str(input_data.get("tool_name") or ""),
+                tool_use_id=tool_use_id,
+                agent_id_present=bool(input_data.get("agent_id")),
+            )
         except Exception:  # noqa: BLE001 - telemetry must never affect the turn
             pass
+        return {}
+
+    async def subagent_start_hook(
+        input_data: dict[str, Any], tool_use_id: str | None, _context: Any
+    ) -> dict[str, Any]:
+        record_lifecycle(
+            "subagent_start",
+            tool_use_id=tool_use_id,
+            agent_type=input_data.get("agent_type"),
+            agent_id_present=bool(input_data.get("agent_id")),
+        )
+        return {}
+
+    async def subagent_stop_hook(
+        input_data: dict[str, Any], tool_use_id: str | None, _context: Any
+    ) -> dict[str, Any]:
+        record_lifecycle(
+            "subagent_stop",
+            tool_use_id=tool_use_id,
+            agent_type=input_data.get("agent_type"),
+            agent_id_present=bool(input_data.get("agent_id")),
+        )
+        return {}
+
+    async def post_tool_failure(
+        input_data: dict[str, Any], tool_use_id: str | None, _context: Any
+    ) -> dict[str, Any]:
+        error = input_data.get("error")
+        record_lifecycle(
+            "post_tool_use_failure",
+            tool_name=input_data.get("tool_name"),
+            tool_use_id=tool_use_id,
+            agent_id_present=bool(input_data.get("agent_id")),
+            reason_code=type(error).__name__ if isinstance(error, BaseException) else "sdk_tool_failure",
+        )
         return {}
 
     async def post_tool_use(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
@@ -643,6 +803,13 @@ async def _run_sdk_turn(
                 delegated,
                 task_id or None,
             )
+            record_lifecycle(
+                "native_handler_entry",
+                tool_name=tool_name,
+                capability_key=capability_key,
+                delegated=delegated,
+                tool_use_id=task_id,
+            )
             # Delegation-first guard (SDK-permission-agnostic): allowed_tools (Fix B) permits this
             # tool globally, so a direct lead call could reach here and bypass the pre_task_use
             # contract/ordering/single-run/cap checks. pre_task_use is the only writer of
@@ -710,6 +877,14 @@ async def _run_sdk_turn(
                 )
             except Exception as exc:  # noqa: BLE001 - the Task receives a bounded worker failure
                 logger.warning("SDK native subagent %s failed safely: %s", capability_key, exc)
+                record_lifecycle(
+                    "native_handler_failure",
+                    tool_name=tool_name,
+                    capability_key=capability_key,
+                    delegated=True,
+                    tool_use_id=task_id,
+                    reason_code=type(exc).__name__,
+                )
                 return {
                     "content": [{"type": "text", "text": json.dumps({"error": "Worker failed safely."})}],
                     "is_error": True,
@@ -721,6 +896,15 @@ async def _run_sdk_turn(
                 capability_key,
                 getattr(result, "run_id", None),
                 getattr(result, "status", None),
+            )
+            record_lifecycle(
+                "native_handler_completion",
+                tool_name=tool_name,
+                capability_key=capability_key,
+                delegated=True,
+                tool_use_id=task_id,
+                child_run_id=getattr(result, "run_id", None),
+                child_status=getattr(result, "status", None),
             )
             citations = [item for item in result.citations if isinstance(item, dict)]
             task_sources[task_id].extend(citations)
@@ -775,6 +959,7 @@ async def _run_sdk_turn(
         post_hooks.append(HookMatcher(matcher="Task", hooks=[post_tool_use]))
     hooks: dict[str, Any] = {
         "PostToolUse": post_hooks,
+        "PostToolUseFailure": [HookMatcher(matcher=r"^(Task|mcp__.*)$", hooks=[post_tool_failure])],
         "Stop": [HookMatcher(hooks=[stop_hook])],
         "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
     }
@@ -785,6 +970,8 @@ async def _run_sdk_turn(
             # decision. The handler grant comes from allowed_tools (Fix B), not from this hook.
             HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
         ]
+        hooks["SubagentStart"] = [HookMatcher(hooks=[subagent_start_hook])]
+        hooks["SubagentStop"] = [HookMatcher(hooks=[subagent_stop_hook])]
     native_prompt = _native_lead_prompt(required_agents) if native_mode else ""
     compiled = compile_founder_sdk_options(
         store=tool_context.store,
@@ -824,6 +1011,13 @@ async def _run_sdk_turn(
             "Task",
             *(f"mcp__{SDK_TOOL_SERVER_NAME}__run_{key}" for key in required_agents),
         ]
+    runtime_manifest = build_native_runtime_manifest(compiled, required_agents=required_agents)
+    if native_mode:
+        record_lifecycle(
+            "runtime_manifest",
+            decision="violations_detected" if runtime_manifest["violations"] else "clean",
+            reason_code="|".join(runtime_manifest["violations"]) or "none",
+        )
     trace_metadata.update(
         {
             "sdk_compiled_tool_count": len(compiled.tool_names),
@@ -832,6 +1026,7 @@ async def _run_sdk_turn(
             "sdk_native_subagent_mode": native_mode,
             "sdk_required_subagents": list(required_agents),
             "sdk_agent_model_routes": compiled.agent_model_routes if native_mode else {},
+            "sdk_runtime_manifest": runtime_manifest if native_mode else {},
         }
     )
 
