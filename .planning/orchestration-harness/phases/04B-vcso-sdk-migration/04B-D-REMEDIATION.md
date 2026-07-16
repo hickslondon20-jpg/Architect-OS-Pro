@@ -196,3 +196,143 @@ Phase E start, and the harness-root `ROADMAP.md` is untouched. The confirmed-pas
   delegate a single approved worker in isolation, confirm one child `agent_delegation_runs` row is
   created with correct `parent_run_id` and `tier_worker → claude-haiku-4-5` attribution, then STOP and
   re-darken. **Do not run the full three-worker anchor** — that remains a separate, separately-gated step.
+
+---
+
+## 10. Why the deployed Option-1 hook failed, and the corrected fix
+
+**Correction of record:** `v0.6.53` was committed, pushed, and is the ACTIVE Railway deployment on
+`api.architectospro.com`. The §8 "commit blocked" note was a stale sandbox artifact — the repro did
+test the live fix. It still produced zero child rows.
+
+### 10.1 What the SDK source proves (definitive)
+
+From the vendored SDK `0.2.118` (`python-backend/venv/.../claude_agent_sdk`):
+
+- **`--allowedTools` is one global grant.** `_internal/transport/subprocess_cli.py:317` serializes
+  `allowed_tools` exactly once for the whole session; `AgentDefinition` has no per-agent allow list.
+  This is the only permission channel we have *proven* both (a) reaches subagent tool calls and (b) is
+  consulted under `permission_mode="dontAsk"`.
+- **`can_use_tool` does not fire under `dontAsk`.** `types.py:1895–1911` — the callback is "the SDK
+  replacement for the interactive permission prompt," invoked only when rules evaluate to **"ask"**,
+  and "*not* invoked for tool calls already permitted by `allowed_tools` [or] `permission_mode`."
+  `dontAsk` = "don't prompt; deny if not pre-approved" (`types.py:1783`) — i.e. there is no "ask"
+  state, so the prompt-replacement callback is skipped. **`can_use_tool` is the only channel the SDK
+  enriches with `agent_id`** (`_internal/query.py:400`, built into `ToolPermissionContext`) — but that
+  is moot here because it never fires under `dontAsk`.
+- **The PreToolUse hook's dedicated context arg carries no `agent_id`.** `_internal/query.py:446–450`
+  invokes the hook as `callback(input, tool_use_id, {"signal": None})`. Any `agent_id` a hook could see
+  must come from `input` (arg 1); the CLI's population of `agent_id` in the *PreToolUse input* is
+  asserted only by a comment (`types.py:284–306`) and is **not verifiable from source** — the matching
+  and input-assembly live in the bundled CLI (`_bundled/claude.exe`, a 251 MB compiled binary).
+
+### 10.2 RC-α / RC-β / RC-γ — cannot be split from existing evidence
+
+The failed Option-1 hook contained **no log line**, and the run was launched with
+`include_hook_events=False` — so neither the Railway logs for run
+`dda760fc-2c72-4424-b50e-377536e8ef6d` nor the SDK stream can show whether `pre_worker_handler` fired,
+what its input held, or what it returned. The matcher/agent_id/subagent-firing behaviors all live in
+the compiled CLI binary. Therefore:
+
+| Cause | Can source confirm? | Assessment |
+|---|---|---|
+| **RC-α** hooks don't fire for subagent tool calls | No (CLI-internal) | *Unlikely* — the SDK schema deliberately carries `agent_id` for hooks "fired from inside a Task-spawned sub-agent" (`types.py:290–306`) and docs say PreToolUse gates "every tool call regardless of permission rules." But not provable. |
+| **RC-β** hook fires but `agent_id` absent from its input | No (CLI-internal) | *Plausible and self-inflicting* — Option-1 denied whenever `input_data.get("agent_id")` was falsy. If the CLI omits `agent_id` from the PreToolUse input, the hook denied its own legitimate subagent call. |
+| **RC-γ** matcher `^mcp__architectos__run_` didn't match `mcp__architectos__run_<agent>` | No (CLI-internal) | *Plausible* — unlike the codebase's proven `^mcp__.*$`, the Option-1 pattern was not closed with `.*$`; under full-match semantics it never matches, so the hook never fires. |
+
+**Adjudication:** the three cannot be disambiguated from what exists today. Crucially, **the corrected
+fix must not depend on which one it is** — every RC lives in the hook/callback layer, so the fix routes
+around that layer entirely.
+
+### 10.3 Fix A vs Fix B
+
+- **Fix A — `can_use_tool` keyed on `agent_id`:** rejected. The channel that carries `agent_id`
+  (`can_use_tool`) does not fire under `dontAsk` (10.1). Making Fix A work would require abandoning
+  `dontAsk` for the whole session — a large blast radius that reintroduces prompt semantics into a
+  headless server path. Not worth it.
+- **Fix B — inverted `allowed_tools` (RECOMMENDED):** add the three required handler tools
+  (`mcp__architectos__run_structured_data_agent`, `…run_sandbox_execution_agent`,
+  `…run_per_user_wiki`) to the global `allowed_tools` in the native override
+  (`vcso_sdk_loop.py:769`): `options.allowed_tools = ["Task", *(f"mcp__{SDK_TOOL_SERVER_NAME}__run_{k}"
+  for k in required_agents)]`. This is the proven channel; it is independent of RC-α/β/γ.
+  **Also remove the Option-1 `pre_worker_handler` allow/deny hook** — an explicit hook *deny* overrides
+  an `allowed_tools` allow, so leaving the buggy hook in place could actively block Fix B.
+
+### 10.4 Preserving delegation-first without a per-call permission gate
+
+`allowed_tools` is global, so Fix B would also let the *lead* call `run_<agent>` directly and bypass
+the `pre_task_use` contract/ordering/cap guardrails. Because no hook/callback channel reliably gives us
+lead-vs-subagent context under `dontAsk`, enforce the guardrail in **code we fully control** — the
+handler itself:
+
+- In `make_native_handler_tool.execute` (`vcso_sdk_loop.py:612–721`), refuse to run unless
+  `pre_task_use` has already registered a contract for this capability, i.e. **require
+  `capability_key in task_contracts`** (populated only by an approved `Task` delegation at
+  `pre_task_use`, which already enforces order/single-run/cap). A direct lead call arrives with no
+  registered contract → return a bounded `is_error` "must be delegated via an approved Task contract."
+  This makes delegation-first deterministic and SDK-permission-agnostic.
+
+### 10.5 Self-diagnosing instrumentation (so the next repro is unambiguous)
+
+1. **Grant/decision log in the handler:** at `execute` entry, `logger.info` the `capability_key`,
+   whether a registered contract exists (`delegated=<bool>`), the resolved `task_id`, and — after the
+   orchestrator call — the child `run_id` and status. "Handler fired + child created" then appears
+   directly in Railway logs, resolving the "not confirmed" gap without the SDK stream.
+2. **Observe-only PreToolUse probe (optional, high value):** register a *logging-only* PreToolUse hook
+   on the **proven** matcher `^mcp__.*$` that returns `{}` (no decision — permission stays with
+   `allowed_tools`) and logs `tool_name`, `bool(input.get("agent_id"))`, `tool_use_id`. One repro then
+   empirically settles RC-α (does it fire for subagent calls?) and RC-β (is `agent_id` in the input?)
+   for good — telemetry only, cannot affect the grant.
+
+### 10.6 Process precondition for any live repro
+
+Before spending a canary turn: **confirm the deployed Railway head == the intended fix commit**
+(`/health` or deploy SHA), so a stale deploy can never again masquerade as a fix failure. The one-worker
+repro (single approved worker, one child row with correct `parent_run_id` + `tier_worker →
+claude-haiku-4-5`) runs once; then STOP. Do **not** run the full three-worker anchor.
+
+### 10.7 Status
+
+Diagnosis complete; **STOPPED for London**. No code changed for Fix B, no flag touched, no canary run.
+The Option-1 `pre_worker_handler` change from §8 is still uncommitted in the working tree and should be
+**replaced** (not extended) by Fix B when authorized.
+
+---
+
+## 11. Fix B implemented (v0.6.54) — verified on disk, pending commit/deploy/repro
+
+**London authorized (2026-07-16).** Applied to `python-backend/services/vcso_sdk_loop.py` in the
+GitHub-linked repo. Diff vs deployed `v0.6.53` (four changes, native path only):
+
+1. **Grant (the actual fix).** Native override at the former `options.allowed_tools = ["Task"]` now
+   pre-approves the required handlers:
+   `options.allowed_tools = ["Task", *(f"mcp__{SDK_TOOL_SERVER_NAME}__run_{k}" for k in required_agents)]`.
+   This is the one channel proven to reach subagent calls under `dontAsk`.
+2. **Removed the ineffective Option-1 hook.** `pre_worker_handler` (PreToolUse allow/deny) is gone —
+   an explicit hook deny would have overridden the allowed_tools allow and re-blocked Fix B.
+3. **Delegation-first guard, in code we control.** `make_native_handler_tool.execute` now refuses
+   unless `capability_key in task_contracts` (written only by an approved `pre_task_use` delegation,
+   which already enforces ordering/single-run/cap). A direct lead call → bounded `is_error`, so the
+   guardrails survive without depending on any SDK permission channel.
+4. **Self-diagnosing instrumentation.**
+   - Handler entry log: `capability`, `delegated=<bool>`, `task_id`; completion log: `capability`,
+     child `run_id`, `status`. "Handler fired + child created" now shows directly in Railway logs.
+   - Observe-only `pre_tool_probe` PreToolUse hook on the proven `^mcp__.*$` matcher — logs
+     `tool_name`, `agent_id_present`, `tool_use_id`, returns `{}` (no permission decision). One repro
+     then settles RC-α/RC-β empirically.
+
+**Verification done here:** `py_compile` clean; `git diff` shows exactly the four hunks; no dangling
+`pre_worker_handler` reference remains.
+
+**Handoff — must run in London's environment (sandbox cannot commit/deploy/spend canary credits):**
+1. Commit + push: `git commit -m "v0.6.54 Grant native worker handlers via allowed_tools + delegation guard"`
+   (a stale `.git/index.lock` from an earlier sandbox `git checkout` may need `rm -f .git/index.lock`
+   first).
+2. Let Railway deploy; **confirm deployed head == v0.6.54 commit SHA before the canary** (§10.6).
+3. Enroll only the founder under `vcso_sdk_loop`; run the **one-worker** repro once (single approved
+   worker delegated in isolation). Pass = one `agent_delegation_runs` child row with correct
+   `parent_run_id` and `tier_worker → claude-haiku-4-5`; logs show `handler fired … delegated=True`
+   and `handler completed … run_id=…`. Then **STOP and re-darken**. Do **not** run the full
+   three-worker anchor.
+4. If it still fails: the `pre_tool_probe` log lines now disambiguate RC-α (did it fire for the
+   subagent call?) and RC-β (was `agent_id` present?) without further guesswork.

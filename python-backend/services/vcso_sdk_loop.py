@@ -471,36 +471,24 @@ async def _run_sdk_turn(
             }
         }
 
-    async def pre_worker_handler(
+    async def pre_tool_probe(
         input_data: dict[str, Any],
-        _tool_use_id: str | None,
+        tool_use_id: str | None,
         _context: Any,
     ) -> dict[str, Any]:
-        # Each approved worker's sole implementation tool is mcp__architectos__run_<capability>.
-        # Under permissionMode="dontAsk" the global allowed_tools grant is Task-only, so the handler
-        # call would be denied as un-pre-approved. Pre-approve it here - but only when it originates
-        # inside a Task-spawned subagent (agent_id present) and targets an approved required worker.
-        # A direct lead call (no agent_id) is denied so pre_task_use stays the only delegation entry
-        # path and its contract/ordering/cap guardrails cannot be bypassed.
-        tool_name = str(input_data.get("tool_name") or "")
-        capability_key = tool_name.split(f"mcp__{SDK_TOOL_SERVER_NAME}__run_", 1)[-1]
-        if bool(input_data.get("agent_id")) and capability_key in required_agents:
-            return {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "allow",
-                    "permissionDecisionReason": "Approved bounded Phase-D worker handler.",
-                }
-            }
-        return {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": (
-                    "Worker handler tools run only inside an approved Phase-D subagent delegation."
-                ),
-            }
-        }
+        # Observe-only telemetry. Records whether PreToolUse fires for this call and whether
+        # agent_id is present in the hook input, so the next repro's logs resolve RC-alpha/RC-beta
+        # empirically. Returns no permission decision -- the handler grant stays with allowed_tools.
+        try:
+            logger.info(
+                "vcso_sdk pretooluse probe fired tool=%s agent_id_present=%s tool_use_id=%s",
+                str(input_data.get("tool_name") or ""),
+                bool(input_data.get("agent_id")),
+                tool_use_id,
+            )
+        except Exception:  # noqa: BLE001 - telemetry must never affect the turn
+            pass
+        return {}
 
     async def post_tool_use(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
         sdk_tool_name = str(input_data.get("tool_name") or "tool")
@@ -648,6 +636,26 @@ async def _run_sdk_turn(
                 (key for key, value in reversed(list(task_capabilities.items())) if value == capability_key),
                 "",
             )
+            delegated = capability_key in task_contracts
+            logger.info(
+                "vcso_sdk native worker handler fired capability=%s delegated=%s task_id=%s",
+                capability_key,
+                delegated,
+                task_id or None,
+            )
+            # Delegation-first guard (SDK-permission-agnostic): allowed_tools (Fix B) permits this
+            # tool globally, so a direct lead call could reach here and bypass the pre_task_use
+            # contract/ordering/single-run/cap checks. pre_task_use is the only writer of
+            # task_contracts, so its absence means this was not an approved delegation -- refuse.
+            if not delegated:
+                logger.warning(
+                    "vcso_sdk native worker handler refused (no approved delegation) capability=%s",
+                    capability_key,
+                )
+                return {
+                    "content": [{"type": "text", "text": json.dumps({"error": "Worker handlers run only inside an approved Task delegation."})}],
+                    "is_error": True,
+                }
             contract = task_contracts.get(capability_key) or {}
             objective = str(args.get("objective") or contract.get("objective") or "").strip()
             if not objective:
@@ -708,6 +716,12 @@ async def _run_sdk_turn(
                 }
 
             worker_results[capability_key] = result
+            logger.info(
+                "vcso_sdk native worker handler completed capability=%s run_id=%s status=%s",
+                capability_key,
+                getattr(result, "run_id", None),
+                getattr(result, "status", None),
+            )
             citations = [item for item in result.citations if isinstance(item, dict)]
             task_sources[task_id].extend(citations)
             source_refs.extend(citations)
@@ -767,10 +781,9 @@ async def _run_sdk_turn(
     if native_mode:
         hooks["PreToolUse"] = [
             HookMatcher(matcher="Task", hooks=[pre_task_use]),
-            HookMatcher(
-                matcher=rf"^mcp__{SDK_TOOL_SERVER_NAME}__run_",
-                hooks=[pre_worker_handler],
-            ),
+            # Observe-only probe on the proven ^mcp__.*$ matcher: telemetry only, no permission
+            # decision. The handler grant comes from allowed_tools (Fix B), not from this hook.
+            HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
         ]
     native_prompt = _native_lead_prompt(required_agents) if native_mode else ""
     compiled = compile_founder_sdk_options(
@@ -803,7 +816,14 @@ async def _run_sdk_turn(
     if native_mode:
         # The lead composes from bounded worker findings. Direct registry tools here would
         # duplicate retrieval, consume the turn cap, and bypass the explicit P4 contracts.
-        options.allowed_tools = ["Task"]
+        # Fix B: allowed_tools is the one grant channel proven to reach subagent tool calls under
+        # dontAsk, so the required worker handlers must be pre-approved here for the subagents to
+        # call them. The lead is kept delegation-first by prompt + the in-handler contract guard
+        # (make_native_handler_tool.execute), not by withholding the grant.
+        options.allowed_tools = [
+            "Task",
+            *(f"mcp__{SDK_TOOL_SERVER_NAME}__run_{key}" for key in required_agents),
+        ]
     trace_metadata.update(
         {
             "sdk_compiled_tool_count": len(compiled.tool_names),
