@@ -189,6 +189,7 @@ def test_standard_sdk_turn_compiles_registry_tools_and_normalizes_lifecycle(monk
 
     assert registry.calls == [("wiki_search", {"query": "margin"})]
     assert [item["data"]["text"] for item in events if item["event"] == "token"] == ["Margin ", "is stable."]
+    assert {item["data"]["channel"] for item in events if item["event"] == "token"} == {"answer"}
     assert next(item for item in events if item["event"] == "tool_call")["data"]["stepIndex"] == 4
     assert next(item for item in events if item["event"] == "tool_call")["data"]["input"] == {}
     assert next(item for item in events if item["event"] == "tool_result")["data"]["output"] == "{}"
@@ -285,5 +286,64 @@ def test_sdk_stream_uses_final_result_only_as_non_streaming_fallback(monkeypatch
             query_impl=fake_query,
         )
     )
-    assert events == [{"event": "token", "data": {"text": "Fallback chunk."}}]
+    assert events == [
+        {
+            "event": "token",
+            "data": {"text": "Fallback chunk.", "channel": "answer", "sdkMode": True},
+        }
+    ]
     assert result.tool_step_count == 0
+
+
+def test_sdk_stream_separates_curated_narration_from_persisted_answer(monkeypatch):
+    _capture_sdk_tools(monkeypatch)
+
+    async def fake_query(*, options, **_kwargs):
+        for index, text in enumerate(
+            ("<nar", "ration>Now I'll review the margin record.</nar", "ration>", "Margin is stable.")
+        ):
+            yield StreamEvent(
+                uuid=str(index),
+                session_id="session-4",
+                event={"type": "content_block_delta", "delta": {"type": "text_delta", "text": text}},
+            )
+        await options.hooks["Stop"][0].hooks[0]({}, None, None)
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=4,
+            duration_api_ms=3,
+            is_error=False,
+            num_turns=2,
+            session_id="session-4",
+            result="Margin is stable.",
+        )
+
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="Founder prompt",
+            system_prompt="System",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(user_id="user-1"),
+            trace_metadata={"run_id": "run-1"},
+            query_impl=fake_query,
+        )
+    )
+
+    narration = "".join(
+        item["data"]["text"]
+        for item in events
+        if item["event"] == "token" and item["data"]["channel"] == "narration"
+    )
+    answer = "".join(
+        item["data"]["text"]
+        for item in events
+        if item["event"] == "token" and item["data"]["channel"] == "answer"
+    )
+    assert narration == "Now I'll review the margin record."
+    assert answer == "Margin is stable."
+    assert result.answer_text == "Margin is stable."
+    assert "<narration>" not in str(events)

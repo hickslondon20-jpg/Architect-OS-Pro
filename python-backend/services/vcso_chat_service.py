@@ -548,6 +548,8 @@ class VcsoChatService:
             }
             return
 
+        sdk_flag = self._sdk_loop_settings(user_id)
+        sdk_mode = bool(sdk_flag.get("enabled")) and not deep_mode and not is_deep_resume and not planner_path_selected
         self._active_turn["ready_emitted"] = True
         yield {
             "event": "ready",
@@ -568,11 +570,11 @@ class VcsoChatService:
                 "agentSteps": initial_trace_steps,
                 "deepMode": deep_mode,
                 "agentStatus": "working" if deep_mode else "complete",
+                "sdkMode": sdk_mode,
             },
         }
 
-        sdk_flag = self._sdk_loop_settings(user_id)
-        if sdk_flag.get("enabled") and not deep_mode and not is_deep_resume and not planner_path_selected:
+        if sdk_mode:
             sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
             try:
                 sdk_max_turns = max(2, min(int(sdk_settings.get("max_turns", max_rounds + 1)), 12))

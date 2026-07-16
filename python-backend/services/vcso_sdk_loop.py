@@ -33,6 +33,8 @@ VCSO_SDK_CAPABILITY_KEY = "vcso_sdk_loop"
 SDK_STANDARD_SCHEMA_VERSION = "vcso_sdk_standard_v1"
 SDK_TOOL_SERVER_NAME = "architectos"
 SDK_TOOL_PREFIX = f"mcp__{SDK_TOOL_SERVER_NAME}__"
+NARRATION_OPEN = "<narration>"
+NARRATION_CLOSE = "</narration>"
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,55 @@ class _WorkerFailure:
 class _ToolOutcome:
     status: str
     sources: list[dict[str, Any]]
+
+
+@dataclass
+class _NarrationStreamNormalizer:
+    """Strip explicit progress markers while preserving real text deltas."""
+
+    buffer: str = ""
+    in_narration: bool = False
+    narration_segment: int = 0
+
+    def feed(self, chunk: str) -> list[tuple[str, str, int | None]]:
+        self.buffer += chunk
+        pieces: list[tuple[str, str, int | None]] = []
+        while self.buffer:
+            marker = NARRATION_CLOSE if self.in_narration else NARRATION_OPEN
+            marker_index = self.buffer.find(marker)
+            if marker_index >= 0:
+                self._append_piece(pieces, self.buffer[:marker_index])
+                self.buffer = self.buffer[marker_index + len(marker) :]
+                if self.in_narration:
+                    self.in_narration = False
+                else:
+                    self.in_narration = True
+                    self.narration_segment += 1
+                continue
+
+            retained = _marker_prefix_suffix_length(self.buffer, marker)
+            safe_length = len(self.buffer) - retained
+            if safe_length <= 0:
+                break
+            self._append_piece(pieces, self.buffer[:safe_length])
+            self.buffer = self.buffer[safe_length:]
+        return pieces
+
+    def finish(self) -> list[tuple[str, str, int | None]]:
+        pieces: list[tuple[str, str, int | None]] = []
+        marker = NARRATION_CLOSE if self.in_narration else NARRATION_OPEN
+        marker_prefixes = {marker[:length] for length in range(1, len(marker) + 1)}
+        if self.buffer and self.buffer not in marker_prefixes:
+            self._append_piece(pieces, self.buffer)
+        self.buffer = ""
+        return pieces
+
+    def _append_piece(self, pieces: list[tuple[str, str, int | None]], text: str) -> None:
+        if not text:
+            return
+        channel = "narration" if self.in_narration else "answer"
+        segment = self.narration_segment if self.in_narration else None
+        pieces.append((channel, text, segment))
 
 
 _WORKER_DONE = object()
@@ -324,7 +375,10 @@ async def _run_sdk_turn(
             "scoped ArchitectOS tools when additional evidence is needed. The selected founder context "
             "in the prompt is authoritative pre-assembly. Keep tool results compact, cite factual founder "
             "claims using source markers supplied in context or tool results, and never reveal raw tool "
-            "payloads, hidden reasoning, or chain-of-thought."
+            "payloads, hidden reasoning, or chain-of-thought. Before or between tool calls, you may give "
+            "the founder one brief action-oriented progress line wrapped exactly in <narration> and "
+            "</narration>. Narration says what you are doing next, never why you reasoned privately, and "
+            "never contains tool inputs or results. Do not wrap the final answer in narration markers."
         ),
         main_model=model,
         api_key=api_key,
@@ -346,6 +400,7 @@ async def _run_sdk_turn(
     )
 
     answer_parts: list[str] = []
+    text_normalizer = _NarrationStreamNormalizer()
     input_tokens: int | None = None
     output_tokens: int | None = None
     total_cost_usd: Decimal | None = None
@@ -367,8 +422,17 @@ async def _run_sdk_turn(
                 if delta.get("type") == "text_delta":
                     text = str(delta.get("text") or "")
                     if text:
-                        answer_parts.append(text)
-                        events.put({"event": "token", "data": {"text": text}})
+                        for channel, visible_text, segment_id in text_normalizer.feed(text):
+                            if channel == "answer":
+                                answer_parts.append(visible_text)
+                            token_data: dict[str, Any] = {
+                                "text": visible_text,
+                                "channel": channel,
+                                "sdkMode": True,
+                            }
+                            if segment_id is not None:
+                                token_data["segmentId"] = segment_id
+                            events.put({"event": "token", "data": token_data})
         elif isinstance(message, ResultMessage):
             session_id = message.session_id
             final_result_text = message.result
@@ -391,14 +455,31 @@ async def _run_sdk_turn(
                 except Exception as exc:  # noqa: BLE001 - metering failure must not erase the founder answer
                     logger.warning("SDK ResultMessage usage sink failed open: %s", exc)
 
+    for channel, visible_text, segment_id in text_normalizer.finish():
+        if channel == "answer":
+            answer_parts.append(visible_text)
+        token_data = {"text": visible_text, "channel": channel, "sdkMode": True}
+        if segment_id is not None:
+            token_data["segmentId"] = segment_id
+        events.put({"event": "token", "data": token_data})
+
     if not turn_trace_emitted:
         _record_turn_trace(metadata=trace_metadata, status="completed")
         turn_trace_emitted = True
     answer_text = "".join(answer_parts).strip()
     if not answer_text and final_result_text:
-        answer_text = final_result_text.strip()
+        fallback_normalizer = _NarrationStreamNormalizer()
+        fallback_pieces = [*fallback_normalizer.feed(final_result_text), *fallback_normalizer.finish()]
+        answer_text = "".join(
+            text for channel, text, _segment in fallback_pieces if channel == "answer"
+        ).strip()
         if answer_text:
-            events.put({"event": "token", "data": {"text": answer_text}})
+            events.put(
+                {
+                    "event": "token",
+                    "data": {"text": answer_text, "channel": "answer", "sdkMode": True},
+                }
+            )
     if not answer_text:
         raise RuntimeError("Claude Agent SDK returned no assistant text.")
     return VcsoSdkTurnResult(
@@ -480,6 +561,13 @@ def _make_sdk_tool(
         ),
     )(execute)
     return decorated
+
+
+def _marker_prefix_suffix_length(value: str, marker: str) -> int:
+    for length in range(min(len(value), len(marker) - 1), 0, -1):
+        if value.endswith(marker[:length]):
+            return length
+    return 0
 
 
 def _selected_definitions(registry: ToolRegistry, tool_names: list[str]) -> list[ToolDefinition]:
