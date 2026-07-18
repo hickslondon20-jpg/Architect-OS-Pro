@@ -178,6 +178,14 @@ ingestion pipeline* manual uploads use (with a mandatory provenance field). This
 the compiled-truth-over-timeline page shape (adopted from gbrain) carries it. Product prompting (when
 to offer/auto-snapshot) is a later conversation. Not in initial scope.
 
+**Added 2026-07-16 (Phase D):** the sandbox's *real* concentration/margin computation joins this
+cluster as deferred — it needs a stored/vectorized financial **series** (client-level revenue +
+multi-period P&L), which has no table today and will most likely be fed by MCP retrieval. Real compute
+is validated in **Phase F** alongside MCP; **Phase D2** restores model-driven delegation with the
+sandbox as a working smoke only. Path A (v0.6.57–59) proved the delegation plumbing but removed
+model-driven delegation, and is retained dark as the fallback until D2 is proven. (Also record this
+deferral in the platform concerns/roadmap doc.)
+
 ---
 
 ## Locks reconciliation (founder-confirmed 2026-07-15)

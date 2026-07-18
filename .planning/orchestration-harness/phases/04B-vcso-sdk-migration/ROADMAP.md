@@ -50,7 +50,8 @@ commits per `CLAUDE.md`. **Decisive unknown gated first:** SDK token-streaming g
 | B | SDK loop for standard VCSO (parallel) | One real standard VCSO turn end-to-end on the SDK path (canary founder), SSE contract unchanged, 160-char fake deleted, matched-set cost/quality at parity-or-better, traces paired to usage rows. |
 | C | Registry → SDK-config compiler + extensions | Per-founder `ClaudeAgentOptions` compiled from `tool_registry` × `agent_capabilities` × active `mcp_connections`; `persistence_semantics` live and enforcing read-only-vs-write guardrails; tier→model resolver resolved (Q2 resolved — see detail). |
 | C2 | Streaming surface redesign (UI/UX) | The transparency/streaming surface matches the target screenshots: token-by-token answer + streamed curated narration, drill-down step chips (not blocky accordions), living right-hand plan panel. Visual-only against the stable SSE schema (one normalizer tweak). The migration's first `src/` phase. |
-| D | Native subagents — the P4 re-approach | The P4 thin-slice strategic question decomposes **correctly** (spawns the mandatory structured-data **and** sandbox children), plan + workers visible via MA-05, correct tiers, budget/depth caps enforced. **STOP-and-review checkpoint** — the one P4 never reached. |
+| D | Native subagents — the P4 re-approach | The P4 thin-slice strategic question decomposes **correctly** (spawns the mandatory structured-data **and** sandbox children), plan + workers visible via MA-05, correct tiers, budget/depth caps enforced. **STOP-and-review checkpoint** — the one P4 never reached. **Delegation plumbing proven via Path A (interim); model-driven delegation moved to D2.** |
+| D2 | Model-driven delegation (restore reasoning-driven worker selection) | The **lead** reasons the decomposition and delegates via `Task` (worker tools scoped invisible to the lead), not the app deterministically; workers run, sandbox fires (working smoke), effort-scaling + delegation contracts, coverage safety-net retained. Restores the migration's intent after Path A proved the plumbing. **STOP-and-review checkpoint.** |
 | E | Sessions + Deep Mode reconciliation | A Deep Mode thread pauses on `ask_user` and resumes with full context via SDK sessions; `agent_todos` plan + workspace persist with no double-bookkeeping against resume-state. |
 | F | First live MCP (QuickBooks) | Live QuickBooks P&L pull through a bounded worker, cited, **read-only**, founder-scoped via vault auth, ephemeral; freshness policy chose the live source; write/privileged blocked at runtime. Ties to harness Phase 5. |
 | G | Generalize, verify, cut over | Co-equal gates proven on live (cost ↓ vs. baseline, cited CFO/CSO quality, native legible UX, safety under adversarial prompts); hand-rolled path retired on parity; harness root `ROADMAP.md` updated (founder-gated). |
@@ -110,6 +111,20 @@ sub-delegation, no recursion. **Prove on the P4 thin-slice question end-to-end**
 must spawn the mandatory structured-data **and** sandbox children — plan + workers visible via MA-05,
 correct tiers. **STOP-and-review checkpoint with the founder before broadening.**
 
+### Phase D2 — Model-Driven Delegation (restore reasoning-driven worker selection)
+Path A (Phase D, v0.6.57–59) proved the delegation **plumbing** end-to-end but did it by **removing
+model-driven delegation** — the app deterministically runs a fixed worker set and the SDK lead only
+composes, which does not generalize and inverts the migration's purpose. D2 restores it: the **lead
+reasons** the decomposition and delegates via `Task`, with the worker tools scoped **invisible to the
+lead** (the tool-visibility trap from handoff §17 — resolved via an external/scoped MCP server) so the
+lead *must* delegate. Reuses the `SubAgentOrchestrator` handlers and every proven Path-A asset (sandbox
+wiring, nested UI, tiers, traces). Keeps Path A's deterministic guarantee as a **safety-net** (stop-hook
+catches a clearly-missing mandatory child) and adds **effort-scaling + explicit delegation contracts**.
+**Research the SDK source before building;** Path A stays the dark fallback until D2 is proven at parity.
+Sandbox real computation stays deferred (financial-series storage + MCP, Phase F). **Gate:** the lead
+(not the app) reasons and delegates; workers run; sandbox fires (working smoke); nested UI + traces +
+tiers intact; **STOP-and-review checkpoint.** Full plan: `04B-D2-PLAN.md`.
+
 ### Phase E — Sessions + Deep Mode reconciliation
 Map SDK **sessions** (resume/fork) onto Deep Mode: the `ask_user` pause/resume, the `agent_todos`
 editable plan, and workspace files. Reconcile so there is a single source of truth for resume state
@@ -162,7 +177,8 @@ root `ROADMAP.md` (founder-gated).
 | B. SDK loop for standard VCSO (parallel) | **Done — matched canary parity proven** | 2026-07-15 |
 | C. Registry → SDK-config compiler + extensions | **Done — live-dark; guardrail/compiler gate passed** | 2026-07-15 |
 | C2. Streaming surface redesign (UI/UX) | **Done — live canary + reload gate passed; flag dark** | 2026-07-15 |
-| D. Native subagents — P4 re-approach (checkpoint) | **Proposed — not started** | — |
+| D. Native subagents — P4 re-approach (checkpoint) | **Delegation plumbing proven via Path A (interim, v0.6.57–59); flag dark** | 2026-07-16 |
+| D2. Model-driven delegation (restore reasoning-driven selection) | **SDK-M1 done + approved. Pre-fix (b) applied (pending host commit v0.6.60); pre-fix (a) runbook ready. SDK-M2 fully implemented + compile-clean across 7 files (core, FastMCP transport, main.py mount, config external-per-agent rewire, loop model-driven branch behind `native_model_driven` incl. token/scope, PreToolUse hooks, DB completion bridge, inverted-manifest abort, unregister; flag read+founder-scoped in vcso_chat_service; unit tests for core/config/helpers). Path A byte-identical when flag off. Remaining (venv only): a `_run_sdk_turn` model-driven test + run focused suite + FastMCP local-serve check + confirm Railway PORT/base URL → then the cheap one-worker probe. Nothing committed/deployed; all dark.** | — |
 | E. Sessions + Deep Mode reconciliation | **Proposed — not started** | — |
 | F. First live MCP (QuickBooks) | **Proposed — not started** | — |
 | G. Generalize, verify, cut over | **Proposed — not started** | — |
