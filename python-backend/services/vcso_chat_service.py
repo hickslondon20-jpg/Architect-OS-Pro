@@ -405,6 +405,16 @@ class VcsoChatService:
             else ()
         )
         sdk_native_subagent_mode = bool(native_required_agents)
+        # Phase D2 (SDK-M2): model-driven delegation is gated behind the dark sub-flag
+        # `native_model_driven_enabled` AND founder-scoped via the existing `diagnostic_user_ids` allowlist.
+        # Default off ⇒ the native path stays Path A (deterministic app-owned delegation).
+        _sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
+        _md_user_ids = {str(value) for value in (_sdk_settings.get("diagnostic_user_ids") or [])}
+        native_model_driven = (
+            sdk_native_subagent_mode
+            and bool(_sdk_settings.get("native_model_driven_enabled"))
+            and str(user_id) in _md_user_ids
+        )
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
         planner_path_selected = (
@@ -700,6 +710,7 @@ class VcsoChatService:
                     else {}
                 ),
                 native_lifecycle_sink=persist_sdk_lifecycle if sdk_native_subagent_mode else None,
+                native_model_driven=native_model_driven,
             )
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))

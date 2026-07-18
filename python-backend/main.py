@@ -17,7 +17,7 @@ import asyncio
 import json
 import logging
 import os
-from contextlib import suppress
+from contextlib import AsyncExitStack, suppress
 from datetime import date
 from typing import Annotated
 import uuid
@@ -643,6 +643,21 @@ app.include_router(skills.router, prefix="/api/skills", tags=["Skills"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Domain Agent Tasks"])
 app.include_router(domain_agents.router, tags=["Domain Agents"])
 
+# Phase D2 (SDK-M2) — loopback worker MCP endpoint for model-driven delegation. Mounted unconditionally
+# but INERT until a turn registers a scope in TURN_REGISTRY behind the dark `native_model_driven_enabled`
+# sub-flag; any call with no/foreign per-turn token is refused in the core (services/vcso_worker_mcp.py).
+# Starlette's app.mount() does NOT propagate lifespan to a mounted sub-app, so FastMCP's session-manager
+# task group must be started from this app's own startup (confirmed locally, 04B-D2-M2 Stage C).
+from services.vcso_worker_mcp_server import (  # noqa: E402
+    WORKER_MCP_MOUNT_PATH,
+    build_worker_asgi_app,
+    worker_session_manager_lifespan,
+)
+
+app.mount(WORKER_MCP_MOUNT_PATH, build_worker_asgi_app())
+
+_worker_mcp_stack: AsyncExitStack | None = None
+
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
@@ -760,6 +775,31 @@ async def sync_tool_registry_catalog() -> None:
         logging.getLogger("architectos.tool_registry").warning(
             "tool_registry catalog sync skipped", exc_info=True
         )
+
+
+@app.on_event("startup")
+async def start_worker_mcp_session_manager() -> None:
+    """Start the mounted worker MCP endpoint's session manager (fail-open: the endpoint is inert unless a
+    model-driven turn registers a scope, so a failure here must not block backend startup)."""
+    global _worker_mcp_stack
+    try:
+        stack = AsyncExitStack()
+        await stack.enter_async_context(worker_session_manager_lifespan())
+        _worker_mcp_stack = stack
+    except Exception:
+        logging.getLogger("architectos.vcso_worker_mcp").warning(
+            "worker MCP session manager failed to start; model-driven delegation unavailable",
+            exc_info=True,
+        )
+
+
+@app.on_event("shutdown")
+async def stop_worker_mcp_session_manager() -> None:
+    global _worker_mcp_stack
+    if _worker_mcp_stack is not None:
+        with suppress(Exception):
+            await _worker_mcp_stack.aclose()
+        _worker_mcp_stack = None
 
 
 @app.on_event("shutdown")

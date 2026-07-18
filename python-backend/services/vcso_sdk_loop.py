@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import queue
 import re
 import threading
+from types import SimpleNamespace
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -24,7 +26,9 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import StreamEvent
 
 from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
-from services.vcso_sdk_config import compile_founder_sdk_options
+from services.vcso_sdk_config import MODEL_DRIVEN_WORKER_SERVER, compile_founder_sdk_options
+from services.vcso_worker_mcp import TURN_REGISTRY, TurnScope
+from services.vcso_worker_mcp_server import worker_server_url
 from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
 
 
@@ -315,6 +319,7 @@ def stream_vcso_sdk_turn(
     native_subagent_required_agents: tuple[str, ...] = (),
     native_subagent_scopes: dict[str, dict[str, Any]] | None = None,
     native_lifecycle_sink: LifecycleSink | None = None,
+    native_model_driven: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -346,6 +351,7 @@ def stream_vcso_sdk_turn(
                         native_subagent_required_agents=native_subagent_required_agents,
                         native_subagent_scopes=native_subagent_scopes or {},
                         native_lifecycle_sink=native_lifecycle_sink,
+                        native_model_driven=native_model_driven,
                     )
                 )
             )
@@ -367,6 +373,91 @@ def stream_vcso_sdk_turn(
     if not result_box:
         raise RuntimeError("Claude Agent SDK turn ended without a result.")
     return result_box[0]
+
+
+def model_driven_completed_children(
+    client: Any, *, parent_run_id: str | None, required_agents: tuple[str, ...]
+) -> set[str]:
+    """Phase D2 completion bridge (SDK-M2): with model-driven delegation the workers run OUT of process
+    (in the external worker MCP endpoint), so the turn coroutine never populates `worker_results` /
+    `completed_agents` in memory the way Path A's `run_app_owned_workers` does. The DB is the transport-
+    independent source of truth: the orchestrator writes a parent-linked `agent_delegation_runs` row per
+    child. This returns the set of required capabilities that have a completed child for this parent run,
+    so `post_tool_use`/`stop_hook` can confirm delegation without depending on the in-process handler.
+
+    Read-only, best-effort: any error returns an empty set (the safety-net stop-hook then keeps blocking,
+    never fail-opening)."""
+
+    if not parent_run_id or client is None or not required_agents:
+        return set()
+    try:
+        rows = (
+            client.table("agent_delegation_runs")
+            .select("capability_key,status")
+            .eq("parent_run_id", str(parent_run_id))
+            .eq("status", "completed")
+            .execute()
+            .data
+            or []
+        )
+    except Exception as exc:  # noqa: BLE001 - diagnostics/bridge must never break the turn
+        logger.warning("model-driven completion lookup failed open (no children counted): %s", exc)
+        return set()
+    wanted = set(required_agents)
+    return {str(row.get("capability_key")) for row in rows if str(row.get("capability_key")) in wanted}
+
+
+def build_model_driven_manifest(
+    compiled: Any, *, required_agents: tuple[str, ...], worker_server_name: str
+) -> dict[str, Any]:
+    """Phase D2 INVERTED runtime manifest (SDK-M2). Path A's `build_native_runtime_manifest` asserts the
+    in-process model (worker handlers pre-approved on the lead + scoped to SDK_INTERNAL_SERVER). Model-
+    driven inverts every one of those: the lead's schema must carry NO run_<agent> tool, the external
+    worker server must NOT be top-level, and each worker agent must scope that external server inline.
+    Any violation must abort before the SDK query so a statically-invalid surface never spends a canary."""
+
+    options = compiled.options
+    allowed_tools = list(options.allowed_tools or [])
+    top_level_servers = dict(options.mcp_servers or {}) if isinstance(options.mcp_servers, dict) else {}
+    violations: list[str] = []
+
+    # 1. Lead sees Task only (plus any non-worker registry tools); no run_<agent> pre-approved on the lead.
+    if "Task" not in allowed_tools:
+        violations.append("model_driven_lead_task_not_preapproved")
+    for name in allowed_tools:
+        if "__run_" in str(name):
+            violations.append(f"model_driven_worker_tool_on_lead:{name}")
+
+    # 2. The external worker server is NOT registered top-level, and no top-level server exposes run_<agent>.
+    if worker_server_name in top_level_servers:
+        violations.append("model_driven_worker_server_top_level")
+    for server_name, server in top_level_servers.items():
+        tools = server.get("tools", []) if isinstance(server, dict) else []
+        for tool in tools:
+            tool_name = tool.get("name", "") if isinstance(tool, dict) else ""
+            if str(tool_name).startswith("run_"):
+                violations.append(f"model_driven_worker_tool_top_level:{server_name}.{tool_name}")
+
+    # 3. Each required worker agent scopes ONLY the external server inline (never the in-process server name).
+    agents = options.agents or {}
+    for key in required_agents:
+        agent = agents.get(key)
+        servers = list(getattr(agent, "mcpServers", None) or []) if agent is not None else []
+        scoped_external = any(
+            isinstance(entry, dict) and worker_server_name in entry for entry in servers
+        )
+        if agent is None:
+            violations.append(f"model_driven_required_agent_missing:{key}")
+        elif not scoped_external:
+            violations.append(f"model_driven_worker_server_not_scoped:{key}")
+
+    return {
+        "delegation_model": "model_driven",
+        "required_agents": list(required_agents),
+        "lead_allowed_tools": allowed_tools,
+        "top_level_servers": sorted(top_level_servers.keys()),
+        "violations": violations,
+    }
 
 
 async def _run_sdk_turn(
@@ -391,6 +482,7 @@ async def _run_sdk_turn(
     native_subagent_required_agents: tuple[str, ...],
     native_subagent_scopes: dict[str, dict[str, Any]],
     native_lifecycle_sink: LifecycleSink | None,
+    native_model_driven: bool = False,
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -402,6 +494,11 @@ async def _run_sdk_turn(
     usage_recorded = False
     next_step_index = step_index_offset + 1
     native_mode = bool(native_subagent_required_agents)
+    # Phase D2 (SDK-M2): model-driven delegation restores reasoning-driven worker selection — the lead
+    # reasons + delegates via Task with workers scoped to an external per-agent MCP server (invisible to
+    # the lead). Gated: model_driven is only ever True behind the dark `native_model_driven_enabled`
+    # sub-flag. When False, every branch below is byte-identical to Path A.
+    model_driven = bool(native_model_driven) and native_mode
     required_agents = tuple(
         key for key in native_subagent_required_agents if key in P4_NATIVE_SUBAGENT_KEYS
     )
@@ -717,6 +814,24 @@ async def _run_sdk_turn(
             capability_key = task_capabilities.get(task_id, "bounded_worker")
             step_index = allocate_step(task_id, sdk_tool_name)
             result = worker_results.get(capability_key)
+            if result is None and model_driven and capability_key in required_agents:
+                # Completion bridge: the model-driven worker ran OUT of process (external endpoint), so the
+                # in-process worker_results is empty. The orchestrator has already written a parent-linked
+                # completed child row (ordering: worker completes before the Task result returns), so confirm
+                # delegation from the DB and synthesize the minimal completed marker post_tool_use expects.
+                done = model_driven_completed_children(
+                    getattr(tool_context.store, "client", None),
+                    parent_run_id=tool_context.metadata.get("parent_run_id"),
+                    required_agents=required_agents,
+                )
+                if capability_key in done:
+                    result = SimpleNamespace(
+                        run_id=None,
+                        status="completed",
+                        result_summary=f"{_subagent_title(capability_key)} returned a compact finding.",
+                        citations=[],
+                    )
+                    worker_results[capability_key] = result
             status = "completed" if result is not None and result.status == "completed" else "failed"
             sources = task_sources.get(task_id, [])
             title = _subagent_title(capability_key)
@@ -1165,7 +1280,9 @@ async def _run_sdk_turn(
         return collected
 
     native_findings: list[dict[str, Any]] = []
-    if native_mode:
+    model_driven_token: str | None = None
+    model_driven_worker_url: str | None = None
+    if native_mode and not model_driven:
         try:
             native_findings = await run_app_owned_workers()
         except RuntimeError as exc:
@@ -1177,15 +1294,57 @@ async def _run_sdk_turn(
             native_mode = False
             required_agents = ()
             native_findings = []
-    # Path A: no worker MCP tools and no Task are registered; the lead composes from injected findings.
-    native_subagent_tools: dict[str, Any] = {}
+    # Path A registers no worker MCP tools and no Task (compose-only). Model-driven registers Task on the
+    # lead + exposes each worker via an EXTERNAL per-agent MCP server (invisible to the lead), so the lead
+    # must reason the decomposition and delegate via Task.
+    native_subagent_tools: dict[str, Any] = (
+        {key: {"name": f"run_{key}"} for key in required_agents} if model_driven else {}
+    )
     hooks: dict[str, Any] = {
         "PostToolUse": [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])],
         "PostToolUseFailure": [HookMatcher(matcher=r"^(Task|mcp__.*)$", hooks=[post_tool_failure])],
         "Stop": [HookMatcher(hooks=[stop_hook])],
         "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
     }
-    native_prompt = _native_synthesis_prompt(required_agents, native_findings) if native_mode else ""
+    if model_driven:
+        # The completion bridge + subagent-step trace live in post_tool_use's `Task` branch, so the
+        # PostToolUse matcher must also match `Task` (the `^mcp__.*$` default never would).
+        hooks["PostToolUse"] = [HookMatcher(matcher=r"^(Task|mcp__.*)$", hooks=[post_tool_use])]
+
+        async def pre_tool_probe(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
+            # Observe-only: records whether a worker tool call fired from inside a Task-spawned subagent
+            # (agent_id present) vs a lead direct-call. Returns {} so permission stays with the surface.
+            record_lifecycle(
+                "pre_tool_probe",
+                tool_name=input_data.get("tool_name"),
+                tool_use_id=tool_use_id,
+                agent_id_present=bool(input_data.get("agent_id")),
+            )
+            return {}
+
+        base_url = os.environ.get("VCSO_WORKER_MCP_BASE_URL") or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}"
+        model_driven_token = TURN_REGISTRY.mint(
+            TurnScope(
+                user_id=tool_context.user_id,
+                parent_surface=str(tool_context.metadata.get("surface") or "virtual_cso"),
+                thread_id=tool_context.thread_id,
+                parent_message_id=tool_context.metadata.get("parent_message_id"),
+                parent_run_id=tool_context.metadata.get("parent_run_id"),
+                allowed_capabilities=frozenset(required_agents),
+                store=tool_context.store,
+                progress_bridge=None,
+            )
+        )
+        model_driven_worker_url = worker_server_url(base_url, model_driven_token)
+        hooks["PreToolUse"] = [
+            HookMatcher(matcher="Task", hooks=[pre_task_use]),
+            HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
+        ]
+    native_prompt = (
+        _native_lead_prompt(required_agents)
+        if model_driven
+        else (_native_synthesis_prompt(required_agents, native_findings) if native_mode else "")
+    )
     compiled_base_prompt = _native_base_system_prompt(system_prompt) if native_mode else system_prompt
     compiled = compile_founder_sdk_options(
         store=tool_context.store,
@@ -1210,24 +1369,41 @@ async def _run_sdk_turn(
         hooks=hooks,
         max_turns=max_turns,
         max_budget_usd=max_budget_usd,
-        enable_native_subagents=False,
+        enable_native_subagents=model_driven,
         native_subagent_tools=native_subagent_tools,
+        model_driven_worker_server_url=model_driven_worker_url,
     )
     options = compiled.options
-    if native_mode:
+    if native_mode and not model_driven:
         # Path A: the lead composes only from the app-run worker findings injected into the system
         # prompt. Remove the agent definitions as well as the grants so the SDK cannot synthesize a
         # Task surface from them; the turn is compose-only under dontAsk (no worker tools, no Task,
-        # no registry re-crawl).
+        # no registry re-crawl). Model-driven KEEPS the agents (external workers) and Task.
         options.agents = {}
         options.allowed_tools = []
-    runtime_manifest = {
-        "delegation_model": "app_owned",
-        "required_agents": list(required_agents),
-        "violations": [],
-    }
-    if native_mode:
-        record_lifecycle("runtime_manifest", decision="app_owned", reason_code="none")
+    if model_driven:
+        # Inverted safety manifest: abort before spending a canary if any run_<agent> tool leaked into the
+        # lead's schema or the external worker server was registered top-level (04B-D2-FINDINGS §8).
+        runtime_manifest = build_model_driven_manifest(
+            compiled, required_agents=required_agents, worker_server_name=MODEL_DRIVEN_WORKER_SERVER
+        )
+        if runtime_manifest["violations"]:
+            if model_driven_token:
+                TURN_REGISTRY.unregister(model_driven_token)
+            record_lifecycle("runtime_manifest", decision="model_driven", reason_code="invalid_surface")
+            raise RuntimeError(
+                "Model-driven lead surface invalid; refusing to spend a turn: "
+                + ", ".join(runtime_manifest["violations"])
+            )
+        record_lifecycle("runtime_manifest", decision="model_driven", reason_code="none")
+    else:
+        runtime_manifest = {
+            "delegation_model": "app_owned",
+            "required_agents": list(required_agents),
+            "violations": [],
+        }
+        if native_mode:
+            record_lifecycle("runtime_manifest", decision="app_owned", reason_code="none")
     trace_metadata.update(
         {
             "sdk_compiled_tool_count": len(compiled.tool_names),
@@ -1327,6 +1503,10 @@ async def _run_sdk_turn(
             token_data["segmentId"] = segment_id
         events.put({"event": "token", "data": token_data})
 
+    if model_driven_token:
+        # Release the per-turn worker scope. Exception paths are covered by TurnRegistry's stale-eviction
+        # backstop; a finally-wrap around the query loop is the clean M4 follow-up.
+        TURN_REGISTRY.unregister(model_driven_token)
     missing_after_query = [key for key in required_agents if key not in completed_agents]
     if missing_after_query:
         _record_turn_trace(metadata=trace_metadata, status="failed")

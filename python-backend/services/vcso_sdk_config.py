@@ -15,6 +15,11 @@ from services.tool_registry import ToolDefinition, ToolRegistry
 
 
 SDK_INTERNAL_SERVER = "architectos"
+# Phase D2 (SDK-M2): the external (loopback HTTP) worker MCP server name. Must match the FastMCP `name`
+# in services/vcso_worker_mcp_server.py. In model-driven mode the worker handlers are exposed from this
+# EXTERNAL server, referenced inline per-agent and kept OUT of top-level mcp_servers, so the lead cannot
+# see or call run_<agent> — it must delegate via Task (04B-D2-FINDINGS.md §2-§3).
+MODEL_DRIVEN_WORKER_SERVER = "vcso_workers"
 CLAUDE_PROVIDER = "anthropic"
 DISALLOWED_SDK_BUILTINS = [
     "Bash",
@@ -56,6 +61,7 @@ def compile_founder_sdk_options(
     max_budget_usd: float,
     enable_native_subagents: bool = False,
     native_subagent_tools: dict[str, Any] | None = None,
+    model_driven_worker_server_url: str | None = None,
 ) -> CompiledFounderSdkOptions:
     """Compile one founder's callable tools, bounded agents, models, and MCP servers.
 
@@ -66,6 +72,10 @@ def compile_founder_sdk_options(
 
     client = getattr(store, "client", None)
     native_subagent_tools = native_subagent_tools or {}
+    # Model-driven delegation (D2): when a worker-server URL is supplied, expose each worker handler from
+    # the EXTERNAL per-agent server instead of the in-process session server. Path-A/Fix-C behavior is
+    # byte-identical when this is None.
+    model_driven = bool(model_driven_worker_server_url)
     enabled_catalog = _enabled_catalog_names(client) if client is not None else None
     connected_servers = _connected_sdk_servers(client, user_id=user_id) if client is not None else []
     selected, excluded = _select_definitions(
@@ -116,7 +126,18 @@ def compile_founder_sdk_options(
         route = resolve_capability_model(store, capability=capability, fallback_model=main_model)
         handler_tool = native_subagent_tools.get(capability.capability_key)
         handler_name = _native_handler_name(capability.capability_key) if handler_tool is not None else None
-        agent_tools = [f"mcp__{SDK_INTERNAL_SERVER}__{handler_name}"] if handler_name else sdk_grants
+        if handler_name and model_driven:
+            # External per-agent worker server: the only construction that hides run_<agent> from the lead.
+            agent_tools = [f"mcp__{MODEL_DRIVEN_WORKER_SERVER}__{handler_name}"]
+            agent_mcp_servers: list[Any] | None = [
+                {MODEL_DRIVEN_WORKER_SERVER: {"type": "http", "url": model_driven_worker_server_url}}
+            ]
+        elif handler_name:
+            agent_tools = [f"mcp__{SDK_INTERNAL_SERVER}__{handler_name}"]
+            agent_mcp_servers = [SDK_INTERNAL_SERVER]
+        else:
+            agent_tools = sdk_grants
+            agent_mcp_servers = None
         agents[capability.capability_key] = AgentDefinition(
             description=capability.description or capability.label,
             prompt=_capability_prompt(capability, handler_name=handler_name),
@@ -128,8 +149,9 @@ def compile_founder_sdk_options(
             maxTurns=max(2, _capability_max_turns(capability)) if handler_name else _capability_max_turns(capability),
             permissionMode="dontAsk",
             # The in-process server is registered once at session level for SDK transport, while
-            # the agent definition explicitly declares the only MCP server its worker may use.
-            mcpServers=[SDK_INTERNAL_SERVER] if handler_name else None,
+            # the agent definition explicitly declares the only MCP server its worker may use. In
+            # model-driven mode this is an EXTERNAL per-agent server (kept out of top-level mcp_servers).
+            mcpServers=agent_mcp_servers,
         )
         agent_tool_grants[capability.capability_key] = grant_names
         agent_model_routes[capability.capability_key] = route
@@ -157,7 +179,11 @@ def compile_founder_sdk_options(
         if server_name != SDK_INTERNAL_SERVER and server_name not in connected_set:
             continue
         grouped_tools.setdefault(server_name, []).append(sdk_tool)
-    grouped_tools[SDK_INTERNAL_SERVER].extend(native_subagent_tools.values())
+    if not model_driven:
+        # In-process worker tools attach to the session server only for the Path-A/Fix-C surface. Model-
+        # driven scoping exposes workers via the external per-agent server instead (D2), so they are never
+        # added to any top-level server — keeping run_<agent> out of the lead's tool schema.
+        grouped_tools[SDK_INTERNAL_SERVER].extend(native_subagent_tools.values())
     mcp_servers = {
         server_name: create_sdk_mcp_server(name=server_name, version="1.0.0", tools=server_tools)
         for server_name, server_tools in grouped_tools.items()

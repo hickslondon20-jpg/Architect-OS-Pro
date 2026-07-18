@@ -90,7 +90,7 @@ def _capability(key, tools, *, routing_tier=None):
     }
 
 
-def _compile_for(user_id, *, connection_user_id=None, native_subagents=False):
+def _compile_for(user_id, *, connection_user_id=None, native_subagents=False, model_driven_url=None):
     tables = {
         "tool_registry": [
             {"slug": "wiki_search", "enabled": True, "is_code_registered": True},
@@ -158,6 +158,7 @@ def _compile_for(user_id, *, connection_user_id=None, native_subagents=False):
             if native_subagents
             else None
         ),
+        model_driven_worker_server_url=model_driven_url,
     )
 
 
@@ -232,6 +233,47 @@ def test_compiler_enables_task_only_for_lead_and_keeps_worker_recursion_blocked(
     assert "Task" in compiled.options.agents["sandbox_agent"].disallowedTools
     assert "Agent" in compiled.options.agents["sandbox_agent"].disallowedTools
     assert compiled.options.agents["sandbox_agent"].model == "claude-haiku-test"
+
+
+def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead(monkeypatch):
+    # D2 inversion: worker handlers move OFF the in-process session server onto an EXTERNAL per-agent
+    # server, so the lead's schema carries no run_<agent> tool — it must delegate via Task.
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.create_sdk_mcp_server",
+        lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
+    )
+    url = "http://127.0.0.1:8000/internal/mcp/workers/?t=TESTTOKEN"
+    compiled = _compile_for("founder-12", native_subagents=True, model_driven_url=url)
+
+    # Lead sees Task only; no worker handler is pre-approved on the lead.
+    assert compiled.options.allowed_tools == ["Task"]
+    assert not any(str(name).endswith("run_wiki_agent") or str(name).endswith("run_sandbox_agent")
+                   for name in compiled.options.allowed_tools)
+
+    # The external worker server is NOT registered top-level (invisible to the lead), and no top-level
+    # server exposes a run_<agent> tool.
+    assert "vcso_workers" not in compiled.options.mcp_servers
+    for server in compiled.options.mcp_servers.values():
+        for tool in server.get("tools", []):
+            assert not str(tool.get("name", "")).startswith("run_")
+
+    # Each worker agent scopes ONLY the external server, inline, and points its single tool at it.
+    for key, handler in (("sandbox_agent", "run_sandbox_agent"), ("wiki_agent", "run_wiki_agent")):
+        agent = compiled.options.agents[key]
+        assert agent.tools == [f"mcp__vcso_workers__{handler}"]
+        assert agent.mcpServers == [{"vcso_workers": {"type": "http", "url": url}}]
+
+    # The inline external config must JSON-serialize (unlike the in-process McpSdkServerConfig instance),
+    # which is exactly why the SDK can deliver it per-agent in the initialize request.
+    serialized = json.loads(
+        json.dumps(
+            {
+                name: {key: value for key, value in asdict(agent).items() if value is not None}
+                for name, agent in compiled.options.agents.items()
+            }
+        )
+    )
+    assert serialized["sandbox_agent"]["mcpServers"] == [{"vcso_workers": {"type": "http", "url": url}}]
 
 
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():
