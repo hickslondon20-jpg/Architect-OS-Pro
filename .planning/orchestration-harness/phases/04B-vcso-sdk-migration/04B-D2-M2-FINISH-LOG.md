@@ -108,7 +108,51 @@ The runbook makes "deployed head == intended SHA" a mandatory pre-canary gate, a
 already cost one run; right now that gate can only be checked by hand in the Railway dashboard or by
 route-probing as above.
 
-## Stage D — Loopback base URL · OPEN (needs London)
+## Stage D — Loopback base URL + single-process requirement · LARGELY ANSWERED FROM THE REPO
+
+Two conditions must hold, not one (the second is not in the runbook but follows directly from the
+mechanism): the server must bind Railway's `$PORT`, **and** it must run as a single process, because
+`TURN_REGISTRY` is a process-global dict (`04B-D2-FINDINGS.md` §8, Discovery 1).
+
+**Condition 1 — `$PORT` binding · SATISFIED (documented, confirmed at setup).**
+`.planning/skills-sandbox/PYTHON-BACKEND-DEPLOYMENT.md:34,64-65` records the Railway service
+configuration, reviewed against London's own dashboard screenshots on 2026-07-01:
+
+- Root directory: `python-backend`
+- Build command: `pip install -r requirements.txt`
+- Start command: **`uvicorn main:app --host 0.0.0.0 --port $PORT`**
+
+So server and loopback resolve `PORT` from the same env var and agree by construction. **No
+`VCSO_WORKER_MCP_BASE_URL` override is needed.** Caveat: this is a July-1 record, not a live dashboard
+read — worth a glance to confirm nothing has changed since.
+
+**Condition 2 — single worker · NOT PROVABLE FROM THE START COMMAND ALONE. CHECK `WEB_CONCURRENCY`.**
+The documented start command carries no `--workers` flag, which reads as "single process" — but that is
+**not sufficient**. In the pinned `uvicorn==0.35.0`, `config.py:330-331`:
+
+```python
+if workers is None and "WEB_CONCURRENCY" in os.environ:
+    self.workers = int(os.environ["WEB_CONCURRENCY"])
+```
+
+If a `WEB_CONCURRENCY` variable exists in the Railway service (set by a platform default, or added by
+anyone for throughput), uvicorn silently spawns that many worker **processes** despite the start command
+looking single-process. The loopback request would then round-robin across processes that do not share
+`TURN_REGISTRY`, the token would miss, and the canary would fail as `WorkerScopeError` — indistinguishable
+at a glance from the visibility mechanism failing.
+
+**Action before Stage H:** confirm no `WEB_CONCURRENCY` variable is set on the Railway service (and that
+no `--workers` was added to the start command). This is invisible in the start command and is the single
+highest-value pre-canary check.
+
+**Precision worth recording — replicas are fine, workers are not.** Scaling the Railway service to
+multiple *replicas* does not break the mechanism: each replica is its own container, `127.0.0.1` stays
+inside it, and the turn that minted the token is the one whose loopback call is served. Only multiple
+*processes inside one container* (uvicorn workers sharing a socket) break the process-global registry. If
+throughput ever demands in-container workers, `TURN_REGISTRY` needs a shared backing store first — this is
+a design constraint, not a tuning knob.
+
+## Stage D — original open item (superseded by the above)
 
 Resolution logic (`vcso_sdk_loop.py:1325`): `VCSO_WORKER_MCP_BASE_URL` if set, else
 `http://127.0.0.1:${PORT}`, defaulting to port 8000. There is **no `Procfile`, `railway.json`,
