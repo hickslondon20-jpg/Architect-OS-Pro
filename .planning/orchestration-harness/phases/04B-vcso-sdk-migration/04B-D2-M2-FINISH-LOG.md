@@ -67,6 +67,47 @@ IS_ERROR: True | CONTENT: Error executing tool run_structured_data_agent: No act
 Exactly the three worker tools; an unregistered token is refused cleanly in the core with no child row and
 no spend. Smoke script retained at `python-backend/scripts/smoke_worker_mcp.py`.
 
+### Stage C addendum — the local venv was running the WRONG `mcp` version
+
+The first Stage-C green was **not trustworthy**: the local venv had **mcp 1.13.1** while
+`requirements.txt` pins **mcp==1.28.1**, so the smoke had validated against a different library than
+production runs. (`04B-D2-M2-BUILD.md` Step 1 asserts "pkg `mcp` 1.28.1 is installed" — true of Railway,
+false of the venv.) Found while diagnosing Stage F. The venv has been upgraded to 1.28.1 and **all of
+Stage A, B and C re-run green under it** (31 passed; the endpoint smoke returns the same three tools and
+the same clean token refusal).
+
+The version gap is behaviourally load-bearing. In 1.13.1 FastMCP leaves `transport_security=None` ⇒ DNS
+rebinding protection **off**. In 1.28.1 it defaults to protection **on** with
+`allowed_hosts=['127.0.0.1:*','localhost:*','[::1]:*']`. Consequences, both verified:
+
+- **Public access is refused.** `POST https://api.architectospro.com/internal/mcp/workers/` returns
+  **421 `Invalid Host header`** — reproduced locally by spoofing `Host: api.architectospro.com`. Good: the
+  mount is on the public FastAPI app, and this is what keeps it from being an internet-reachable MCP
+  surface. Do **not** widen `allowed_hosts` to "fix" this.
+- **The loopback path the canary depends on is allowed.** `POST http://127.0.0.1:8000/internal/mcp/
+  workers/?t=…` returns **200**, because `Host: 127.0.0.1:8000` matches `127.0.0.1:*`. The CLI subprocess
+  calls the same origin, so Stage H is not blocked by this.
+
+**Follow-up worth doing separately:** align the local venv to `requirements.txt` generally — the 1.13.1/
+1.28.1 gap was silent, and any other drift is equally silent. A pinned-vs-installed check before a
+canary would have caught this in seconds.
+
+## Stage F — Deploy confirmation · GREEN
+
+Deployed head is **v0.6.62+** (`ff20a164` pushed; `d9ecf25e..ff20a164`). `GET /api/health` →
+`{"ok":true,"service":"architectos-ingestion"}`.
+
+The health endpoint exposes no commit SHA, so deployment was confirmed **by route existence** instead:
+`/internal/mcp/workers/` (which exists only from v0.6.62) returns **421**, while a sibling unknown path
+`/internal/nonexistent-path-xyz` returns FastAPI's **404 `{"detail":"Not Found"}`**. A 404-vs-421 split on
+the same prefix proves the new mount is routed by the running app. Before the deploy landed, the same
+probe returned 404 — so the transition was observed directly, not assumed.
+
+**Recommendation:** add the Railway commit SHA (`RAILWAY_GIT_COMMIT_SHA`) to the `/api/health` payload.
+The runbook makes "deployed head == intended SHA" a mandatory pre-canary gate, and a stale deploy has
+already cost one run; right now that gate can only be checked by hand in the Railway dashboard or by
+route-probing as above.
+
 ## Stage D — Loopback base URL · OPEN (needs London)
 
 Resolution logic (`vcso_sdk_loop.py:1325`): `VCSO_WORKER_MCP_BASE_URL` if set, else
@@ -92,7 +133,7 @@ stale-test fix needed its own commit, so **M2 is v0.6.62, not v0.6.61**. Gate F 
 SHA `9253caca` (or a later docs-only head that contains it). `git diff --stat` showed clean hunks
 throughout — no whole-file CRLF churn.
 
-## Stage F — Deploy confirmation · see below
+| v0.6.63 | `ff20a164` | Phase D2 planning docs + this finish log (docs only) |
 
 ## Stages G–I — NOT STARTED
 
