@@ -106,9 +106,12 @@ class HarnessEngine:
         settings = get_settings()
         if not settings.supabase_url or not settings.supabase_service_role_key:
             raise HarnessEngineError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.")
-        client = create_client(settings.supabase_url, settings.supabase_service_role_key)
-        store = VectorStore(client, None, settings)
-        return cls(client, store=store)
+        # Build the store via VectorStore.from_env() so its OpenAI client is wired from
+        # OPENAI_API_KEY (mirrors the v0.6.59 VcsoChatService fix). Passing None here left
+        # every harness/domain-agent worker that embeds without an embedding client,
+        # reproducing the "OPENAI_API_KEY is required for embedding" failure.
+        store = VectorStore.from_env()
+        return cls(store.client, store=store)
 
     def create_task(
         self,
