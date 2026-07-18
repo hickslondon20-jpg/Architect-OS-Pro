@@ -152,6 +152,56 @@ inside it, and the turn that minted the token is the one whose loopback call is 
 throughput ever demands in-container workers, `TURN_REGISTRY` needs a shared backing store first — this is
 a design constraint, not a tuning knob.
 
+---
+
+## Gate G/H pre-flight — TWO MORE SILENT NO-OPS (found while sanity-checking the Gate G write)
+
+Both are the same class of hazard as `WEB_CONCURRENCY`: the turn appears to run, costs money, and proves
+nothing, because native subagent mode never engaged. Neither is visible in the flag settings.
+
+**Trap 1 — the anchor question must match a literal regex, and "90-day" FAILS it.**
+`native_subagent_requirements` (`vcso_sdk_loop.py:196-222`) returns `()` — no workers, no model-driven
+branch, plain flat SDK path — unless **all** of these hold:
+
+1. `intent.move_type` (or `intent.intent`) == `"strategic_synthesis"`;
+2. `intent.depth` == `"deep"`;
+3. the message matches `P4_THIN_SLICE_SIGNALS` (`:59-62`), which requires **all three** of a
+   financial term (`financial|p&l|margin|revenue`), the word `concentration`, **and** `\b90\s+days?\b`.
+
+That last lookahead demands **whitespace** between `90` and `day`. Verified against the live regex:
+
+| Phrasing | Result |
+|---|---|
+| `...margin is compressing. What should I do in the next 90 days?` | **MATCH** |
+| `...margin is compressing. Give me a 90-day plan.` | **NO MATCH** (hyphen) |
+| `Client concentration is up and revenue quality is slipping - what is the 90 day plan?` | **MATCH** |
+| `Margin is compressing and concentration is rising; recommend a 90days plan.` | **NO MATCH** (no space) |
+| `What should I do about client concentration over the next 90 days?` | **NO MATCH** (no financial term) |
+
+The hyphenated form is the trap: **every doc in this phase writes the anchor as "a cited 90-day
+recommendation"** (including `_native_lead_prompt` itself), so the natural way to type the question is the
+one that silently no-ops. The anchor turn must contain a financial term, `concentration`, and `90 days`
+(or `90 day`) **with a space** — and must read as a deep strategic-synthesis move.
+
+**Trap 2 — the founder must be logged in as the enrolled account.**
+The enrolled UUID `cd490873-99aa-4533-9240-f0aa04deb54f` is the **seeded** account
+(`hicks.london25@gmail.com`), not London's everyday account. Per `.planning/codebase/CONCERNS.md:104`
+there are two: UI uploads land under the real `4ef8…` account while the seeded Tier-1 data lives under
+`cd490873…`. `.planning/STATE-AND-ROADMAP-TO-MVP.md:56` records that the forgot-password feature shipped
+and the seeded account is now directly usable.
+
+Both gates are `str(user_id) in test_user_ids` / `in diagnostic_user_ids`. If the anchor turn is sent
+while logged in as `4ef8…`, the flag simply does not match, the SDK loop stays off, and the turn runs the
+old path — a clean-looking answer that proves nothing about M2. **Send both the control and canary turns
+logged in as `hicks.london25@gmail.com`**, or enroll the `4ef8…` UUID instead — but the account sending
+the turn and the UUID in both allowlists must be the same one.
+
+**Verified sound in the proposed Gate G write:** every settings key matches the code exactly
+(`test_user_ids`, `diagnostic_user_ids`, `diagnostic_single_worker_enabled`, `diagnostic_single_worker`,
+`native_model_driven_enabled`); `structured_data_agent` is in `P4_THIN_SLICE_REQUIRED_AGENTS` so the
+single-worker narrowing will take effect; `max_budget_usd=0.25` sits inside the code's clamp of
+[0.01, 1.0] (`vcso_chat_service.py:623`) and so is honoured as written.
+
 ## Stage D — original open item (superseded by the above)
 
 Resolution logic (`vcso_sdk_loop.py:1325`): `VCSO_WORKER_MCP_BASE_URL` if set, else

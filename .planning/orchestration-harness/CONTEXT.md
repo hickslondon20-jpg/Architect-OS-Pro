@@ -164,6 +164,18 @@ re-crawling raw source each turn.
 7. **Per-turn budget + depth cap on the planner** are mandatory guardrails (rounds / delegation depth /
    spend). One controlled level of sub-delegation; never open recursion.
 8. **No founder-facing model selector; founder isolation unchanged** (MA-05/MA-06 locks).
+9. **Scale replicas, never in-container worker processes** — until the worker MCP registry has a shared
+   backing store. Phase 04B-D2's model-driven delegation mints a per-turn token into `TURN_REGISTRY`, a
+   **process-global** dict in `services/vcso_worker_mcp.py`, and the worker MCP endpoint is reached over
+   loopback (`http://127.0.0.1:$PORT`). Multiple **replicas are safe** — each is its own container,
+   `127.0.0.1` stays inside it, and the process that minted the token serves its own loopback call.
+   Multiple **processes inside one container are not** — they share the listening socket but not the
+   registry, so a loopback call can land on a sibling process that has never seen the token, failing as
+   `WorkerScopeError` that reads exactly like a delegation-mechanism failure. This is not a tuning knob:
+   do **not** add `--workers` to the uvicorn start command, and do **not** set a `WEB_CONCURRENCY`
+   environment variable (pinned `uvicorn==0.35.0` reads it at `config.py:330-331` when `--workers` is
+   absent, so it spawns worker processes with no visible change to the start command). If in-container
+   throughput is ever genuinely needed, give `TURN_REGISTRY` a shared backing store first.
 
 ---
 
