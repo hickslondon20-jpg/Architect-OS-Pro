@@ -481,10 +481,12 @@ def test_app_owned_workers_run_before_synthesis_with_no_lead_delegation_surface(
         "sandbox_execution_agent",
         "per_user_wiki",
     )
+    # Mandatory compute chain first (structured -> sandbox), best-effort strategic context last, so a wiki
+    # failure can never pre-empt sandbox (vcso_sdk_loop.run_app_owned_workers, "Improvement #1", v0.6.57).
     execution_order = (
         "structured_data_agent",
-        "per_user_wiki",
         "sandbox_execution_agent",
+        "per_user_wiki",
     )
     monkeypatch.setattr(
         "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
@@ -606,7 +608,7 @@ def test_app_owned_workers_run_before_synthesis_with_no_lead_delegation_surface(
     assert all(request.routing_tier_override == "worker" for request in calls)
     assert all(request.enforce_compact_contract is True for request in calls)
     assert all(request.parent_run_id == "lead-run" for request in calls)
-    sandbox_call = calls[2]
+    sandbox_call = calls[execution_order.index("sandbox_execution_agent")]
     assert "prior_findings" not in sandbox_call.context_scope
     assert "COMPACT PRIOR FINDINGS" in sandbox_call.task_summary
     assert len([item for item in events if item["event"] == "sub_agent_step"]) == 3
@@ -677,3 +679,149 @@ def test_app_owned_worker_failure_fails_open_to_standard_flat_sdk_path(monkeypat
     assert failures[0]["capability_key"] == "structured_data_agent"
     assert failures[0]["delegated"] is True
     assert result.answer_text == "Flat fallback answer."
+
+
+class _ModelDrivenClient:
+    """Stands in for the Supabase client behind the model-driven DB completion bridge: the worker runs
+    out of process, so `agent_delegation_runs` is the only in-turn evidence that the child completed."""
+
+    def table(self, name: str):
+        if name == "agent_delegation_runs":
+            return _FlagQuery(rows=[{"capability_key": "structured_data_agent", "status": "completed"}])
+        return _FlagQuery(error=RuntimeError("not required by this unit test"))
+
+
+class _ModelDrivenStore(_NativeStore):
+    client = _ModelDrivenClient()
+
+
+def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
+    """Phase D2 / SDK-M2: with `native_model_driven=True` the lead must reason the decomposition and
+    delegate via Task, while every `run_<agent>` worker tool stays invisible to it (external per-agent
+    MCP server). Path A's app-owned worker run must not fire at all."""
+
+    _capture_sdk_tools(monkeypatch)
+    required = ("structured_data_agent",)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    orchestrator_calls = []
+    lifecycle_events = []
+
+    class UnusedOrchestrator:
+        def __init__(self, _store):
+            pass
+
+        def start_run(self, request):  # pragma: no cover - must never run in model-driven mode
+            orchestrator_calls.append(request)
+            raise AssertionError("Model-driven delegation must not run app-owned workers in process.")
+
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", UnusedOrchestrator)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+
+    contract = json.dumps(
+        {
+            "objective": "Bind the founder's latest ready financial dataset and return compact cited figures.",
+            "output_format": "compact_json",
+            "tools_sources": ["founder_dataset"],
+            "boundaries": ["founder isolation", "citations required", "compact output"],
+            "context_scope": {"founder_dataset_ids": ["dataset-1"]},
+        }
+    )
+    worker_tool = "mcp__vcso_workers__run_structured_data_agent"
+
+    async def fake_query(*, options, **_kwargs):
+        # 1. The lead's surface: Task only, no worker handler anywhere it can see.
+        assert options.allowed_tools == ["Task"]
+        assert all("__run_" not in tool for tool in options.allowed_tools)
+        assert "vcso_workers" not in dict(options.mcp_servers or {})
+        agent = options.agents["structured_data_agent"]
+        assert agent.tools == [worker_tool]
+        inline = agent.mcpServers
+        assert inline == [{"vcso_workers": {"type": "http", "url": inline[0]["vcso_workers"]["url"]}}]
+        assert "?t=" in inline[0]["vcso_workers"]["url"]
+        json.dumps(inline)  # the inline config must survive CLI serialization
+        assert "PreToolUse" in options.hooks
+
+        # 2. The lead reasons a decomposition and emits Task.
+        pre_task = options.hooks["PreToolUse"][0].hooks[0]
+        decision = await pre_task(
+            {
+                "tool_name": "Task",
+                "tool_input": {"subagent_type": "structured_data_agent", "prompt": contract},
+                "agent_id": None,
+            },
+            "task-1",
+            None,
+        )
+        assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+        # 3. The worker tool fires from INSIDE the Task-spawned subagent (agent_id present) — the §4 probe.
+        probe = options.hooks["PreToolUse"][1].hooks[0]
+        assert await probe({"tool_name": worker_tool, "agent_id": "sub-1"}, "call-1", None) == {}
+
+        # 4. Task returns; the DB completion bridge must clear the worker out of process.
+        post = options.hooks["PostToolUse"][0].hooks[0]
+        await post({"tool_name": "Task"}, "task-1", None)
+
+        # 5. Stop must not block — the required worker is accounted for.
+        assert await options.hooks["Stop"][0].hooks[0]({}, None, None) == {}
+
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-model-driven",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=25,
+            duration_api_ms=20,
+            is_error=False,
+            num_turns=1,
+            session_id="session-model-driven",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 100, "output_tokens": 10},
+            result="Cited 90-day recommendation.",
+        )
+
+    _events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="P4 thin-slice prompt",
+            system_prompt="System\n\nRules remain bounded.",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=_ModelDrivenStore(),
+                thread_id="thread-1",
+                metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+            ),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=required,
+            native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
+            native_lifecycle_sink=lifecycle_events.append,
+            native_model_driven=True,
+            query_impl=fake_query,
+        )
+    )
+
+    assert orchestrator_calls == []
+    assert result.answer_text == "Cited 90-day recommendation."
+    manifest = next(event for event in lifecycle_events if event["event"] == "runtime_manifest")
+    assert manifest["decision"] == "model_driven"
+    assert manifest["reason_code"] == "none"
+    task_events = [event for event in lifecycle_events if event["event"] == "task_pre_tool_use"]
+    assert len(task_events) == 1
+    assert task_events[0]["decision"] == "allow"
+    assert task_events[0]["capability_key"] == "structured_data_agent"
+    probes = [event for event in lifecycle_events if event["event"] == "pre_tool_probe"]
+    assert len(probes) == 1
+    assert probes[0]["agent_id_present"] is True
+    assert "objective" not in str(lifecycle_events)
