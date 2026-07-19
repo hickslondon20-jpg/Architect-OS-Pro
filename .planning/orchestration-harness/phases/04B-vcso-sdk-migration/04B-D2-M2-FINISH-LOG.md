@@ -318,6 +318,103 @@ and a control with the worker server present in `--mcp-config`. Whichever varian
 `Task` while keeping `run_<agent>` out of its schema is the M2 mechanism. This needs no founder turn and
 no production flag.
 
+---
+
+## Post-canary local CLI experiment · **BOTH ROOT CAUSES FOUND — and the M2 mechanism is PROVEN SOUND**
+
+Run locally against the real bundled `claude` CLI, no founder turn and no production flag. To isolate the
+CLI-consumption question from our worker core, the worker MCP server was replaced by a trivial stand-in
+(`scripts/probe_cli_server.py`) exposing one `run_structured_data_agent` tool that always succeeds, so any
+failure is unambiguously SDK/CLI wiring. Driver: `scripts/probe_cli_model_driven.py` (variant matrix) and
+`scripts/probe_cli_debug.py` (full init + hook-event dump).
+
+**The `--strict-mcp-config` hypothesis from Stage H was WRONG.** Variants A (production repro), B (strict
+off) and C (worker server also top-level) all failed identically — no delegation in any of them. Strict
+mode was never the discriminator.
+
+### Root cause 1 — `tools=[]` disables the delegation tool itself
+
+`vcso_sdk_config.py:199` passes `tools=[]` to `ClaudeAgentOptions`. Per the SDK's own field docs:
+
+> `tools` — "Specify the base set of available built-in tools. `[]` (empty list) — **Disable all built-in
+> tools.**" … `allowed_tools` — "Tool names that are auto-allowed **without prompting for permission**. To
+> restrict which tools are available at all, use `tools`."
+
+So `tools` **provisions**; `allowed_tools` only **permits**. Adding `"Task"` to `allowed_tools`
+(`:196-197`) granted permission for a tool that was never provisioned. The debug dump confirms it —
+`[init] tools=[]` — the lead had **no tools at all**. It then *hallucinated* the delegation in prose
+("[Calling Task tool with subagent_type='structured_data_agent']"), which is the classic signature of a
+model instructed to use a tool it does not have. That is precisely the observed production behaviour:
+reason, get blocked by `stop_hook`, reason again, exhaust `max_turns`.
+
+This also explains why the inverted manifest passed: `build_model_driven_manifest` checks
+`"Task" in options.allowed_tools`, which was true — but `allowed_tools` was never the field that mattered.
+
+### Root cause 2 — the delegation tool is named `Agent`, not `Task`
+
+With `tools=["Task"]` provisioned, `[init] tools=['Task']` and the agent registers correctly
+(`agents=[…, 'structured_data_agent']`). The lead then delegates — but the tool it actually emits is:
+
+```
+[assistant TOOL_USE] name=Agent
+PreToolUse tool='Agent' agent_id=no  id=toolu_016CES…
+PostToolUse tool='Agent'             id=toolu_016CES…
+```
+
+`"Task"` is the **provisioning** name; **`Agent`** is the runtime tool name in `claude-agent-sdk==0.2.118`.
+Every hook and check in the loop is keyed to the wrong string:
+
+| Site | Current | Consequence |
+|---|---|---|
+| `vcso_sdk_loop.py:1340` | `HookMatcher(matcher="Task", hooks=[pre_task_use])` | never fires ⇒ no contract enforcement, `task_capabilities` never populated, no `task_pre_tool_use` lifecycle event |
+| `vcso_sdk_loop.py:1312` | `HookMatcher(matcher=r"^(Task\|mcp__.*)$", hooks=[post_tool_use])` | `post_tool_use`'s `Task` branch never runs ⇒ completion bridge never consulted ⇒ `completed_agents` stays empty ⇒ `stop_hook` blocks forever ⇒ **max_turns** |
+| `vcso_sdk_config.py:193,197` | `allowed_tools.append("Task")`, `Task` exempted from disallowed | permits a name the model never emits |
+| `build_model_driven_manifest` | asserts `"Task" in allowed_tools` | passes while the real surface is wrong — a **false-green safety check** |
+
+Together these two causes fully and exactly explain the Stage H signature.
+
+### The part that MATTERS: the M2 mechanism itself works
+
+Variant **D** = production construction (`strict_mcp_config=True`, worker server **kept out** of top-level
+`mcp_servers`, inline per-agent only) **plus** `tools=["Task"]`:
+
+```
+Task emitted by lead : NO   <- measurement artifact: the hook matcher says "Task", the CLI emits "Agent"
+worker tool called   : YES
+from a subagent      : YES   <- agent_id present
+LEAKED (lead direct) : NO    <- the lead never called run_<agent>
+```
+
+And the debug dump shows the delegation end-to-end: `Agent` → `TaskStartedMessage` →
+`mcp__vcso_workers__run_structured_data_agent` **with `agent_id=yes`** → `TaskUpdatedMessage` →
+`PostToolUse tool='Agent'`.
+
+**This settles the §4 CLI-consumption residual POSITIVELY.** The compiled inline per-agent external MCP
+server *is* consumed by the real CLI; the worker tool *is* callable from inside the Task-spawned subagent;
+and with the server withheld from top-level `mcp_servers` it *is* invisible to the lead. The construction
+D2 was built on is correct — only the tool naming and provisioning were wrong.
+
+**Secondary confirmation of the safety net.** In the debug run the server *was* registered top-level, and
+the lead did then direct-call the worker (`agent_id=no`) — the §16 trap reappearing exactly as predicted
+when the server is visible. That call was **denied** by `dontAsk` because the worker tool was not in the
+lead's `allowed_tools`. So the permission layer holds as a second line of defence behind the hiding.
+
+### Recommended M2 remediation (small, and testable without a canary)
+
+1. `vcso_sdk_config.py`: for model-driven, pass `tools=["Task"]` instead of `[]` so the delegation tool is
+   actually provisioned. Leave Path A on `tools=[]` — Path A is compose-only and *wants* no tools.
+2. Introduce one constant (e.g. `DELEGATION_TOOL_NAME = "Agent"`) and key every matcher/allowlist/manifest
+   assertion to it, rather than the literal `"Task"`, at the four sites tabled above.
+3. Extend `build_model_driven_manifest` to assert the delegation tool is **provisioned** (in `options.tools`)
+   and not merely permitted — this specific false-green is what let a statically "valid" surface reach a
+   paid canary.
+4. Update the Stage B integration test to drive the hook under the real runtime name, so the regression is
+   locked in code rather than in a runbook.
+5. Re-run this local probe (free) to confirm D goes fully green, then re-canary.
+
+Local experiment cost: a few cents across five CLI runs. No production flag was touched; the flags were
+already re-darkened before this began.
+
 ## Stage I — Re-darken · DONE
 
 `vcso_sdk_loop`: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`,
