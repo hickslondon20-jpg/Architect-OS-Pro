@@ -20,6 +20,16 @@ SDK_INTERNAL_SERVER = "architectos"
 # EXTERNAL server, referenced inline per-agent and kept OUT of top-level mcp_servers, so the lead cannot
 # see or call run_<agent> — it must delegate via Task (04B-D2-FINDINGS.md §2-§3).
 MODEL_DRIVEN_WORKER_SERVER = "vcso_workers"
+# The SDK's delegation built-in has TWO names, and conflating them cost the first canary (Stage H):
+#   * PROVISION name ("Task") — what `ClaudeAgentOptions.tools` / `allowed_tools` must contain.
+#     `tools` decides which built-ins EXIST (`tools=[]` disables all of them); `allowed_tools` only
+#     decides which are permitted without prompting. Granting permission alone provisions nothing.
+#   * RUNTIME name ("Agent") — what the model actually emits, so every hook matcher and every
+#     `tool_name ==` comparison must key off this one.
+# Confirmed empirically against claude-agent-sdk 0.2.118 on 2026-07-19; see the post-canary CLI
+# experiment in 04B-D2-M2-FINISH-LOG.md. Re-verify both if the SDK is upgraded.
+DELEGATION_TOOL_PROVISION_NAME = "Task"
+DELEGATION_TOOL_RUNTIME_NAME = "Agent"
 CLAUDE_PROVIDER = "anthropic"
 DISALLOWED_SDK_BUILTINS = [
     "Bash",
@@ -190,13 +200,19 @@ def compile_founder_sdk_options(
     }
     compiled_connectors = sorted(name for name in grouped_tools if name != SDK_INTERNAL_SERVER)
     main_disallowed_tools = [
-        name for name in DISALLOWED_SDK_BUILTINS if not (enable_native_subagents and name == "Task")
+        name
+        for name in DISALLOWED_SDK_BUILTINS
+        if not (enable_native_subagents and name == DELEGATION_TOOL_PROVISION_NAME)
     ]
     main_allowed_tools = [_sdk_tool_name(definition) for definition in selected]
     if enable_native_subagents:
-        main_allowed_tools.append("Task")
+        main_allowed_tools.append(DELEGATION_TOOL_PROVISION_NAME)
     options = ClaudeAgentOptions(
-        tools=[],
+        # `tools` PROVISIONS built-in tools. Path A stays `[]` (compose-only: it deliberately wants no
+        # tools at all). Model-driven MUST provision the delegation built-in here — putting it only in
+        # `allowed_tools` permits a tool that does not exist, which is what left the Stage H lead with an
+        # empty tool schema, hallucinating delegations in prose until it hit max_turns.
+        tools=[DELEGATION_TOOL_PROVISION_NAME] if enable_native_subagents else [],
         allowed_tools=main_allowed_tools,
         disallowed_tools=main_disallowed_tools,
         agents=agents,

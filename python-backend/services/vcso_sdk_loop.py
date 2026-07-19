@@ -26,13 +26,21 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import StreamEvent
 
 from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
-from services.vcso_sdk_config import MODEL_DRIVEN_WORKER_SERVER, compile_founder_sdk_options
+from services.vcso_sdk_config import (
+    DELEGATION_TOOL_PROVISION_NAME,
+    DELEGATION_TOOL_RUNTIME_NAME,
+    MODEL_DRIVEN_WORKER_SERVER,
+    compile_founder_sdk_options,
+)
 from services.vcso_worker_mcp import TURN_REGISTRY, TurnScope
 from services.vcso_worker_mcp_server import worker_server_url
 from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
 
 
 logger = logging.getLogger(__name__)
+
+# Hook matchers key off the RUNTIME tool name the model emits, never the provision name.
+_DELEGATION_OR_MCP_MATCHER = rf"^({re.escape(DELEGATION_TOOL_RUNTIME_NAME)}|mcp__.*)$"
 
 VCSO_SDK_LOOP_FLAG = "vcso_sdk_loop"
 VCSO_SDK_CAPABILITY_KEY = "vcso_sdk_loop"
@@ -418,11 +426,20 @@ def build_model_driven_manifest(
 
     options = compiled.options
     allowed_tools = list(options.allowed_tools or [])
+    raw_provisioned = getattr(options, "tools", None)
+    provisioned_tools = list(raw_provisioned) if isinstance(raw_provisioned, list) else []
     top_level_servers = dict(options.mcp_servers or {}) if isinstance(options.mcp_servers, dict) else {}
     violations: list[str] = []
 
-    # 1. Lead sees Task only (plus any non-worker registry tools); no run_<agent> pre-approved on the lead.
-    if "Task" not in allowed_tools:
+    # 0. The delegation built-in must actually EXIST, not merely be permitted. `tools=[]` disables every
+    #    built-in, so a lead can be perfectly "allowed" to delegate while having no delegation tool at
+    #    all — it then narrates fake tool calls until max_turns. Stage H spent a canary on exactly that
+    #    while this manifest reported green, because it only ever checked `allowed_tools`.
+    if DELEGATION_TOOL_PROVISION_NAME not in provisioned_tools:
+        violations.append("model_driven_delegation_tool_not_provisioned")
+
+    # 1. Lead sees the delegation tool only (plus any non-worker registry tools); no run_<agent> on the lead.
+    if DELEGATION_TOOL_PROVISION_NAME not in allowed_tools:
         violations.append("model_driven_lead_task_not_preapproved")
     for name in allowed_tools:
         if "__run_" in str(name):
@@ -455,6 +472,7 @@ def build_model_driven_manifest(
         "delegation_model": "model_driven",
         "required_agents": list(required_agents),
         "lead_allowed_tools": allowed_tools,
+        "lead_provisioned_tools": provisioned_tools,
         "top_level_servers": sorted(top_level_servers.keys()),
         "violations": violations,
     }
@@ -809,7 +827,7 @@ async def _run_sdk_turn(
         if sdk_tool_name.startswith(f"mcp__{SDK_TOOL_SERVER_NAME}__run_"):
             _record_post_tool_trace(metadata=trace_metadata, tool_name=sdk_tool_name, tool_use_id=tool_use_id)
             return {}
-        if sdk_tool_name == "Task":
+        if sdk_tool_name == DELEGATION_TOOL_RUNTIME_NAME:
             task_id = str(tool_use_id or "")
             capability_key = task_capabilities.get(task_id, "bounded_worker")
             step_index = allocate_step(task_id, sdk_tool_name)
@@ -1302,14 +1320,18 @@ async def _run_sdk_turn(
     )
     hooks: dict[str, Any] = {
         "PostToolUse": [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])],
-        "PostToolUseFailure": [HookMatcher(matcher=r"^(Task|mcp__.*)$", hooks=[post_tool_failure])],
+        "PostToolUseFailure": [
+            HookMatcher(matcher=_DELEGATION_OR_MCP_MATCHER, hooks=[post_tool_failure])
+        ],
         "Stop": [HookMatcher(hooks=[stop_hook])],
         "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
     }
     if model_driven:
-        # The completion bridge + subagent-step trace live in post_tool_use's `Task` branch, so the
-        # PostToolUse matcher must also match `Task` (the `^mcp__.*$` default never would).
-        hooks["PostToolUse"] = [HookMatcher(matcher=r"^(Task|mcp__.*)$", hooks=[post_tool_use])]
+        # The completion bridge + subagent-step trace live in post_tool_use's delegation branch, so the
+        # PostToolUse matcher must also match the delegation tool (the `^mcp__.*$` default never would).
+        hooks["PostToolUse"] = [
+            HookMatcher(matcher=_DELEGATION_OR_MCP_MATCHER, hooks=[post_tool_use])
+        ]
 
         async def pre_tool_probe(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
             # Observe-only: records whether a worker tool call fired from inside a Task-spawned subagent
@@ -1337,7 +1359,7 @@ async def _run_sdk_turn(
         )
         model_driven_worker_url = worker_server_url(base_url, model_driven_token)
         hooks["PreToolUse"] = [
-            HookMatcher(matcher="Task", hooks=[pre_task_use]),
+            HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
             HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
         ]
     native_prompt = (
@@ -1435,7 +1457,7 @@ async def _run_sdk_turn(
             if event.get("type") == "content_block_start":
                 block = event.get("content_block") or {}
                 if block.get("type") == "tool_use":
-                    if native_mode and str(block.get("name") or "") == "Task":
+                    if native_mode and str(block.get("name") or "") == DELEGATION_TOOL_RUNTIME_NAME:
                         continue
                     emit_tool_start(
                         str(block.get("name") or "tool"),

@@ -415,6 +415,53 @@ lead's `allowed_tools`. So the permission layer holds as a second line of defenc
 Local experiment cost: a few cents across five CLI runs. No production flag was touched; the flags were
 already re-darkened before this began.
 
+---
+
+## M2 remediation · APPLIED AND LOCALLY PROVEN (v0.6.69)
+
+Two named constants now carry the distinction that caused Stage H
+(`vcso_sdk_config.py`): `DELEGATION_TOOL_PROVISION_NAME = "Task"` (what `options.tools` /
+`allowed_tools` must contain) and `DELEGATION_TOOL_RUNTIME_NAME = "Agent"` (what the model emits, so what
+every matcher must key off). The comment block records that both must be re-verified on any SDK upgrade.
+
+**Changes:**
+1. `vcso_sdk_config.py` — `tools=[DELEGATION_TOOL_PROVISION_NAME] if enable_native_subagents else []`.
+   Path A keeps `tools=[]` and is byte-identical (it is compose-only and deliberately wants no tools);
+   `enable_native_subagents` is `True` only for model-driven. `DISALLOWED_SDK_BUILTINS` exemption and the
+   `allowed_tools` entry now use the provision constant.
+2. `vcso_sdk_loop.py` — module-level `_DELEGATION_OR_MCP_MATCHER = rf"^({runtime}|mcp__.*)$"`; the
+   `PreToolUse` delegation matcher, the `PostToolUse` and `PostToolUseFailure` matchers, the
+   `post_tool_use` branch test, and the UI tool-start filter all key off the **runtime** name.
+3. `build_model_driven_manifest` — new **first** violation
+   `model_driven_delegation_tool_not_provisioned`, asserting the delegation tool is *provisioned* in
+   `options.tools`, not merely permitted. `lead_provisioned_tools` is now recorded in the manifest.
+   This is the specific false-green that let a statically "valid" surface reach a paid canary.
+4. Tests — the Stage B integration test asserts `options.tools == ["Task"]`, that the `PreToolUse` matcher
+   is `"Agent"` and the `PostToolUse` matcher is `^(Agent|mcp__.*)$`, and drives both hooks under the
+   runtime name. New `test_model_driven_manifest_flags_delegation_tool_not_provisioned` reproduces the
+   pre-fix surface (`tools=[]`, `allowed_tools=["Task"]`) and requires the manifest to reject it.
+
+**Local suite:** 32 passed (was 31 + the new manifest test). Path A tests green throughout.
+
+**Live CLI re-run of the variant matrix — the fix is the discriminator:**
+
+| Variant | delegation emitted | worker called | from subagent | leaked to lead | verdict |
+|---|---|---|---|---|---|
+| A production repro (`tools=[]`) | NO | NO | NO | NO | FAIL |
+| B strict off | NO | NO | NO | NO | FAIL |
+| C server also top-level | NO | NO | NO | NO | FAIL |
+| **D production construction + provisioned tool** | **YES** | **YES** | **YES** | **NO** | **PASS** |
+
+D holds `strict_mcp_config=True` and keeps the worker server **out** of top-level `mcp_servers` — the
+production hiding construction, unchanged. Only the provisioning differs. So the M2 mechanism is now
+proven end-to-end against the real CLI: the lead delegates, the worker executes **inside** the
+Task-spawned subagent, and `run_<agent>` never reaches the lead.
+
+**Still unproven and only a canary can settle it:** the same flow against the *real* worker MCP endpoint
+on Railway (per-turn token minting, founder isolation, the DB completion bridge clearing `stop_hook`, and
+a composed cited answer). The probe deliberately substituted a trivial worker server to isolate CLI
+wiring, so the worker-core half of the path has not been exercised model-driven.
+
 ## Stage I — Re-darken · DONE
 
 `vcso_sdk_loop`: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`,

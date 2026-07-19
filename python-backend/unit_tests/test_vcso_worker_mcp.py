@@ -156,10 +156,32 @@ from services.vcso_sdk_loop import (  # noqa: E402
 )
 
 
-def _compiled(*, allowed_tools, mcp_servers, agent_servers):
+def _compiled(*, allowed_tools, mcp_servers, agent_servers, tools=("Task",)):
     agents = {key: SimpleNamespace(mcpServers=servers) for key, servers in agent_servers.items()}
-    options = SimpleNamespace(allowed_tools=allowed_tools, mcp_servers=mcp_servers, agents=agents)
+    options = SimpleNamespace(
+        tools=list(tools),
+        allowed_tools=allowed_tools,
+        mcp_servers=mcp_servers,
+        agents=agents,
+    )
     return SimpleNamespace(options=options)
+
+
+def test_model_driven_manifest_flags_delegation_tool_not_provisioned():
+    """The Stage H false-green: `tools=[]` disables every built-in, so the lead can be permitted to
+    delegate while holding no delegation tool at all — it then narrates fake tool calls to max_turns.
+    The old manifest only inspected allowed_tools and reported this surface clean."""
+
+    compiled = _compiled(
+        tools=[],  # production's pre-fix value
+        allowed_tools=["Task"],
+        mcp_servers={"architectos": {"tools": []}},
+        agent_servers={"structured_data_agent": [{"vcso_workers": {"type": "http", "url": "http://x/?t=1"}}]},
+    )
+    manifest = build_model_driven_manifest(
+        compiled, required_agents=("structured_data_agent",), worker_server_name="vcso_workers"
+    )
+    assert "model_driven_delegation_tool_not_provisioned" in manifest["violations"]
 
 
 def test_model_driven_manifest_passes_clean_scoped_surface():

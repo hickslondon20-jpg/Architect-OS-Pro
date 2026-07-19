@@ -733,7 +733,10 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
     worker_tool = "mcp__vcso_workers__run_structured_data_agent"
 
     async def fake_query(*, options, **_kwargs):
-        # 1. The lead's surface: Task only, no worker handler anywhere it can see.
+        # 1. The lead's surface: the delegation tool only, no worker handler anywhere it can see.
+        #    `tools` must PROVISION it — being in allowed_tools alone means the tool does not exist
+        #    (Stage H: the lead then narrates fake delegations until max_turns).
+        assert options.tools == ["Task"]
         assert options.allowed_tools == ["Task"]
         assert all("__run_" not in tool for tool in options.allowed_tools)
         assert "vcso_workers" not in dict(options.mcp_servers or {})
@@ -745,11 +748,15 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
         json.dumps(inline)  # the inline config must survive CLI serialization
         assert "PreToolUse" in options.hooks
 
-        # 2. The lead reasons a decomposition and emits Task.
+        # 2. The lead reasons a decomposition and delegates. The model emits the RUNTIME tool name
+        #    ("Agent"), not the provision name ("Task") — matchers keyed to "Task" never fire, which is
+        #    why Stage H recorded no task_pre_tool_use and stop_hook blocked to max_turns.
+        assert options.hooks["PreToolUse"][0].matcher == "Agent"
+        assert options.hooks["PostToolUse"][0].matcher == r"^(Agent|mcp__.*)$"
         pre_task = options.hooks["PreToolUse"][0].hooks[0]
         decision = await pre_task(
             {
-                "tool_name": "Task",
+                "tool_name": "Agent",
                 "tool_input": {"subagent_type": "structured_data_agent", "prompt": contract},
                 "agent_id": None,
             },
@@ -764,7 +771,7 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
 
         # 4. Task returns; the DB completion bridge must clear the worker out of process.
         post = options.hooks["PostToolUse"][0].hooks[0]
-        await post({"tool_name": "Task"}, "task-1", None)
+        await post({"tool_name": "Agent"}, "task-1", None)
 
         # 5. Stop must not block — the required worker is accounted for.
         assert await options.hooks["Stop"][0].hooks[0]({}, None, None) == {}

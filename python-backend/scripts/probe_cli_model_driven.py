@@ -78,7 +78,7 @@ def build_options(*, strict: bool, worker_top_level: bool, events: list, provisi
         max_turns=6,
         max_budget_usd=0.15,
         include_partial_messages=False,
-        hooks={"PreToolUse": [HookMatcher(matcher=r"^(Task|mcp__.*)$", hooks=[pre_tool])]},
+        hooks={"PreToolUse": [HookMatcher(matcher=r"^(Agent|Task|mcp__.*)$", hooks=[pre_tool])]},
         setting_sources=[],
         env={"ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", "")},
         thinking={"type": "disabled"},
@@ -97,7 +97,8 @@ async def run_variant(label: str, *, strict: bool, worker_top_level: bool, provi
     except Exception as exc:  # noqa: BLE001 - diagnostic
         error = f"{type(exc).__name__}: {exc}"
 
-    task_seen = [e for e in events if e["tool"] == "Task"]
+    # The model emits the RUNTIME name; "Task" is only the provisioning name.
+    task_seen = [e for e in events if e["tool"] in ("Agent", "Task")]
     worker_calls = [e for e in events if e["tool"] == WORKER_TOOL]
     delegated = [e for e in worker_calls if e["agent_id_present"]]
     leaked = [e for e in worker_calls if not e["agent_id_present"]]
