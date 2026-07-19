@@ -229,7 +229,103 @@ throughout — no whole-file CRLF churn.
 
 | v0.6.63 | `ff20a164` | Phase D2 planning docs + this finish log (docs only) |
 
-## Stages G–I — NOT STARTED
+---
+
+## Stage G — Control run · PASS (baseline established)
+
+Run `7274db2a-b207-4b76-b4ef-7491743f5073`, 2026-07-19 04:04:50Z, founder `cd490873…`.
+
+- `ai_usage_log` records the main call under capability **`vcso_sdk_loop`** on `claude-sonnet-4-6` — proof
+  the SDK loop engaged rather than the legacy path.
+- Lifecycle: `native_handler_entry` → `native_handler_completion` (child `bd00bb04…`, completed) →
+  `runtime_manifest decision="app_owned" reason_code="none"`.
+- Exactly **one** child: `structured_data_agent`, completed, `delegation_depth: 1`, `routing_tier: worker`.
+- **No `task_pre_tool_use` event** — the lead never emitted `Task`, which is correct for Path A.
+- Cost **$0.0593** vs. the $0.25 cap. Sonnet compose + Haiku utilities ⇒ the Claude/tier lock held.
+
+A note on sequencing: an earlier turn at 03:29Z (`772cd5c7…`) predated the Gate G write and ran the
+ordinary `vcso_chat_tool_loop` with **no** children — the flag row was still fully dark. It is not a
+control and should be ignored. The Gate G settings had been described in planning but never written to
+`platform_ai_settings`; this pass wrote them.
+
+## Stage H — Canary (THE PROBE) · **FAIL — and it settles the §4 residual**
+
+Two attempts (the founder retried once), both identical:
+`07aa0ddf…` 11:51:49Z and `e2cb4016…` 11:53:36Z. Only `native_model_driven_enabled` differed from Stage G.
+
+**Result: `status=failed`, `error_message="Claude Code returned an error result: Reached maximum number
+of turns (6)"`.** This is precisely the documented fail signature — *no `Task` / max-turns*.
+
+Lifecycle for both runs contains **exactly one event**:
+
+```json
+{"event": "runtime_manifest", "decision": "model_driven", "sequence": 1, "reason_code": "none"}
+```
+
+What that single event proves, and what its absent siblings prove:
+
+| Expectation | Observed | Read |
+|---|---|---|
+| model-driven branch selected | `decision="model_driven"` | **PASS** — the flag, founder scoping and branch all work |
+| inverted manifest passes | `reason_code="none"` | **PASS** — `Task` pre-approved; no `run_<agent>` leaked to the lead; worker server absent top-level; each worker agent inline-scoped |
+| lead emits `Task` | **no `task_pre_tool_use` event** | **FAIL** — the lead never delegated, not even a denied attempt |
+| worker call from inside the subagent | **no `pre_tool_probe` event** | **FAIL** — no `mcp__*` tool call fired at all |
+| one completed child row | **no child rows** | **FAIL** |
+
+Cost: $0.0769 + $0.1260 = **$0.2029** total. Each attempt stayed inside its own $0.25 cap; no worker LLM
+spend occurred because no worker ever ran.
+
+**Diagnosis — what did NOT cause it (each ruled out with evidence):**
+
+1. *Not the flag or founder scoping* — `decision="model_driven"` only records inside the gated branch.
+2. *Not a leaked/invalid lead surface* — the inverted manifest passed with `reason_code="none"`, so
+   `Task` **was** in `allowed_tools` and no worker tool was visible to the lead.
+3. *Not the anchor phrasing* — native subagent mode engaged, which requires `P4_THIN_SLICE_SIGNALS` to
+   have matched.
+4. *Not the account* — both runs are under the enrolled `cd490873…`.
+5. *Not `WEB_CONCURRENCY`/multi-process* — confirmed unset on the Railway service by the founder.
+6. *Not the session-manager lifespan* — the deployed mount answers at protocol level (421), not the
+   pre-fix 500 `Task group is not initialized`.
+7. *Not transport-security blocking the loopback* — FastMCP auto-enables DNS-rebinding protection only
+   for localhost hosts, with `allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"]`
+   (`fastmcp/server.py`). The CLI's `http://127.0.0.1:${PORT}` Host **is** allowed. The 421 seen from the
+   public internet is that protection working correctly against a non-loopback Host, not a defect.
+8. *Not an unsupported SDK field* — `claude_agent_sdk.types.AgentDefinition.mcpServers` is
+   `list[str | dict[str, Any]]`, documented as "a server name (str) or an inline `{name: config}` dict",
+   which is exactly the shape compiled.
+
+**Leading hypothesis (unproven, and the next experiment):** the inline per-agent MCP server is not
+honoured by the CLI under **`--strict-mcp-config`**. In `subprocess_cli.py:368-402`, `--mcp-config`
+carries **only** top-level `options.mcp_servers` — which by design excludes `vcso_workers` — while
+`--strict-mcp-config` is also passed, and agent definitions travel separately "via initialize request"
+(`:410-411`). If strict mode confines resolvable servers to those in `--mcp-config`, then
+`structured_data_agent`'s sole tool `mcp__vcso_workers__run_structured_data_agent` never resolves, the
+agent has no usable tool surface, and `Task` has no valid `subagent_type` to target — so a Sonnet lead,
+even while being told by `stop_hook` six consecutive times to delegate, has nothing it *can* delegate to.
+That matches the observed signature exactly: manifest passes (a **static** check on `options`), yet zero
+`Task` emissions at runtime.
+
+**This is exactly the §4 residual, and the probe did its job.** The static half was already proven by the
+Stage B integration test; the residual was always "does the compiled CLI actually consume this
+construction." The answer, on this evidence, is **no** — and it cost $0.20 to learn rather than being
+discovered inside SDK-M3.
+
+**Recommended next experiment (cheap, local, no canary):** drive the real `claude` CLI locally against
+the same compiled options and inspect the initialize handshake / the lead's rendered tool schema, varying
+one thing at a time — `strict_mcp_config=False`; the worker server registered top-level *and*
+inline-scoped per agent (visibility then rests on `allowed_tools` alone rather than server registration);
+and a control with the worker server present in `--mcp-config`. Whichever variant makes the lead emit
+`Task` while keeping `run_<agent>` out of its schema is the M2 mechanism. This needs no founder turn and
+no production flag.
+
+## Stage I — Re-darken · DONE
+
+`vcso_sdk_loop`: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`,
+`diagnostic_single_worker_enabled=false`, `native_model_driven_enabled=false`, `enabled_for_all=false`,
+`default=false`. Read back and confirmed. `vcso_planner` re-confirmed `is_enabled=false` with empty
+`test_user_ids` — untouched throughout. **STOPPED for London's review; SDK-M3 not started.**
+
+## Stages G–I — original placeholder (superseded)
 
 Control run, canary probe, and re-darken all require London's environment. Flag settings are unchanged:
 `vcso_sdk_loop` **dark**, `native_model_driven_enabled` **false**, `vcso_planner` **retired**. Nothing was
