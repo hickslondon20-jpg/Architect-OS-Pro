@@ -987,6 +987,22 @@ async def _run_sdk_turn(
     async def stop_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
         nonlocal turn_trace_emitted
         missing = [key for key in required_agents if key not in completed_agents]
+        if missing and model_driven:
+            # Model-driven workers run OUT of process, so a worker whose Task tool-call was abandoned early
+            # (e.g. a slow worker timing out in-band) is absent from the in-memory `completed_agents` even
+            # though it wrote a completed child row. Consult the authoritative DB completion bridge so
+            # genuinely-finished work is never discarded and no completed worker is named for re-delegation.
+            # A worker missing from BOTH memory AND the DB stays missing — a real block, preserved.
+            db_completed = model_driven_completed_children(
+                getattr(tool_context.store, "client", None),
+                parent_run_id=tool_context.metadata.get("parent_run_id"),
+                required_agents=required_agents,
+            )
+            missing = [key for key in missing if key not in db_completed]
+            # TODO (M4, optional): for a DB-completed worker whose finding never reached the lead in-band
+            # (the timed-out case), inject its compact child finding into the compose so the answer isn't
+            # missing that worker's content. Deferred: it needs mid-stream injection into the SDK lead —
+            # significant machinery. For now the turn composes from what the lead already holds.
         if missing:
             return {
                 "decision": "block",
@@ -1620,6 +1636,16 @@ async def _run_sdk_turn(
         # backstop; a finally-wrap around the query loop is the clean M4 follow-up.
         TURN_REGISTRY.unregister(model_driven_token)
     missing_after_query = [key for key in required_agents if key not in completed_agents]
+    if missing_after_query and model_driven:
+        # Same DB completion bridge the stop_hook and post_tool_use use: a model-driven worker that
+        # completed server-side but never returned its Task result in-band is DB-completed and must not
+        # fail the turn. A worker missing from BOTH memory AND the DB still raises (real failure preserved).
+        db_completed = model_driven_completed_children(
+            getattr(tool_context.store, "client", None),
+            parent_run_id=tool_context.metadata.get("parent_run_id"),
+            required_agents=required_agents,
+        )
+        missing_after_query = [key for key in missing_after_query if key not in db_completed]
     if missing_after_query:
         _record_turn_trace(metadata=trace_metadata, status="failed")
         raise RuntimeError(

@@ -696,6 +696,20 @@ class _ModelDrivenStore(_NativeStore):
     client = _ModelDrivenClient()
 
 
+class _NoChildrenClient:
+    """Negative-case bridge stub: NO completed child rows exist for this parent run — the worker either
+    never started or genuinely failed, so the compose gates must keep blocking / raising."""
+
+    def table(self, name: str):
+        if name == "agent_delegation_runs":
+            return _FlagQuery(rows=[])
+        return _FlagQuery(error=RuntimeError("not required by this unit test"))
+
+
+class _NoChildrenStore(_NativeStore):
+    client = _NoChildrenClient()
+
+
 def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
     """Phase D2 / SDK-M2: with `native_model_driven=True` the lead must reason the decomposition and
     delegate via Task, while every `run_<agent>` worker tool stays invisible to it (external per-agent
@@ -847,6 +861,142 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
     assert len(probes) == 1
     assert probes[0]["agent_id_present"] is True
     assert "objective" not in str(lifecycle_events)
+
+
+def _reject_orchestrator():
+    """Model-driven mode must never run app-owned workers in process; start_run firing is a hard failure."""
+
+    class _Unused:
+        def __init__(self, _store):
+            pass
+
+        def start_run(self, _request):  # pragma: no cover - must never run in model-driven mode
+            raise AssertionError("Model-driven delegation must not run app-owned workers in process.")
+
+    return _Unused
+
+
+def test_model_driven_compose_gates_accept_a_db_completed_worker(monkeypatch):
+    """Fix (v0.6.81) POSITIVE: a required worker whose Task tool-call was abandoned early (the timed-out
+    case) is ABSENT from the in-memory `completed_agents` — post_tool_use never ran — yet it wrote a
+    `completed` child row. Both compose gates (stop_hook + the post-query terminal check) must consult the
+    DB completion bridge and treat that worker as satisfied: stop does NOT block, and the turn does NOT
+    raise. The store's DB bridge is stubbed (`_ModelDrivenStore`), never live Supabase."""
+
+    _capture_sdk_tools(monkeypatch)
+    required = ("structured_data_agent",)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _reject_orchestrator())
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+
+    async def fake_query(*, options, **_kwargs):
+        # The worker was delegated, but its Task result never returned in-band, so post_tool_use is NEVER
+        # called here — completed_agents stays empty. Only the DB bridge knows the worker completed.
+        stop = await options.hooks["Stop"][0].hooks[0]({}, None, None)
+        assert stop == {}  # graceful: the DB-completed worker satisfies the gate, no re-delegation ordered
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-graceful",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=25,
+            duration_api_ms=20,
+            is_error=False,
+            num_turns=1,
+            session_id="session-graceful",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 100, "output_tokens": 10},
+            result="Cited 90-day recommendation.",
+        )
+
+    _events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="P4 thin-slice prompt",
+            system_prompt="System\n\nRules remain bounded.",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=_ModelDrivenStore(),
+                thread_id="thread-1",
+                metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+            ),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=required,
+            native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
+            native_model_driven=True,
+            query_impl=fake_query,
+        )
+    )
+
+    # Terminal check did not raise: the turn composed its answer from the DB-completed worker.
+    assert result.answer_text == "Cited 90-day recommendation."
+
+
+def test_model_driven_compose_gates_still_block_and_raise_when_worker_missing_everywhere(monkeypatch):
+    """Fix (v0.6.81) NEGATIVE (safety-critical): a required worker absent from BOTH `completed_agents` AND
+    the DB bridge is a genuine failure — the union must NOT mask it. stop_hook STILL blocks (orders the
+    missing worker re-delegated) and the terminal check STILL raises RuntimeError. DB bridge stubbed to
+    return no children (`_NoChildrenStore`)."""
+
+    _capture_sdk_tools(monkeypatch)
+    required = ("structured_data_agent",)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _reject_orchestrator())
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+
+    async def fake_query(*, options, **_kwargs):
+        # No post_tool_use AND the DB has no completed child: the worker never actually finished.
+        stop = await options.hooks["Stop"][0].hooks[0]({}, None, None)
+        assert stop["decision"] == "block"
+        assert "structured_data_agent" in stop["reason"]
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-missing",
+            result="",
+        )
+
+    with pytest.raises(RuntimeError, match="before required workers completed"):
+        _consume(
+            stream_vcso_sdk_turn(
+                prompt="P4 thin-slice prompt",
+                system_prompt="System\n\nRules remain bounded.",
+                model="claude-sonnet-test",
+                api_key="test-key",
+                registry=_Registry(),
+                tool_names=[],
+                tool_context=ToolExecutionContext(
+                    user_id="founder-1",
+                    store=_NoChildrenStore(),
+                    thread_id="thread-1",
+                    metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+                ),
+                trace_metadata={"run_id": "lead-run"},
+                native_subagent_required_agents=required,
+                native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
+                native_model_driven=True,
+                query_impl=fake_query,
+            )
+        )
 
 
 # --- Item A (v0.6.78): model-driven worker progress bridge -----------------------------------------
