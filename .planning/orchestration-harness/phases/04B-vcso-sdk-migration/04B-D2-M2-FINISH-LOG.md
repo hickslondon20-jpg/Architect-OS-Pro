@@ -714,3 +714,58 @@ step's own context pack?** This must be nailed down in tier 2, because the three
 (`structured → sandbox → wiki`) depends on each worker producing findings that genuinely feed the next via
 `prior_findings`. A single ~0.4s, zero-cost worker does not yet prove that findings-passing works under
 load.
+
+---
+
+## Canary 8 (deployed `72ababb8`, v0.6.82, verified) · **PASS — full three-worker chain proven live end-to-end.** Tier 2 CLOSED.
+
+**Date:** 2026-07-20. **Deploy confirmed directly:** `/api/health` `ok=true`, deployed build `72ababb8`
+(v0.6.82). This is the first live turn to drive the full `structured → wiki → sandbox` three-worker chain
+model-driven, with the progress bridge and app-owned findings-chaining active, all the way to a
+founder-visible cited answer.
+
+**Flag config used (`vcso_sdk_loop`), founder-only, then re-darkened immediately after the turn:**
+- enrolled founder `cd490873-99aa-4533-9240-f0aa04deb54f` only; `native_model_driven_enabled=true`;
+  `diagnostic_single_worker_enabled=false` (the **full three-worker chain**, not the single-worker
+  diagnostic); `max_turns=12`; `max_budget_usd=0.50`.
+- **Re-darken confirmed (read back after the turn):** both allowlists empty
+  (`test_user_ids=[]`, `diagnostic_user_ids=[]`), `native_model_driven_enabled=false`. `vcso_planner`
+  remains dark/retired throughout.
+
+**Runs (from `agent_delegation_runs`):**
+- Parent `f0f5add5-c71f-476f-82e7-95a6d3187766` (`vcso_chat_tool_loop`) — status **completed**, no error,
+  duration **3m34s**.
+- Three worker types, **all `task_pre_tool_use → allow` on the FIRST attempt (zero denials, zero
+  thrashing)**, all completed:
+  - `structured_data_agent` child `073534ec-da43-47d6-8a8e-374f6e05f8de` — completed, **0.3s**.
+  - `per_user_wiki` child `76e36f48-fbe6-47ce-bf8b-34761c2594bd` — completed, **2.0s**.
+  - `per_user_wiki` child `db140287-56cb-4fb0-a44f-39022384e222` — completed, **1.0s**.
+    **(DUPLICATE dispatch — the same `per_user_wiki` capability was dispatched twice; both completed.
+    Recorded as the known non-blocking wart — see the named follow-up below.)**
+  - `sandbox_execution_agent` child `e48905fd-48ac-434c-914b-ea38801f7912` — completed, **113s** — ran
+    **in-band under the 240s `MCP_TOOL_TIMEOUT`**, which is the fix that unblocked canaries 6/7 (the slow
+    sandbox worker previously timed out at the ~60s default and never returned to the lead in-band).
+
+**Lifecycle — the full happy path across three worker types, no denials:**
+- `runtime_manifest decision=model_driven`;
+- **3×** (`Task allow` on the first try + `pre_tool_probe` with `agent_id_present=true`);
+- `worker_hop` **received + completed** for all three worker types (`per_user_wiki` twice — the duplicate);
+- **no failures, no denials.**
+
+**Founder-visible cited answer:** **8,577 chars, 33 citations** to real founder wiki/data. Structure
+"The Read / The Verdict / 90-Day Sequenced Action"; names a single binding constraint
+("no systematized pipeline"); grounded in real figures — $45K rev, 71.1% gross / 18.5% net margins,
+Vantage $32K + Harborline $28K = **41% of book**, 3.6-month runway, 2.5% churn. Main compose cost
+**$0.1454**.
+
+**Tier 2 CLOSED — full structured → wiki → sandbox three-worker chain proven live end-to-end, with the
+progress bridge and app-owned findings-chaining, and a founder-visible cited answer.**
+
+### Named non-blocking follow-up recorded here — duplicate worker dispatch (defect #4)
+
+`per_user_wiki` was dispatched twice this run (children `76e36f48…` and `db140287…`), both completed. A
+re-sent CLI `tools/call` starts a second `start_run`; the fix is to dedupe/coalesce on
+`(token, capability_key)` in `services/vcso_worker_mcp.py` (~:198–268). **Cosmetic today** — workers
+occasionally run twice and both complete, so the answer is unaffected — but it is wasteful and should be
+made idempotent. Batched to the tier-2-close backlog (item 1); see
+`04B-D2-TIER2-CLOSE-HANDOFF.md`.

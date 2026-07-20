@@ -211,3 +211,19 @@ handler on the lead's `allowed_tools`, derived from the same list that builds th
 moves the leak-check onto the real exposure surface (worker server attached in top-level `mcp_servers`, or a
 handler name in the lead's `tools` availability list). Isolation is unchanged — the worker server stays
 per-agent-only and the handlers stay out of the lead's availability list; only the permission surface opened.
+
+## 10. Worker tool-call timeout (2026-07-20) — per-agent `timeout` config key REJECTED by the deployed CLI; delivered via `MCP_TOOL_TIMEOUT` env var instead
+
+The slow `sandbox_execution_agent` worker (~113s in-band, canary 8) exceeds the CLI's default MCP tool-call
+timeout (~60s), which caused canaries 6/7 to lose the worker return in-band. The first attempt at a fix
+(**v0.6.80**) set a per-agent http `timeout` config key on the inline worker `McpHttpServerConfig`. **The
+deployed Linux CLI rejected it**: canary 7 ran the lead but produced **zero delegations and zero worker
+calls** — the malformed/unknown key broke delegation entirely. **Reverted in v0.6.82.**
+
+The working delivery is the **Railway env var `MCP_TOOL_TIMEOUT=240000`** (ms). The SDK forwards the
+backend process environment to the CLI subprocess, so the 240s worker tool-call timeout reaches the CLI
+without any per-agent config key. This is **not in code** — it lives only in the Railway service env.
+Canary 8 confirmed it live: the 113s sandbox worker returned in-band under the 240s window.
+
+**Do not re-add the per-agent `timeout` key** — it is rejected by the deployed CLI and breaks delegation.
+See the CRITICAL INFRA NOTE in `04B-D2-TIER2-CLOSE-HANDOFF.md`.
