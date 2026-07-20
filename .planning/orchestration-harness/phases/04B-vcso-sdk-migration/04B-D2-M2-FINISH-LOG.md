@@ -519,6 +519,65 @@ Each canary bought exactly one of them. The manifest now covers all four, and th
 production's full option surface rather than a convenient subset — which is what turned canary 3's
 diagnosis from a paid guess into a free A/B.
 
+---
+
+## Canary 3 (deployed `8ecd3cb7`, verified) · **§4 RESIDUAL SETTLED POSITIVELY** — new, narrower failure
+
+Run `9dbed506-8e9c-4ee7-8e71-8d8e055537f6`, 2026-07-20 02:58:13Z. **Deploy confirmed directly for the
+first time**: `/api/health` returned `commit_sha 8ecd3cb7919b47c231ac93260b250e7e34f82df1`, matching the
+intended SHA (and the field's mere existence proves the new build, since it ships in v0.6.71).
+
+Lifecycle — five events, versus one in every previous attempt:
+
+| # | Event | Detail |
+|---|---|---|
+| 1 | `runtime_manifest` | `decision=model_driven`, `reason_code=none` |
+| 2 | `task_pre_tool_use` | **deny** — "Task contract boundaries must be a non-empty list" |
+| 3 | `task_pre_tool_use` | **allow** — `approved_bounded_contract` (the lead corrected itself and retried) |
+| 4 | `pre_tool_probe` | `mcp__vcso_workers__run_structured_data_agent`, **`agent_id_present: true`** |
+| 5 | `task_pre_tool_use` | deny — "Each approved thin-slice worker may run only once per turn" |
+
+**Event 4 is the whole point of Phase D2.** Against the *real* Railway deployment, the lead reasoned a
+decomposition, delegated, and the worker tool fired **from inside the Task-spawned subagent** — reaching
+the loopback worker MCP endpoint through the per-turn token URL, with `run_<agent>` never visible to the
+lead. The §4 CLI-consumption residual is settled **positively in production**, not just in a lab.
+
+Event 2→3 is also a good sign: the delegation-contract gate rejected a malformed contract, the lead read
+the denial reason and produced a valid one. `pre_task_use` is doing its job.
+
+### The remaining failure is now isolated to the worker execution hop
+
+The turn still ended in `max_turns`. Evidence:
+- **No `structured_data_agent` child row exists** for this parent.
+- **No worker row in `ai_usage_log`** — only `vcso_intent_read` (haiku) and the `vcso_sdk_loop` main call
+  (`claude-sonnet-4-6`, $0.1311).
+
+So `pre_tool_probe` (a **PreToolUse** hook — it fires *before* execution) confirms the call was
+*attempted*, but the execution produced no child run and no spend. `run_worker_capability` therefore
+failed. With no completed child, `model_driven_completed_children` returns empty ⇒ `completed_agents`
+never fills ⇒ `stop_hook` keeps blocking ⇒ the lead retries delegation ⇒ denied as already-run (event 5)
+⇒ `max_turns`. That chain matches the observed events exactly.
+
+**Note the worker core itself is known good:** the Stage G control produced a completed
+`structured_data_agent` child via Path A. The only untested element in this path is the new hop — per-turn
+token minting, the `?t=` lift into the ContextVar, scope resolution in `TURN_REGISTRY`, and the argument
+mapping from the Task contract into `run_worker_capability`.
+
+**And this is exactly the gap the local probe cannot see:** the stand-in server
+(`scripts/probe_cli_server.py`) ignores tokens entirely and always succeeds, so the entire token/scope/
+argument path has never been exercised anywhere.
+
+### Recommended next step — a free local end-to-end worker test, not a fourth canary
+
+Run the **real** backend app in-process (uvicorn in a thread), mint a real `TurnScope` in `TURN_REGISTRY`,
+then drive `…/internal/mcp/workers/?t=<token>` with an MCP client using a realistic Task-contract argument
+set. That exercises the ASGI token lift, the ContextVar, scope resolution, founder isolation, the argument
+mapping, `SubAgentOrchestrator.start_run`, and the child-row write — the precise span that failed — with
+no CLI, no founder turn, and no canary spend. A second run with a deliberately wrong/expired token should
+produce a clean `WorkerScopeError` and no row.
+
+Whatever that returns is the last unknown in M2.
+
 ## Stage I — Re-darken · DONE
 
 `vcso_sdk_loop`: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`,
