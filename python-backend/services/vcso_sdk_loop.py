@@ -1839,6 +1839,16 @@ def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
         "payloads, no wiki writes, no recursion, and no external writes. Compose only from the compact Task "
         "findings after every required Task completes; do not re-crawl sources. For all non-canary/simple turns, "
         "answer directly and do not use Task."
+        "\n\nTASK CONTRACT SCHEMA. Each Task prompt must be EXACTLY one JSON object -- no prose, no markdown "
+        "fence, no text before or after the braces. Required keys: objective (non-empty string), "
+        "output_format (present), tools_sources (NON-EMPTY list), boundaries (NON-EMPTY list), context_scope "
+        "(object). For sandbox_execution_agent, context_scope.prior_findings must be non-empty (the compact "
+        "structured-data finding). Each approved worker may run only once per turn. Worked example "
+        "(structured-data delegation): "
+        '{"objective":"Quantify client-concentration and margin trend from the founder dataset",'
+        '"output_format":"compact cited findings","tools_sources":["founder_dataset"],'
+        '"boundaries":["founder isolation","cite every claim","compact output","no raw payloads",'
+        '"no wiki writes","no recursion","no external writes"],"context_scope":{"quarter":"current"}}'
     )
 
 
