@@ -20,12 +20,6 @@ SDK_INTERNAL_SERVER = "architectos"
 # EXTERNAL server, referenced inline per-agent and kept OUT of top-level mcp_servers, so the lead cannot
 # see or call run_<agent> — it must delegate via Task (04B-D2-FINDINGS.md §2-§3).
 MODEL_DRIVEN_WORKER_SERVER = "vcso_workers"
-# Phase D2 (SDK-M2): per-server tool-call timeout for the external worker MCP endpoint, in MILLISECONDS
-# (the claude CLI's http-server schema is milliseconds; values below 1000 are ignored). 240s sits
-# comfortably above the ~128s worst-case sandbox worker so a slow worker returns its finding IN-BAND
-# instead of having its Task tool-call abandoned early — the defect that stranded a completed worker
-# in the DB while the compose gates blocked (canary re-delegation thrash to max_turns).
-MODEL_DRIVEN_WORKER_TOOL_TIMEOUT_MS = 240000
 # The SDK's delegation built-in has TWO names, and conflating them cost the first canary (Stage H):
 #   * PROVISION name ("Task") — what `ClaudeAgentOptions.tools` / `allowed_tools` must contain.
 #     `tools` decides which built-ins EXIST (`tools=[]` disables all of them); `allowed_tools` only
@@ -159,18 +153,11 @@ def compile_founder_sdk_options(
             # not silently deny the subagent's call under dontAsk.
             agent_tools = [f"mcp__{MODEL_DRIVEN_WORKER_SERVER}__{handler_name}"]
             model_driven_worker_tools.extend(agent_tools)
+            # The worker tool-call timeout is delivered via the `MCP_TOOL_TIMEOUT` env var (Railway),
+            # NOT a per-server config key: the deployed CLI rejects an unknown `timeout` key on the http
+            # server config, which stranded the lead with no valid delegation target (see 04B-D2 findings).
             agent_mcp_servers: list[Any] | None = [
-                {
-                    MODEL_DRIVEN_WORKER_SERVER: {
-                        "type": "http",
-                        "url": model_driven_worker_server_url,
-                        # `timeout` is NOT declared on the McpHttpServerConfig TypedDict (types.py), but it is
-                        # a runtime-safe key: TypedDict is not runtime-enforced and strict_mcp_config does not
-                        # strip unknown keys — the claude CLI serializes it verbatim as a per-call wall-clock
-                        # limit (milliseconds). Named constant above documents the unit and rationale.
-                        "timeout": MODEL_DRIVEN_WORKER_TOOL_TIMEOUT_MS,
-                    }
-                }
+                {MODEL_DRIVEN_WORKER_SERVER: {"type": "http", "url": model_driven_worker_server_url}}
             ]
         elif handler_name:
             agent_tools = [f"mcp__{SDK_INTERNAL_SERVER}__{handler_name}"]
