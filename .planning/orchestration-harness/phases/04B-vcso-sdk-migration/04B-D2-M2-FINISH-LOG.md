@@ -653,3 +653,64 @@ MA-06 tier map), no model selector, tier authority at the capability grain, cura
 retained as the fallback and not pruned; native-delegation scaffolding intact; `vcso_planner` stays
 retired; harness-root `ROADMAP.md` untouched. No new conflict was found, so no row was added to
 `../../CONTEXT.md`. SDK-M3 not started.
+
+---
+
+## Canary 5 (deployed `56c8d604`, v0.6.76, verified) · **PASS — first founder-visible cited answer on the model-driven path.** SDK-M2 closed.
+
+Run 2026-07-20. **Deploy confirmed directly:** `/api/health` `ok=true`, deployed build `56c8d604`
+(v0.6.76). This is the first time a founder-visible cited answer has ever reached the user on the
+model-driven delegation path.
+
+**Flag config used (`vcso_sdk_loop`), founder-only, then re-darkened immediately after the turn:**
+- enrolled founder `cd490873-99aa-4533-9240-f0aa04deb54f` only; `native_model_driven_enabled=true`;
+  `max_turns=10`.
+- **Re-darken confirmed (read back after the turn):** both allowlists empty
+  (`test_user_ids=[]`, `diagnostic_user_ids=[]`), `native_model_driven_enabled=false`,
+  `diagnostic_single_worker_enabled=false`. `vcso_planner` remains dark/retired throughout.
+
+**Runs (from `agent_delegation_runs`):**
+- Parent `28d1b9ce-954e-4a21-9e76-77700b1886a1` (`vcso_chat_tool_loop`) — status **completed**, no error.
+- Child `3f5554f0-686e-4e9e-aeac-0609ba992276` (`structured_data_agent`) — status **completed**, parented
+  to the above. **First worker child row ever produced on the model-driven path.**
+
+**Lifecycle (`metadata.sdk_native_lifecycle` on the parent) — the full happy path, first attempt:**
+
+| # | Event | Detail |
+|---|---|---|
+| 1 | `runtime_manifest` | `decision=model_driven` |
+| 2 | `task_pre_tool_use` | **allow** — `reason=approved_bounded_contract`, **on the first attempt (zero denials)** |
+| 3 | `pre_tool_probe` | `mcp__vcso_workers__run_structured_data_agent`, **`agent_id_present=true`** |
+| 4 | `worker_hop` | **received** |
+| 5 | `worker_hop` | **completed**, `child_status=completed` |
+
+Contrast with canary 3, which denied a malformed contract before self-correcting (2 `task_pre_tool_use`
+events) and then produced **no** child row and no `worker_hop` events. Here the contract was approved
+first try, the hop landed, and the child completed — end to end.
+
+**Founder-visible answer:** 5,242 chars, **33 citations** to real founder wiki pages
+(`financial_context`, `client_market_position`, `revenue_concentration_forecasting_risk`,
+`harborline_legal`, `vantage_cloud`). Grounded in real figures — $45K MRR; 71.1% gross / 18.5% net margin;
+3.6-month runway; top-5 concentration 55%; Vantage Cloud $32K (~22%); Harborline $28K. Sequenced 90-day
+plan with inline `[[Source: ...]]` markers.
+
+**Cost:** main compose `vcso_sdk_loop` (`claude-sonnet-4-6`) = **$0.0776** — in line with the Path A
+control (~$0.06).
+
+**What this confirms shipped correctly in production (v0.6.75 / v0.6.76):**
+- **v0.6.75 worker-handler pre-approval** → the `CallToolRequest` now dispatches. **Defect 6 resolved and
+  verified live** (see `04B-D2-FINDINGS.md` §9).
+- **v0.6.75 gate inversion** → isolation now enforced on the exposure surface; the gate passed clean.
+- **v0.6.76 lead-prompt contract schema** → the contract was approved on the first try, no wasted turns.
+
+**SDK-M2 closed — first founder-visible cited answer on the model-driven path.**
+
+### Open follow-up for tier 2 (do not bury) — the worker's actual contribution is unquantified
+
+The child worker completed in **~0.4s** (11:04:28.82 → 11:04:29.20 UTC) and logged **no separate Haiku
+worker cost** in `ai_usage_log`. For a structured-data (deterministic-pull) agent this is plausibly
+correct, but it leaves an open question: **how much did the worker actually contribute versus the compose
+step's own context pack?** This must be nailed down in tier 2, because the three-worker chain
+(`structured → sandbox → wiki`) depends on each worker producing findings that genuinely feed the next via
+`prior_findings`. A single ~0.4s, zero-cost worker does not yet prove that findings-passing works under
+load.

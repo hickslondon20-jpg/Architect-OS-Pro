@@ -178,7 +178,13 @@ one-worker probe.
 
 ---
 
-## 9. Defect 6 (2026-07-20) — silent `dontAsk` deny of the subagent worker tool (fixed in v0.6.75)
+## 9. Defect 6 (2026-07-20) — silent `dontAsk` deny of the subagent worker tool (fixed in v0.6.75) — **RESOLVED & VERIFIED LIVE by Canary 5**
+
+> **Status: RESOLVED & VERIFIED LIVE by Canary 5 (2026-07-20, deployed `56c8d604`/v0.6.76; parent run
+> `28d1b9ce-954e-4a21-9e76-77700b1886a1`, child `3f5554f0-686e-4e9e-aeac-0609ba992276`).** The `CallToolRequest`
+> now dispatches: the subagent worker call fired, produced a completed child row, and drove a founder-visible
+> cited answer. See `04B-D2-M2-FINISH-LOG.md` → "Canary 5".
+
 
 **Symptom.** The 2026-07-20 model-driven canary (parent run `40e39ee8-4262-4d7f-a0fc-19a676798a26`) had the
 lead correctly emit `Task` and the subagent correctly attach the external worker server — the worker's
