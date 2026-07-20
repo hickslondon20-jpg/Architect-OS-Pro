@@ -750,7 +750,15 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
         agent = options.agents["structured_data_agent"]
         assert agent.tools == [worker_tool]
         inline = agent.mcpServers
-        assert inline == [{"vcso_workers": {"type": "http", "url": inline[0]["vcso_workers"]["url"]}}]
+        assert inline == [
+            {
+                "vcso_workers": {
+                    "type": "http",
+                    "url": inline[0]["vcso_workers"]["url"],
+                    "timeout": 240000,
+                }
+            }
+        ]
         assert "?t=" in inline[0]["vcso_workers"]["url"]
         json.dumps(inline)  # the inline config must survive CLI serialization
         assert "PreToolUse" in options.hooks

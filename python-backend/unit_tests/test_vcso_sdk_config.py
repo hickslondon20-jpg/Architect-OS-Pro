@@ -19,7 +19,10 @@ from services.tool_registry import (
     ToolRegistry,
     ToolResultEnvelope,
 )
-from services.vcso_sdk_config import compile_founder_sdk_options
+from services.vcso_sdk_config import (
+    MODEL_DRIVEN_WORKER_TOOL_TIMEOUT_MS,
+    compile_founder_sdk_options,
+)
 
 
 class _Query:
@@ -264,11 +267,21 @@ def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead
         for tool in server.get("tools", []):
             assert not str(tool.get("name", "")).startswith("run_")
 
-    # Each worker agent scopes ONLY the external server, inline, and points its single tool at it.
+    # Each worker agent scopes ONLY the external server, inline, and points its single tool at it. The
+    # external http server also carries a per-call `timeout` (ms) so a slow worker returns its finding
+    # in-band instead of having its Task tool-call abandoned early.
+    expected_server = {
+        "vcso_workers": {
+            "type": "http",
+            "url": url,
+            "timeout": MODEL_DRIVEN_WORKER_TOOL_TIMEOUT_MS,
+        }
+    }
     for key, handler in (("sandbox_agent", "run_sandbox_agent"), ("wiki_agent", "run_wiki_agent")):
         agent = compiled.options.agents[key]
         assert agent.tools == [f"mcp__vcso_workers__{handler}"]
-        assert agent.mcpServers == [{"vcso_workers": {"type": "http", "url": url}}]
+        assert agent.mcpServers == [expected_server]
+        assert agent.mcpServers[0]["vcso_workers"]["timeout"] == 240000
 
     # The inline external config must JSON-serialize (unlike the in-process McpSdkServerConfig instance),
     # which is exactly why the SDK can deliver it per-agent in the initialize request.
@@ -280,7 +293,9 @@ def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead
             }
         )
     )
-    assert serialized["sandbox_agent"]["mcpServers"] == [{"vcso_workers": {"type": "http", "url": url}}]
+    assert serialized["sandbox_agent"]["mcpServers"] == [
+        {"vcso_workers": {"type": "http", "url": url, "timeout": MODEL_DRIVEN_WORKER_TOOL_TIMEOUT_MS}}
+    ]
 
 
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():
