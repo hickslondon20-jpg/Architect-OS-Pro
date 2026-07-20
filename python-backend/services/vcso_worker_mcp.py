@@ -83,6 +83,17 @@ class TurnScope:
     # Compact prior findings by capability_key, so an ordered worker (e.g. sandbox after structured) can
     # inherit the upstream finding even across the external hop. Optional; populated by the loop bridge.
     prior_findings: dict[str, Any] = field(default_factory=dict)
+    # APP-OWNED data scope per capability (Path A's `native_subagent_scopes`). The model authors the Task
+    # contract, so its `context_scope` carries intent but NOT the founder's dataset/thread bindings — a
+    # model-driven worker running on the contract alone reviews 0 datasets and returns "no sources"
+    # (observed 2026-07-20 in scripts/probe_worker_hop.py). Which data a worker may read is a founder-
+    # isolation decision and must come from the app, never from model-authored text.
+    context_scopes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Same-process diagnostics drained by the loop after the query. The endpoint runs in a separate
+    # request context and cannot reach `record_lifecycle`, so without this a worker call that never
+    # arrives is indistinguishable from one that arrived and failed — which is precisely what canary 3
+    # could not tell us.
+    diagnostics: list[dict[str, Any]] = field(default_factory=list)
     # Optional bridge back into the live turn for the C2 nested-UI + citations surface. Signature mirrors
     # the in-process emit_worker_progress. None during the bare visibility probe (surface hold is M4).
     progress_bridge: Callable[[str, dict[str, Any]], None] | None = None
@@ -173,6 +184,9 @@ async def run_worker_capability(
     if scope is None:
         logger.warning("vcso worker call refused: unknown/expired turn token (capability=%s)", capability_key)
         raise WorkerScopeError("No active turn scope for this token.")
+    # From here the scope is known, so every outcome is recorded for the loop to drain. The mere presence
+    # of a "received" entry proves the loopback request reached this endpoint at all.
+    scope.diagnostics.append({"stage": "received", "capability_key": capability_key})
     if capability_key not in scope.allowed_capabilities:
         logger.warning(
             "vcso worker call refused: capability=%s not permitted this turn (allowed=%s)",
@@ -185,8 +199,11 @@ async def run_worker_capability(
     if not objective:
         raise WorkerScopeError("Missing task objective.")
 
+    # App-owned bindings win over anything the model wrote into the contract: the contract may express
+    # intent, but the founder's dataset/thread scope is not the model's to choose.
     requested_scope = args.get("context_scope") if isinstance(args.get("context_scope"), dict) else {}
-    context_scope: dict[str, Any] = {**requested_scope, "delegation_depth": 1}
+    app_scope = scope.context_scopes.get(capability_key) or {}
+    context_scope: dict[str, Any] = {**requested_scope, **app_scope, "delegation_depth": 1}
     prior = scope.prior_findings.get(capability_key)
     task_summary = objective
     if prior:
@@ -208,28 +225,42 @@ async def run_worker_capability(
 
     # Reuse the proven orchestrator call exactly as the in-process handler does (vcso_sdk_loop
     # make_native_handler_tool): depth 1, worker tier, compact contract, citations, progress callback.
-    result: SubAgentRunResult = await asyncio.to_thread(
-        SubAgentOrchestrator(scope.store).start_run,
-        SubAgentRunRequest(
-            user_id=scope.user_id,
-            parent_surface=scope.parent_surface or "virtual_cso",
-            capability_key=capability_key,
-            task_summary=task_summary[:4000],
-            context_scope=context_scope,
-            task_title=capability_key.replace("_", " ").title()[:120],
-            parent_thread_id=scope.thread_id,
-            parent_message_id=scope.parent_message_id,
-            parent_run_id=scope.parent_run_id,
-            delegation_depth=1,
-            routing_tier_override="worker",
-            enforce_compact_contract=True,
-            progress_callback=_bridge,
-        ),
-    )
+    try:
+        result: SubAgentRunResult = await asyncio.to_thread(
+            SubAgentOrchestrator(scope.store).start_run,
+            SubAgentRunRequest(
+                user_id=scope.user_id,
+                parent_surface=scope.parent_surface or "virtual_cso",
+                capability_key=capability_key,
+                task_summary=task_summary[:4000],
+                context_scope=context_scope,
+                task_title=capability_key.replace("_", " ").title()[:120],
+                parent_thread_id=scope.thread_id,
+                parent_message_id=scope.parent_message_id,
+                parent_run_id=scope.parent_run_id,
+                delegation_depth=1,
+                routing_tier_override="worker",
+                enforce_compact_contract=True,
+                progress_callback=_bridge,
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 - record then re-raise; the transport maps this to is_error
+        scope.diagnostics.append(
+            {"stage": "error", "capability_key": capability_key, "error": f"{type(exc).__name__}: {exc}"[:300]}
+        )
+        raise
     logger.info(
         "vcso worker (scoped) completed capability=%s run_id=%s status=%s",
         capability_key,
         getattr(result, "run_id", None),
         getattr(result, "status", None),
+    )
+    scope.diagnostics.append(
+        {
+            "stage": "completed",
+            "capability_key": capability_key,
+            "child_run_id": getattr(result, "run_id", None),
+            "child_status": getattr(result, "status", None),
+        }
     )
     return _compact_result(result)

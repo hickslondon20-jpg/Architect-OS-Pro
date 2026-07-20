@@ -1365,6 +1365,11 @@ async def _run_sdk_turn(
                 parent_run_id=tool_context.metadata.get("parent_run_id"),
                 allowed_capabilities=frozenset(required_agents),
                 store=tool_context.store,
+                # App-owned data scope per worker — the same bindings Path A passes. The model's Task
+                # contract supplies intent only; without these the worker reviews 0 datasets.
+                context_scopes={
+                    key: dict(native_subagent_scopes.get(key) or {}) for key in required_agents
+                },
                 progress_bridge=None,
             )
         )
@@ -1537,6 +1542,13 @@ async def _run_sdk_turn(
         events.put({"event": "token", "data": token_data})
 
     if model_driven_token:
+        # Drain the endpoint's same-process diagnostics BEFORE unregistering. Without this a worker call
+        # that never reached the endpoint looks identical to one that arrived and failed — the ambiguity
+        # that left canary 3 undiagnosable. No `worker_hop` events at all ⇒ the loopback request never
+        # landed; a `received` with no `completed` ⇒ it landed and the execution failed.
+        _hop_scope = TURN_REGISTRY.get(model_driven_token)
+        for entry in list(getattr(_hop_scope, "diagnostics", []) or []):
+            record_lifecycle("worker_hop", **entry)
         # Release the per-turn worker scope. Exception paths are covered by TurnRegistry's stale-eviction
         # backstop; a finally-wrap around the query loop is the clean M4 follow-up.
         TURN_REGISTRY.unregister(model_driven_token)

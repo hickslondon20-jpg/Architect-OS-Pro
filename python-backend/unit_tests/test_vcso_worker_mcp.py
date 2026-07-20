@@ -110,6 +110,47 @@ def test_missing_objective_is_refused():
         _run(run_worker_capability(token, "structured_data_agent", {"objective": "  "}, registry=reg))
 
 
+def test_app_owned_context_scope_overrides_model_authored_contract():
+    """Which data a worker may read is a founder-isolation decision, so it comes from the app's
+    native_subagent_scopes — never from the model-authored Task contract. Running on the contract alone
+    left the worker reviewing 0 datasets (observed live, scripts/probe_worker_hop.py 2026-07-20)."""
+
+    reg = TurnRegistry()
+    token = reg.mint(
+        _scope(context_scopes={"structured_data_agent": {"founder_dataset_ids": ["ds-real"]}})
+    )
+    _run(
+        run_worker_capability(
+            token,
+            "structured_data_agent",
+            {
+                "objective": "bind the dataset",
+                # The model tries to widen its own scope; the app's binding must win.
+                "context_scope": {"founder_dataset_ids": ["ds-model-invented"], "note": "kept"},
+            },
+            registry=reg,
+        )
+    )
+    sent = _Orchestrator.calls[0].context_scope
+    assert sent["founder_dataset_ids"] == ["ds-real"]
+    assert sent["note"] == "kept"  # non-conflicting contract keys survive
+    assert sent["delegation_depth"] == 1
+
+
+def test_diagnostics_record_arrival_and_completion_for_the_loop_to_drain():
+    """No worker_hop events at all means the loopback request never landed; a `received` with no
+    `completed` means it landed and execution failed. Canary 3 could not distinguish these."""
+
+    reg = TurnRegistry()
+    scope = _scope()
+    token = reg.mint(scope)
+    _run(run_worker_capability(token, "structured_data_agent", {"objective": "x"}, registry=reg))
+    stages = [entry["stage"] for entry in scope.diagnostics]
+    assert stages == ["received", "completed"]
+    assert scope.diagnostics[1]["child_status"] == "completed"
+    assert scope.diagnostics[1]["child_run_id"]
+
+
 def test_permitted_call_reuses_orchestrator_contract_and_returns_compact_cited_result():
     reg = TurnRegistry()
     token = reg.mint(_scope())

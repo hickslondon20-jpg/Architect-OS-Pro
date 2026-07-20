@@ -578,6 +578,56 @@ produce a clean `WorkerScopeError` and no row.
 
 Whatever that returns is the last unknown in M2.
 
+---
+
+## Worker-hop end-to-end test · **HOP IS SOUND** — and it found a separate scope bug (v0.6.73)
+
+`scripts/probe_worker_hop.py` runs the **real** app in-process (uvicorn in a thread, so `TURN_REGISTRY` is
+genuinely shared exactly as on Railway), mints a real `TurnScope`, and drives
+`…/internal/mcp/workers/?t=<token>` with a real MCP client and a realistic Task-contract argument set.
+
+| Case | Result |
+|---|---|
+| valid token | `is_error: False`, `status: completed`, child run `8763ac1c…` written and parent-linked |
+| bogus token | `is_error: True`, "No active turn scope for this token", **no row** |
+
+**So the hop is not broken.** Token lift from `?t=`, the ContextVar, scope resolution, founder isolation,
+contract→args mapping, `SubAgentOrchestrator.start_run`, and the child-row write all work against real
+Supabase. Confirmed by query: the only child of the canary-3 parent is this test's row (03:17:48Z), not
+one from the canary itself (02:58Z) — canary 3 genuinely produced none.
+
+That leaves the untested difference as **environmental**: whether the loopback HTTP request actually
+reaches the endpoint inside the Railway container. Nothing local can settle that — hence the diagnostics
+below, which make the next canary answer it directly.
+
+### Bug found by the test: the model was choosing the founder's data scope
+
+The valid-token call returned **"Reviewed 0 dataset(s)"** where the Stage G control reviewed **1**.
+Cause: Path A passes `native_subagent_scopes` (the founder's dataset/thread bindings) into each worker,
+but model-driven built `context_scope` from the **model-authored Task contract**, which carries intent and
+no bindings. So even a perfectly working hop would return "no sources" and produce a useless answer.
+
+This is also a scope-integrity issue, not just a quality one: which data a worker may read is a
+founder-isolation decision and must never be model-authored.
+
+**Fix:** `TurnScope.context_scopes` (app-owned, per capability), populated by the loop from
+`native_subagent_scopes` and merged **over** the contract's `context_scope` in `run_worker_capability`, so
+non-conflicting contract keys survive but app bindings win. Unit-tested, including a case where the model
+tries to widen its own scope and is overridden.
+
+### Diagnostics: canary 3's ambiguity cannot recur
+
+The endpoint runs in a separate request context and cannot reach `record_lifecycle`, which is exactly why
+canary 3 could not tell "the request never arrived" from "it arrived and failed". `TurnScope.diagnostics`
+now records `received` / `completed` / `error` in the same process, and the loop drains it into
+`worker_hop` lifecycle events before unregistering the token. Reading the next canary:
+
+- **no `worker_hop` events** ⇒ the loopback request never landed (environmental — URL/port/reachability);
+- **`received` with no `completed`** ⇒ it landed and execution failed, with the error text recorded;
+- **`received` + `completed`** ⇒ the hop worked and any remaining fault is downstream.
+
+**35 tests pass.** Path A green throughout.
+
 ## Stage I — Re-darken · DONE
 
 `vcso_sdk_loop`: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`,
