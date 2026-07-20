@@ -197,8 +197,12 @@ from services.vcso_sdk_loop import (  # noqa: E402
 )
 
 
-def _compiled(*, allowed_tools, mcp_servers, agent_servers, tools=("Task",), disallowed_tools=()):
-    agents = {key: SimpleNamespace(mcpServers=servers) for key, servers in agent_servers.items()}
+def _compiled(*, allowed_tools, mcp_servers, agent_servers, tools=("Task",), disallowed_tools=(), agent_tools=None):
+    agent_tools = agent_tools or {}
+    agents = {
+        key: SimpleNamespace(mcpServers=servers, tools=list(agent_tools.get(key, [])))
+        for key, servers in agent_servers.items()
+    }
     options = SimpleNamespace(
         tools=list(tools),
         allowed_tools=allowed_tools,
@@ -246,10 +250,13 @@ def test_model_driven_manifest_flags_delegation_tool_not_provisioned():
 
 
 def test_model_driven_manifest_passes_clean_scoped_surface():
+    # FIXED surface: worker handler pre-approved on the lead's allowed_tools, scoped to the per-agent
+    # external server, and NOT present in the lead's `tools` availability list or top-level mcp_servers.
     compiled = _compiled(
-        allowed_tools=["Task"],
+        allowed_tools=["Task", "mcp__vcso_workers__run_structured_data_agent"],
         mcp_servers={"architectos": {"tools": []}},
         agent_servers={"structured_data_agent": [{"vcso_workers": {"type": "http", "url": "http://x/?t=1"}}]},
+        agent_tools={"structured_data_agent": ["mcp__vcso_workers__run_structured_data_agent"]},
     )
     manifest = build_model_driven_manifest(
         compiled, required_agents=("structured_data_agent",), worker_server_name="vcso_workers"
@@ -258,16 +265,45 @@ def test_model_driven_manifest_passes_clean_scoped_surface():
     assert manifest["delegation_model"] == "model_driven"
 
 
-def test_model_driven_manifest_flags_worker_tool_leaked_to_lead():
+def test_model_driven_manifest_flags_worker_handler_not_preapproved():
+    """The v0.6.74 production defect: the worker handler was scoped to the agent but ABSENT from the parent
+    allowed_tools, so under permission_mode="dontAsk" the subagent's CallToolRequest was silently denied —
+    ListTools returned 200 but zero calls reached the worker. The gate must catch this before a canary."""
+
     compiled = _compiled(
-        allowed_tools=["Task", "mcp__vcso_workers__run_structured_data_agent"],
-        mcp_servers={},
+        allowed_tools=["Task"],  # handler NOT pre-approved on the lead
+        mcp_servers={"architectos": {"tools": []}},
         agent_servers={"structured_data_agent": [{"vcso_workers": {"type": "http", "url": "http://x/?t=1"}}]},
+        agent_tools={"structured_data_agent": ["mcp__vcso_workers__run_structured_data_agent"]},
     )
     manifest = build_model_driven_manifest(
         compiled, required_agents=("structured_data_agent",), worker_server_name="vcso_workers"
     )
-    assert any(v.startswith("model_driven_worker_tool_on_lead") for v in manifest["violations"])
+    assert (
+        "worker_handler_not_preapproved:mcp__vcso_workers__run_structured_data_agent"
+        in manifest["violations"]
+    )
+
+
+def test_model_driven_manifest_flags_worker_handler_in_lead_availability():
+    """Isolation lock, real surface: a worker handler in the lead's `tools` AVAILABILITY list would hand the
+    LEAD the handler to call directly, collapsing delegation. Pre-approval in allowed_tools is required and
+    correct; the availability list must carry only the delegation built-in."""
+
+    compiled = _compiled(
+        tools=["Task", "mcp__vcso_workers__run_structured_data_agent"],
+        allowed_tools=["Task", "mcp__vcso_workers__run_structured_data_agent"],
+        mcp_servers={"architectos": {"tools": []}},
+        agent_servers={"structured_data_agent": [{"vcso_workers": {"type": "http", "url": "http://x/?t=1"}}]},
+        agent_tools={"structured_data_agent": ["mcp__vcso_workers__run_structured_data_agent"]},
+    )
+    manifest = build_model_driven_manifest(
+        compiled, required_agents=("structured_data_agent",), worker_server_name="vcso_workers"
+    )
+    assert (
+        "model_driven_worker_tool_in_lead_availability:mcp__vcso_workers__run_structured_data_agent"
+        in manifest["violations"]
+    )
 
 
 def test_model_driven_manifest_flags_worker_server_registered_top_level():

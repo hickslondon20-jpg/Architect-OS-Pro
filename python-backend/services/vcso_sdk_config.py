@@ -126,6 +126,12 @@ def compile_founder_sdk_options(
     agent_tool_grants: dict[str, list[str]] = {}
     agent_model_routes: dict[str, dict[str, str]] = {}
     agent_handler_tools: dict[str, str] = {}
+    # Model-driven only: the exact per-agent worker handler tool names (mcp__vcso_workers__run_<agent>).
+    # These MUST be pre-approved on the lead's `allowed_tools` — under permission_mode="dontAsk" a subagent
+    # MCP tool absent from the PARENT allowed_tools is silently denied (ListTools 200 but zero CallToolRequest
+    # ever reaches the worker server), which was the v0.6.74 production defect. This list is the single source
+    # for both the per-agent AgentDefinition.tools and the lead pre-approval below, so the two cannot drift.
+    model_driven_worker_tools: list[str] = []
     selectable_names = (
         _grantable_names(
             registry,
@@ -142,8 +148,11 @@ def compile_founder_sdk_options(
         handler_tool = native_subagent_tools.get(capability.capability_key)
         handler_name = _native_handler_name(capability.capability_key) if handler_tool is not None else None
         if handler_name and model_driven:
-            # External per-agent worker server: the only construction that hides run_<agent> from the lead.
+            # External per-agent worker server: the worker handler is scoped to this agent (not the lead's
+            # availability list), but the handler tool name is still pre-approved on the lead so the SDK does
+            # not silently deny the subagent's call under dontAsk.
             agent_tools = [f"mcp__{MODEL_DRIVEN_WORKER_SERVER}__{handler_name}"]
+            model_driven_worker_tools.extend(agent_tools)
             agent_mcp_servers: list[Any] | None = [
                 {MODEL_DRIVEN_WORKER_SERVER: {"type": "http", "url": model_driven_worker_server_url}}
             ]
@@ -212,6 +221,11 @@ def compile_founder_sdk_options(
     main_allowed_tools = [_sdk_tool_name(definition) for definition in selected]
     if enable_native_subagents:
         main_allowed_tools.append(DELEGATION_TOOL_PROVISION_NAME)
+    if model_driven:
+        # Pre-approve each provisioned worker handler so the subagent's MCP call is permitted (not silently
+        # denied) under dontAsk. Isolation is preserved on the exposure surface: the worker server stays out
+        # of top-level mcp_servers and the handler names stay out of the lead's `tools` availability list.
+        main_allowed_tools.extend(model_driven_worker_tools)
     options = ClaudeAgentOptions(
         # `tools` PROVISIONS built-in tools. Path A stays `[]` (compose-only: it deliberately wants no
         # tools at all). Model-driven MUST provision the delegation built-in here — putting it only in

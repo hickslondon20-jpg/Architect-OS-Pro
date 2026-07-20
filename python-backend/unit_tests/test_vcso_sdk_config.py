@@ -236,8 +236,10 @@ def test_compiler_enables_task_only_for_lead_and_keeps_worker_recursion_blocked(
 
 
 def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead(monkeypatch):
-    # D2 inversion: worker handlers move OFF the in-process session server onto an EXTERNAL per-agent
-    # server, so the lead's schema carries no run_<agent> tool — it must delegate via Task.
+    # D2: worker handlers move OFF the in-process session server onto an EXTERNAL per-agent server and are
+    # kept out of the lead's `tools` availability list, so the lead must delegate via Task. But each handler
+    # tool name IS pre-approved on the lead's allowed_tools — under permission_mode="dontAsk" a subagent MCP
+    # tool absent from the PARENT allowed_tools is silently denied (the v0.6.74 production defect).
     monkeypatch.setattr(
         "services.vcso_sdk_config.create_sdk_mcp_server",
         lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
@@ -245,10 +247,15 @@ def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead
     url = "http://127.0.0.1:8000/internal/mcp/workers/?t=TESTTOKEN"
     compiled = _compile_for("founder-12", native_subagents=True, model_driven_url=url)
 
-    # Lead sees Task only; no worker handler is pre-approved on the lead.
-    assert compiled.options.allowed_tools == ["Task"]
-    assert not any(str(name).endswith("run_wiki_agent") or str(name).endswith("run_sandbox_agent")
-                   for name in compiled.options.allowed_tools)
+    # Lead pre-approves Task AND every provisioned worker handler tool (required under dontAsk). The handler
+    # names must NOT be provisioned into the lead's `tools` availability list (isolation is on the exposure
+    # surface, checked below).
+    assert compiled.options.allowed_tools[0] == "Task"
+    assert set(compiled.options.allowed_tools[1:]) == {
+        "mcp__vcso_workers__run_wiki_agent",
+        "mcp__vcso_workers__run_sandbox_agent",
+    }
+    assert compiled.options.tools == ["Task"]
 
     # The external worker server is NOT registered top-level (invisible to the lead), and no top-level
     # server exposes a run_<agent> tool.

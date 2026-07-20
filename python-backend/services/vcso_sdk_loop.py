@@ -419,11 +419,14 @@ def model_driven_completed_children(
 def build_model_driven_manifest(
     compiled: Any, *, required_agents: tuple[str, ...], worker_server_name: str
 ) -> dict[str, Any]:
-    """Phase D2 INVERTED runtime manifest (SDK-M2). Path A's `build_native_runtime_manifest` asserts the
-    in-process model (worker handlers pre-approved on the lead + scoped to SDK_INTERNAL_SERVER). Model-
-    driven inverts every one of those: the lead's schema must carry NO run_<agent> tool, the external
-    worker server must NOT be top-level, and each worker agent must scope that external server inline.
-    Any violation must abort before the SDK query so a statically-invalid surface never spends a canary."""
+    """Phase D2 runtime manifest (SDK-M2). Under permission_mode="dontAsk" a subagent's MCP tool is
+    silently denied unless it is pre-approved on the PARENT `allowed_tools` (subagents have no allowedTools
+    field in claude-agent-sdk 0.2.118). So the lead MUST pre-approve every provisioned worker handler tool;
+    the isolation lock lives on the EXPOSURE surface instead — the worker server must NOT be attached
+    top-level and no worker handler may appear in the lead's `tools` availability list — with each worker
+    agent scoping that external server inline. The prior invariant guarded pre-approval (the wrong surface)
+    and was inverted in v0.6.75 (04B-D2-FINDINGS §Defect 6). Any violation must abort before the SDK query
+    so a statically-invalid surface never spends a canary."""
 
     options = compiled.options
     allowed_tools = list(options.allowed_tools or [])
@@ -448,14 +451,35 @@ def build_model_driven_manifest(
     for blocked in sorted(DELEGATION_TOOL_NAMES & set(map(str, disallowed_tools))):
         violations.append(f"model_driven_delegation_tool_disallowed:{blocked}")
 
-    # 1. Lead sees the delegation tool only (plus any non-worker registry tools); no run_<agent> on the lead.
+    # 1. Lead pre-approves Task AND every provisioned worker handler tool. Under permission_mode="dontAsk"
+    #    a subagent MCP tool absent from the PARENT allowed_tools is silently denied — ListTools returns 200
+    #    but zero CallToolRequest ever reaches the worker server. That was the v0.6.74 production defect: the
+    #    old invariant here inverted the lock, flagging worker handlers that appeared in allowed_tools and so
+    #    forbidding the very pre-approval the SDK requires. Isolation is enforced on the exposure surface
+    #    (checks 1b and 2), not on pre-approval (04B-D2-FINDINGS §Defect 6).
+    agents = options.agents or {}
     if DELEGATION_TOOL_PROVISION_NAME not in allowed_tools:
         violations.append("model_driven_lead_task_not_preapproved")
-    for name in allowed_tools:
-        if "__run_" in str(name):
-            violations.append(f"model_driven_worker_tool_on_lead:{name}")
+    for key in required_agents:
+        agent = agents.get(key)
+        if agent is None:
+            continue  # missing-agent is reported by the scoping check (3) below
+        for tool in list(getattr(agent, "tools", None) or []):
+            handler = str(tool)
+            if handler.startswith(f"mcp__{worker_server_name}__") and handler not in allowed_tools:
+                violations.append(f"worker_handler_not_preapproved:{handler}")
 
-    # 2. The external worker server is NOT registered top-level, and no top-level server exposes run_<agent>.
+    # 1b. Isolation lock, real surface #1: no worker handler may appear in the lead's `tools` AVAILABILITY
+    #     list. Pre-approval (above) merely permits the subagent's call; availability would hand the LEAD the
+    #     handler to call directly, collapsing the delegation boundary. The lead's availability list carries
+    #     only the delegation built-in.
+    for name in provisioned_tools:
+        if str(name).startswith(f"mcp__{worker_server_name}__"):
+            violations.append(f"model_driven_worker_tool_in_lead_availability:{name}")
+
+    # 2. Isolation lock, real surface #2: the external worker server is NOT registered top-level, and no
+    #    top-level server exposes run_<agent>. Attaching it top-level would expose every worker handler to
+    #    the lead directly.
     if worker_server_name in top_level_servers:
         violations.append("model_driven_worker_server_top_level")
     for server_name, server in top_level_servers.items():
@@ -466,7 +490,6 @@ def build_model_driven_manifest(
                 violations.append(f"model_driven_worker_tool_top_level:{server_name}.{tool_name}")
 
     # 3. Each required worker agent scopes ONLY the external server inline (never the in-process server name).
-    agents = options.agents or {}
     for key in required_agents:
         agent = agents.get(key)
         servers = list(getattr(agent, "mcpServers", None) or []) if agent is not None else []

@@ -733,16 +733,18 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
     worker_tool = "mcp__vcso_workers__run_structured_data_agent"
 
     async def fake_query(*, options, **_kwargs):
-        # 1. The lead's surface: the delegation tool only, no worker handler anywhere it can see.
-        #    `tools` must PROVISION it — being in allowed_tools alone means the tool does not exist
-        #    (Stage H: the lead then narrates fake delegations until max_turns).
+        # 1. The lead's surface: `tools` (availability) PROVISIONS the delegation tool ONLY — a worker
+        #    handler in `tools` would let the lead call it directly (Stage H narrated fake delegations to
+        #    max_turns when the delegation tool was not provisioned at all). The worker handler IS pre-
+        #    approved in allowed_tools, because under dontAsk a subagent tool absent from the PARENT
+        #    allowed_tools is silently denied (Defect 6). Isolation lives on availability, not permission.
         assert options.tools == ["Task"]
-        assert options.allowed_tools == ["Task"]
+        assert options.allowed_tools == ["Task", worker_tool]
         # BOTH delegation names must be exempted from disallowed_tools. Blocking the runtime name hands
         # the lead a tool it may never call, which stalls the turn to max_turns.
         assert "Agent" not in (options.disallowed_tools or [])
         assert "Task" not in (options.disallowed_tools or [])
-        assert all("__run_" not in tool for tool in options.allowed_tools)
+        assert all("__run_" not in tool for tool in options.tools)
         assert "vcso_workers" not in dict(options.mcp_servers or {})
         agent = options.agents["structured_data_agent"]
         assert agent.tools == [worker_tool]

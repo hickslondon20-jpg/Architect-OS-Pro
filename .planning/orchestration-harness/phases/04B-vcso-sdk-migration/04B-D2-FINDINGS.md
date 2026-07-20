@@ -175,3 +175,33 @@ surface never spends a canary.
 no ability to run the venv/deploy/canary from the sandbox, is precisely the six-versions-burned pattern.
 They are specified for step-by-step build + validation in `04B-D2-M2-BUILD.md`, gated by the cheap
 one-worker probe.
+
+---
+
+## 9. Defect 6 (2026-07-20) — silent `dontAsk` deny of the subagent worker tool (fixed in v0.6.75)
+
+**Symptom.** The 2026-07-20 model-driven canary (parent run `40e39ee8-4262-4d7f-a0fc-19a676798a26`) had the
+lead correctly emit `Task` and the subagent correctly attach the external worker server — the worker's
+`tools/list` (ListTools) returned **200** — yet **zero** `CallToolRequest` ever reached the worker server:
+no child `agent_delegation_runs` row, no worker spend. The subagent's handler call was **silently denied**.
+
+**Root cause.** Under `permission_mode="dontAsk"`, a subagent MCP tool call is denied unless the tool name is
+pre-approved on the **parent's** `allowed_tools`. `AgentDefinition` has no `allowedTools` field in
+claude-agent-sdk `0.2.118` (§2A), so the subagent inherits the lead's permission surface. In model-driven mode
+the lead's `allowed_tools` was `["Task"]` only — the `mcp__vcso_workers__run_<agent>` handler names were never
+pre-approved anywhere — so every subagent worker call was refused before it left the CLI.
+
+**Why the manifest missed it (and made it worse).** Discovery 2 (§8) asserted the invariant *inverted* — it
+guarded **pre-approval**, flagging `model_driven_worker_tool_on_lead` whenever a `__run_` handler appeared in
+the lead's `allowed_tools`. That is the wrong surface: pre-approval is exactly what `dontAsk` **requires**, so
+the old gate actively forbade the fix. The real isolation surface is **availability/attachment**, not
+permission — a handler leaks to the lead only if the worker server is attached top-level or the handler name
+is in the lead's `tools` availability list, neither of which pre-approval touches.
+
+**Fix (v0.6.75).** (a) `vcso_sdk_config.py` now pre-approves every provisioned `mcp__vcso_workers__run_<agent>`
+handler on the lead's `allowed_tools`, derived from the same list that builds the per-agent
+`AgentDefinition.tools` (no drift). (b) `build_model_driven_manifest` is inverted: it flags
+`worker_handler_not_preapproved:<tool>` when a provisioned handler is **absent** from `allowed_tools`, and
+moves the leak-check onto the real exposure surface (worker server attached in top-level `mcp_servers`, or a
+handler name in the lead's `tools` availability list). Isolation is unchanged — the worker server stays
+per-agent-only and the handlers stay out of the lead's availability list; only the permission surface opened.
