@@ -416,6 +416,47 @@ def model_driven_completed_children(
     return {str(row.get("capability_key")) for row in rows if str(row.get("capability_key")) in wanted}
 
 
+def _make_worker_progress_bridge(
+    events: queue.Queue[dict[str, Any] | _WorkerFailure | object],
+    task_capabilities: dict[str, str],
+    step_indexes: dict[str, int],
+) -> Callable[[str, dict[str, Any]], None]:
+    """C2 progress bridge (SDK-M2): turn a model-driven worker's internal progress into user-visible
+    `sub_agent_step` SSE events, instead of a bare delegation spinner.
+
+    The model-driven worker runs OUT of process (external endpoint), so its `progress_callback` fires from
+    the worker request context — a different asyncio task/thread than this turn's SDK thread. `events` is a
+    ``queue.Queue`` (thread-safe across threads), so a direct ``put`` is the CORRECT enqueue mechanism from
+    any thread; ``loop.call_soon_threadsafe`` is NOT needed (that is only for ``asyncio.Queue``). The
+    emitted shape mirrors the model-driven/Path-A ``emit_worker_progress`` verbatim (same event type,
+    ``sdkMode`` marker, and parent linkage), so the existing SSE relay and the frontend need no change.
+    ``parentToolUseId`` is the delegation ``task_id`` for the completing capability, resolved from the live
+    ``task_capabilities`` map (captured by reference, so task_ids added later in the turn are visible)."""
+
+    def bridge_worker_progress(capability_key: str, progress: dict[str, Any]) -> None:
+        # Defensive: a progress hiccup must never fail the worker turn (mirrors worker_mcp._bridge).
+        try:
+            task_id = next(
+                (tid for tid, cap in reversed(list(task_capabilities.items())) if cap == capability_key),
+                "",
+            )
+            events.put(
+                {
+                    "event": "sub_agent_step",
+                    "data": {
+                        **progress,
+                        "parentStepIndex": step_indexes.get(task_id),
+                        "parentToolUseId": task_id,
+                        "sdkMode": True,
+                    },
+                }
+            )
+        except Exception:  # noqa: BLE001 - the surface bridge must never break the worker turn
+            logger.debug("model-driven worker progress bridge enqueue failed; ignored", exc_info=True)
+
+    return bridge_worker_progress
+
+
 def build_model_driven_manifest(
     compiled: Any, *, required_agents: tuple[str, ...], worker_server_name: str
 ) -> dict[str, Any]:
@@ -1393,7 +1434,7 @@ async def _run_sdk_turn(
                 context_scopes={
                     key: dict(native_subagent_scopes.get(key) or {}) for key in required_agents
                 },
-                progress_bridge=None,
+                progress_bridge=_make_worker_progress_bridge(events, task_capabilities, step_indexes),
             )
         )
         model_driven_worker_url = worker_server_url(base_url, model_driven_token)

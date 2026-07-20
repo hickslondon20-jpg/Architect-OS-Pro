@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolResultEnvelope, ToolSourceRef
 from services.vcso_sdk_loop import (
+    _make_worker_progress_bridge,
     _native_synthesis_prompt,
     native_subagent_requirements,
     read_sdk_loop_settings,
@@ -838,3 +839,59 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
     assert len(probes) == 1
     assert probes[0]["agent_id_present"] is True
     assert "objective" not in str(lifecycle_events)
+
+
+# --- Item A (v0.6.78): model-driven worker progress bridge -----------------------------------------
+
+
+def test_worker_progress_bridge_enqueues_shaped_sub_agent_step():
+    """The bridge must turn a model-driven worker's internal progress into a `sub_agent_step` event on the
+    SAME thread-safe `events` queue the SDK loop drains, shaped IDENTICALLY to Path A's emit_worker_progress
+    (event type, sdkMode marker, parent linkage), so no relay/frontend change is needed. `parentToolUseId`
+    resolves to the delegation task_id for that capability from the live task_capabilities map."""
+
+    import queue as _queue
+
+    events: _queue.Queue = _queue.Queue()
+    # The delegation task_id per capability, as pre_task_use records it during the turn.
+    task_capabilities = {"task-abc": "structured_data_agent"}
+    step_indexes = {"task-abc": 7}
+
+    bridge = _make_worker_progress_bridge(events, task_capabilities, step_indexes)
+    bridge("structured_data_agent", {"capabilityKey": "structured_data_agent", "status": "running", "title": "Structured Data Agent"})
+
+    item = events.get_nowait()
+    assert item["event"] == "sub_agent_step"
+    data = item["data"]
+    # Curated progress fields pass through verbatim (no raw payload/CoT — carried by the caller).
+    assert data["capabilityKey"] == "structured_data_agent"
+    assert data["status"] == "running"
+    # App-added parent linkage + mode marker, identical to the existing emitters.
+    assert data["parentToolUseId"] == "task-abc"
+    assert data["parentStepIndex"] == 7
+    assert data["sdkMode"] is True
+
+
+def test_worker_progress_bridge_is_defensive_and_never_raises():
+    """A progress hiccup must never fail the worker turn: an events queue whose put() raises is swallowed."""
+
+    class _BadQueue:
+        def put(self, _item):
+            raise RuntimeError("queue is broken")
+
+    bridge = _make_worker_progress_bridge(_BadQueue(), {}, {})
+    # Must not raise even with an unknown capability (task_id resolves to "") and a failing put.
+    bridge("structured_data_agent", {"status": "running"})
+
+
+def test_model_driven_mint_wires_a_real_progress_bridge_not_none():
+    """Regression lock for the disconnected wire: the model-driven TurnScope must be minted with a callable
+    progress bridge (was `progress_bridge=None`), so worker-internal progress becomes user-visible."""
+
+    import inspect
+
+    from services import vcso_sdk_loop as loop_module
+
+    source = inspect.getsource(loop_module._run_sdk_turn)
+    assert "progress_bridge=None" not in source
+    assert "progress_bridge=_make_worker_progress_bridge(events, task_capabilities, step_indexes)" in source
