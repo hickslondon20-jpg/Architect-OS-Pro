@@ -738,6 +738,10 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
         #    (Stage H: the lead then narrates fake delegations until max_turns).
         assert options.tools == ["Task"]
         assert options.allowed_tools == ["Task"]
+        # BOTH delegation names must be exempted from disallowed_tools. Blocking the runtime name hands
+        # the lead a tool it may never call, which stalls the turn to max_turns.
+        assert "Agent" not in (options.disallowed_tools or [])
+        assert "Task" not in (options.disallowed_tools or [])
         assert all("__run_" not in tool for tool in options.allowed_tools)
         assert "vcso_workers" not in dict(options.mcp_servers or {})
         agent = options.agents["structured_data_agent"]

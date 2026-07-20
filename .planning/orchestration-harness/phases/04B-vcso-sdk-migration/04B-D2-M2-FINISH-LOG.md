@@ -462,6 +462,63 @@ on Railway (per-turn token minting, founder isolation, the DB completion bridge 
 a composed cited answer). The probe deliberately substituted a trivial worker server to isolate CLI
 wiring, so the worker-core half of the path has not been exercised model-driven.
 
+---
+
+## Canary 2 (deployed v0.6.69/v0.6.70) · FAIL — third root cause found, reproduced, fixed (v0.6.71)
+
+Run `9cfd4adf-b062-46a4-a8da-976c0c4f946e`, 2026-07-20 02:16:33Z. Identical signature to Stage H: one lone
+`runtime_manifest decision=model_driven reason_code=none`, no delegation hook, no probe, no child row,
+`Reached maximum number of turns (6)`. The control was deliberately skipped — Path A is byte-identical
+under this change, and the 04:04Z baseline stands.
+
+`v0.6.70` (dd9920e8, the venv sync) was pushed at 13:08Z on 07-19, ~13 hours before the turn, so the
+remediation was live. The v0.6.69 fix was therefore **necessary but not sufficient.**
+
+### Root cause 3 — `DISALLOWED_SDK_BUILTINS` blocks the RUNTIME name
+
+```python
+DISALLOWED_SDK_BUILTINS = [..., "Task", "Agent"]   # blocks BOTH delegation names
+```
+
+Correct for Path A and the flat loop, which must never spawn agents. But v0.6.69's exemption read
+`name == DELEGATION_TOOL_PROVISION_NAME` — it removed only `"Task"`, leaving **`"Agent"` in
+`disallowed_tools`**. So the deployed lead was handed a delegation tool it was explicitly forbidden to
+call: provisioned, permitted, and blocked, all at once. It stalls to `max_turns` exactly as before.
+
+This is also precisely why the local probe passed while production failed: the probe never set
+`disallowed_tools` at all. Closing that gap is what found this.
+
+**Controlled local A/B against the real CLI** (probe now reproduces production's disallowed list):
+
+| Variant | delegation | worker | from subagent | leaked | verdict |
+|---|---|---|---|---|---|
+| **E** deployed v0.6.69 surface (`Agent` still disallowed) | NO | NO | NO | NO | **FAIL** — reproduces the canary |
+| **F** exempt BOTH delegation names | **YES** | **YES** | **YES** | **NO** | **PASS** |
+
+### Fixes (v0.6.71)
+
+1. `vcso_sdk_config.py` — `DELEGATION_TOOL_NAMES = frozenset({provision, runtime})`; the disallowed
+   exemption is now `name in DELEGATION_TOOL_NAMES`. Path A keeps both blocked.
+2. `build_model_driven_manifest` — new violation `model_driven_delegation_tool_disallowed:<name>`, and
+   `lead_disallowed_tools` is recorded. **The manifest had never inspected `disallowed_tools` at all** —
+   the second false-green in a row, and the direct cause of the second wasted canary. Both blind spots
+   (not-provisioned, and disallowed-by-name) are now assertions that abort before spend.
+3. Tests — the integration test asserts neither delegation name is in `disallowed_tools`; a new manifest
+   test reproduces the exact deployed surface and requires rejection. **33 passed**, Path A green.
+4. `main.py` — `/api/health` now returns `commit_sha` / `commit_sha_short` from
+   `RAILWAY_GIT_COMMIT_SHA` (fallbacks for other hosts; `"unknown"` locally). Two canaries were spent on
+   surfaces whose deployed revision could only be inferred indirectly; the runbook's mandatory
+   "deployed head == intended SHA" gate is now directly checkable. Verified locally.
+
+### Pattern worth naming
+
+Three root causes, all the same shape: **a static check that inspected the wrong field.** The manifest
+asserted the lead *could* delegate by reading `allowed_tools`, while the model's ability to delegate
+actually depended on `tools` (provisioning), `disallowed_tools` (prohibition), and the runtime tool name.
+Each canary bought exactly one of them. The manifest now covers all four, and the local probe reproduces
+production's full option surface rather than a convenient subset — which is what turned canary 3's
+diagnosis from a paid guess into a free A/B.
+
 ## Stage I — Re-darken · DONE
 
 `vcso_sdk_loop`: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`,

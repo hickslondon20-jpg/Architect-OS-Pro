@@ -156,15 +156,35 @@ from services.vcso_sdk_loop import (  # noqa: E402
 )
 
 
-def _compiled(*, allowed_tools, mcp_servers, agent_servers, tools=("Task",)):
+def _compiled(*, allowed_tools, mcp_servers, agent_servers, tools=("Task",), disallowed_tools=()):
     agents = {key: SimpleNamespace(mcpServers=servers) for key, servers in agent_servers.items()}
     options = SimpleNamespace(
         tools=list(tools),
         allowed_tools=allowed_tools,
+        disallowed_tools=list(disallowed_tools),
         mcp_servers=mcp_servers,
         agents=agents,
     )
     return SimpleNamespace(options=options)
+
+
+def test_model_driven_manifest_flags_delegation_tool_disallowed_by_runtime_name():
+    """The second canary's cause: v0.6.69 provisioned the delegation tool but exempted only the PROVISION
+    name from DISALLOWED_SDK_BUILTINS, leaving the RUNTIME name ("Agent") blocked. The lead then held a
+    delegation tool it was forbidden to call and stalled to max_turns, while the manifest — which never
+    inspected disallowed_tools — reported the surface clean."""
+
+    compiled = _compiled(
+        tools=["Task"],
+        allowed_tools=["Task"],
+        disallowed_tools=["Bash", "Agent"],  # production's list with only "Task" exempted
+        mcp_servers={"architectos": {"tools": []}},
+        agent_servers={"structured_data_agent": [{"vcso_workers": {"type": "http", "url": "http://x/?t=1"}}]},
+    )
+    manifest = build_model_driven_manifest(
+        compiled, required_agents=("structured_data_agent",), worker_server_name="vcso_workers"
+    )
+    assert "model_driven_delegation_tool_disallowed:Agent" in manifest["violations"]
 
 
 def test_model_driven_manifest_flags_delegation_tool_not_provisioned():

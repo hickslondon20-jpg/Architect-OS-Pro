@@ -78,6 +78,12 @@ class IngestRequest(BaseModel):
 class HealthResponse(BaseModel):
     ok: bool
     service: str
+    # Deployed commit, so "is my fix actually live?" is answerable without guessing. Two canary turns were
+    # spent on surfaces whose deployed revision could only be inferred indirectly; the phase runbook
+    # requires confirming deployed head == intended SHA before every canary, and this is what makes that
+    # check possible. Railway injects RAILWAY_GIT_COMMIT_SHA; "unknown" when running outside Railway.
+    commit_sha: str
+    commit_sha_short: str
 
 
 class ProviderConfigDebugResponse(BaseModel):
@@ -659,9 +665,25 @@ app.mount(WORKER_MCP_MOUNT_PATH, build_worker_asgi_app())
 _worker_mcp_stack: AsyncExitStack | None = None
 
 
+def _deployed_commit_sha() -> str:
+    """Best-effort deployed revision. Railway sets RAILWAY_GIT_COMMIT_SHA on every deploy; the others are
+    fallbacks for other hosts/local runs. Non-secret by nature (it is a public repo revision)."""
+    for name in ("RAILWAY_GIT_COMMIT_SHA", "GIT_COMMIT_SHA", "SOURCE_VERSION", "VERCEL_GIT_COMMIT_SHA"):
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return "unknown"
+
+
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(ok=True, service="architectos-ingestion")
+    sha = _deployed_commit_sha()
+    return HealthResponse(
+        ok=True,
+        service="architectos-ingestion",
+        commit_sha=sha,
+        commit_sha_short=sha[:8] if sha != "unknown" else "unknown",
+    )
 
 
 @app.get(

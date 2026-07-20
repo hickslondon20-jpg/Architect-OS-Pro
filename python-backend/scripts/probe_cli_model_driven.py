@@ -44,7 +44,19 @@ LEAD_PROMPT = (
 USER_PROMPT = "Our client concentration is rising and our margin is compressing. What should I do in the next 90 days?"
 
 
-def build_options(*, strict: bool, worker_top_level: bool, events: list, provision_task: bool = False) -> ClaudeAgentOptions:
+# Production's list — note it disallows BOTH delegation names. Reproducing it locally is what closes the
+# gap between "variant D passes on my machine" and "the canary still fails".
+PROD_DISALLOWED = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Task", "Agent"]
+
+
+def build_options(
+    *,
+    strict: bool,
+    worker_top_level: bool,
+    events: list,
+    provision_task: bool = False,
+    disallowed: list[str] | None = None,
+) -> ClaudeAgentOptions:
     async def pre_tool(input_data, tool_use_id, _ctx):
         events.append(
             {
@@ -69,6 +81,7 @@ def build_options(*, strict: bool, worker_top_level: bool, events: list, provisi
         # never delegate no matter what allowed_tools said.
         tools=["Task"] if provision_task else [],
         allowed_tools=["Task"],
+        disallowed_tools=list(disallowed or []),
         agents={"structured_data_agent": agent},
         mcp_servers=dict(INLINE) if worker_top_level else {},
         strict_mcp_config=strict,
@@ -85,10 +98,21 @@ def build_options(*, strict: bool, worker_top_level: bool, events: list, provisi
     )
 
 
-async def run_variant(label: str, *, strict: bool, worker_top_level: bool, provision_task: bool = False) -> None:
+async def run_variant(
+    label: str,
+    *,
+    strict: bool,
+    worker_top_level: bool,
+    provision_task: bool = False,
+    disallowed: list[str] | None = None,
+) -> None:
     events: list = []
     options = build_options(
-        strict=strict, worker_top_level=worker_top_level, events=events, provision_task=provision_task
+        strict=strict,
+        worker_top_level=worker_top_level,
+        events=events,
+        provision_task=provision_task,
+        disallowed=disallowed,
     )
     error = None
     try:
@@ -117,10 +141,22 @@ async def run_variant(label: str, *, strict: bool, worker_top_level: bool, provi
 async def main() -> None:
     # A reproduces production exactly; B and C each change one thing; D applies the actual fix
     # (provision the Task built-in) while keeping production's strict/hidden-server construction.
-    await run_variant("A production repro", strict=True, worker_top_level=False)
-    await run_variant("B strict off", strict=False, worker_top_level=False)
-    await run_variant("C server also top-level", strict=True, worker_top_level=True)
-    await run_variant("D production + tools=['Task']", strict=True, worker_top_level=False, provision_task=True)
+    # E reproduces the DEPLOYED v0.6.69 surface: tool provisioned, but production's disallowed list still
+    # blocks the runtime name "Agent". F is the candidate fix — exempt BOTH delegation names.
+    await run_variant(
+        "E deployed v0.6.69 (Agent still disallowed)",
+        strict=True,
+        worker_top_level=False,
+        provision_task=True,
+        disallowed=PROD_DISALLOWED,
+    )
+    await run_variant(
+        "F fix: exempt both delegation names",
+        strict=True,
+        worker_top_level=False,
+        provision_task=True,
+        disallowed=[n for n in PROD_DISALLOWED if n not in ("Task", "Agent")],
+    )
 
 
 anyio.run(main)

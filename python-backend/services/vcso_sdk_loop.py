@@ -27,6 +27,7 @@ from claude_agent_sdk.types import StreamEvent
 
 from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
 from services.vcso_sdk_config import (
+    DELEGATION_TOOL_NAMES,
     DELEGATION_TOOL_PROVISION_NAME,
     DELEGATION_TOOL_RUNTIME_NAME,
     MODEL_DRIVEN_WORKER_SERVER,
@@ -438,6 +439,15 @@ def build_model_driven_manifest(
     if DELEGATION_TOOL_PROVISION_NAME not in provisioned_tools:
         violations.append("model_driven_delegation_tool_not_provisioned")
 
+    # 0b. …and must not be forbidden by name. DISALLOWED_SDK_BUILTINS blocks BOTH delegation names (right
+    #     for Path A and the flat loop); model-driven must exempt both. Exempting only the provision name
+    #     leaves the RUNTIME name blocked, so the lead holds a tool it may never call and stalls to
+    #     max_turns — the second false-green this manifest missed, and the cause of the second canary.
+    raw_disallowed = getattr(options, "disallowed_tools", None)
+    disallowed_tools = list(raw_disallowed) if isinstance(raw_disallowed, list) else []
+    for blocked in sorted(DELEGATION_TOOL_NAMES & set(map(str, disallowed_tools))):
+        violations.append(f"model_driven_delegation_tool_disallowed:{blocked}")
+
     # 1. Lead sees the delegation tool only (plus any non-worker registry tools); no run_<agent> on the lead.
     if DELEGATION_TOOL_PROVISION_NAME not in allowed_tools:
         violations.append("model_driven_lead_task_not_preapproved")
@@ -473,6 +483,7 @@ def build_model_driven_manifest(
         "required_agents": list(required_agents),
         "lead_allowed_tools": allowed_tools,
         "lead_provisioned_tools": provisioned_tools,
+        "lead_disallowed_tools": disallowed_tools,
         "top_level_servers": sorted(top_level_servers.keys()),
         "violations": violations,
     }

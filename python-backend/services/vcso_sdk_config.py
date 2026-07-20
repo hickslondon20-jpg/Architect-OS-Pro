@@ -30,6 +30,11 @@ MODEL_DRIVEN_WORKER_SERVER = "vcso_workers"
 # experiment in 04B-D2-M2-FINISH-LOG.md. Re-verify both if the SDK is upgraded.
 DELEGATION_TOOL_PROVISION_NAME = "Task"
 DELEGATION_TOOL_RUNTIME_NAME = "Agent"
+# BOTH names must be exempted from `disallowed_tools` in model-driven mode. DISALLOWED_SDK_BUILTINS below
+# blocks both (correctly, for Path A and the flat loop, which must never spawn agents). Exempting only the
+# provision name leaves the RUNTIME name blocked, so the lead is handed a delegation tool it is forbidden
+# to call and stalls to max_turns — reproduced locally as probe variant E, fixed as variant F.
+DELEGATION_TOOL_NAMES = frozenset({DELEGATION_TOOL_PROVISION_NAME, DELEGATION_TOOL_RUNTIME_NAME})
 CLAUDE_PROVIDER = "anthropic"
 DISALLOWED_SDK_BUILTINS = [
     "Bash",
@@ -202,7 +207,7 @@ def compile_founder_sdk_options(
     main_disallowed_tools = [
         name
         for name in DISALLOWED_SDK_BUILTINS
-        if not (enable_native_subagents and name == DELEGATION_TOOL_PROVISION_NAME)
+        if not (enable_native_subagents and name in DELEGATION_TOOL_NAMES)
     ]
     main_allowed_tools = [_sdk_tool_name(definition) for definition in selected]
     if enable_native_subagents:
