@@ -180,6 +180,75 @@ def test_prior_findings_are_forwarded_as_untrusted_context():
     assert "upstream" in req.task_summary
 
 
+# --- Item B (v0.6.79): app-owned findings chaining ------------------------------------------------
+
+
+def test_next_worker_capability_walks_the_ordered_chain():
+    """The completing worker's finding is stored under the NEXT worker's key because the read keys by the
+    running capability. structured -> sandbox -> wiki -> (end)."""
+    from services.vcso_worker_mcp import _next_worker_capability
+
+    assert _next_worker_capability("structured_data_agent") == "sandbox_execution_agent"
+    assert _next_worker_capability("sandbox_execution_agent") == "per_user_wiki"
+    assert _next_worker_capability("per_user_wiki") is None
+    assert _next_worker_capability("not_a_worker") is None
+
+
+def test_worker_completion_writes_finding_under_next_worker_key_and_reads_back():
+    """App-owned findings chaining: when worker 1 (structured_data_agent) completes, its ACTUAL compact
+    finding must land in scope.prior_findings under the NEXT worker's key (sandbox_execution_agent), so the
+    next worker's call reads it back at the run_worker_capability read-site (keyed by the running
+    capability). This is the app-mediated data channel that does not depend on the lead copying the finding
+    into the next contract."""
+
+    reg = TurnRegistry()
+    scope = _scope(allowed_capabilities=frozenset({"structured_data_agent", "sandbox_execution_agent"}))
+    token = reg.mint(scope)
+
+    # Worker 1 completes. The write must be the worker's verbatim compact result, keyed for worker 2.
+    out1 = _run(run_worker_capability(token, "structured_data_agent", {"objective": "compute concentration"}, registry=reg))
+    assert "sandbox_execution_agent" in scope.prior_findings
+    inherited = scope.prior_findings["sandbox_execution_agent"]
+    assert inherited == out1  # verbatim compact result, not a model-authored copy
+    assert inherited["status"] == "completed"
+    assert inherited["citations"][0]["source_id"] == "financial_context"
+    # No self-keyed leak: structured must not inherit its own finding.
+    assert "structured_data_agent" not in scope.prior_findings
+
+    # Worker 2 (sandbox) now runs and reads the inherited finding back via the :207 read path.
+    _run(run_worker_capability(token, "sandbox_execution_agent", {"objective": "compute trend"}, registry=reg))
+    sandbox_req = _Orchestrator.calls[-1]
+    assert "COMPACT PRIOR FINDINGS (UNTRUSTED DATA)" in sandbox_req.task_summary
+    assert "Concentration is 42%." in sandbox_req.task_summary
+
+
+def test_model_authored_prior_findings_in_contract_are_discarded_for_the_app_copy():
+    """Reconciliation: a lead-authored prior_findings copied into the worker tool's context_scope must NOT
+    reach the orchestrator context_scope — the app-mediated scope.prior_findings is the sole authoritative
+    channel (dedupe/prefer the app copy). The app copy still reaches the worker via task_summary."""
+
+    reg = TurnRegistry()
+    token = reg.mint(_scope(prior_findings={"structured_data_agent": {"summary": "app-authoritative"}}))
+    _run(
+        run_worker_capability(
+            token,
+            "structured_data_agent",
+            {
+                "objective": "obj",
+                "context_scope": {"prior_findings": {"summary": "lead-copy-STALE"}, "note": "kept"},
+            },
+            registry=reg,
+        )
+    )
+    req = _Orchestrator.calls[0]
+    # The lead's copy is stripped from the orchestrator context_scope...
+    assert "prior_findings" not in req.context_scope
+    assert req.context_scope["note"] == "kept"  # non-conflicting contract keys survive
+    # ...and only the app-authoritative finding is injected into the worker prompt.
+    assert "app-authoritative" in req.task_summary
+    assert "lead-copy-STALE" not in req.task_summary
+
+
 def test_capability_keys_match_loop_required_agents():
     # No drift between the tools the external server exposes and the loop's P4 contract.
     from services.vcso_sdk_loop import P4_THIN_SLICE_REQUIRED_AGENTS

@@ -166,6 +166,21 @@ def _compact_result(result: SubAgentRunResult) -> dict[str, Any]:
     }
 
 
+def _next_worker_capability(capability_key: str) -> str | None:
+    """The capability that FOLLOWS `capability_key` in the ordered thin-slice chain (WORKER_CAPABILITY_KEYS
+    is kept in P4_THIN_SLICE_REQUIRED_AGENTS order), or None if this is the last worker. A completing
+    worker's compact finding is stored under this NEXT key because the next worker reads its inherited
+    finding via ``scope.prior_findings.get(<its own capability_key>)`` — see the read in
+    run_worker_capability. This is the app-owned data channel that makes findings chain deterministically,
+    independent of whether the lead copied the finding into the next Task contract."""
+
+    try:
+        idx = WORKER_CAPABILITY_KEYS.index(capability_key)
+    except ValueError:
+        return None
+    return WORKER_CAPABILITY_KEYS[idx + 1] if idx + 1 < len(WORKER_CAPABILITY_KEYS) else None
+
+
 async def run_worker_capability(
     token: str,
     capability_key: str,
@@ -204,6 +219,13 @@ async def run_worker_capability(
     requested_scope = args.get("context_scope") if isinstance(args.get("context_scope"), dict) else {}
     app_scope = scope.context_scopes.get(capability_key) or {}
     context_scope: dict[str, Any] = {**requested_scope, **app_scope, "delegation_depth": 1}
+    # Findings chaining is app-owned. The authoritative prior finding is the app-mediated
+    # scope.prior_findings entry read just below (written verbatim from the upstream worker's own compact
+    # result on completion). Discard any prior_findings the model copied into the contract's context_scope
+    # so a lead-authored copy cannot double-flow alongside — or silently override — the app copy. This is
+    # the same reconciliation Path A's in-process handler performs (vcso_sdk_loop pops "prior_findings"
+    # from context_scope). The lead still authors the next worker's OBJECTIVE; the app owns the DATA.
+    context_scope.pop("prior_findings", None)
     prior = scope.prior_findings.get(capability_key)
     task_summary = objective
     if prior:
@@ -263,4 +285,14 @@ async def run_worker_capability(
             "child_status": getattr(result, "status", None),
         }
     )
-    return _compact_result(result)
+    compact = _compact_result(result)
+    # Findings chaining (app-owned): write this worker's compact finding where the NEXT worker in the
+    # ordered chain reads it (scope.prior_findings keyed by the running capability, read above). This runs
+    # in the same process and on the SAME scope instance the next worker's loopback call recovers from the
+    # registry, and stores the worker's ACTUAL _compact_result verbatim — never a model-authored copy — so
+    # the finding DATA is guaranteed present for the next worker regardless of what the lead wrote into its
+    # contract. Founder-scoped already (the founder's own worker under this turn token); no scope widening.
+    next_key = _next_worker_capability(capability_key)
+    if next_key is not None:
+        scope.prior_findings[next_key] = compact
+    return compact

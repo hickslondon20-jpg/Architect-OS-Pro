@@ -895,3 +895,137 @@ def test_model_driven_mint_wires_a_real_progress_bridge_not_none():
     source = inspect.getsource(loop_module._run_sdk_turn)
     assert "progress_bridge=None" not in source
     assert "progress_bridge=_make_worker_progress_bridge(events, task_capabilities, step_indexes)" in source
+
+
+# --- Item B (v0.6.79): lead-mediated non-empty guard is preserved as defense-in-depth ---------------
+
+
+def test_sandbox_delegation_guard_still_fires_alongside_app_owned_findings_channel(monkeypatch):
+    """Item B keeps the pre_task_use guard (loop:731-733) as defense-in-depth even though the app-mediated
+    prior_findings channel now carries the authoritative data. The guard must still DENY a sandbox
+    delegation that (a) precedes structured_data_agent completion, or (b) omits prior_findings from the
+    lead's contract — and ALLOW one that satisfies both. This drives the real nested pre_task_use hook off
+    the compiled options, so it proves behavior, not just source presence."""
+
+    _capture_sdk_tools(monkeypatch)
+    required = ("structured_data_agent", "sandbox_execution_agent")
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+
+    class _TwoWorkerClient:
+        def table(self, name: str):
+            if name == "agent_delegation_runs":
+                return _FlagQuery(
+                    rows=[
+                        {"capability_key": "structured_data_agent", "status": "completed"},
+                        {"capability_key": "sandbox_execution_agent", "status": "completed"},
+                    ]
+                )
+            return _FlagQuery(error=RuntimeError("not required by this unit test"))
+
+    class _TwoWorkerStore(_NativeStore):
+        client = _TwoWorkerClient()
+
+    class _UnusedOrchestrator:
+        def __init__(self, _store):
+            pass
+
+        def start_run(self, _request):  # pragma: no cover - model-driven never runs workers in process
+            raise AssertionError("Model-driven delegation must not run app-owned workers in process.")
+
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _UnusedOrchestrator)
+
+    def _contract(context_scope):
+        return json.dumps(
+            {
+                "objective": "Compute the concentration and margin trend.",
+                "output_format": "compact_json",
+                "tools_sources": ["founder_dataset"],
+                "boundaries": ["founder isolation", "citations required"],
+                "context_scope": context_scope,
+            }
+        )
+
+    decisions = {}
+
+    async def fake_query(*, options, **_kwargs):
+        pre_task = options.hooks["PreToolUse"][0].hooks[0]
+        post = options.hooks["PostToolUse"][0].hooks[0]
+
+        async def _delegate(subagent_type, task_id, context_scope):
+            return await pre_task(
+                {
+                    "tool_name": "Agent",
+                    "tool_input": {"subagent_type": subagent_type, "prompt": _contract(context_scope)},
+                    "agent_id": None,
+                },
+                task_id,
+                None,
+            )
+
+        # (a) sandbox BEFORE structured completes -> deny on the ordering clause.
+        decisions["early"] = await _delegate(
+            "sandbox_execution_agent", "task-early", {"prior_findings": {"summary": "x"}}
+        )
+        # structured delegates and completes (DB completion bridge marks it done).
+        decisions["structured"] = await _delegate(
+            "structured_data_agent", "task-structured", {"founder_dataset_ids": ["dataset-1"]}
+        )
+        await post({"tool_name": "Agent"}, "task-structured", None)
+        # (b) sandbox WITHOUT prior_findings, structured now complete -> deny on the inherit clause (guard).
+        decisions["no_prior"] = await _delegate("sandbox_execution_agent", "task-bad", {})
+        # (c) sandbox WITH prior_findings -> allow, then complete it so the turn's post-query invariant
+        #     (all required workers accounted for) is satisfied and the turn composes normally.
+        decisions["ok"] = await _delegate(
+            "sandbox_execution_agent", "task-ok", {"prior_findings": {"summary": "concentration 42%"}}
+        )
+        await post({"tool_name": "Agent"}, "task-ok", None)
+
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-guard",
+            result="Guard verified.",
+        )
+
+    _consume(
+        stream_vcso_sdk_turn(
+            prompt="P4 thin-slice prompt",
+            system_prompt="System\n\nRules remain bounded.",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=_TwoWorkerStore(),
+                thread_id="thread-1",
+                metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+            ),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=required,
+            native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
+            native_model_driven=True,
+            query_impl=fake_query,
+        )
+    )
+
+    def _decision(key):
+        return decisions[key]["hookSpecificOutput"]["permissionDecision"]
+
+    def _reason(key):
+        return decisions[key]["hookSpecificOutput"]["permissionDecisionReason"]
+
+    assert _decision("early") == "deny"
+    assert "structured_data_agent to completion" in _reason("early")
+    assert _decision("structured") == "allow"
+    assert _decision("no_prior") == "deny"
+    assert "inherit the compact structured-data finding" in _reason("no_prior")
+    assert _decision("ok") == "allow"

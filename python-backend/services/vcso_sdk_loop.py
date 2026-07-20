@@ -1429,8 +1429,11 @@ async def _run_sdk_turn(
                 parent_run_id=tool_context.metadata.get("parent_run_id"),
                 allowed_capabilities=frozenset(required_agents),
                 store=tool_context.store,
-                # App-owned data scope per worker — the same bindings Path A passes. The model's Task
-                # contract supplies intent only; without these the worker reviews 0 datasets.
+                # App-owned findings channel: start empty; run_worker_capability writes each completing
+                # worker's compact finding under the NEXT worker's key during the turn, and the next
+                # worker's loopback call reads it back off THIS same scope instance (recovered from
+                # TURN_REGISTRY). Explicit here so the intent — the loop bridge populates it — is visible.
+                prior_findings={},
                 context_scopes={
                     key: dict(native_subagent_scopes.get(key) or {}) for key in required_agents
                 },
