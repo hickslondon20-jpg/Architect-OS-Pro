@@ -249,6 +249,100 @@ def test_model_authored_prior_findings_in_contract_are_discarded_for_the_app_cop
     assert "lead-copy-STALE" not in req.task_summary
 
 
+# --- Item 1 (v0.6.84): duplicate dispatch idempotency (defect #4) ---------------------------------
+
+
+def test_resent_tools_call_does_not_start_a_second_run():
+    """Canary 8's wart: the CLI re-sent the same `tools/call` and a SECOND `start_run` fired
+    (`per_user_wiki` children 76e36f48… and db140287… both completed). A re-send must now replay the first
+    run's compact result, so exactly one worker is ever started per (token, capability_key)."""
+
+    reg = TurnRegistry()
+    scope = _scope()
+    token = reg.mint(scope)
+
+    first = _run(run_worker_capability(token, "structured_data_agent", {"objective": "compute concentration"}, registry=reg))
+    second = _run(run_worker_capability(token, "structured_data_agent", {"objective": "compute concentration"}, registry=reg))
+
+    assert len(_Orchestrator.calls) == 1  # the whole point: one start_run, not two
+    assert second == first
+    assert second is not first  # a copy, so the lead cannot corrupt the cached finding
+    stages = [entry["stage"] for entry in scope.diagnostics]
+    assert stages == ["received", "completed", "received", "deduped"]
+    assert scope.diagnostics[-1]["same_objective"] is True
+
+
+def test_concurrent_duplicate_dispatch_is_coalesced_not_raced():
+    """A duplicate that lands while the first dispatch is still in flight must WAIT on the dispatch lock and
+    then read the cache — otherwise the cache-only check would miss it and both would run (which is exactly
+    the timing a re-sent tools/call after a slow worker produces)."""
+
+    async def _both():
+        reg = TurnRegistry()
+        token = reg.mint(_scope())
+        return await asyncio.gather(
+            run_worker_capability(token, "structured_data_agent", {"objective": "obj"}, registry=reg),
+            run_worker_capability(token, "structured_data_agent", {"objective": "obj"}, registry=reg),
+        )
+
+    out_a, out_b = _run(_both())
+    assert len(_Orchestrator.calls) == 1
+    assert out_a == out_b
+
+
+def test_dedupe_is_scoped_per_capability_and_per_token():
+    """The dedupe key is (token, capability_key): a different capability under the same turn still runs, and
+    a different turn's token runs its own worker. Coalescing must never suppress real work."""
+
+    reg = TurnRegistry()
+    token = reg.mint(_scope(allowed_capabilities=frozenset({"structured_data_agent", "per_user_wiki"})))
+    _run(run_worker_capability(token, "structured_data_agent", {"objective": "a"}, registry=reg))
+    _run(run_worker_capability(token, "per_user_wiki", {"objective": "b"}, registry=reg))
+    assert len(_Orchestrator.calls) == 2
+
+    other_token = reg.mint(_scope())
+    _run(run_worker_capability(other_token, "structured_data_agent", {"objective": "a"}, registry=reg))
+    assert len(_Orchestrator.calls) == 3
+
+
+def test_failed_dispatch_is_not_cached_so_a_real_retry_still_runs(monkeypatch):
+    """Only successful completions are cached. A worker that raised must be retryable — the dedupe exists to
+    suppress waste, never to suppress recovery."""
+
+    reg = TurnRegistry()
+    scope = _scope()
+    token = reg.mint(scope)
+
+    class _Failing(_Orchestrator):
+        def start_run(self, request):
+            _Orchestrator.calls.append(request)
+            raise RuntimeError("worker blew up")
+
+    monkeypatch.setattr(core, "SubAgentOrchestrator", _Failing)
+    with pytest.raises(RuntimeError):
+        _run(run_worker_capability(token, "structured_data_agent", {"objective": "x"}, registry=reg))
+    assert "structured_data_agent" not in scope.completed_results
+
+    monkeypatch.setattr(core, "SubAgentOrchestrator", _Orchestrator)
+    out = _run(run_worker_capability(token, "structured_data_agent", {"objective": "x"}, registry=reg))
+    assert out["status"] == "completed"
+    assert len(_Orchestrator.calls) == 2  # the failure attempt + the real retry
+
+
+def test_dedupe_does_not_double_write_the_chained_finding():
+    """Findings chaining is app-owned and written once on completion. A replay must not re-run the write
+    path (and must not clobber a downstream worker's inherited finding with a stale copy)."""
+
+    reg = TurnRegistry()
+    scope = _scope(allowed_capabilities=frozenset({"structured_data_agent", "sandbox_execution_agent"}))
+    token = reg.mint(scope)
+
+    _run(run_worker_capability(token, "structured_data_agent", {"objective": "compute"}, registry=reg))
+    inherited = scope.prior_findings["sandbox_execution_agent"]
+    _run(run_worker_capability(token, "structured_data_agent", {"objective": "compute"}, registry=reg))
+    assert scope.prior_findings["sandbox_execution_agent"] is inherited
+
+
 def test_capability_keys_match_loop_required_agents():
     # No drift between the tools the external server exposes and the loop's P4 contract.
     from services.vcso_sdk_loop import P4_THIN_SLICE_REQUIRED_AGENTS

@@ -97,7 +97,28 @@ class TurnScope:
     # Optional bridge back into the live turn for the C2 nested-UI + citations surface. Signature mirrors
     # the in-process emit_worker_progress. None during the bare visibility probe (surface hold is M4).
     progress_bridge: Callable[[str, dict[str, Any]], None] | None = None
+    # --- Dispatch idempotency (defect #4, v0.6.84) -------------------------------------------------
+    # The compact result of each capability that has already COMPLETED under this token. A re-sent
+    # `tools/call` for the same (token, capability_key) replays this instead of starting a second
+    # `start_run`. Only successful completions are cached: a failed attempt leaves no entry, so a genuine
+    # retry after a failure still runs.
+    completed_results: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # The objective the FIRST accepted dispatch of each capability ran with, kept only so a replay whose
+    # objective differs is visible in the logs rather than silently swallowed.
+    dispatched_objectives: dict[str, str] = field(default_factory=dict)
+    # One asyncio.Lock per capability. A duplicate that arrives while the first dispatch is still in
+    # flight waits here and then reads the cache, so the coalesce holds for the concurrent case too — not
+    # just the after-the-fact case. Lazily built (see `dispatch_lock_for`); py>=3.10 Locks bind no loop at
+    # construction, and the loopback endpoint and the turn share this process's single event loop.
+    dispatch_locks: dict[str, asyncio.Lock] = field(default_factory=dict)
     created_at: float = field(default_factory=time.monotonic)
+
+    def dispatch_lock_for(self, capability_key: str) -> asyncio.Lock:
+        lock = self.dispatch_locks.get(capability_key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self.dispatch_locks[capability_key] = lock
+        return lock
 
 
 class TurnRegistry:
@@ -214,6 +235,42 @@ async def run_worker_capability(
     if not objective:
         raise WorkerScopeError("Missing task objective.")
 
+    # Dispatch idempotency (defect #4). Canary 8 dispatched `per_user_wiki` twice: the CLI re-sent the
+    # same `tools/call`, and because every call ran unconditionally that started a SECOND `start_run`.
+    # Both children completed and the answer was unaffected, but the founder paid for a duplicate worker.
+    # Coalescing on (token, capability_key) makes the dispatch idempotent for the whole life of the turn
+    # scope: the lock serialises a duplicate that lands mid-flight, and the completed-result cache answers
+    # both it and any later re-send with the FIRST run's compact result. See `completed_results`.
+    async with scope.dispatch_lock_for(capability_key):
+        cached = scope.completed_results.get(capability_key)
+        if cached is not None:
+            first_objective = scope.dispatched_objectives.get(capability_key, "")
+            logger.info(
+                "vcso worker dispatch deduped capability=%s run_id=%s (objective %s)",
+                capability_key,
+                cached.get("run_id"),
+                "identical" if objective == first_objective else "DIFFERS from the first dispatch",
+            )
+            scope.diagnostics.append(
+                {
+                    "stage": "deduped",
+                    "capability_key": capability_key,
+                    "child_run_id": cached.get("run_id"),
+                    "same_objective": objective == first_objective,
+                }
+            )
+            # A copy, so the lead mutating its tool result cannot corrupt the cached finding.
+            return dict(cached)
+        scope.dispatched_objectives[capability_key] = objective
+        return await _dispatch_worker_capability(scope, capability_key, objective, args)
+
+
+async def _dispatch_worker_capability(
+    scope: TurnScope, capability_key: str, objective: str, args: dict[str, Any]
+) -> dict[str, Any]:
+    """Run one worker for real. Called only by `run_worker_capability`, and only once per
+    (token, capability_key) that reaches completion — it holds that capability's dispatch lock."""
+
     # App-owned bindings win over anything the model wrote into the contract: the contract may express
     # intent, but the founder's dataset/thread scope is not the model's to choose.
     requested_scope = args.get("context_scope") if isinstance(args.get("context_scope"), dict) else {}
@@ -295,4 +352,7 @@ async def run_worker_capability(
     next_key = _next_worker_capability(capability_key)
     if next_key is not None:
         scope.prior_findings[next_key] = compact
+    # Cache LAST, and only on success: a raised dispatch leaves no entry, so a genuine retry after a
+    # failure still runs a real worker (the dedupe suppresses waste, never recovery).
+    scope.completed_results[capability_key] = compact
     return compact
