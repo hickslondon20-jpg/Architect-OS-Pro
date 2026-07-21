@@ -22,7 +22,7 @@ import pytest
 
 # ── Fake source-row fixture ───────────────────────────────────────────────────
 # Used to give compile_page ≥1 source so it emits ≥1 claim.
-# Matches the shape returned by WikiCompilationService._load_sources().
+# One row of the shape WikiCompilationService._load_sources() puts in its "primary" bucket.
 
 FAKE_SOURCE_ROW = {
     "table": "ae_assessments",
@@ -97,7 +97,13 @@ class TestStep1Compile:
             "embed_query": lambda self, q: _fake_embed(q),
         }
 
-        with patch.object(type(svc), "_load_sources", return_value=[FAKE_SOURCE_ROW]):
+        # `_load_sources` returns {"primary": [...], "supporting": [...]} (wiki_compilation.py:~800). The
+        # patch used to return a bare list, which the service then indexed by string key — a TypeError that
+        # failed step 1 and cascaded through every downstream step. It went unnoticed because the store
+        # fixture was skipping the whole suite on an env-name mismatch (see conftest).
+        with patch.object(
+            type(svc), "_load_sources", return_value={"primary": [FAKE_SOURCE_ROW], "supporting": []}
+        ):
             if openai_available:
                 result = svc.compile_page(test_user_id, "diagnostic_synthesis")
             else:
@@ -1220,12 +1226,90 @@ class TestDeferredLiveItems:
         assert before == after, \
             "DI-07: compiled base must be byte-identical before and after run_consolidation"
 
-    @pytest.mark.skip(reason=(
-        "DI-EMBED: Real text-embedding-3-small quality check — OPEN ITEM. "
-        "OpenAI quota was exhausted during sub-phase 04 live smoke. The compile path "
-        "(compile_page → store → vector index → wiki_search) is proven structurally. "
-        "Semantic ranking quality is unvalidated until quota is restored. "
-        "Re-run this test with openai_available=True to clear this item."
-    ))
-    def test_di_embed_real_embeddings_semantic_ranking(self, store, test_user_id):
-        pass  # See skip reason — not faked, explicitly flagged open.
+    def test_di_embed_real_embeddings_semantic_ranking(self, store, test_user_id, openai_available):
+        """DI-EMBED (closed 2026-07-21, 04B-D2 Tier 3): real text-embedding-3-small ranking quality.
+
+        Was skipped from sub-phase 04 live smoke because OpenAI quota was exhausted — the compile path
+        (compile_page → store → vector index → wiki_search) was proven structurally, but nothing had ever
+        confirmed the vectors actually rank by MEANING. The hash-seeded `_fake_embed` used elsewhere in this
+        file cannot answer that: it produces unit-random vectors, so a fake-embedding run would rank these
+        three claims arbitrarily and pass or fail by luck.
+
+        So: write three claims about clearly different parts of the business through the real writeback
+        path (which embeds with the production client), then ask two queries that share almost no words
+        with their target claim and require the semantically-right claim to win each time, by a margin.
+        Word overlap would not carry these — only real embeddings do.
+        """
+
+        if not openai_available:
+            pytest.skip(
+                "DI-EMBED: OPEN ITEM — requires live OpenAI embeddings. Never faked: a hash-seeded "
+                "vector ranks by noise, so a faked pass would assert nothing. Restore OPENAI_API_KEY "
+                "quota and re-run."
+            )
+
+        from services.wiki_read import WikiReadService
+        from services.wiki_writeback import WikiWritebackService
+
+        wb = WikiWritebackService(store)
+
+        def _evidence(source_id: str) -> list[dict[str, Any]]:
+            return [{
+                "source_id": source_id, "source_kind": "tier0_record", "path": f"ae/{source_id}",
+                "lines": None, "weight": 1.0, "note": "DI-EMBED fixture",
+            }]
+
+        concentration = (
+            "Client concentration risk is high: the agency's top two accounts together make up 41% of "
+            "total revenue for the year."
+        )
+        hiring = (
+            "The team cannot staff design work fast enough; two senior designer roles have stayed open "
+            "for five months and delivery is slipping."
+        )
+        premises = (
+            "The agency's office lease renews in March and the landlord has proposed a 12% increase on "
+            "the current rent."
+        )
+        proposed = {}
+        for label, text, source_id in (
+            ("concentration", concentration, "di-embed-conc"),
+            ("hiring", hiring, "di-embed-hiring"),
+            ("premises", premises, "di-embed-lease"),
+        ):
+            res = wb.propose_insight_claim(
+                test_user_id, "business_context", text, _evidence(source_id), "medium", actor="domain_agent"
+            )
+            assert res.claim_id, f"DI-EMBED fixture claim '{label}' was rejected: {res.rejection_reasons}"
+            proposed[label] = res.claim_id
+
+        reader = WikiReadService(store)
+
+        def _scores(query: str) -> dict[str, float]:
+            findings = reader.search(test_user_id, query, page_key="business_context").get("findings") or []
+            by_claim_id = {
+                str((item.get("claim") or {}).get("id")): float((item.get("ranking") or {}).get("vector_similarity") or 0.0)
+                for item in findings
+            }
+            missing = [label for label, cid in proposed.items() if cid not in by_claim_id]
+            assert not missing, f"DI-EMBED: claims absent from search results for '{query}': {missing}"
+            return {label: by_claim_id[cid] for label, cid in proposed.items()}
+
+        # Query 1 — about revenue dependence. Shares no content word with the concentration claim
+        # ("depend", "handful", "customers" appear in none of the three), so only meaning can rank it.
+        revenue_scores = _scores("how much do we depend on a handful of big customers?")
+        assert revenue_scores["concentration"] == max(revenue_scores.values()), (
+            f"DI-EMBED: revenue-dependence query did not rank the concentration claim first: {revenue_scores}"
+        )
+        assert revenue_scores["concentration"] - max(
+            revenue_scores["hiring"], revenue_scores["premises"]
+        ) >= 0.05, f"DI-EMBED: concentration claim won only by noise: {revenue_scores}"
+
+        # Query 2 — about recruiting. A different target claim, so a single lucky ordering cannot pass both.
+        staffing_scores = _scores("we are struggling to recruit creative people")
+        assert staffing_scores["hiring"] == max(staffing_scores.values()), (
+            f"DI-EMBED: recruiting query did not rank the hiring claim first: {staffing_scores}"
+        )
+        assert staffing_scores["hiring"] - max(
+            staffing_scores["concentration"], staffing_scores["premises"]
+        ) >= 0.05, f"DI-EMBED: hiring claim won only by noise: {staffing_scores}"

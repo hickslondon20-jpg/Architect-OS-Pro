@@ -26,15 +26,26 @@ if _env_file.exists():
         from dotenv import dotenv_values
         _vals = dotenv_values(str(_env_file))
 
+        # Try the backend's own names FIRST, then the historical aliases. .env.local carries
+        # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY directly; reading only the aliases meant the
+        # service-role key was never found, the `store` fixture skipped, and the whole live suite
+        # (including the DI-EMBED semantic-ranking check) silently reported green-by-skip.
         if not os.environ.get("SUPABASE_URL"):
-            os.environ["SUPABASE_URL"] = _vals.get("VITE_SUPABASE_URL") or ""
+            for _k in ("SUPABASE_URL", "VITE_SUPABASE_URL"):
+                _v = _vals.get(_k)
+                if _v:
+                    os.environ["SUPABASE_URL"] = _v
+                    break
 
         if not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
-            for _k in ("service_role", "SUPABASE_SERVICE_KEY"):
+            for _k in ("SUPABASE_SERVICE_ROLE_KEY", "service_role", "SUPABASE_SERVICE_KEY"):
                 _v = _vals.get(_k)
                 if _v:
                     os.environ["SUPABASE_SERVICE_ROLE_KEY"] = _v
                     break
+
+        if not os.environ.get("OPENAI_EMBEDDING_MODEL") and _vals.get("OPENAI_EMBEDDING_MODEL"):
+            os.environ["OPENAI_EMBEDDING_MODEL"] = _vals["OPENAI_EMBEDDING_MODEL"]
 
         if not os.environ.get("OPENAI_API_KEY"):
             os.environ["OPENAI_API_KEY"] = _vals.get("OPENAI_API_KEY") or ""
