@@ -663,12 +663,20 @@ async def _run_sdk_turn(
             "reason_code",
             "child_run_id",
             "child_status",
+            # `stage` carries the whole meaning of a worker_hop entry (received / completed / deduped /
+            # fault_injected). Omitting it made canary 9-retry's dedupe readable only as an ABSENCE — a
+            # worker_hop with a child_run_id and no child_status — and would have made canary 10's
+            # fault_injected marker indistinguishable from a normal arrival. Bounded enum-ish string;
+            # no prompt, tool input, or model output passes through here.
+            "stage",
         ):
             value = details.get(key)
             if value not in (None, ""):
                 safe[key] = str(value)[:200]
         if "agent_id_present" in details:
             safe["agent_id_present"] = bool(details["agent_id_present"])
+        if "same_objective" in details:
+            safe["same_objective"] = bool(details["same_objective"])
         if "delegated" in details:
             safe["delegated"] = bool(details["delegated"])
         try:

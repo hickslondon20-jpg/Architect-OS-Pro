@@ -844,3 +844,62 @@ identical.
    zero completed children it produced the byte-identical original apology ("This response was interrupted
    before it could finish. Please try again."). That is the designed no-partials path. It still has **not**
    been seen doing its real job, because there was nothing to show.
+
+---
+
+## Canary 9-retry (deployed `f8cef250`, v0.6.88, verified) · **PASS — dispatch dedupe confirmed live. Item 1 CLOSED.**
+
+**Date:** 2026-07-21. `/api/health` `ok=true`, deployed `f8cef250` == local HEAD. Flag armed founder-only
+at 19:34:33Z, **re-darkened and read back before any evidence was pulled**.
+
+**The controlled change vs canary 9:** the anchor prompt, reverted to Canary 8's **verbatim** text
+("Our client concentration is rising and our margin is compressing. What should I do in the next 90 days?").
+Nothing else differed — same build, same flag config, same CLI. Canary 9's failure was caused by an
+agent-authored replacement anchor; see the canary 9 post-mortem above.
+
+**Runs (`agent_delegation_runs`), parent `f6b00fc8-2d86-4637-a986-94c2bca8f4c5` — completed, 193.8s:**
+- `structured_data_agent` child `421c942b-b25a-4f14-a549-52a9a3ab29a4` — completed, **0.4s**
+- `per_user_wiki` child `2464a061-da1d-4276-a9aa-e23e02315550` — completed, **1.8s** — **ONE child**
+  (Canary 8 wrote two here; the wart did not recur)
+- `sandbox_execution_agent` child `9a97d559-ce14-450a-ad48-7b2e1d8d49a0` — completed, **117.2s**, in-band
+  under the 240s `MCP_TOOL_TIMEOUT`
+
+**Lifecycle:** `runtime_manifest decision=model_driven reason_code=none`; **3× `Task` → `allow` on the
+FIRST attempt** (`approved_bounded_contract`), zero denials; **4 `pre_tool_probe` worker invocations**
+(`agent_id_present=true` on all four).
+
+### The dedupe proof (defect #4, v0.6.84) — a duplicate ARRIVED and was coalesced
+
+**Four worker tool invocations, three child runs.** `structured_data_agent` was invoked **twice**
+(`pre_tool_probe` at sequence 3 and again at sequence 7). Its second `worker_hop` pair (sequences 13–14)
+returned `child_run_id: 421c942b…` — **the same child as the first invocation** — and no new run was
+started. Exactly one `structured_data_agent` row exists in `agent_delegation_runs`.
+
+This is the strong result, not the weak one: it is not "no duplicate happened to occur", it is "a duplicate
+occurred and was suppressed". On a pre-v0.6.84 build that second invocation is a second `start_run` and a
+fourth child row.
+
+**Founder-visible answer:** 4,793 chars, **33 citations**, grounded in real figures (Vantage $32k +
+Harborline $28k ≈ 40% of retainer revenue; top 5 = 55%; 2.5% monthly churn; 3.6-month runway). Main compose
+**$0.122** (`claude-sonnet-4-6`, 30,808 in / 2,242 out), plus two Haiku tier workers. Shorter than Canary
+8's 8,577 chars at the same citation count — noted, not a regression.
+
+### Evidence defect found while reading this canary (fixed in v0.6.89)
+
+The dedupe was readable only as an **absence**: `record_lifecycle`'s key whitelist did not include `stage`,
+so the `deduped` marker persisted as an anonymous `worker_hop` distinguishable from a real completion only
+by its missing `child_status`. The inference was sound and corroborated by the run table, but
+evidence-by-omission is not acceptable as canonical proof — and the same gap would have rendered canary
+10's `fault_injected` marker **indistinguishable from a normal arrival**. `stage` and `same_objective` are
+now persisted (v0.6.89). Bounded strings/bools only; no prompt, tool input, or model output passes through.
+
+### Status after this canary
+
+- **Item 1 (dispatch idempotency) — CLOSED live.**
+- **Item 2 — still owed.** The partial-answer surface has still never done its real job (nothing has
+  failed with completed children to show), and the fault-injection safety net is still unexercised.
+  **Canary 10 must run on v0.6.89 or later**, or its central evidence will not be legible.
+- **Reproducibility caveat, unchanged:** model-driven delegation is now 2 passes / 1 fail across three
+  live runs, and the one failure is explained by a changed anchor rather than proven to be. The anchor
+  remains a load-bearing, uncontrolled variable until SDK-M3's explicit per-worker delegation contracts
+  land. Do not treat "the lead reliably delegates" as established.
