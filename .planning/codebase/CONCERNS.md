@@ -110,6 +110,7 @@ Surfaced repeatedly during live verification; codebase-wide, not Ep4-specific. A
 - **Uniqueness-assumption mismatches.** App-level user-scoped checks against **globally-unique** DB columns (and vice versa) have recurred (the MRA/`agent_capabilities` collision; the Ep4 Skills `last_updated`→`updated_at` alias). Audit for app uniqueness assumptions that don't match the actual DB constraints.
 - **Error-swallowing around Supabase/PostgREST/Storage.** `error instanceof Error ? error.message` on those plain-object errors loses the real diagnostic (related to the earlier "Failed to fetch" panel-blanking). Grep for that pattern and preserve the underlying error detail.
 - **Structured backend errors.** Fold the actionable text into `detail` unless the frontend error parser is broadened — otherwise the useful message is dropped before the UI sees it.
+- **False-green test suites (observed twice, 2026-07-20).** Test suites have twice reported green while not actually exercising the code under test — a green suite that isn't running is more dangerous than a red one. (1) The 38 SDK permission tests passed by mocking `query_impl`, bypassing the live CLI permission engine where the delegation-denial bug actually lived — it reached a live canary before it was caught. (2) The entire live wiki suite reported all-`skipped` (false green) because the setup looked for the Supabase key under a name `.env.local` doesn't use, silently hiding ten stale-fixture failures until the env-key name was fixed. **Guard:** in environments that are *supposed* to have the config (CI / canary host), a skip-due-to-missing-config should be **loud** (error/fail, not a silent skip); and permission/CLI-gated paths need at least one test that runs the real engine, not a mock. Audit for both patterns. — **Case (2) closed `v0.6.86` (2026-07-21):** `tests/conftest.py` now tries the backend's own env names (`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`) before the historical aliases, and the stale `_load_sources` fixture (bare list vs `{"primary": [...], "supporting": [...]}`) that the false green was hiding is fixed — the live wiki suite genuinely runs: **44 passed, 1 skipped**. The **guard itself is still unbuilt**: nothing yet makes a missing-config skip loud where the config should exist, so this pattern can still recur elsewhere. Case (1) remains open.
 
 ## Deferred / Likely-Retire (product decisions)
 
@@ -121,6 +122,15 @@ Surfaced repeatedly during live verification; codebase-wide, not Ep4-specific. A
   updates/resynthesis. Full note: `.planning/wiki-system/TIER1-SYNTHESIS-UPGRADE-DESIGN-BRIEF.md` → §8 Future
   Work. **Not in scope for Ep4–Ep7.**
 - **Guided Skill Creator — likely retire for MVP** (founder decision, 2026-07-11). Not verified in Ep4 by design (the guided-draft direct-Anthropic path is left alone). Revisit in the §8 UI pass: keep or retire. Skill **import/export + CRUD + `@slug`** are the verified, kept paths.
+- **Financial-series storage for VCSO sandbox compute — deferred (2026-07-20).** The VCSO model-driven
+  sandbox worker fires but cannot do the real client-concentration / margin-*trend* computation because
+  there is no stored/vectorized financial **series** — `structured_data_agent` surfaces only a single
+  aggregate P&L row (no client-level revenue, no multi-period). Needs a storage/vectorization design
+  (uploaded-and-vectorized P&L, or generated-then-vectorized into the retrievable store) and most likely
+  pulls from **MCP connections**, so it is validated alongside the MCP-retrieval path (04B SDK-migration
+  Phase F). Sandbox stays a working smoke until then. Full context:
+  `.planning/orchestration-harness/phases/04B-vcso-sdk-migration/CONTEXT.md` (data-lifecycle pin) +
+  `04B-D2-PLAN.md`.
 
 ## Launch Readiness Concerns
 

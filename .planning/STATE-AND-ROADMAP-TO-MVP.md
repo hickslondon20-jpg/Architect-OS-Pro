@@ -75,7 +75,10 @@ real-wiring + UI polish; router (C) — evidence-based in-beta-vs-fast-follow.
 **Post-MVP / v1:** insight-accretion loop on Tier-1 pages; MCP live financial feed into `financial_context`;
 native Tier-1 claim tools + tool-name-collision fix; metering ledger / usage % / pricing / admin panel; real
 MCP connections (L7 scaffold-only at beta); dark-by-design citations (`web`, `reflection_reviews`,
-`sprint_retrospective`); Reflection Review V-11 (core-platform); Ep1 return-pass queue; Ep7B PDF geometry.
+`sprint_retrospective`); Reflection Review V-11 (core-platform); Ep1 return-pass queue; Ep7B PDF geometry; **financial-series
+storage + real VCSO sandbox compute** (04B SDK-migration Phase F) — client-concentration/margin-trend
+compute needs a stored/vectorized P&L *series* (client-level revenue + multi-period), which has no table
+today and couples to the MCP live-financial-feed above; sandbox is a working smoke until then.
 
 ## The sequenced path to MVP
 1. **Fix** — MRA quick win (Ep7).
