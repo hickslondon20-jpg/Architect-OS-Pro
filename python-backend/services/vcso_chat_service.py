@@ -19,6 +19,8 @@ from supabase import Client, create_client
 from core.config import get_settings
 from core.langsmith_tracing import trace_anthropic_client, trace_scope
 from services.citations.binding import (
+    INLINE_SOURCE_MARKER_RE,
+    ORDINAL_MARKER_RE,
     format_numbered_source_list,
     normalize_vcso_turn_sources,
     number_citation_refs,
@@ -46,6 +48,7 @@ from services.vcso_sdk_loop import (
     SDK_STANDARD_SCHEMA_VERSION,
     VCSO_SDK_CAPABILITY_KEY,
     VcsoSdkUsage,
+    native_fault_injection_capabilities,
     native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
@@ -415,6 +418,17 @@ class VcsoChatService:
             and bool(_sdk_settings.get("native_model_driven_enabled"))
             and str(user_id) in _md_user_ids
         )
+        # Tier 3 graceful-failure rehearsal: dark, founder-only, and only ever non-empty on a model-driven
+        # turn. Off by default, so this is inert on every real turn.
+        native_fault_injection = (
+            native_fault_injection_capabilities(
+                settings=_sdk_settings,
+                user_id=user_id,
+                required_agents=native_required_agents,
+            )
+            if native_model_driven
+            else ()
+        )
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
         planner_path_selected = (
@@ -711,6 +725,7 @@ class VcsoChatService:
                 ),
                 native_lifecycle_sink=persist_sdk_lifecycle if sdk_native_subagent_mode else None,
                 native_model_driven=native_model_driven,
+                native_fault_injection=native_fault_injection,
             )
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))
@@ -1242,8 +1257,12 @@ class VcsoChatService:
             user_id = str(state["user_id"])
             thread_id = str(state["thread_id"])
             assistant_message = state.get("assistant_message")
+            # Tier 3 graceful-failure UX: before writing the apology, ask the DB what actually finished.
+            # The v0.6.81 safety net already refuses to discard a DB-completed worker inside the turn; this
+            # is the founder-facing half of the same idea — show that work rather than a blanket failure.
+            partials = self._completed_child_findings(state.get("run_id"), user_id)
             if not assistant_message:
-                fallback_text = _failed_turn_message(terminal_status)
+                fallback_text = _failed_turn_message(terminal_status, partials=partials)
                 assistant_message = self._insert_message(
                     thread_id,
                     user_id,
@@ -1271,6 +1290,7 @@ class VcsoChatService:
                     )
                     + 1,
                     terminal_status=terminal_status,
+                    partials=partials,
                 )
                 try:
                     self._create_step(
@@ -1293,6 +1313,7 @@ class VcsoChatService:
                     assistant_message_id=str(assistant_message["id"]),
                     terminal_status=terminal_status,
                     error_message=_safe_internal_error(exc),
+                    partials=partials,
                 )
 
             if state.get("deep_mode"):
@@ -1340,6 +1361,49 @@ class VcsoChatService:
         except Exception:
             return None
 
+    def _completed_child_findings(
+        self, run_id: Any, user_id: str
+    ) -> list[dict[str, str]]:
+        """The workers that reached a completed child row under this parent run, newest-first read but
+        returned in completion order, one entry per capability.
+
+        Read-only and fail-open: this runs on the recovery path, so it must never be the reason a founder
+        loses their turn entirely. Any error yields `[]` and the caller falls back to the plain apology.
+        The per-capability dedupe also means a duplicate dispatch (defect #4) never doubles a line."""
+
+        if not run_id:
+            return []
+        try:
+            rows = (
+                self.supabase.table("agent_delegation_runs")
+                .select("capability_key,result_summary,completed_at")
+                .eq("parent_run_id", str(run_id))
+                .eq("user_id", str(user_id))
+                .eq("status", "completed")
+                .execute()
+                .data
+                or []
+            )
+        except Exception as exc:  # noqa: BLE001 - recovery must never fail because of a lookup
+            logger.warning("partial-answer child lookup failed open: %s", exc)
+            return []
+        findings: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for row in sorted(rows, key=lambda item: str(item.get("completed_at") or "")):
+            capability_key = str(row.get("capability_key") or "").strip()
+            summary = _strip_citation_markers(str(row.get("result_summary") or ""))
+            if not capability_key or not summary or capability_key in seen:
+                continue
+            seen.add(capability_key)
+            findings.append(
+                {
+                    "capability_key": capability_key,
+                    "title": capability_key.replace("_", " ").title(),
+                    "summary": summary[:800],
+                }
+            )
+        return findings
+
     def _fail_main_run(
         self,
         run_id: str,
@@ -1348,17 +1412,20 @@ class VcsoChatService:
         assistant_message_id: str,
         terminal_status: str,
         error_message: str,
+        partials: list[dict[str, str]] | None = None,
     ) -> None:
         status = "cancelled" if terminal_status == "cancelled" else "failed"
         self.supabase.table("agent_delegation_runs").update(
             {
                 "status": status,
                 "assistant_message_id": assistant_message_id,
-                "result_summary": _failed_turn_message(terminal_status)[:500],
+                "result_summary": _failed_turn_message(terminal_status, partials=partials)[:500],
                 "structured_result": {
                     "schema_version": "vcso_tool_loop_v1",
                     "status": status,
                     "reasoning_visibility": "summary_only",
+                    "partial_answer": bool(partials),
+                    "completed_workers": [item["capability_key"] for item in (partials or [])],
                 },
                 "error_message": error_message,
                 "completed_at": _now(),
@@ -3094,23 +3161,68 @@ def _result_trace_step(*, step_index: int, answer_chars: int, tool_step_count: i
     }
 
 
-def _failure_trace_step(*, step_index: int, terminal_status: str) -> dict[str, Any]:
+def _failure_trace_step(
+    *, step_index: int, terminal_status: str, partials: list[dict[str, str]] | None = None
+) -> dict[str, Any]:
+    partials = partials or []
     return {
         "stepIndex": step_index,
         "stepType": "error",
-        "title": "Response interrupted",
-        "summary": _failed_turn_message(terminal_status),
+        "title": "Partial answer" if partials else "Response interrupted",
+        "summary": _failed_turn_message(terminal_status, partials=partials),
         "input": {},
-        "output": json.dumps({"status": "cancelled" if terminal_status == "cancelled" else "failed"}),
+        "output": json.dumps(
+            {
+                "status": "cancelled" if terminal_status == "cancelled" else "failed",
+                "completed_workers": [item["capability_key"] for item in partials],
+            }
+        ),
         "status": "failed",
         "sourceRefs": [],
     }
 
 
-def _failed_turn_message(terminal_status: str) -> str:
-    if terminal_status == "cancelled":
-        return "This response was interrupted before it could finish. Please try again."
-    return "I couldn't complete that response. Your request was saved; please try again."
+def _strip_citation_markers(text: str) -> str:
+    """A degraded turn is written with ``citations=[]``, so a worker summary carrying `[3]` or an inline
+    `[[Source: …]]` marker would render a reference the founder cannot open. Strip both."""
+
+    cleaned = INLINE_SOURCE_MARKER_RE.sub("", ORDINAL_MARKER_RE.sub("", text or ""))
+    return re.sub(r"[ \t]{2,}", " ", cleaned).strip()
+
+
+def _failed_turn_message(terminal_status: str, *, partials: list[dict[str, str]] | None = None) -> str:
+    """The founder-visible text for a turn that did not finish.
+
+    With no `partials` this stays the original binary apology. With partials — the workers that reached a
+    completed `agent_delegation_runs` row before the turn broke — it becomes a real partial answer instead.
+    The v0.6.81 safety net already keeps genuinely-finished worker output out of the bin; before this, that
+    work still surfaced to the founder as "I couldn't complete that response", which reads as total loss.
+
+    Deliberately NOT the deferred mid-stream finding-injection into the SDK lead (`vcso_sdk_loop.py`
+    TODO, M4): this is an after-the-fact read of what the app already persisted, so it needs no SDK
+    machinery and cannot perturb a live turn."""
+
+    if not partials:
+        if terminal_status == "cancelled":
+            return "This response was interrupted before it could finish. Please try again."
+        return "I couldn't complete that response. Your request was saved; please try again."
+
+    lead_in = (
+        "This response was interrupted before I could pull it together, but part of the analysis "
+        "finished first. Here's what completed:"
+        if terminal_status == "cancelled"
+        else "I couldn't finish that response, but part of the analysis completed before it stopped. "
+        "Here's what I have:"
+    )
+    lines = [lead_in, ""]
+    for item in partials:
+        lines.append(f"**{item['title']}** — {item['summary']}")
+    lines.append("")
+    lines.append(
+        "The rest of the analysis didn't complete, so treat this as partial. Ask again and I'll rebuild "
+        "the full answer from here."
+    )
+    return "\n".join(lines)
 
 
 def _safe_internal_error(exc: BaseException) -> str:

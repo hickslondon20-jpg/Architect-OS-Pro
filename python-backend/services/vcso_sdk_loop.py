@@ -231,6 +231,40 @@ def native_subagent_requirements(
     return P4_THIN_SLICE_REQUIRED_AGENTS
 
 
+def native_fault_injection_capabilities(
+    *,
+    settings: dict[str, Any] | None,
+    user_id: str | None,
+    required_agents: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Which required workers this turn must FORCE to fail (Tier 3 graceful-failure rehearsal, v0.6.85).
+
+    The v0.6.81 DB-completion safety net — stop_hook + terminal check composing from completed children
+    instead of thrashing on a missing one — has never been exercised live, because nothing has failed since
+    it was built. Untested recovery code is not recovery code. This gives us a way to make a required worker
+    fail on demand on a real turn.
+
+    Gated exactly like the existing `diagnostic_single_worker` probe: an explicit enable bool, the founder
+    `diagnostic_user_ids` allowlist, and a named worker that must already be in this turn's required set.
+    Any of those missing ⇒ empty ⇒ the mechanism does not exist for that turn. Never returns EVERY required
+    worker: a turn with nothing left to compose from is not the failure mode being rehearsed."""
+
+    settings = settings or {}
+    if not bool(settings.get("diagnostic_fault_injection_enabled")):
+        return ()
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    if not user_id or str(user_id) not in diagnostic_user_ids:
+        return ()
+    requested = [
+        str(value)
+        for value in (settings.get("diagnostic_fault_injection_workers") or [])
+        if str(value) in required_agents
+    ]
+    if not requested or len(set(requested)) >= len(set(required_agents)):
+        return ()
+    return tuple(dict.fromkeys(requested))
+
+
 def build_native_runtime_manifest(compiled: Any, *, required_agents: tuple[str, ...]) -> dict[str, Any]:
     """Describe the native SDK surface without exposing prompts, credentials, or tool payloads."""
 
@@ -329,6 +363,7 @@ def stream_vcso_sdk_turn(
     native_subagent_scopes: dict[str, dict[str, Any]] | None = None,
     native_lifecycle_sink: LifecycleSink | None = None,
     native_model_driven: bool = False,
+    native_fault_injection: tuple[str, ...] = (),
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -361,6 +396,7 @@ def stream_vcso_sdk_turn(
                         native_subagent_scopes=native_subagent_scopes or {},
                         native_lifecycle_sink=native_lifecycle_sink,
                         native_model_driven=native_model_driven,
+                        native_fault_injection=native_fault_injection,
                     )
                 )
             )
@@ -576,6 +612,7 @@ async def _run_sdk_turn(
     native_subagent_scopes: dict[str, dict[str, Any]],
     native_lifecycle_sink: LifecycleSink | None,
     native_model_driven: bool = False,
+    native_fault_injection: tuple[str, ...] = (),
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -1454,8 +1491,17 @@ async def _run_sdk_turn(
                     key: dict(native_subagent_scopes.get(key) or {}) for key in required_agents
                 },
                 progress_bridge=_make_worker_progress_bridge(events, task_capabilities, step_indexes),
+                # Dark, founder-only, and empty on every normal turn (see
+                # native_fault_injection_capabilities). Present so the graceful-failure path can be
+                # rehearsed on a real canary instead of shipping untested recovery code.
+                fault_injection_capabilities=frozenset(native_fault_injection),
             )
         )
+        if native_fault_injection:
+            record_lifecycle(
+                "fault_injection_armed",
+                reason_code=",".join(native_fault_injection)[:120],
+            )
         model_driven_worker_url = worker_server_url(base_url, model_driven_token)
         hooks["PreToolUse"] = [
             HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),

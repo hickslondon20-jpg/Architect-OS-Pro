@@ -89,6 +89,11 @@ class TurnScope:
     # (observed 2026-07-20 in scripts/probe_worker_hop.py). Which data a worker may read is a founder-
     # isolation decision and must come from the app, never from model-authored text.
     context_scopes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # DARK, FOUNDER-ONLY fault injection (Tier 3, v0.6.85). Capabilities named here are forced to fail
+    # instead of running, so the v0.6.81 graceful-compose safety net can be exercised on a live canary
+    # without breaking anything real. Populated only from the `vcso_sdk_loop` diagnostic sub-flag under the
+    # existing founder allowlist; empty on every other path, so this is inert by construction.
+    fault_injection_capabilities: frozenset[str] = field(default_factory=frozenset)
     # Same-process diagnostics drained by the loop after the query. The endpoint runs in a separate
     # request context and cannot reach `record_lifecycle`, so without this a worker call that never
     # arrives is indistinguishable from one that arrived and failed — which is precisely what canary 3
@@ -171,6 +176,13 @@ TURN_REGISTRY = TurnRegistry()
 
 class WorkerScopeError(Exception):
     """Raised when a worker call cannot be attributed to a valid, permitted turn scope."""
+
+
+class WorkerFaultInjected(RuntimeError):
+    """Raised INSTEAD of running a worker when that capability is named in the dark fault-injection
+    sub-flag. A RuntimeError (not a WorkerScopeError) on purpose: the failure we need to rehearse is a
+    worker blowing up mid-run, not a scope refusal, and the transport maps both to the same `is_error`
+    the lead would see from a genuinely broken worker."""
 
 
 def _compact_result(result: SubAgentRunResult) -> dict[str, Any]:
@@ -270,6 +282,15 @@ async def _dispatch_worker_capability(
 ) -> dict[str, Any]:
     """Run one worker for real. Called only by `run_worker_capability`, and only once per
     (token, capability_key) that reaches completion — it holds that capability's dispatch lock."""
+
+    if capability_key in scope.fault_injection_capabilities:
+        # Fail BEFORE start_run: no child row is written, so the DB completion bridge genuinely reports
+        # this worker missing and the stop_hook / terminal check face a real absence, not a simulated one.
+        logger.warning("vcso worker FAULT-INJECTED (dark diagnostic) capability=%s", capability_key)
+        scope.diagnostics.append({"stage": "fault_injected", "capability_key": capability_key})
+        raise WorkerFaultInjected(
+            f"Fault injection: {capability_key} was forced to fail for this diagnostic turn."
+        )
 
     # App-owned bindings win over anything the model wrote into the contract: the contract may express
     # intent, but the founder's dataset/thread scope is not the model's to choose.
