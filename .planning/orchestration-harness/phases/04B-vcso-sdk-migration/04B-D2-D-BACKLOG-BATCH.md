@@ -4,8 +4,9 @@
 **Scope:** the three batched-polish items in that handoff's §4 (items 1–3). SDK-M3, M4, and E/F/G
 untouched by instruction.
 
-**Versions produced:** `v0.6.84`, `v0.6.85`, `v0.6.86`. Local `main` is **three commits ahead of the
-deployed head `9d6a5633`** — nothing here is deployed yet, so neither live confirmation has run.
+**Versions produced:** `v0.6.84` – `v0.6.91`. All deployed and canaried. **FINAL STATE: items 1 and 3
+CLOSED live; item 2 HALF CLOSED** — (b) the partial-answer surface is proven live, (a) the fault-injection
+/ v0.6.81 rescue is **blocked behind Defect 7** and handed to SDK-M3.
 
 ---
 
@@ -13,11 +14,11 @@ deployed head `9d6a5633`** — nothing here is deployed yet, so neither live con
 
 | Item | Version | State |
 |---|---|---|
-| 1 · Duplicate dispatch idempotency (defect #4) | `v0.6.84` | **Built + unit-proven.** Live canary confirmation pending a deploy. |
-| 2 · Tier 3 graceful-failure UX | `v0.6.85` | **(b) partial-answer surface built + unit-proven. (a) fault-injection mechanism built; the live fault-injection canary itself is pending a deploy.** |
-| 3 · `per_user_wiki` formal confirmation | `v0.6.86` | **DONE — closed live.** DI-EMBED passes against real embeddings; sibling confirmed closed. |
+| 1 · Duplicate dispatch idempotency (defect #4) | `v0.6.84` | **CLOSED live** (Canary 9-retry). A duplicate arrived and was coalesced — one `start_run` per `(token, capability_key)`. See the attribution correction in `04B-D2-FINDINGS.md` §11: the duplicate was a *cross-worker call*, not a CLI re-send. |
+| 2 · Tier 3 graceful-failure UX | `v0.6.85`, `v0.6.90` | **HALF CLOSED.** (b) partial-answer surface **proven live** (Canary 10a). (a) fault injection **never fired** — blocked behind Defect 7, handed to M3. |
+| 3 · `per_user_wiki` formal confirmation | `v0.6.86` | **CLOSED live.** DI-EMBED passes against real embeddings; sibling confirmed closed. |
 
-Focused unit suite: **71 passed** (was 45 at Tier 2 close; +5 dedupe, +21 graceful-failure).
+Focused unit suite: **76 passed** (was 45 at Tier 2 close).
 Live wiki acceptance suite: **44 passed, 1 skipped** (the unrelated G2 founder-JWT item).
 
 ---
@@ -122,13 +123,37 @@ a `worker_hop` `deduped` entry if the CLI re-sends, and a founder-visible cited 
 8's. **If the lead again fails to delegate on the identical prompt, code, and CLI that worked on 2026-07-20,
 stop — that is a Tier 2 reproducibility problem, not a canary to retry a third time.**
 
-**Canary 10 — graceful failure.** Same arm plus `diagnostic_fault_injection_enabled=true` and
-`diagnostic_fault_injection_workers=["sandbox_execution_agent"]`. Expect: `fault_injection_armed` in the
-lifecycle; the sandbox worker writes **no** child row; the other two complete; the stop_hook does **not**
-thrash on the missing worker (it consults the DB bridge); the turn either composes gracefully from the two
-completed children **or**, if it terminalises, the founder reads the **partial answer naming those two
-workers** rather than "I couldn't complete that response". Re-darken the fault-injection keys with the
-rest of the flag.
+**Canary 10a — RUN 2026-07-21 → MIXED.** Armed `after_completion` on `sandbox_execution_agent`.
+**The injection never fired**: the sandbox subagent called `run_structured_data_agent` instead of its own
+tool, took the deduped cached result, and returned — so no sandbox child row ever existed to inject into
+(**Defect 7**, `04B-D2-FINDINGS.md` §11). Lead re-delegated three times into the once-per-turn guard, hit
+`max_turns`. **$0.2196, no answer.**
+
+**What it did prove — item 2(b), CLOSED live.** The failed turn produced a genuine founder-visible partial
+answer naming `Structured Data Agent` and `Per User Wiki`, correctly framed as partial ("treat this as
+partial. Ask again and I'll rebuild the full answer from here"), with the trace step titled "Partial
+answer". The founder's gating concern — that a degraded turn must never read as complete on a
+financial-advisory surface — is satisfied on a real live turn.
+
+**Canary 10b — NOT RUN, deliberately.** It would exercise the same partial-answer surface just proven, on
+a build with a known isolation defect, for another ~$0.20. Deferred.
+
+**Item 2(a) — still owed, now blocked.** `after_completion` mode exists (`v0.6.90`) and is unit-proven,
+but the v0.6.81 rescue cannot be exercised until a worker subagent can no longer call a sibling's tool.
+Re-running the fault-injection canary on this build would likely fail the same way.
+
+### Live-run tally (five model-driven turns)
+
+| Run | Result |
+|---|---|
+| Canary 8 (2026-07-20) | PASS — three workers, cited answer |
+| Canary 9 | FAIL — no delegation (changed anchor) |
+| Canary 9-retry | PASS — dedupe confirmed, item 1 closed |
+| Canary 10a | MIXED — item 2(b) closed; Defect 7 found |
+| Canary 10b | not run |
+
+**Delegation is 3 passes / 2 failures. Do not treat "the lead reliably delegates" as established** — the
+anchor prompt is still an uncontrolled variable and Defect 7 is live. SDK-M3 is the hardening step.
 
 ---
 

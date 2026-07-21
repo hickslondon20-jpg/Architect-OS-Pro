@@ -74,14 +74,26 @@ Single-process env only — no `WEB_CONCURRENCY`, no `--workers` (the `TURN_REGI
 
 1. ~~**[medium] Duplicate worker dispatch idempotency (defect #4).**~~ **Built, `v0.6.84`** — coalesced on
    `(token, capability_key)` in `services/vcso_worker_mcp.py`. **Live canary 9 still owed.**
-2. ~~**[medium] Tier 3 — graceful-failure UX.**~~ **Built, `v0.6.85`** — real partial-answer surface
-   (`_failed_turn_message` now renders the DB-completed children) + a dark founder-only fault-injection
-   sub-flag to force a required worker to fail. **Live canary 10 still owed.** The optional mid-stream
-   finding-injection (`vcso_sdk_loop.py:~1002`) stays deferred to M4 by instruction.
+2. **[medium] Tier 3 — graceful-failure UX — HALF CLOSED.**
+   - **(b) partial-answer surface — CLOSED live** (Canary 10a, 2026-07-21): a real degraded turn showed the
+     founder the two workers that completed, correctly framed as partial.
+   - **(a) fault-injection / v0.6.81 rescue — STILL OWED and now BLOCKED behind Defect 7.** Canary 10a's
+     injection never fired because the sandbox worker was never dispatched (`04B-D2-FINDINGS.md` §11).
+     `after_completion` mode exists (`v0.6.90`) and is unit-proven; it needs a build where a worker
+     subagent cannot call a sibling's tool.
+   - The optional mid-stream finding-injection (`vcso_sdk_loop.py:~1002`) stays deferred to M4.
 3. ~~**[medium] Tier 3 — `per_user_wiki` formal confirmation.**~~ **CLOSED, `v0.6.86`** — DI-EMBED now
    validates real semantic ranking and passes live (44 passed / 1 skipped). Sibling confirmed already
    fixed at `harness_engine.py:113`.
 4. **[large] SDK-M3.** Effort-scaling + explicit per-worker delegation contracts + full anchor.
+   **Now also carries Defect 7** (`04B-D2-FINDINGS.md` §11): mint the worker token per
+   `(turn, capability)` so a worker subagent cannot call a sibling worker's tool. Existing scope check
+   then refuses it with no new authorisation logic. **Unblocks item 2(a).** Also fold in: wrap the
+   `worker_hop` diagnostics drain in `try/finally` so failed turns keep their evidence; a cheaper give-up
+   when the lead will not delegate (today it thrashes to `max_turns` for ~$0.10–0.22 and no answer); a
+   keepalive on the model-driven path (a 3-minute silent stream is close to the client-disconnect
+   threshold that killed Canary 9); and pin the anchor prompt — it remains an uncontrolled variable
+   (3 passes / 2 failures across five live runs).
 5. **[medium] M4.** Progress-bridge full C2 frontend surface — the bridge emits `sub_agent_step` today;
    the full surface treatment is pending.
 6. **Later phases.** E (sessions + Deep Mode reconciliation), F (first live MCP — QuickBooks; sandbox real

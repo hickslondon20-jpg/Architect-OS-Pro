@@ -227,3 +227,78 @@ Canary 8 confirmed it live: the 113s sandbox worker returned in-band under the 2
 
 **Do not re-add the per-agent `timeout` key** — it is rejected by the deployed CLI and breaks delegation.
 See the CRITICAL INFRA NOTE in `04B-D2-TIER2-CLOSE-HANDOFF.md`.
+
+---
+
+## 11. Defect 7 (2026-07-21) — **worker subagents can call each other's tools** (per-turn token is not per-capability) — OPEN, M3
+
+**Severity: this is an isolation defect, not a cosmetic one.** It has now broken one canary outright
+(Canary 10a) and silently distorted the evidence of another (Canary 9-retry).
+
+### Mechanism
+
+The per-turn token scopes a worker call to one **founder/thread/parent-run** — but **not to one
+capability**. Three things compose badly:
+
+1. `TURN_REGISTRY` mints **one token per turn** (`vcso_sdk_loop.py`, model-driven branch), and every
+   worker `AgentDefinition.mcpServers` entry points at that **same** URL (`?t=<turn-token>`).
+2. The external FastMCP server exposes **all three** `run_<capability>` tools on that one endpoint
+   (`vcso_worker_mcp_server.py` — one server, three `@server.tool` registrations).
+3. `run_worker_capability` authorises against `scope.allowed_capabilities`, which is
+   `frozenset(required_agents)` — **all three** for the turn.
+
+So the scope check asks *"is this capability permitted for this turn?"* when it needs to ask *"is this
+capability permitted for **the subagent making the call**?"*. Any worker subagent can invoke any sibling
+worker's tool and it is authorised. Nothing in the manifest catches it: `build_model_driven_manifest`
+verifies the surface is correctly *scoped and pre-approved*, which it is — the leak is at call time.
+
+### Observed — Canary 10a (2026-07-21, `e2cacc08`/v0.6.90) — the canary it broke
+
+```
+seq 7   Task allow  → sandbox_execution_agent      delegation approved
+seq 8   probe       → run_structured_data_agent    the sandbox subagent called the WRONG tool
+seq 9   Task deny   → structured_data_agent        "may run only once per turn"
+seq 10  Task deny   → sandbox_execution_agent      "may run only once per turn"
+seq 11  Task deny   → sandbox_execution_agent      "may run only once per turn"
+```
+
+The sandbox subagent called `run_structured_data_agent`; the v0.6.84 dedupe returned the **cached
+structured result**; the subagent accepted that as its answer and returned **without ever calling its own
+tool**. `sandbox_execution_agent` therefore has **no child row at all** — so the `after_completion` fault
+injection had nothing to fire on, and Item 2(a) went untested. The lead then tried three times to
+re-delegate, hit the once-per-turn guard each time, and ground out at `max_turns`. **$0.2196, no answer.**
+
+### Correction to the Canary 9-retry record (§ "Canary 9-retry" in `04B-D2-M2-FINISH-LOG.md`)
+
+Canary 9-retry showed the **identical** pattern — sandbox's subagent called `run_structured_data_agent`
+(seq 7) and only then called its own tool (seq 8). That run's "duplicate" was recorded as proof the dedupe
+had caught **a re-sent CLI `tools/call` (defect #4)**. That attribution is **wrong**: it was a
+cross-worker call, i.e. this defect.
+
+**What still stands:** the dedupe worked, coalesced the duplicate onto the first child, and prevented a
+second `start_run` — Item 1's acceptance ("a re-sent `tools/call` does not start a second `start_run`;
+one dispatch per `(token, capability_key)`") is met by observed behaviour. **Item 1 stays closed.**
+
+**What does not stand:** that canary is *not* evidence that defect #4's CLI-re-send scenario occurs live.
+It has still never been observed. The dedupe is also now **masking** defect 7 — without it, a cross-worker
+call would surface as a visible duplicate child row.
+
+### Fix direction (M3)
+
+Mint the token **per `(turn, capability)`** instead of per turn: each `AgentDefinition.mcpServers` entry
+carries its own token whose `TurnScope.allowed_capabilities` is **its own capability only**. The existing
+refusal in `run_worker_capability` ("Capability X is not permitted for this turn") then rejects
+cross-worker calls with **no new authorisation logic** — the registry, the scope object, and the check are
+all already in place. `TurnScope` gains nothing; `TURN_REGISTRY` holds N scopes per turn instead of 1, and
+the loop unregisters all of them.
+
+Natural home is **SDK-M3** (explicit per-worker delegation contracts). Do not land it as a hotfix inside
+the D2 polish batch.
+
+### Secondary finding — failed turns lose their diagnostics
+
+The `worker_hop` drain (`vcso_sdk_loop.py`, after the query loop) and the child usage-attribution loop both
+run **after** the SDK query completes. A turn that raises — `max_turns`, a required-worker block, a client
+disconnect — skips both. Canary 10a's lifecycle therefore carries **zero** `worker_hop` entries and **zero**
+child usage rows, i.e. we lose the worker-level evidence precisely on the turns that most need explaining.
+Wrap the drain in `try/finally` so diagnostics survive the failure path.

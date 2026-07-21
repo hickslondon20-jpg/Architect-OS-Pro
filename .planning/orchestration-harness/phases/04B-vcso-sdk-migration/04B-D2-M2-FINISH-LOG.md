@@ -903,3 +903,68 @@ now persisted (v0.6.89). Bounded strings/bools only; no prompt, tool input, or m
   live runs, and the one failure is explained by a changed anchor rather than proven to be. The anchor
   remains a load-bearing, uncontrolled variable until SDK-M3's explicit per-worker delegation contracts
   land. Do not treat "the lead reliably delegates" as established.
+
+---
+
+## Canary 10a (deployed `e2cacc08`, v0.6.90, verified) · **MIXED — Item 2(b) PROVEN LIVE; Item 2(a) untested; new Defect 7 found.**
+
+**Date:** 2026-07-21. `/api/health` `ok=true`, deployed `e2cacc08` == local HEAD. Armed founder-only at
+20:15:38Z with `diagnostic_fault_injection_enabled=true`,
+`diagnostic_fault_injection_workers=["sandbox_execution_agent"]`,
+`diagnostic_fault_injection_mode="after_completion"`. **Re-darkened and read back** before any evidence was
+pulled. Anchor: Canary 8's verbatim text (unchanged, third run).
+
+**Intent:** exercise the v0.6.81 DB-completion rescue — let sandbox complete and write its child row, drop
+only its return to the lead, and confirm the stop_hook does **not** block. **That is not what happened.**
+
+**Runs — parent `ec508113-feff-47ac-a691-49a94e5b67bc`, status `failed`, 157.1s,**
+`error_message: "Claude Code returned an error result: Reached maximum number of turns (12)"`:
+- `structured_data_agent` child `7abaf0a3-cc2a-41ce-b9ee-22b3ac784c54` — completed, 0.4s
+- `per_user_wiki` child `6df60f90-c1de-4021-b7df-64629b94ea1b` — completed, 2.2s
+- `sandbox_execution_agent` — **NO CHILD ROW AT ALL** (not completed, not failed)
+
+Main compose **$0.2196** (`claude-sonnet-4-6`, 155,317 in / 5,375 out) — the most expensive run of the
+phase, for no answer.
+
+### Why the fault injection never fired
+
+The arm itself was correct and reached the code: lifecycle sequence 1 is
+`fault_injection_armed · after_completion:sandbox_execution_agent`. But **Defect 7** (see
+`04B-D2-FINDINGS.md` §11) meant the sandbox worker was never dispatched: its subagent called
+`run_structured_data_agent` instead, got the v0.6.84 dedupe's cached structured result, accepted it and
+returned. With no sandbox dispatch there was nothing for `after_completion` to inject into. The lead then
+re-delegated three times into the once-per-turn guard and hit `max_turns`.
+
+**Item 2(a) is therefore still unexercised.** The v0.6.81 rescue has still never run live.
+
+### What this canary DID prove — Item 2(b), the partial-answer surface — **CLOSED**
+
+The turn failed with two workers completed, and `_recover_failed_turn` produced a genuine founder-visible
+partial answer rather than the binary apology:
+
+> I couldn't finish that response, but part of the analysis completed before it stopped. Here's what I have:
+> **Structured Data Agent** — Reviewed 1 dataset(s) and carried forward 1 bounded numeric row(s).
+> **Per User Wiki** — Found 8 wiki claim(s) for '…'.
+> The rest of the analysis didn't complete, so treat this as partial. Ask again and I'll rebuild the full
+> answer from here.
+
+Correctly framed as partial (lead-in, per-worker attribution, closing caveat, trace step titled "Partial
+answer", `1 need attention` chip). **The founder's gating concern — that a degraded turn must not read as
+complete — is satisfied on a real live turn.**
+
+**UX weakness recorded:** the worker summaries report **process, not findings** ("Reviewed 1 dataset(s)",
+"Found 8 wiki claim(s)"), so the founder learns what *ran*, not what was *learned*. Honest but thin. The
+substantive content requires the deferred M4 finding-injection, or surfacing each child's
+`structured_result` instead of its `result_summary`. Backlog, not a blocker.
+
+### Status after this canary
+
+- **Item 1 — CLOSED** (dedupe confirmed; see the attribution correction in `04B-D2-FINDINGS.md` §11).
+- **Item 2(b) — CLOSED live.**
+- **Item 2(a) — STILL OWED**, now blocked behind Defect 7. Re-running the fault-injection canary on this
+  build would likely fail the same way.
+- **Item 3 — CLOSED** (v0.6.86).
+- **Canary 10b was NOT run.** It would exercise the same partial-answer surface just proven, on a build
+  with a known isolation defect, for ~$0.20. Deferred deliberately.
+- **Delegation reproducibility:** 3 passes / 2 failures across five live model-driven runs. Still not a
+  reliable path; SDK-M3 remains the hardening step.
