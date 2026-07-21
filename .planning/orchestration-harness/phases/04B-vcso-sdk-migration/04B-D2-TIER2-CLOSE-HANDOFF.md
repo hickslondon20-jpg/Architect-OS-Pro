@@ -67,18 +67,20 @@ Single-process env only — no `WEB_CONCURRENCY`, no `--workers` (the `TURN_REGI
 
 ## 4. Batched remaining-work backlog (priority order)
 
-1. **[medium] Duplicate worker dispatch idempotency (defect #4).** A re-sent CLI `tools/call` starts a
-   second `start_run` (canary 8 dispatched `per_user_wiki` twice; both completed). Dedupe/coalesce on
-   `(token, capability_key)` in `services/vcso_worker_mcp.py` (~:198–268). Cosmetic today — workers
-   occasionally run twice, both complete, answer unaffected — but wasteful.
-2. **[medium] Tier 3 — graceful-failure UX.** The DB-completion safety net (v0.6.81, `vcso_sdk_loop.py`
-   `stop_hook` + terminal check) is **built but never exercised live** (nothing has failed since). The
-   optional finding-injection is left as a TODO at `vcso_sdk_loop.py:~1001–1004`. Needs a **live
-   fault-injection test** + a **real partial-answer surface** (replace the binary `_failed_turn_message`
-   at `vcso_chat_service.py:~3110`).
-3. **[medium] Tier 3 — `per_user_wiki` formal confirmation.** Embedding semantic-ranking validation is
-   deferred (`tests/test_wiki_08_acceptance.py:~1224–1230`); relates to the v0.6.59 embedding fix
-   (`services/harness_engine.py:~110–112`).
+> **Items 1–3 were worked 2026-07-21 → `v0.6.84` / `v0.6.85` / `v0.6.86`. Full record:
+> `04B-D2-D-BACKLOG-BATCH.md`.** Item 3 is CLOSED. Items 1 and 2 are built and unit-proven but their
+> **live confirmations are still owed** (canary 9 = dedupe, canary 10 = fault injection) and nothing is
+> deployed yet — local `main` is ahead of the deployed head. Status below updated in place.
+
+1. ~~**[medium] Duplicate worker dispatch idempotency (defect #4).**~~ **Built, `v0.6.84`** — coalesced on
+   `(token, capability_key)` in `services/vcso_worker_mcp.py`. **Live canary 9 still owed.**
+2. ~~**[medium] Tier 3 — graceful-failure UX.**~~ **Built, `v0.6.85`** — real partial-answer surface
+   (`_failed_turn_message` now renders the DB-completed children) + a dark founder-only fault-injection
+   sub-flag to force a required worker to fail. **Live canary 10 still owed.** The optional mid-stream
+   finding-injection (`vcso_sdk_loop.py:~1002`) stays deferred to M4 by instruction.
+3. ~~**[medium] Tier 3 — `per_user_wiki` formal confirmation.**~~ **CLOSED, `v0.6.86`** — DI-EMBED now
+   validates real semantic ranking and passes live (44 passed / 1 skipped). Sibling confirmed already
+   fixed at `harness_engine.py:113`.
 4. **[large] SDK-M3.** Effort-scaling + explicit per-worker delegation contracts + full anchor.
 5. **[medium] M4.** Progress-bridge full C2 frontend surface — the bridge emits `sub_agent_step` today;
    the full surface treatment is pending.
