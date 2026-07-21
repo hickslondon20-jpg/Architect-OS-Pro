@@ -107,9 +107,20 @@ Both need the deploy first: push `main`, confirm `/api/health` `commit_sha_short
 with `cd490873…` / `hicks.london25@gmail.com`; anchor prompt needs a financial term + `concentration` +
 `90 days` **with a space**; re-darken immediately after and read back both flags off).
 
-**Canary 9 — dedupe.** Standard full-chain arm, no fault injection. Expect **exactly one child row per
-capability** (specifically one `per_user_wiki`, against Canary 8's two), a `worker_hop` `deduped` entry if
-the CLI re-sends, and a founder-visible cited answer no worse than Canary 8's.
+**Canary 9 — dedupe. RUN 2026-07-21 → FAIL, evidence NOT obtained.** The lead never delegated: zero `Task`
+calls, zero children, stop_hook thrash to `max_turns`, $0.107 for no answer. Full post-mortem in
+`04B-D2-M2-FINISH-LOG.md` → "Canary 9". Ruled out: the v0.6.84–88 commits (delegation surface
+byte-identical to Canary 8's build), CLI drift (`claude-agent-sdk==0.2.118` pinned since v0.6.29), the
+Railway env, and the worker mount. **Leading cause: the anchor prompt was changed** from Canary 8's
+verbatim text — agent error, not a code defect. **The dedupe therefore remains unconfirmed live.**
+
+**Canary 9-retry — the controlled rerun.** Identical arm, and **Canary 8's anchor verbatim**:
+> Our client concentration is rising and our margin is compressing. What should I do in the next 90 days?
+
+Expect **exactly one child row per capability** (specifically one `per_user_wiki`, against Canary 8's two),
+a `worker_hop` `deduped` entry if the CLI re-sends, and a founder-visible cited answer no worse than Canary
+8's. **If the lead again fails to delegate on the identical prompt, code, and CLI that worked on 2026-07-20,
+stop — that is a Tier 2 reproducibility problem, not a canary to retry a third time.**
 
 **Canary 10 — graceful failure.** Same arm plus `diagnostic_fault_injection_enabled=true` and
 `diagnostic_fault_injection_workers=["sandbox_execution_agent"]`. Expect: `fault_injection_armed` in the

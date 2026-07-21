@@ -769,3 +769,78 @@ re-sent CLI `tools/call` starts a second `start_run`; the fix is to dedupe/coale
 occasionally run twice and both complete, so the answer is unaffected — but it is wasteful and should be
 made idempotent. Batched to the tier-2-close backlog (item 1); see
 `04B-D2-TIER2-CLOSE-HANDOFF.md`.
+
+---
+
+## Canary 9 (deployed `f8cef250`, v0.6.88, verified) · **FAIL — lead never delegated. Zero Task calls, zero children.**
+
+**Date:** 2026-07-21. **Deploy confirmed:** `/api/health` `ok=true`, `commit_sha_short=f8cef250` == intended
+SHA. Purpose: live confirmation of the v0.6.84 dispatch dedupe (expect **one** `per_user_wiki` child vs
+Canary 8's two). **That evidence was not obtained** — the turn produced no workers at all.
+
+**Flag config used:** standard full-chain arm, founder `cd490873…` only, `native_model_driven_enabled=true`,
+`diagnostic_single_worker_enabled=false`, no fault-injection keys. Merged (not replaced) and read back;
+`max_turns=12` / `max_budget_usd=0.50` / `enabled_for_all=false` all preserved. **Re-darkened immediately
+after** and read back: both allowlists `[]`, `native_model_driven_enabled=false`; `vcso_planner` untouched.
+
+**Timeline (parent `6637a861-1219-48fd-b6d3-2b2ea825cbee`):**
+- 18:48:01 `vcso_intent_read` OK (haiku).
+- 18:48:04 `runtime_manifest decision=model_driven reason_code=none` — **the surface certified clean.**
+- 18:48:04 CLI spawned (`Using bundled Claude Code CLI: …/claude_agent_sdk/_bundled/claude`).
+- 18:48:34 → 18:49:03 — **ten** `agent_delegation_runs?parent_run_id=…&status=eq.completed` reads in 30s.
+  That query fires only from `post_tool_use` / `stop_hook` / the terminal check. With **zero** `Task`
+  lifecycle entries and zero children, this is the **stop_hook thrash**: lead tries to stop → blocked with
+  "delegate the missing required worker(s)" → retries → blocked, ~10 rounds until `max_turns=12`.
+- 18:49:03 ResultMessage → usage logged: **99,602 in / 2,036 out, claude-sonnet-4-6, $0.1071**.
+- 18:49:03 → 18:53:43 — **4m40s of silence after the SDK finished.** Turn terminalised only when the
+  browser disconnected: `GeneratorExit`, status `cancelled`. Founder saw "network error".
+- **Lifecycle contains exactly one entry** (`runtime_manifest`). No `task_pre_tool_use`, no
+  `pre_tool_probe`, no `worker_hop`, no children.
+
+**Ruled out (do not re-investigate without new evidence):**
+- **Not a regression from v0.6.84–88.** `git diff 72ababb8..f8cef250` over the delegation surface:
+  `vcso_sdk_config.py` **unchanged**, `main.py` **unchanged**, `vcso_worker_mcp_server.py` **unchanged**.
+  `vcso_sdk_loop.py` +46 lines, all additive (new standalone fn; two kwargs defaulting `()`; one TurnScope
+  kwarg; a `record_lifecycle` behind `if native_fault_injection:` which was empty). `vcso_worker_mcp.py`
+  +81 lines, all inside paths reached only *after* a worker call arrives — none arrived. **The compiled
+  lead surface is byte-identical to the build that passed Canary 8.**
+- **Not CLI drift.** `claude-agent-sdk==0.2.118` pinned exactly since v0.6.29; `requirements.txt` unchanged
+  since `72ababb8`. Same bundled CLI as Canary 8.
+- **Not the Railway env.** Founder confirmed `MCP_TOOL_TIMEOUT=240000` still set, no `WEB_CONCURRENCY`.
+  Logs show a single uvicorn process on `0.0.0.0:8080` and `StreamableHTTP session manager started`.
+- **Not the worker mount.** Alive: an external probe returned `421 Invalid Host header` (FastMCP's
+  loopback-only DNS-rebinding guard — a missing mount would 404). The CLI made **no** loopback request to
+  `/internal/mcp/workers` all turn; the only hit in the log is that diagnostic probe.
+
+**Leading cause — the anchor prompt was changed (agent error, not a code defect).** Canary 9 used a fresh
+anchor instead of Canary 8's verbatim text:
+
+| | Anchor |
+|---|---|
+| **C8 (PASS)** | "Our client concentration is rising and our margin is compressing. What should I do in the next 90 days?" |
+| **C9 (FAIL)** | "Our top two clients are a large share of revenue and margins are tightening. Where is our real client concentration risk, and what should I do about it over the next 90 days?" |
+
+C9's is 70% longer, asks two questions, and **states the concentration finding in the prompt** ("top two
+clients are a large share of revenue") while asking a diagnostic "where is our risk" — both plausibly
+reduce the lead's felt need to delegate when it already holds 99k tokens of assembled context. C8 supplies
+no figures and asks only "what should I do", leaving the lead needing to go get them. **Unproven** — it is
+a hypothesis, not a finding. The controlled retry is Canary 10: **C8's anchor verbatim**, everything else
+identical.
+
+### Findings that stand regardless of the anchor
+
+1. **Tier 2 was closed on n=1.** Canary 8 is the only successful model-driven run that has ever occurred.
+   Canary 9 is n=2 and produced nothing. Whatever explains it, "the lead reliably delegates" is **not**
+   established, and SDK-M3 (explicit per-worker delegation contracts) is the work that would establish it.
+   Treat the Tier 2 close as *demonstrated once*, not *proven stable*.
+2. **Non-delegation fails expensively and slowly.** ~$0.107 and 5 minutes of stop_hook thrash to
+   `max_turns`, then 4m40s hung after the SDK returned, and the founder gets nothing. A cheap early
+   give-up (detect "lead produced no Task by turn N" and terminalise with a real message) belongs on the
+   backlog.
+3. **Long silent SSE streams get killed.** The client disconnect is what ended this turn. Even Canary 8's
+   *successful* run streamed 3m34s. Whatever intermediary dropped this one is close enough to that number
+   to be a live risk on passing turns too. Needs a keepalive/heartbeat on the model-driven path.
+4. **The v0.6.85 partial-answer surface behaved correctly on its first live encounter** — with genuinely
+   zero completed children it produced the byte-identical original apology ("This response was interrupted
+   before it could finish. Please try again."). That is the designed no-partials path. It still has **not**
+   been seen doing its real job, because there was nothing to show.
