@@ -265,6 +265,21 @@ def native_fault_injection_capabilities(
     return tuple(dict.fromkeys(requested))
 
 
+FAULT_INJECTION_MODES: tuple[str, ...] = ("before_start", "after_completion")
+
+
+def native_fault_injection_mode(settings: dict[str, Any] | None) -> str:
+    """Which failure shape the fault-injection canary rehearses. Defaults to the conservative
+    ``before_start``; an unrecognised value falls back to it rather than failing a turn on a typo.
+
+    ``after_completion`` is the one that exercises the v0.6.81 rescue: the worker completes and writes its
+    child row, but its return to the lead is dropped — the canary-6/7 slow-worker shape. ``before_start``
+    leaves the worker missing everywhere, which is a genuine block, and drives the v0.6.85 partial answer."""
+
+    mode = str((settings or {}).get("diagnostic_fault_injection_mode") or "").strip()
+    return mode if mode in FAULT_INJECTION_MODES else "before_start"
+
+
 def build_native_runtime_manifest(compiled: Any, *, required_agents: tuple[str, ...]) -> dict[str, Any]:
     """Describe the native SDK surface without exposing prompts, credentials, or tool payloads."""
 
@@ -364,6 +379,7 @@ def stream_vcso_sdk_turn(
     native_lifecycle_sink: LifecycleSink | None = None,
     native_model_driven: bool = False,
     native_fault_injection: tuple[str, ...] = (),
+    native_fault_injection_mode_key: str = "before_start",
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -397,6 +413,7 @@ def stream_vcso_sdk_turn(
                         native_lifecycle_sink=native_lifecycle_sink,
                         native_model_driven=native_model_driven,
                         native_fault_injection=native_fault_injection,
+                        native_fault_injection_mode_key=native_fault_injection_mode_key,
                     )
                 )
             )
@@ -613,6 +630,7 @@ async def _run_sdk_turn(
     native_lifecycle_sink: LifecycleSink | None,
     native_model_driven: bool = False,
     native_fault_injection: tuple[str, ...] = (),
+    native_fault_injection_mode_key: str = "before_start",
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -1503,12 +1521,13 @@ async def _run_sdk_turn(
                 # native_fault_injection_capabilities). Present so the graceful-failure path can be
                 # rehearsed on a real canary instead of shipping untested recovery code.
                 fault_injection_capabilities=frozenset(native_fault_injection),
+                fault_injection_mode=native_fault_injection_mode_key,
             )
         )
         if native_fault_injection:
             record_lifecycle(
                 "fault_injection_armed",
-                reason_code=",".join(native_fault_injection)[:120],
+                reason_code=f"{native_fault_injection_mode_key}:{','.join(native_fault_injection)}"[:120],
             )
         model_driven_worker_url = worker_server_url(base_url, model_driven_token)
         hooks["PreToolUse"] = [

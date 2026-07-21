@@ -28,7 +28,10 @@ from services.vcso_chat_service import (
     _failure_trace_step,
     _strip_citation_markers,
 )
-from services.vcso_sdk_loop import native_fault_injection_capabilities
+from services.vcso_sdk_loop import (
+    native_fault_injection_capabilities,
+    native_fault_injection_mode,
+)
 from services.vcso_worker_mcp import (
     TurnRegistry,
     TurnScope,
@@ -166,6 +169,77 @@ def test_uninjected_capabilities_on_the_same_turn_still_run():
     out = asyncio.run(run_worker_capability(token, "structured_data_agent", {"objective": "x"}, registry=reg))
     assert out["status"] == "completed"
     assert len(_Orchestrator.calls) == 1
+
+
+def test_after_completion_mode_writes_the_child_row_then_drops_the_return():
+    """The v0.6.81 rescue exists for ONE shape: the worker finished server-side but its result never got
+    back to the lead in-band (canaries 6/7, the slow sandbox worker). `before_start` produces the opposite
+    shape — missing everywhere — so it cannot exercise that rescue. `after_completion` must therefore let
+    start_run actually run (child row written, finding chained) and fail only the return."""
+
+    reg = TurnRegistry()
+    scope = _scope(
+        allowed_capabilities=frozenset(REQUIRED),
+        fault_injection_capabilities=frozenset({"structured_data_agent"}),
+        fault_injection_mode="after_completion",
+    )
+    token = reg.mint(scope)
+
+    with pytest.raises(WorkerFaultInjected):
+        asyncio.run(run_worker_capability(token, "structured_data_agent", {"objective": "x"}, registry=reg))
+
+    # The worker really ran — that is the whole point; a child row exists for the DB bridge to find.
+    assert len(_Orchestrator.calls) == 1
+    injected = [e for e in scope.diagnostics if e["stage"] == "fault_injected"]
+    assert injected and injected[0]["mode"] == "after_completion"
+    assert injected[0]["child_run_id"] == "child-1"
+    # The finding still chains to the next worker, exactly as a real timed-out worker's would.
+    assert scope.prior_findings["sandbox_execution_agent"]["run_id"] == "child-1"
+
+
+def test_after_completion_failure_is_not_cached_so_a_resend_stays_failed():
+    """Caching here would let a CLI re-send succeed and quietly dissolve the condition under test."""
+
+    reg = TurnRegistry()
+    scope = _scope(
+        fault_injection_capabilities=frozenset({"structured_data_agent"}),
+        fault_injection_mode="after_completion",
+    )
+    token = reg.mint(scope)
+    for _ in range(2):
+        with pytest.raises(WorkerFaultInjected):
+            asyncio.run(run_worker_capability(token, "structured_data_agent", {"objective": "x"}, registry=reg))
+    assert "structured_data_agent" not in scope.completed_results
+
+
+def test_before_start_mode_never_reaches_the_orchestrator():
+    """Contrast with the above: before_start must leave NO child row, or the DB bridge would rescue a
+    worker that never ran and the block-preserved branch would go untested."""
+
+    reg = TurnRegistry()
+    scope = _scope(
+        fault_injection_capabilities=frozenset({"structured_data_agent"}),
+        fault_injection_mode="before_start",
+    )
+    token = reg.mint(scope)
+    with pytest.raises(WorkerFaultInjected):
+        asyncio.run(run_worker_capability(token, "structured_data_agent", {"objective": "x"}, registry=reg))
+    assert _Orchestrator.calls == []
+    assert scope.prior_findings == {}
+
+
+def test_fault_injection_mode_defaults_and_rejects_typos():
+    """A typo in a dark diagnostic key must not fail a founder's turn — it falls back to before_start."""
+
+    assert native_fault_injection_mode(None) == "before_start"
+    assert native_fault_injection_mode({}) == "before_start"
+    assert native_fault_injection_mode({"diagnostic_fault_injection_mode": "after_completion"}) == "after_completion"
+    assert native_fault_injection_mode({"diagnostic_fault_injection_mode": "after_completed"}) == "before_start"
+    assert native_fault_injection_mode({"diagnostic_fault_injection_mode": ""}) == "before_start"
+
+
+def test_default_scope_mode_is_before_start():
+    assert TurnScope(user_id="u", parent_surface="virtual_cso").fault_injection_mode == "before_start"
 
 
 def test_default_scope_injects_nothing():

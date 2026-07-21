@@ -94,6 +94,17 @@ class TurnScope:
     # without breaking anything real. Populated only from the `vcso_sdk_loop` diagnostic sub-flag under the
     # existing founder allowlist; empty on every other path, so this is inert by construction.
     fault_injection_capabilities: frozenset[str] = field(default_factory=frozenset)
+    # WHICH failure shape to rehearse. The two are not interchangeable — they exercise opposite branches
+    # of the v0.6.81 safety net:
+    #   "before_start"     — fail before start_run. NO child row is written, so the worker is missing from
+    #                        memory AND the DB, the completion bridge finds nothing, and the stop_hook
+    #                        rightly keeps blocking. Proves the "a real block is preserved" branch, and
+    #                        drives the turn into the v0.6.85 partial-answer surface.
+    #   "after_completion" — let the worker run and write its completed child row, then fail the RETURN to
+    #                        the lead. This reproduces the actual shape v0.6.81 was built for (canaries
+    #                        6/7: the slow worker finished server-side but its result never got back
+    #                        in-band), so the bridge should find it completed and NOT block.
+    fault_injection_mode: str = "before_start"
     # Same-process diagnostics drained by the loop after the query. The endpoint runs in a separate
     # request context and cannot reach `record_lifecycle`, so without this a worker call that never
     # arrives is indistinguishable from one that arrived and failed — which is precisely what canary 3
@@ -283,11 +294,16 @@ async def _dispatch_worker_capability(
     """Run one worker for real. Called only by `run_worker_capability`, and only once per
     (token, capability_key) that reaches completion — it holds that capability's dispatch lock."""
 
-    if capability_key in scope.fault_injection_capabilities:
+    injected = capability_key in scope.fault_injection_capabilities
+    if injected and scope.fault_injection_mode != "after_completion":
         # Fail BEFORE start_run: no child row is written, so the DB completion bridge genuinely reports
         # this worker missing and the stop_hook / terminal check face a real absence, not a simulated one.
-        logger.warning("vcso worker FAULT-INJECTED (dark diagnostic) capability=%s", capability_key)
-        scope.diagnostics.append({"stage": "fault_injected", "capability_key": capability_key})
+        logger.warning(
+            "vcso worker FAULT-INJECTED before_start (dark diagnostic) capability=%s", capability_key
+        )
+        scope.diagnostics.append(
+            {"stage": "fault_injected", "capability_key": capability_key, "mode": "before_start"}
+        )
         raise WorkerFaultInjected(
             f"Fault injection: {capability_key} was forced to fail for this diagnostic turn."
         )
@@ -373,6 +389,28 @@ async def _dispatch_worker_capability(
     next_key = _next_worker_capability(capability_key)
     if next_key is not None:
         scope.prior_findings[next_key] = compact
+    if injected:
+        # "after_completion": the worker DID run and DID write its completed child row (and its finding is
+        # chained above, exactly as a real timed-out worker's would be) — only the return to the lead is
+        # lost. Raise WITHOUT caching, so the failure is stable if the CLI re-sends; caching here would let
+        # a retry succeed and quietly dissolve the very condition under test. This is the shape v0.6.81 was
+        # written for, so the DB bridge must now rescue this worker and the stop_hook must NOT block.
+        logger.warning(
+            "vcso worker FAULT-INJECTED after_completion (dark diagnostic) capability=%s child_run_id=%s",
+            capability_key,
+            compact.get("run_id"),
+        )
+        scope.diagnostics.append(
+            {
+                "stage": "fault_injected",
+                "capability_key": capability_key,
+                "mode": "after_completion",
+                "child_run_id": compact.get("run_id"),
+            }
+        )
+        raise WorkerFaultInjected(
+            f"Fault injection: {capability_key} completed but its return to the lead was dropped."
+        )
     # Cache LAST, and only on success: a raised dispatch leaves no entry, so a genuine retry after a
     # failure still runs a real worker (the dedupe suppresses waste, never recovery).
     scope.completed_results[capability_key] = compact

@@ -49,6 +49,7 @@ from services.vcso_sdk_loop import (
     VCSO_SDK_CAPABILITY_KEY,
     VcsoSdkUsage,
     native_fault_injection_capabilities,
+    native_fault_injection_mode,
     native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
@@ -429,6 +430,9 @@ class VcsoChatService:
             if native_model_driven
             else ()
         )
+        native_fault_mode = (
+            native_fault_injection_mode(_sdk_settings) if native_fault_injection else "before_start"
+        )
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
         planner_path_selected = (
@@ -726,6 +730,7 @@ class VcsoChatService:
                 native_lifecycle_sink=persist_sdk_lifecycle if sdk_native_subagent_mode else None,
                 native_model_driven=native_model_driven,
                 native_fault_injection=native_fault_injection,
+                native_fault_injection_mode_key=native_fault_mode,
             )
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))
