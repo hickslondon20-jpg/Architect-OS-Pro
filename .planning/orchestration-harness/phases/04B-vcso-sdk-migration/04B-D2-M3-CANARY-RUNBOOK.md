@@ -79,7 +79,7 @@ not met — that is the whole point of the rule.
 | 2 | 2026-07-22 | `b3dab271` | `beba1825` (completed, 2m03s) | structured `4ab2ee8f` 0.5s · sandbox `61ecd789` 26.7s · wiki `f47705e2` 1.9s — all completed | $0.1369 compose | **PASS** |
 | 3 | 2026-07-22 | `b3dab271` | `c38d37e6` (completed, 2m04s) | structured `e0bca1c6` 0.3s · wiki `110b8fdb` 1.8s · sandbox `97e320bf` 35.4s — all completed | $0.1332 compose | **PASS** |
 | 4 | 2026-07-22 | `b3dab271` | `07f31da2` (completed, 2m29s) | structured `b39e81a1` 0.4s · sandbox `2b4e1c49` 51.0s · wiki `c2d0b82b` 1.3s — all completed | $0.1321 compose | **FAIL — stream lost; founder saw an error** |
-| 5 | | | | | | |
+| 5 | 2026-07-22 | `5041fa10` | `c2180f37` (completed, 2m44s) | structured `6cd99058` 0.4s · wiki `1f828dcc` 1.7s · sandbox `2e93beda` 70.0s — all completed | $0.1444 compose | **PASS (both gates)** |
 | Control (paired w/ run 3) | 2026-07-22 | `b3dab271` | `7fc987e1` (completed, **5.6s**) | **zero children**, zero delegation lifecycle | $0.0306 | **PASS** |
 
 ---
@@ -323,4 +323,83 @@ Anchor runs cost ~$0.13–0.15 of compose each. **Only one more anchor run is re
 runs 1–4 all passed it. Do not restart the sequence from zero: that would spend ~$0.60 to re-prove
 delegation that is already evidenced four times over. The control does **not** need re-running either
 (run 3's is sufficient and it is the cheap one at $0.03). Budget for M3 completion: **one anchor run.**
+
+---
+
+## Run 5 — 2026-07-22, deployed `5041fa10`, `ok=true` · **PASS on BOTH gates** — Gate 1 closes 5/5
+
+**Runs.** Parent `c2180f37-d266-4cf3-8c5c-53b83e7a6fc1` completed in **2m44s**. `structured_data_agent`
+`6cd99058` (0.4s) → `per_user_wiki` `1f828dcc` (1.7s) → `sandbox_execution_agent` `2e93beda` (**70.0s**).
+All completed. Intent `strategic_synthesis` / `deep`.
+
+**Lifecycle (14 entries), fifth consecutive clean shape.** `worker_token_scoping tokens=3`;
+`runtime_manifest none`; **3× Task allow first attempt, zero denials**; **3× `pre_tool_probe`, each
+worker on its OWN tool**; 3 received + 3 completed hops; no duplicate, no cross-worker call.
+
+**Tiers.** Haiku workers / Sonnet compose. **Answer.** 5,131 chars, **33 citations**, compose $0.14443.
+
+**Gate 2 PASS — delivered.** Founder screenshots show the progress panel at **8/8** with all three
+workers rendered nested and paired (Structured data worker / Run Structured Data Agent · Strategic
+context worker / Run Per User Wiki · Sandbox compute worker / Run Sandbox Execution Agent), curated
+narration between them, and the answer on screen.
+
+### Two honest caveats on run 5
+
+**1. A `linked: Financial` chip is visible in the composer in the screenshots — an uncontrolled variable
+that should not have been present.** The evidence says it did **not** affect this turn: the persisted
+`routing` for the user message is the ordinary tier-1 selection (`reason_code:
+intent_strategic_synthesis`, `tiers_consulted: [1]`) with the same wiki-sourced shape as runs 1–4, and no
+linked-folder scoping appears anywhere in the routing record. The most likely reading is that the chip
+was staged in the composer for a later message. **Stated as a reading, not a certainty** — the runbook's
+per-run loop should add "composer clear of linked folders" to the pre-send checklist so this cannot
+recur.
+
+**2. The flag was armed for ~58 minutes** (18:03:20Z → turn at 19:01:36Z) while waiting for the founder,
+against a hard rule of "re-darken immediately after each turn". Exposure was bounded to the seeded
+founder UUID only and the flag was re-darkened before any evidence was pulled, so nothing leaked — but
+arming *before* the founder is ready to send is the wrong order. **Arm on the founder's go, not in
+anticipation of it.**
+
+**Carried forward:** `ai_usage_log` again shows 2 `sub_agent` rows both on the sandbox child. Fifth
+consecutive occurrence of the same pre-existing attribution collapse. M4 item.
+
+---
+
+# FINAL TALLY
+
+## Gate 1 — Delegation reliability · **CLOSED, 5 / 5 consecutive**
+
+| Run | Deployed | Delegation | Workers | Denials | Cross-worker call | Answer persisted |
+|---|---|---|---|---|---|---|
+| 1 | `b3dab271` | lead reasoned | 3/3 completed | 0 | none | 5,403 ch / 33 cit |
+| 2 | `b3dab271` | lead reasoned | 3/3 completed | 0 | none | 5,908 ch / 33 cit |
+| 3 | `b3dab271` | lead reasoned | 3/3 completed | 0 | none | 5,005 ch / 33 cit |
+| 4 | `b3dab271` | lead reasoned | 3/3 completed | 0 | none | 4,886 ch / 33 cit |
+| 5 | `5041fa10` | lead reasoned | 3/3 completed | 0 | none | 5,131 ch / 33 cit |
+
+**15 Task delegations, 15 allowed on the first attempt, zero denials. 15 worker child runs, 15
+completed. 15 worker tool calls, every one on the worker's own tool.** Correct tiers on every run
+(Haiku workers / Sonnet compose). Compose cost $0.132–$0.144, tight band.
+
+Delegation ORDER varied across runs (structured→wiki→sandbox on 1/3/5; structured→sandbox→wiki on 2/4)
+while the sandbox-after-structured constraint held every time — the lead is reasoning, not replaying.
+
+## Gate 2 — Founder-visible delivery · **4 / 5, OPEN**
+
+Runs 1, 2, 3, 5 delivered. Run 4 did not: the stream died ~12s in and the founder saw an error for a
+turn that had succeeded. **Defect 8 (the UI asserting an unsaved turn) is fixed in v0.6.100; the CAUSE of
+the early disconnect remains undetermined and unreproduced.** Gate 2 must not be reported as closed.
+
+## Effort-scaling · confirmed both directions
+
+Up: the pinned anchor decomposed on 5/5 runs. Down: the paired control (run 3) answered directly in
+5.6s with **zero** child runs and zero delegation lifecycle, at $0.031 vs $0.133 — with the recorded
+caveat that the control is app-gated and therefore evidences system-level, not model-level, restraint.
+
+## Defect 7 · closed in code, negative-confirmed live
+
+Per-`(turn, capability)` tokens live on all 5 runs (`worker_token_scoping tokens=3`). Across 15 worker
+tool calls there was **not one cross-worker call** — versus Canary 9-retry and Canary 10a, which each
+showed the sandbox subagent calling `run_structured_data_agent`. The refusal path itself is proven by
+unit test, not by canary: no run attempted a cross-worker call for the guard to reject.
 
