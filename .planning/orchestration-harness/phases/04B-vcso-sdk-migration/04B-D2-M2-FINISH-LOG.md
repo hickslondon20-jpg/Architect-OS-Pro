@@ -9,6 +9,26 @@ Stages G–I (control run, canary probe, re-darken) are **not started** — they
 
 ---
 
+## Version-log note (added 2026-07-22, SDK-M3) — the two `v0.6.89` commits
+
+`v0.6.89` was used **twice**. A retry commit re-used the version instead of incrementing it, so a cold
+`git log` reader sees the same version prefix on two different commits with contradictory headlines. The
+history is pushed and is **not** being rewritten; this note is the map.
+
+| SHA | Message | What it actually records |
+|---|---|---|
+| `85a4409d` | v0.6.89 Record Canary 9 FAIL: lead never delegated; dedupe unconfirmed live | **Canary 9 — FAIL.** The lead never delegated (agent-authored replacement anchor); the turn thrashed to `max_turns` for ~$0.107 with no answer, then the client disconnected. Dedupe unproven. |
+| `29742abe` | v0.6.89 Record Canary 9-retry PASS (dedupe confirmed live); persist lifecycle stage | **Canary 9-retry — PASS.** Canary 8's anchor verbatim; three children completed; a duplicate arrived and was coalesced. Item 1 closed. (Its "duplicate" attribution was later corrected — see `04B-D2-FINDINGS.md` §11: it was a **cross-worker call**, i.e. Defect 7, not a re-sent CLI `tools/call`. Item 1 still stands on observed behaviour.) |
+
+**Read the later SHA as the later event.** `29742abe` supersedes `85a4409d` chronologically even though
+both carry `v0.6.89`.
+
+**The rule this violated, restated:** versions only ever move forward — *a failed or retried commit
+increments too*. There is no exception for "the previous attempt did not work". Every commit from
+`v0.6.90` on has held to this.
+
+---
+
 ## Stage A — Local compile + unit tests · GREEN (after one pre-existing fix)
 
 `py_compile` clean across all seven touched files. Focused suite: **31 passed**.
