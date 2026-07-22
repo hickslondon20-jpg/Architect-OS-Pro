@@ -69,6 +69,52 @@ P4_THIN_SLICE_SIGNALS = re.compile(
     r"(?=.*\b(?:financial|p&l|margin|revenue)\b)(?=.*\bconcentration\b)(?=.*\b90\s+days?\b)",
     re.IGNORECASE | re.DOTALL,
 )
+# SDK-M3 step C2 — the explicit per-worker delegation contract each Task must carry. Data, not prose, so
+# the lead prompt, the contract validator and the docs cannot drift apart. `objective` here is a
+# DESCRIPTION of the worker's job that the lead rewrites for the founder's actual question; the other three
+# fields are the floor the validator enforces.
+WORKER_DELEGATION_CONTRACTS: dict[str, dict[str, str]] = {
+    "structured_data_agent": {
+        "objective": (
+            "quantify the founder's client concentration and margin trend from their own dataset "
+            "(top-client revenue share, trend direction, magnitude)"
+        ),
+        "output_format": "compact cited findings; figures with the period they cover",
+        "tools_sources": "the founder's structured dataset only",
+        "boundaries": (
+            "founder isolation, cite every claim, compact output, no raw payloads, no wiki writes, "
+            "no recursion, no external writes"
+        ),
+    },
+    "sandbox_execution_agent": {
+        "objective": (
+            "compute the forward exposure implied by the structured finding (concentration under "
+            "plausible client-loss scenarios over the next 90 days)"
+        ),
+        "output_format": "compact cited findings; show the computed figures, not the code",
+        "tools_sources": (
+            "ONLY the compact structured-data finding passed in context_scope.prior_findings -- never a "
+            "raw dataset"
+        ),
+        "boundaries": (
+            "founder isolation, cite every claim, compact output, no raw payloads, no wiki writes, "
+            "no recursion, no external writes, no network access"
+        ),
+    },
+    "per_user_wiki": {
+        "objective": (
+            "retrieve this founder's own strategic context bearing on concentration and margin risk "
+            "(positioning, client mix history, prior decisions and constraints)"
+        ),
+        "output_format": "compact cited findings; quote the founder's own framing where it exists",
+        "tools_sources": "the founder's per-user wiki only",
+        "boundaries": (
+            "founder isolation, cite every claim, compact output, no raw payloads, no wiki writes, "
+            "no recursion, no external writes"
+        ),
+    },
+}
+
 # SDK-M3 step A3 — cheap give-up thresholds for a lead that will not delegate.
 # MAX_STOP_BLOCKS: how many times the stop_hook may block WITHOUT a new worker completing in between.
 #   Two is deliberate: one block is a legitimate nudge (the lead forgot and then complies — the shape that
@@ -77,6 +123,8 @@ P4_THIN_SLICE_SIGNALS = re.compile(
 #   in a row against the once-per-turn guard, then ground out at max_turns).
 MODEL_DRIVEN_MAX_STOP_BLOCKS = 2
 MODEL_DRIVEN_MAX_TASK_DENIALS = 3
+# Shortest string that can plausibly be a per-worker objective rather than a placeholder.
+MIN_TASK_OBJECTIVE_CHARS = 24
 NATIVE_LEGACY_TOOL_PARAGRAPH = re.compile(
     r"\n*You may call tools mid-turn\. Use tool_search to discover relevant tools or skill packs before\s+"
     r"using specialized tools\. Prefer direct registry tools for narrow reads/computations, and\s+"
@@ -439,7 +487,9 @@ def stream_vcso_sdk_turn(
     # Canary 9, and Canary 8 *passed* with a 3m34s stream, i.e. the successful shape was already inside the
     # danger zone. Draining with a timeout and emitting a keepalive on idle keeps bytes flowing without
     # touching the turn: `heartbeat` is already part of the SSE contract the frontend tolerates.
-    keepalive_seconds = max(1.0, heartbeat_seconds)
+    # Same floor convention as the per-tool heartbeat in `_make_sdk_tool`; the real cadence is the
+    # caller's `heartbeat_seconds` (TOOL_HEARTBEAT_SECONDS = 10s in production).
+    keepalive_seconds = max(0.01, heartbeat_seconds)
     idle_seconds = 0.0
     while True:
         try:
@@ -451,7 +501,7 @@ def stream_vcso_sdk_turn(
                 "data": {
                     "sdkMode": True,
                     "reason": "stream_keepalive",
-                    "idleSeconds": round(idle_seconds, 1),
+                    "idleSeconds": round(idle_seconds, 2),
                 },
             }
             continue
@@ -882,7 +932,15 @@ async def _run_sdk_turn(
         capability_key = str(tool_input.get("subagent_type") or "").strip()
         task_id = str(tool_use_id or "")
         try:
-            contract = _parse_task_contract(tool_input.get("prompt"))
+            contract = _parse_task_contract(
+                tool_input.get("prompt"),
+                # Per-worker contracts (step C2): the objectives already approved this turn, so a reused
+                # objective is refused rather than dispatched as a second, indistinguishable job.
+                prior_objectives={
+                    key: str(existing.get("objective") or "")
+                    for key, existing in task_contracts.items()
+                },
+            )
             if capability_key not in required_agents:
                 raise ValueError("This Phase-D canary may delegate only the approved thin-slice workers.")
             if capability_key in task_capabilities.values():
@@ -1145,15 +1203,18 @@ async def _run_sdk_turn(
                 stop_block_count > MODEL_DRIVEN_MAX_STOP_BLOCKS
                 or task_denial_count >= MODEL_DRIVEN_MAX_TASK_DENIALS
             ):
+                if not gave_up_early:
+                    # Record once. The SDK may call Stop again on the way out; a second identical row would
+                    # read as two separate give-ups in the lifecycle.
+                    record_lifecycle(
+                        "delegation_give_up",
+                        decision="stop",
+                        reason_code=(
+                            f"blocks={stop_block_count},denials={task_denial_count},"
+                            f"delegations={delegation_count},missing={'|'.join(missing)}"
+                        )[:120],
+                    )
                 gave_up_early = True
-                record_lifecycle(
-                    "delegation_give_up",
-                    decision="stop",
-                    reason_code=(
-                        f"blocks={stop_block_count},denials={task_denial_count},"
-                        f"delegations={delegation_count},missing={'|'.join(missing)}"
-                    )[:120],
-                )
                 logger.warning(
                     "vcso_sdk model-driven give-up: lead did not delegate (blocks=%s denials=%s missing=%s)",
                     stop_block_count,
@@ -2070,7 +2131,19 @@ def _subagent_plan_label(capability_key: str) -> str:
     return labels.get(capability_key, _subagent_title(capability_key))
 
 
-def _parse_task_contract(value: Any) -> dict[str, Any]:
+def _normalized_objective(objective: str) -> str:
+    return " ".join(str(objective).lower().split())
+
+
+def _parse_task_contract(value: Any, *, prior_objectives: dict[str, str] | None = None) -> dict[str, Any]:
+    """Validate one delegation contract. `prior_objectives` is capability_key -> objective for the Tasks
+    already approved this turn, so a lead that sends the SAME objective to two workers is caught.
+
+    SDK-M3 step C2 keeps this deliberately light. Every rejection here now feeds the cheap give-up
+    (step A3), so an over-strict validator would turn a recoverable turn into an early failure. It checks
+    only the two things that mean the contract was not actually authored PER WORKER: an objective too short
+    to be one, and an objective reused from a sibling."""
+
     if not isinstance(value, str) or not value.strip():
         raise ValueError("Task prompt must be one JSON object containing the delegation contract.")
     contract = json.loads(value)
@@ -2088,6 +2161,18 @@ def _parse_task_contract(value: Any) -> dict[str, Any]:
         raise ValueError("Task contract boundaries must be a non-empty list.")
     if not isinstance(contract.get("context_scope"), dict):
         raise ValueError("Task contract context_scope must be an object.")
+    objective = _normalized_objective(contract["objective"])
+    if len(objective) < MIN_TASK_OBJECTIVE_CHARS:
+        raise ValueError(
+            "Task contract objective must state this worker's specific job "
+            f"(at least {MIN_TASK_OBJECTIVE_CHARS} characters)."
+        )
+    for other_key, other_objective in (prior_objectives or {}).items():
+        if _normalized_objective(other_objective) == objective:
+            raise ValueError(
+                f"Task contract objective duplicates the one already sent to {other_key}; "
+                "each worker needs its own objective."
+            )
     return contract
 
 
@@ -2107,6 +2192,40 @@ def _native_synthesis_prompt(required_agents: tuple[str, ...], findings: list[di
     )
 
 
+def _per_worker_contract_brief(required_agents: tuple[str, ...]) -> str:
+    """SDK-M3 step C2 — render ONE explicit delegation contract per worker.
+
+    Until M3 the lead got a single generic schema and had to invent each worker's job from the schema plus
+    the worker's name. That is the reasoning discipline the dropped-child failure lacked: a lead that is
+    vague about what a worker is FOR is a lead that can talk itself out of spawning it. Naming each
+    worker's objective, output format, sources and boundaries up front converts "decide what to delegate"
+    into "fill in four fields you have already been handed" — a much smaller ask on a 99k-token context.
+
+    Kept as data, not prose, so the three contracts cannot drift apart in the prompt string."""
+
+    specs = [WORKER_DELEGATION_CONTRACTS[key] for key in required_agents if key in WORKER_DELEGATION_CONTRACTS]
+    if not specs:
+        return ""
+    blocks = []
+    for key, spec in zip(
+        [key for key in required_agents if key in WORKER_DELEGATION_CONTRACTS], specs, strict=False
+    ):
+        blocks.append(
+            f"\n\n  {key}\n"
+            f"    objective     -- {spec['objective']}\n"
+            f"    output_format -- {spec['output_format']}\n"
+            f"    tools_sources -- {spec['tools_sources']}\n"
+            f"    boundaries    -- {spec['boundaries']}"
+        )
+    return (
+        "\n\nPER-WORKER DELEGATION CONTRACTS. Each Task you send carries its OWN contract. Write the "
+        "objective in your own words for THIS founder's question -- do not paste these lines verbatim and "
+        "do not reuse one worker's objective for another; each worker's objective must describe that "
+        "worker's distinct job. The output_format, tools_sources and boundaries below are the floor:"
+        + "".join(blocks)
+    )
+
+
 def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
     required = ", ".join(required_agents)
     return (
@@ -2120,9 +2239,21 @@ def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
         "exactly one JSON object with keys objective, output_format, tools_sources, boundaries, and "
         "context_scope. Boundaries must require founder isolation, citations, compact output, no raw "
         "payloads, no wiki writes, no recursion, and no external writes. Compose only from the compact Task "
-        "findings after every required Task completes; do not re-crawl sources. For all non-canary/simple turns, "
-        "answer directly and do not use Task."
-        "\n\nTASK CONTRACT SCHEMA. Each Task prompt must be EXACTLY one JSON object -- no prose, no markdown "
+        "findings after every required Task completes; do not re-crawl sources."
+        # EFFORT-SCALING, BOTH DIRECTIONS (SDK-M3 step C1). Scaling up is the failure everyone watches for;
+        # scaling DOWN is the one that quietly makes the system expensive and slow. Both are stated as one
+        # rule so neither reads as an afterthought, and the "already know the answer" clause is explicit
+        # because that is the exact rationalisation behind the Canary 9 non-delegation: a lead sitting on
+        # 99k tokens of assembled context can always persuade itself it has enough.
+        "\n\nEFFORT-SCALING. Match effort to the question, in BOTH directions. This turn is a genuine "
+        "multi-part strategic synthesis and must be decomposed. A simple lookup, a factual recall, a "
+        "clarification, or an acknowledgement must be answered DIRECTLY in one pass -- no Task, no worker, "
+        "no plan. Never over-decompose a simple turn. On this turn, do not skip a required worker because "
+        "the assembled context appears to already contain the answer: the workers exist to derive the "
+        "numbers and their evidence, and composing from context you were handed instead of from worker "
+        "findings is the failure mode this contract exists to prevent."
+        + _per_worker_contract_brief(required_agents)
+        + "\n\nTASK CONTRACT SCHEMA. Each Task prompt must be EXACTLY one JSON object -- no prose, no markdown "
         "fence, no text before or after the braces. Required keys: objective (non-empty string), "
         "output_format (present), tools_sources (NON-EMPTY list), boundaries (NON-EMPTY list), context_scope "
         "(object). For sandbox_execution_agent, context_scope.prior_findings must be non-empty (the compact "

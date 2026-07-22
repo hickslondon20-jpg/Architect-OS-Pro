@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import time
@@ -1089,10 +1090,10 @@ def test_sandbox_delegation_guard_still_fires_alongside_app_owned_findings_chann
 
     monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _UnusedOrchestrator)
 
-    def _contract(context_scope):
+    def _contract(context_scope, objective="Compute the concentration and margin trend."):
         return json.dumps(
             {
-                "objective": "Compute the concentration and margin trend.",
+                "objective": objective,
                 "output_format": "compact_json",
                 "tools_sources": ["founder_dataset"],
                 "boundaries": ["founder isolation", "citations required"],
@@ -1107,10 +1108,15 @@ def test_sandbox_delegation_guard_still_fires_alongside_app_owned_findings_chann
         post = options.hooks["PostToolUse"][0].hooks[0]
 
         async def _delegate(subagent_type, task_id, context_scope):
+            # SDK-M3 step C2: each worker must carry its OWN objective, so derive one per capability.
+            objective = f"Deliver the {subagent_type.replace('_', ' ')} finding for this turn."
             return await pre_task(
                 {
                     "tool_name": "Agent",
-                    "tool_input": {"subagent_type": subagent_type, "prompt": _contract(context_scope)},
+                    "tool_input": {
+                        "subagent_type": subagent_type,
+                        "prompt": _contract(context_scope, objective),
+                    },
                     "agent_id": None,
                 },
                 task_id,
@@ -1179,3 +1185,320 @@ def test_sandbox_delegation_guard_still_fires_alongside_app_owned_findings_chann
     assert _decision("no_prior") == "deny"
     assert "inherit the compact structured-data finding" in _reason("no_prior")
     assert _decision("ok") == "allow"
+
+
+# ===================================================================================================
+# SDK-M3 step A/B at the loop level — cheap give-up, diagnostics survive failure, per-capability tokens
+# ===================================================================================================
+
+from services.vcso_worker_mcp import TURN_REGISTRY  # noqa: E402
+
+
+class _AllCompletedClient:
+    """Every required worker has a completed child row, so the compose gates never block."""
+
+    def table(self, name: str):
+        if name == "agent_delegation_runs":
+            return _FlagQuery(
+                rows=[
+                    {"capability_key": "structured_data_agent", "status": "completed"},
+                    {"capability_key": "sandbox_execution_agent", "status": "completed"},
+                    {"capability_key": "per_user_wiki", "status": "completed"},
+                ]
+            )
+        return _FlagQuery(error=RuntimeError("not required by this unit test"))
+
+
+class _AllCompletedStore(_NativeStore):
+    client = _AllCompletedClient()
+
+
+class _LateCompletionClient:
+    """No completed child until the test flips `completed` — lets a stop-hook block LAND (the worker
+    finishes after the nudge) so the give-up budget's reset can be observed."""
+
+    completed = False
+
+    def table(self, name: str):
+        if name == "agent_delegation_runs":
+            rows = (
+                [{"capability_key": "structured_data_agent", "status": "completed"}]
+                if _LateCompletionClient.completed
+                else []
+            )
+            return _FlagQuery(rows=rows)
+        return _FlagQuery(error=RuntimeError("not required by this unit test"))
+
+
+class _LateCompletionStore(_NativeStore):
+    client = _LateCompletionClient()
+
+
+def _worker_tokens(options):
+    """The per-capability tokens the loop minted, recovered from each agent's inline server URL."""
+
+    return {
+        key: agent.mcpServers[0]["vcso_workers"]["url"].split("?t=", 1)[1]
+        for key, agent in options.agents.items()
+    }
+
+
+def _model_driven_turn(monkeypatch, *, fake_query, required=("structured_data_agent",), store=None):
+    """Run one model-driven turn against a stubbed SDK query. Shared by the SDK-M3 tests below."""
+
+    _capture_sdk_tools(monkeypatch)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _reject_orchestrator())
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    lifecycle_events = []
+    generator = stream_vcso_sdk_turn(
+        prompt="P4 thin-slice prompt",
+        system_prompt="System\n\nRules remain bounded.",
+        model="claude-sonnet-test",
+        api_key="test-key",
+        registry=_Registry(),
+        tool_names=[],
+        tool_context=ToolExecutionContext(
+            user_id="founder-1",
+            store=store or _NoChildrenStore(),
+            thread_id="thread-1",
+            metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+        ),
+        trace_metadata={"run_id": "lead-run"},
+        native_subagent_required_agents=required,
+        native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
+        native_lifecycle_sink=lifecycle_events.append,
+        native_model_driven=True,
+        query_impl=fake_query,
+    )
+    return generator, lifecycle_events
+
+
+def _delegation_contract(objective):
+    return json.dumps(
+        {
+            "objective": objective,
+            "output_format": "compact_json",
+            "tools_sources": ["founder_dataset"],
+            "boundaries": ["founder isolation", "cite every claim"],
+            "context_scope": {},
+        }
+    )
+
+
+def test_cheap_give_up_stops_blocking_a_lead_that_will_not_delegate(monkeypatch):
+    """SDK-M3 step A3. Canary 9: the lead never delegated, the stop_hook blocked over and over, and the
+    turn ground to max_turns for ~$0.107 with no answer. Past the cap the hook stops blocking so the turn
+    terminates at once. It still FAILS -- the founder reaches the partial-answer surface -- just far
+    sooner and far cheaper. Nothing is fail-opened."""
+
+    stop_results = []
+
+    async def fake_query(*, options, **_kwargs):
+        stop = options.hooks["Stop"][0].hooks[0]
+        for _ in range(4):
+            stop_results.append(await stop({}, None, None))
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-giveup",
+            result="",
+        )
+
+    generator, lifecycle_events = _model_driven_turn(monkeypatch, fake_query=fake_query)
+    with pytest.raises(RuntimeError, match="before required workers completed"):
+        _consume(generator)
+
+    assert [result.get("decision") for result in stop_results] == ["block", "block", None, None]
+    give_ups = [event for event in lifecycle_events if event["event"] == "delegation_give_up"]
+    assert len(give_ups) == 1
+    assert give_ups[0]["decision"] == "stop"
+    assert "delegations=0" in give_ups[0]["reason_code"]
+
+
+def test_give_up_budget_resets_when_a_worker_actually_completes(monkeypatch):
+    """The nudge must keep working. A block that LANDS (a worker completes after it) resets the budget, so
+    a compliant-but-forgetful lead is never cut off mid-progress."""
+
+    stop_results = []
+
+    async def fake_query(*, options, **_kwargs):
+        stop = options.hooks["Stop"][0].hooks[0]
+        post = options.hooks["PostToolUse"][0].hooks[0]
+        pre_task = options.hooks["PreToolUse"][0].hooks[0]
+        stop_results.append(await stop({}, None, None))  # block 1
+        stop_results.append(await stop({}, None, None))  # block 2, still nothing delegated
+        await pre_task(
+            {
+                "tool_name": "Agent",
+                "tool_input": {
+                    "subagent_type": "structured_data_agent",
+                    "prompt": _delegation_contract(
+                        "Quantify client concentration from the founder dataset"
+                    ),
+                },
+                "agent_id": None,
+            },
+            "task-1",
+            None,
+        )
+        # The DB completion bridge is what marks a model-driven worker done: the child row lands now.
+        _LateCompletionClient.completed = True
+        await post({"tool_name": "Agent"}, "task-1", None)
+        stop_results.append(await stop({}, None, None))  # required worker present -> clean stop
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-reset",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-reset",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 10, "output_tokens": 5},
+            result="Cited 90-day recommendation.",
+        )
+
+    _LateCompletionClient.completed = False
+    generator, lifecycle_events = _model_driven_turn(
+        monkeypatch, fake_query=fake_query, store=_LateCompletionStore()
+    )
+    _events, result = _consume(generator)
+
+    assert result.answer_text == "Cited 90-day recommendation."
+    assert [item.get("decision") for item in stop_results] == ["block", "block", None]
+    assert not [event for event in lifecycle_events if event["event"] == "delegation_give_up"]
+
+
+def test_worker_hop_diagnostics_are_drained_even_when_the_turn_raises(monkeypatch):
+    """SDK-M3 step A4. Canary 10a carried ZERO worker_hop entries because the drain ran only after a clean
+    query -- the turns that most needed explaining were exactly the ones that lost their evidence."""
+
+    async def fake_query(*, options, **_kwargs):
+        token = next(iter(_worker_tokens(options).values()))
+        # A worker call reached the endpoint and recorded a diagnostic; then the turn blew up.
+        TURN_REGISTRY.get(token).diagnostics.append(
+            {"stage": "received", "capability_key": "structured_data_agent"}
+        )
+        raise RuntimeError("client disconnected mid-stream")
+        yield  # pragma: no cover - unreachable; keeps this an async generator
+
+    generator, lifecycle_events = _model_driven_turn(monkeypatch, fake_query=fake_query)
+    with pytest.raises(RuntimeError, match="client disconnected"):
+        _consume(generator)
+
+    hops = [event for event in lifecycle_events if event["event"] == "worker_hop"]
+    assert [hop["stage"] for hop in hops] == ["received"]
+    # Every per-turn token is released on the failure path: no founder scope stays reachable.
+    assert TURN_REGISTRY.active_count() == 0
+
+
+def test_model_driven_mints_one_token_per_capability(monkeypatch):
+    """Defect 7 at the loop level: each worker agent's inline server URL carries its OWN token, so the
+    existing scope check refuses a worker subagent reaching for a sibling's tool."""
+
+    seen = {}
+
+    async def fake_query(*, options, **_kwargs):
+        seen.update(_worker_tokens(options))
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-tokens",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-tokens",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 10, "output_tokens": 5},
+            result="Cited 90-day recommendation.",
+        )
+
+    required = ("structured_data_agent", "sandbox_execution_agent", "per_user_wiki")
+    generator, lifecycle_events = _model_driven_turn(
+        monkeypatch, fake_query=fake_query, required=required, store=_AllCompletedStore()
+    )
+    _consume(generator)
+
+    assert set(seen) == set(required)
+    assert len(set(seen.values())) == len(required), "workers must not share a token URL"
+    scoping = [event for event in lifecycle_events if event["event"] == "worker_token_scoping"]
+    assert scoping and scoping[0]["decision"] == "per_capability"
+    assert TURN_REGISTRY.active_count() == 0
+
+
+def test_stream_emits_a_keepalive_while_an_out_of_process_worker_runs(monkeypatch):
+    """SDK-M3 step A2. The per-tool heartbeat only covers IN-PROCESS registry tools, so a model-driven
+    turn went silent for the whole ~113s the sandbox worker ran. Railway's edge treats a silent gap of
+    roughly two minutes as a dead connection -- that disconnect ended Canary 9, and Canary 8 *passed* with
+    a 3m34s stream, i.e. the successful shape was already inside the danger zone."""
+
+    async def fake_query(*, options, **_kwargs):
+        await asyncio.sleep(0.12)  # the out-of-process worker hop: nothing reaches the SSE queue
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-keepalive",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-keepalive",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 10, "output_tokens": 5},
+            result="Cited 90-day recommendation.",
+        )
+
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="Founder prompt",
+            system_prompt="System",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(user_id="founder-1"),
+            trace_metadata={"run_id": "run-keepalive"},
+            heartbeat_seconds=0.01,
+            query_impl=fake_query,
+        )
+    )
+
+    keepalives = [
+        event
+        for event in events
+        if event["event"] == "heartbeat" and event["data"].get("reason") == "stream_keepalive"
+    ]
+    assert keepalives, "a silent stream must keep bytes flowing"
+    assert keepalives[0]["data"]["idleSeconds"] > 0
+    # The keepalive is additive: the real answer still arrives unchanged.
+    assert result.answer_text == "Cited 90-day recommendation."
+

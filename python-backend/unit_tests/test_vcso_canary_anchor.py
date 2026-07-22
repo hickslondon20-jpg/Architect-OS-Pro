@@ -57,3 +57,99 @@ def test_anchor_states_no_figures_so_the_lead_must_go_and_get_them():
 
     digits = [char for char in PINNED_ANCHOR_PROMPT if char.isdigit()]
     assert digits == ["9", "0"]
+
+
+# ---------------------------------------------------------------------------------------------------
+# SDK-M3 step C — reasoning quality: effort-scaling both ways + explicit per-worker contracts
+# ---------------------------------------------------------------------------------------------------
+
+import json  # noqa: E402
+
+import pytest  # noqa: E402
+
+from services.vcso_sdk_loop import (  # noqa: E402
+    MIN_TASK_OBJECTIVE_CHARS,
+    WORKER_DELEGATION_CONTRACTS,
+    _native_lead_prompt,
+    _parse_task_contract,
+)
+
+
+def _contract(objective, **over):
+    body = {
+        "objective": objective,
+        "output_format": "compact cited findings",
+        "tools_sources": ["founder_dataset"],
+        "boundaries": ["founder isolation", "cite every claim", "compact output"],
+        "context_scope": {},
+    }
+    body.update(over)
+    return json.dumps(body)
+
+
+def test_lead_prompt_states_effort_scaling_in_both_directions():
+    prompt = _native_lead_prompt(P4_THIN_SLICE_REQUIRED_AGENTS)
+    assert "EFFORT-SCALING" in prompt
+    # Up: this turn decomposes. Down: a simple turn is answered directly and NOT decomposed.
+    assert "must be decomposed" in prompt
+    assert "answered DIRECTLY in one pass" in prompt
+    assert "Never over-decompose" in prompt
+
+
+def test_lead_prompt_carries_one_explicit_contract_per_required_worker():
+    prompt = _native_lead_prompt(P4_THIN_SLICE_REQUIRED_AGENTS)
+    assert "PER-WORKER DELEGATION CONTRACTS" in prompt
+    for key in P4_THIN_SLICE_REQUIRED_AGENTS:
+        spec = WORKER_DELEGATION_CONTRACTS[key]
+        assert key in prompt
+        # objective / output_format / tools_sources / boundaries all present for THIS worker.
+        for field in ("objective", "output_format", "tools_sources", "boundaries"):
+            assert spec[field] in prompt, f"{key}.{field} missing from the lead prompt"
+
+
+def test_lead_prompt_contract_brief_follows_the_required_agent_set():
+    """A diagnostic single-worker turn must not be handed the other workers' contracts."""
+
+    prompt = _native_lead_prompt(("structured_data_agent",))
+    assert WORKER_DELEGATION_CONTRACTS["structured_data_agent"]["objective"] in prompt
+    assert WORKER_DELEGATION_CONTRACTS["sandbox_execution_agent"]["objective"] not in prompt
+
+
+def test_contract_rejects_a_placeholder_objective():
+    with pytest.raises(ValueError):
+        _parse_task_contract(_contract("run it"))
+
+
+def test_contract_accepts_a_real_per_worker_objective():
+    objective = "Quantify client-concentration and margin trend from the founder dataset"
+    assert len(objective) >= MIN_TASK_OBJECTIVE_CHARS
+    assert _parse_task_contract(_contract(objective))["objective"] == objective
+
+
+def test_contract_rejects_an_objective_reused_from_a_sibling_worker():
+    """The copy-paste failure: one objective sent to two workers is not two delegation contracts."""
+
+    objective = "Quantify client-concentration and margin trend from the founder dataset"
+    with pytest.raises(ValueError) as excinfo:
+        _parse_task_contract(
+            _contract(objective), prior_objectives={"structured_data_agent": objective}
+        )
+    assert "structured_data_agent" in str(excinfo.value)
+
+
+def test_contract_objective_reuse_check_ignores_case_and_whitespace():
+    objective = "Quantify client-concentration and margin trend from the founder dataset"
+    with pytest.raises(ValueError):
+        _parse_task_contract(
+            _contract("  QUANTIFY   client-concentration and margin trend from the founder DATASET "),
+            prior_objectives={"structured_data_agent": objective},
+        )
+
+
+def test_distinct_objectives_are_accepted_for_different_workers():
+    _parse_task_contract(
+        _contract("Retrieve this founder's strategic context on client mix and positioning"),
+        prior_objectives={
+            "structured_data_agent": "Quantify client-concentration and margin trend from the dataset"
+        },
+    )
