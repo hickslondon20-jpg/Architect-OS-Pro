@@ -78,7 +78,7 @@ not met — that is the whole point of the rule.
 | 1 | 2026-07-22 | `b3dab271` | `734b61fc` (completed, 3m22s) | structured `417523bb` 0.5s · wiki `57ff15dd` 2.1s · sandbox `0df539b6` 98.2s — all completed | $0.1427 compose | **PASS** |
 | 2 | 2026-07-22 | `b3dab271` | `beba1825` (completed, 2m03s) | structured `4ab2ee8f` 0.5s · sandbox `61ecd789` 26.7s · wiki `f47705e2` 1.9s — all completed | $0.1369 compose | **PASS** |
 | 3 | 2026-07-22 | `b3dab271` | `c38d37e6` (completed, 2m04s) | structured `e0bca1c6` 0.3s · wiki `110b8fdb` 1.8s · sandbox `97e320bf` 35.4s — all completed | $0.1332 compose | **PASS** |
-| 4 | | | | | | |
+| 4 | 2026-07-22 | `b3dab271` | `07f31da2` (completed, 2m29s) | structured `b39e81a1` 0.4s · sandbox `2b4e1c49` 51.0s · wiki `c2d0b82b` 1.3s — all completed | $0.1321 compose | **FAIL — stream lost; founder saw an error** |
 | 5 | | | | | | |
 | Control (paired w/ run 3) | 2026-07-22 | `b3dab271` | `7fc987e1` (completed, **5.6s**) | **zero children**, zero delegation lifecycle | $0.0306 | **PASS** |
 
@@ -213,4 +213,55 @@ the chance to over-decompose. This is therefore strong evidence that the **syste
 and it is **not** by itself evidence of model-level restraint. The model-level claim rests on the lead
 prompt's EFFORT-SCALING clause and is only observable on turns that DO reach the model-driven branch.
 Do not let the completion doc overstate this.
+
+---
+
+## Run 4 — 2026-07-22, deployed `b3dab271` · **FAIL (count resets)** — delegation perfect, delivery lost
+
+**The founder saw:** `Virtual CSO stream ended before the turn was saved.` Progress panel stuck at
+**4/4** (Intent and depth read · Sources selected · Context prepared · Prepare the strategic response)
+with **no worker steps at all** — versus 8/8 in runs 1–3.
+
+**The backend, meanwhile, succeeded completely.**
+
+| Evidence | Value |
+|---|---|
+| Parent `07f31da2-35bd-4ee5-89f8-dee25e2bd7de` | **completed**, 148.8s |
+| Children | structured `b39e81a1` 0.4s · sandbox `2b4e1c49` 51.0s · wiki `c2d0b82b` 1.3s — **all completed** |
+| Lifecycle | 14 entries, **identical clean shape to runs 1–3**: `tokens=3`, manifest `none`, 3× Task allow first-try, **zero denials**, 3 probes each on its OWN tool, 3+3 hops |
+| Compose | $0.13214, 44,747 in / 2,545 out, Sonnet |
+| **Assistant message** | **SAVED** — 4,886 chars, **33 citations**, written 17:33:36.200 |
+
+### Two findings, and they are different sizes
+
+**1. The delegation engine did not fail. This is its 4th consecutive clean run.** Every delegation
+criterion passed. Whatever went wrong is downstream of the loop.
+
+**2. Defect 8 (NEW) — the UI reports a saved turn as unsaved.** The message
+"stream ended before the turn was saved" is **factually wrong here**: the assistant message was persisted
+with 33 citations **140ms before the parent run completed**. The founder was shown a failure for a turn
+that had actually succeeded, and the composed answer they paid $0.13 for was sitting in the database the
+whole time. On stream loss the UI must recover the persisted message, not assert it does not exist.
+
+### Why this is NOT the failure the keepalive was built for — and what that means
+
+The keepalive (step A2) addresses an **idle** disconnect: a long silent gap during the slow worker. That
+is not this. The client received four steps and then nothing, i.e. the stream died **~12s in**, before
+the first worker had even returned and long before any silent gap existed. Runs 1–3 each contained silent
+worker stretches of 27–98s and survived them.
+
+**What the keepalive is NOT disproven by:** this run never reached the condition it guards.
+**What remains unproven:** the keepalive's *delivery* has not been directly observed — SSE frames are not
+visible from the database, and Railway request logs were not pulled. Relay path is confirmed by code
+inspection (`vcso_chat_service` does `yield from stream_vcso_sdk_turn`, so heartbeat events pass through
+unfiltered), but code inspection is not observation. **Do not claim the keepalive is proven.**
+
+**Cause of the early disconnect: UNDETERMINED.** Available evidence cannot distinguish a browser/tab-level
+drop, an edge blip, or something in the early SSE path. Naming a cause here would be a guess.
+
+### Bar ruling
+
+Run 4 **fails** criteria 4 (founder-visible cited answer) and 5 (nested UI). Under the rule as written the
+consecutive count **resets to zero**. Recorded as a fail; the founder was asked how to proceed rather than
+the agent quietly redefining the bar mid-measurement — see the checkpoint note.
 
