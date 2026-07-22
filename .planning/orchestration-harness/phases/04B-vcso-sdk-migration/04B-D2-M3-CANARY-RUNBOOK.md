@@ -77,10 +77,10 @@ not met — that is the whole point of the rule.
 |---|---|---|---|---|---|---|
 | 1 | 2026-07-22 | `b3dab271` | `734b61fc` (completed, 3m22s) | structured `417523bb` 0.5s · wiki `57ff15dd` 2.1s · sandbox `0df539b6` 98.2s — all completed | $0.1427 compose | **PASS** |
 | 2 | 2026-07-22 | `b3dab271` | `beba1825` (completed, 2m03s) | structured `4ab2ee8f` 0.5s · sandbox `61ecd789` 26.7s · wiki `f47705e2` 1.9s — all completed | $0.1369 compose | **PASS** |
-| 3 | | | | | | |
+| 3 | 2026-07-22 | `b3dab271` | `c38d37e6` (completed, 2m04s) | structured `e0bca1c6` 0.3s · wiki `110b8fdb` 1.8s · sandbox `97e320bf` 35.4s — all completed | $0.1332 compose | **PASS** |
 | 4 | | | | | | |
 | 5 | | | | | | |
-| Control | | | | (expect **none**) | | |
+| Control (paired w/ run 3) | 2026-07-22 | `b3dab271` | `7fc987e1` (completed, **5.6s**) | **zero children**, zero delegation lifecycle | $0.0306 | **PASS** |
 
 ---
 
@@ -166,4 +166,51 @@ Sandbox also ran 26.7s here vs 98.2s in run 1, so the worker's cost is genuinely
 
 **Carried forward:** `ai_usage_log` again shows 2 `sub_agent` rows both on the sandbox child
 (`61ecd789`). Same pre-existing attribution collapse as runs 1 / Canary 8 / Canary 9-retry. M4 item.
+
+---
+
+## Run 3 — 2026-07-22, deployed `b3dab271`, `ok=true` · **PASS (3/5)** — plus the first paired control
+
+Armed 17:18:11Z, re-darkened and both flags read back off before evidence.
+
+**Anchor.** Parent `c38d37e6-7db3-48a1-b703-fd853104fd1a` completed in **2m04s**. `structured_data_agent`
+`e0bca1c6` (0.3s) → `per_user_wiki` `110b8fdb` (1.8s) → `sandbox_execution_agent` `97e320bf` (35.4s). All
+completed. Intent read `strategic_synthesis` / `deep`, as required for the thin-slice gate.
+
+**Lifecycle (14 entries), third consecutive clean shape.** `worker_token_scoping tokens=3`;
+`runtime_manifest reason_code=none`; **3× `task_pre_tool_use` → allow first attempt, zero denials**;
+**3× `pre_tool_probe`, each worker on its OWN tool**; 3 received + 3 completed hops; no duplicates.
+
+**Tiers.** Haiku workers / Sonnet compose. **Answer.** 5,005 chars, **33 citations**, compose $0.13321.
+
+Delegation order this run: structured → wiki → sandbox (matching run 1; run 2 went structured → sandbox
+→ wiki). Two distinct valid orders across three runs — the ordering constraint holds every time while
+the sequence itself varies, which is what reasoning looks like and what a script does not do.
+
+### The paired simple control — effort-scaling DOWN · **PASS**
+
+> What is my current quarter's sprint theme?
+
+Sent immediately after the anchor, **inside the same armed window**, so it ran through the identical dark
+SDK path with model-driven enabled.
+
+| | Anchor | Control | Ratio |
+|---|---|---|---|
+| Duration | 123.9s | **5.6s** | 22× faster |
+| Child runs | 3 (all completed) | **0** | — |
+| Delegation lifecycle | 14 entries | **none at all** | — |
+| Input tokens (compose) | 33,363 | 6,676 | 5× smaller |
+| Cost | $0.13321 | **$0.03063** | 4.4× cheaper |
+| Answer | 5,005 chars / 33 citations | 396 chars / 2 citations | — |
+
+The control was read as `lookup` / `shallow`, required no workers, spawned none, and answered directly
+with a short cited response. **No over-decomposition.**
+
+**Honest limit of this control (same caveat recorded in `services/vcso_canary_anchor.py`).** Routing is
+**app-gated first**: `native_subagent_requirements` returns `()` for a lookup/shallow intent that lacks
+the three trigger signals, so the turn never reaches the model-driven branch and the lead is never given
+the chance to over-decompose. This is therefore strong evidence that the **system** scales effort down,
+and it is **not** by itself evidence of model-level restraint. The model-level claim rests on the lead
+prompt's EFFORT-SCALING clause and is only observable on turns that DO reach the model-driven branch.
+Do not let the completion doc overstate this.
 
