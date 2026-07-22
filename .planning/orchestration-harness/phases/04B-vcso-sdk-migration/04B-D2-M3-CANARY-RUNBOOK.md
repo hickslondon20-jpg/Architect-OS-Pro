@@ -265,3 +265,62 @@ Run 4 **fails** criteria 4 (founder-visible cited answer) and 5 (nested UI). Und
 consecutive count **resets to zero**. Recorded as a fail; the founder was asked how to proceed rather than
 the agent quietly redefining the bar mid-measurement — see the checkpoint note.
 
+---
+
+## Founder ruling (2026-07-22) — the bar is SPLIT, and Defect 8 is fixed first
+
+London's call, verbatim in substance: *fix Defect 8, then split the bar — the delegation worked, the
+failure was in the UI stream, and every run costs real money, so each one must be intentional.*
+
+**This is a deliberate, recorded scope change to the M3 exit, not a quiet redefinition.** Process Rule 10
+is preserved for the thing it was written to protect (delegation), and the delivery layer becomes its own
+gate rather than being folded in or waved away.
+
+### Gate 1 — Delegation reliability (the Process Rule 10 bar)
+
+Per run: lead reasons and delegates all three workers via `Task`; correct tiers; **cited answer composed
+and persisted**; child traces; Defect 7 holds; no duplicate or cross-worker dispatch.
+
+| Run | Gate 1 |
+|---|---|
+| 1 | PASS |
+| 2 | PASS |
+| 3 | PASS |
+| 4 | **PASS** — 14 clean lifecycle entries, 3 children, answer persisted with 33 citations |
+| 5 | outstanding |
+
+**4 / 5 consecutive.** One more clean run closes Gate 1.
+
+### Gate 2 — Founder-visible delivery (NEW, tracked separately)
+
+The composed answer reaches the founder's screen, with nested worker steps.
+
+| Run | Gate 2 |
+|---|---|
+| 1 | PASS |
+| 2 | PASS (nested UI confirmed on screenshots) |
+| 3 | PASS |
+| 4 | **FAIL** — stream died ~12s in; founder saw an error for a turn that had succeeded |
+
+**Open item:** the cause of run 4's early disconnect is still **undetermined**. Defect 8 fixes the
+*consequence* (a lost answer the founder cannot see) and not the *cause* (why the stream dropped). Gate 2
+therefore stays open even once Defect 8 ships, and must not be reported as closed on the strength of the
+fix alone.
+
+### Defect 8 — FIXED (v0.6.100)
+
+`lib/virtualCsoApi.ts`: when the stream ends without a `done` event, the client now reads the record
+before declaring anything lost — it fetches the thread's persisted messages and recovers the assistant
+answer written for this turn. The guard that matters is the timestamp check: a recovered answer is
+accepted only if it is not older than the user message just sent, so a stale reply from earlier in the
+thread can never be presented as this turn's answer. With no user message to compare against, it recovers
+nothing. Six unit tests in `lib/virtualCsoRecovery.test.ts`. The residual error copy no longer asserts
+the turn was unsaved.
+
+### Cost discipline (founder constraint, standing)
+
+Anchor runs cost ~$0.13–0.15 of compose each. **Only one more anchor run is required** to close Gate 1 —
+runs 1–4 all passed it. Do not restart the sequence from zero: that would spend ~$0.60 to re-prove
+delegation that is already evidenced four times over. The control does **not** need re-running either
+(run 3's is sufficient and it is the cheap one at $0.03). Budget for M3 completion: **one anchor run.**
+

@@ -454,6 +454,33 @@ export const setThreadPinned = async (threadId: string, pinned: boolean) => {
   if (result.error) throw result.error;
 };
 
+/**
+ * Defect 8 recovery: pick the persisted assistant reply for a turn whose SSE stream died.
+ *
+ * The stream is a delivery channel, not the record. When it dies the backend usually finishes anyway —
+ * on the 04B-D2 run-4 canary the answer was written with 33 citations 140ms before the run completed,
+ * while the founder was told the turn "was not saved".
+ *
+ * The one thing this must never do is hand back an OLDER answer from earlier in the thread and pass it
+ * off as the reply to the message just sent. Hence the timestamp guard: with no user message to compare
+ * against there is no way to tell this turn's answer from the previous one, so recover nothing.
+ * Exported for tests.
+ */
+export const selectRecoverableAssistantMessage = (
+  persisted: Message[],
+  sentUserMessage: Message | null,
+): Message | null => {
+  if (!sentUserMessage) return null;
+  const sentAt = new Date(sentUserMessage.createdAt).getTime();
+  if (Number.isNaN(sentAt)) return null;
+  const newestFirst = [...persisted].reverse();
+  const candidate = newestFirst.find((message) => message.role === 'assistant');
+  if (!candidate) return null;
+  const candidateAt = new Date(candidate.createdAt).getTime();
+  if (Number.isNaN(candidateAt) || candidateAt < sentAt) return null;
+  return candidate;
+};
+
 export const sendUserMessage = async (
   threadId: string | null,
   text: string,
@@ -488,6 +515,7 @@ export const sendUserMessage = async (
   let artifactId: string | null = null;
   let artifactDelivery: ArtifactDelivery | null = null;
   let sdkMode = false;
+  let readyThreadId: string | null = threadId;
   const liveAgentSteps = new Map<number, AgentStep>();
   const liveActivityItems: AgentActivityItem[] = [];
   const stepActivityOrders = new Map<number, number>();
@@ -541,6 +569,9 @@ export const sendUserMessage = async (
     onEvent: (event, payload) => {
       if (event === 'ready') {
         sdkMode = payload.sdkMode === true;
+        // Defect 8: remembered so a turn whose stream dies mid-flight can still be recovered from the
+        // database below. Without a thread id there is nothing to look the persisted turn up by.
+        readyThreadId = typeof payload.threadId === 'string' ? payload.threadId : readyThreadId;
         userMessage = toMessage(payload.userMessage);
         route = payload.route;
         assembledContext = payload.assembledContext;
@@ -745,8 +776,40 @@ export const sendUserMessage = async (
     },
   });
 
+  if (!assistantMessage && readyThreadId) {
+    // DEFECT 8 (04B-D2 SDK-M3, run 4). The SSE stream can die while the backend keeps working and
+    // finishes normally — the assistant message is written, the run completes, the founder is billed.
+    // The old code inferred "no `done` event" ⇒ "the turn was not saved" and threw. That inference is
+    // simply wrong: on the run-4 canary the answer was persisted with 33 citations 140ms before the run
+    // completed, and the founder was shown a failure for a turn that had succeeded. The stream is a
+    // delivery channel, not the record — so ask the record before declaring anything lost.
+    try {
+      const persisted = await getMessagesForChat(readyThreadId);
+      const recoveredAssistant = selectRecoverableAssistantMessage(persisted, userMessage);
+      if (recoveredAssistant) {
+        assistantMessage = recoveredAssistant;
+        userMessage =
+          userMessage ?? [...persisted].reverse().find((message) => message.role === 'user') ?? null;
+        if (!chat) {
+          const threadRow = await supabase
+            .from('vcso_chat_threads')
+            .select('*')
+            .eq('id', readyThreadId)
+            .maybeSingle();
+          if (threadRow.data) chat = toChat(threadRow.data);
+        }
+      }
+    } catch {
+      // Recovery is best-effort. A failed lookup must fall through to the original error rather than
+      // replacing a truthful "something went wrong" with a confusing one.
+    }
+  }
+
   if (!chat || !userMessage || !assistantMessage) {
-    throw new Error('Virtual CSO stream ended before the turn was saved.');
+    throw new Error(
+      'Virtual CSO stream ended before the turn could be delivered. If the answer was saved it will '
+        + 'appear when you reopen this conversation.',
+    );
   }
 
   if (artifactId) {
