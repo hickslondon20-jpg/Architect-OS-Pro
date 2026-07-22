@@ -1,8 +1,34 @@
 # State: Orchestration Harness — VCSO Planner — ArchitectOS Pro
 
-**Updated:** 2026-07-16
+**Updated:** 2026-07-22
 
 ## Current Focus
+
+**04B PHASE D2 · SDK-M3 — DELEGATION RELIABILITY CLOSED (5/5); DELIVERY GATE OPEN (4/5); AT
+STOP-AND-REVIEW** (2026-07-22). Deployed `5041fa10`, `/api/health ok=true`. Model-driven delegation now
+meets the Process Rule 10 bar: **five consecutive passing runs on a PINNED anchor** — 15 Task
+delegations all allowed on the first attempt with zero denials, 15 worker child runs all completed, 15
+worker tool calls each on the worker's own tool, correct tiers throughout (Haiku workers / Sonnet
+compose), cited answers every run. The delegation ORDER varied between runs while the
+sandbox-after-structured constraint held every time, which is the evidence that the lead reasons the
+decomposition rather than replaying a fixed sequence.
+
+**Defect 7 (worker subagents able to call each other's tools) is closed in code** — the worker token is
+now minted per `(turn, capability)`, so the existing scope check refuses a cross-worker call with no new
+authorization logic. Unit-proven; the live evidence is *negative* (no run attempted a cross-worker call,
+so the guard has not been observed firing).
+
+**What is NOT closed:** founder-visible delivery sits at 4/5. Run 4's SSE stream died ~12s in and the
+founder was shown an error for a turn that had actually succeeded and been persisted with 33 citations.
+**Defect 8** (the UI asserting a saved turn was unsaved) is fixed in v0.6.100, but that addresses the
+consequence, not the still-undetermined cause of the disconnect. The stream keepalive shipped but has
+**not** been directly observed. Child usage attribution collapses onto one child (pre-existing, M4).
+
+`vcso_sdk_loop` is **dark**, both allowlists empty, `native_model_driven_enabled=false`; `vcso_planner`
+dark/retired; Path A untouched as the fallback. M4 and Phases E/F/G are **not started**. Evidence:
+`phases/04B-vcso-sdk-migration/04B-D2-M3-COMPLETION.md` and `04B-D2-M3-CANARY-RUNBOOK.md`.
+
+---
 
 **04B PHASE D CHECKPOINT BLOCKED — NATIVE WORKER PERMISSION FAILED LIVE PROOF; RETURNED TO LONDON**
 (2026-07-16). v0.6.46–v0.6.50 implement the bounded SDK-native subagent path, sandbox startup
