@@ -75,9 +75,56 @@ not met — that is the whole point of the rule.
 
 | # | Date | Deployed SHA | Parent run | Children (status / duration) | Cost | Verdict |
 |---|---|---|---|---|---|---|
-| 1 | | | | | | |
+| 1 | 2026-07-22 | `b3dab271` | `734b61fc` (completed, 3m22s) | structured `417523bb` 0.5s · wiki `57ff15dd` 2.1s · sandbox `0df539b6` 98.2s — all completed | $0.1427 compose | **PASS** |
 | 2 | | | | | | |
 | 3 | | | | | | |
 | 4 | | | | | | |
 | 5 | | | | | | |
 | Control | | | | (expect **none**) | | |
+
+---
+
+## Run 1 — 2026-07-22, deployed `b3dab271`, `ok=true` · **PASS (1/5)**
+
+Flag armed founder-only 16:54:07Z, **re-darkened and both flags read back off before any evidence was
+pulled**. Anchor sent verbatim (user message is 103 chars — byte-identical to the pinned string).
+
+**Runs.** Parent `734b61fc-c94d-4849-bdb2-3a0118a268c0` completed in **3m22s**. Three children, all
+`completed`: `structured_data_agent` `417523bb` (0.5s) → `per_user_wiki` `57ff15dd` (2.1s) →
+`sandbox_execution_agent` `0df539b6` (**98.2s**, in-band under the 240s `MCP_TOOL_TIMEOUT`). Ordering
+correct; sandbox ran after structured, so the app-owned findings chain held (the `pre_task_use` ordering
+clause requires a non-empty `prior_findings` and it was allowed first try).
+
+**Lifecycle (14 entries).**
+- `worker_token_scoping decision=per_capability reason_code=tokens=3` — **the Defect-7 fix live**.
+- `runtime_manifest decision=model_driven reason_code=none` — including the new shared-token check.
+- **3× `task_pre_tool_use` → `allow` on the FIRST attempt** (`approved_bounded_contract`), **zero denials**.
+- **3× `pre_tool_probe`, `agent_id_present=true`, each worker calling its OWN tool** — structured→
+  `run_structured_data_agent`, wiki→`run_per_user_wiki`, sandbox→`run_sandbox_execution_agent`.
+- 3× `worker_hop received` + 3× `worker_hop completed`. **Three probes, three hops, three children** — a
+  1:1:1 ratio with no duplicate dispatch anywhere.
+
+**Tiers.** Workers `claude-haiku-4-5`, compose `claude-sonnet-4-6`. Claude-lock and the MA-06 tier map hold.
+
+**Answer.** 5,403 chars, **33 citations**, compose $0.14274 (44,266 in / 2,604 out).
+
+### Defect 7 — what run 1 does and does not prove
+
+**Does:** the cross-worker call **did not happen**. Canary 9-retry and Canary 10a both showed the sandbox
+subagent calling `run_structured_data_agent` (4 probes, one of them cross-worker). Run 1 shows exactly
+three probes, each worker on its own tool, and three child rows including a real sandbox child — the row
+Canary 10a never produced. The per-capability minting is live and confirmed by `tokens=3`.
+
+**Does not:** no *refusal* was recorded, because nothing attempted a cross-worker call this run. The
+refusal path itself is proven by unit test (`test_worker_cannot_invoke_a_sibling_workers_tool`), not by
+this canary. That is the honest reading — live evidence is currently **negative** (the leak stopped),
+which is what closing the gap should look like, but it is not the same as watching the guard fire.
+
+### Carried forward, NOT a run-1 regression
+
+`ai_usage_log` has **2 `sub_agent` rows, both attributed to the sandbox child** — the structured and wiki
+children have no usage row. This is the **pre-existing** shape, identical at the Tier-2 close: Canary 8
+produced 2 rows both on `e48905fd`, Canary 9-retry 2 rows both on `9a97d559`. So child-trace pairing is
+met to exactly the standard the Tier-2 close was accepted on, and no worse. **Log it as an M4 item**
+(child usage attribution collapses onto one child) rather than a reliability failure — but do not let the
+completion doc claim per-child pairing it does not have.
