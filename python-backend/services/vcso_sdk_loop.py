@@ -69,6 +69,14 @@ P4_THIN_SLICE_SIGNALS = re.compile(
     r"(?=.*\b(?:financial|p&l|margin|revenue)\b)(?=.*\bconcentration\b)(?=.*\b90\s+days?\b)",
     re.IGNORECASE | re.DOTALL,
 )
+# SDK-M3 step A3 — cheap give-up thresholds for a lead that will not delegate.
+# MAX_STOP_BLOCKS: how many times the stop_hook may block WITHOUT a new worker completing in between.
+#   Two is deliberate: one block is a legitimate nudge (the lead forgot and then complies — the shape that
+#   makes the safety net worth having); a second block with nothing having moved is a stuck lead.
+# MAX_TASK_DENIALS: repeated denied Task attempts are the other stuck shape (Canary 10a denied three times
+#   in a row against the once-per-turn guard, then ground out at max_turns).
+MODEL_DRIVEN_MAX_STOP_BLOCKS = 2
+MODEL_DRIVEN_MAX_TASK_DENIALS = 3
 NATIVE_LEGACY_TOOL_PARAGRAPH = re.compile(
     r"\n*You may call tools mid-turn\. Use tool_search to discover relevant tools or skill packs before\s+"
     r"using specialized tools\. Prefer direct registry tools for narrow reads/computations, and\s+"
@@ -424,8 +432,30 @@ def stream_vcso_sdk_turn(
 
     worker = threading.Thread(target=run, name="vcso-sdk-standard", daemon=True)
     worker.start()
+    # STREAM KEEPALIVE (SDK-M3 step A2). The per-tool heartbeat in `_make_sdk_tool` only covers IN-PROCESS
+    # registry tools. Model-driven workers run OUT of process (the loopback MCP endpoint), so nothing put
+    # anything on this queue while the ~113s sandbox worker ran and the SSE stream went silent. Railway's
+    # edge treats a silent gap of roughly two minutes as a dead connection — that disconnect is what killed
+    # Canary 9, and Canary 8 *passed* with a 3m34s stream, i.e. the successful shape was already inside the
+    # danger zone. Draining with a timeout and emitting a keepalive on idle keeps bytes flowing without
+    # touching the turn: `heartbeat` is already part of the SSE contract the frontend tolerates.
+    keepalive_seconds = max(1.0, heartbeat_seconds)
+    idle_seconds = 0.0
     while True:
-        item = events.get()
+        try:
+            item = events.get(timeout=keepalive_seconds)
+        except queue.Empty:
+            idle_seconds += keepalive_seconds
+            yield {
+                "event": "heartbeat",
+                "data": {
+                    "sdkMode": True,
+                    "reason": "stream_keepalive",
+                    "idleSeconds": round(idle_seconds, 1),
+                },
+            }
+            continue
+        idle_seconds = 0.0
         if item is _WORKER_DONE:
             break
         if isinstance(item, _WorkerFailure):
@@ -595,6 +625,24 @@ def build_model_driven_manifest(
         elif not scoped_external:
             violations.append(f"model_driven_worker_server_not_scoped:{key}")
 
+    # 4. ISOLATION LOCK, real surface #3 — Defect 7. Each worker's inline server URL must carry its OWN
+    #    per-capability token. When two workers share a URL they share a token, that token's scope permits
+    #    every capability of the turn, and any worker subagent can call a sibling's tool and be authorised
+    #    (04B-D2-FINDINGS §11). The URLs are opaque here on purpose: distinctness is the whole invariant, so
+    #    checking it needs no token parsing and no secret ever lands in the manifest.
+    worker_urls: dict[str, str] = {}
+    for key in required_agents:
+        agent = agents.get(key)
+        for entry in list(getattr(agent, "mcpServers", None) or []) if agent is not None else []:
+            config = entry.get(worker_server_name) if isinstance(entry, dict) else None
+            url = str(config.get("url") or "") if isinstance(config, dict) else ""
+            if url:
+                worker_urls[key] = url
+    for key, url in worker_urls.items():
+        shared_with = sorted(other for other, value in worker_urls.items() if value == url and other != key)
+        if shared_with:
+            violations.append(f"model_driven_worker_token_shared:{key}+{'+'.join(shared_with)}")
+
     return {
         "delegation_model": "model_driven",
         "required_agents": list(required_agents),
@@ -660,6 +708,18 @@ async def _run_sdk_turn(
     max_delegations = len(required_agents)
     plan_statuses = {key: "pending" for key in required_agents}
     lifecycle_sequence = 0
+    # CHEAP GIVE-UP (SDK-M3 step A3). When the lead will not delegate, the stop_hook blocks, the lead tries
+    # again, the block repeats — and the turn grinds to `max_turns` costing ~$0.10–0.22 with NO answer for
+    # the founder (Canary 9: five minutes of thrash; Canary 10a: three straight denials then max_turns).
+    # Blocking is right for a lead that is making progress and wrong for one that is stuck, and the two are
+    # distinguishable: count how many times we have blocked without a single NEW worker completing since the
+    # last block. Past the cap we stop blocking and let the turn terminate, which hands it to the v0.6.85
+    # partial-answer surface instead of burning the cap. This only ever *shortens* a turn that was already
+    # failing — it can never suppress a delegation that was going to happen.
+    stop_block_count = 0
+    stop_block_completed_watermark = 0
+    task_denial_count = 0
+    gave_up_early = False
 
     def record_lifecycle(event: str, **details: Any) -> None:
         """Persist bounded lifecycle facts without prompts, tool inputs, or model output."""
@@ -817,7 +877,7 @@ async def _run_sdk_turn(
         tool_use_id: str | None,
         _context: Any,
     ) -> dict[str, Any]:
-        nonlocal delegation_count
+        nonlocal delegation_count, task_denial_count
         tool_input = input_data.get("tool_input") if isinstance(input_data.get("tool_input"), dict) else {}
         capability_key = str(tool_input.get("subagent_type") or "").strip()
         task_id = str(tool_use_id or "")
@@ -836,6 +896,9 @@ async def _run_sdk_turn(
                 if not prior:
                     raise ValueError("The sandbox contract must inherit the compact structured-data finding.")
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            # Counted for the cheap give-up (step A3): a lead whose every Task is refused never completes a
+            # worker, so the stop_hook would otherwise block it all the way to max_turns.
+            task_denial_count += 1
             record_lifecycle(
                 "task_pre_tool_use",
                 tool_name="Task",
@@ -1048,7 +1111,7 @@ async def _run_sdk_turn(
         return {}
 
     async def stop_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
-        nonlocal turn_trace_emitted
+        nonlocal turn_trace_emitted, stop_block_count, stop_block_completed_watermark, gave_up_early
         missing = [key for key in required_agents if key not in completed_agents]
         if missing and model_driven:
             # Model-driven workers run OUT of process, so a worker whose Task tool-call was abandoned early
@@ -1067,6 +1130,40 @@ async def _run_sdk_turn(
             # missing that worker's content. Deferred: it needs mid-stream injection into the SDK lead —
             # significant machinery. For now the turn composes from what the lead already holds.
         if missing:
+            # Cheap give-up (SDK-M3 step A3). "Progress" means at least one required worker completed since
+            # the previous block; a lead that is complying just needs the nudge, and each nudge that lands
+            # resets the budget. A lead that has been told twice and moved nothing is not going to move, and
+            # every further block is pure spend. Stop blocking, record WHY, and let the turn terminate into
+            # the partial-answer surface. `task_denial_count` catches the other stuck shape: the lead does
+            # keep calling Task, but every call is refused, so no worker ever completes.
+            progressed = len(completed_agents) > stop_block_completed_watermark
+            if progressed:
+                stop_block_count = 0
+            stop_block_completed_watermark = len(completed_agents)
+            stop_block_count += 1
+            if (
+                stop_block_count > MODEL_DRIVEN_MAX_STOP_BLOCKS
+                or task_denial_count >= MODEL_DRIVEN_MAX_TASK_DENIALS
+            ):
+                gave_up_early = True
+                record_lifecycle(
+                    "delegation_give_up",
+                    decision="stop",
+                    reason_code=(
+                        f"blocks={stop_block_count},denials={task_denial_count},"
+                        f"delegations={delegation_count},missing={'|'.join(missing)}"
+                    )[:120],
+                )
+                logger.warning(
+                    "vcso_sdk model-driven give-up: lead did not delegate (blocks=%s denials=%s missing=%s)",
+                    stop_block_count,
+                    task_denial_count,
+                    missing,
+                )
+                # Return {} (allow the stop). The turn still ends as a FAILURE — `missing_after_query`
+                # raises just as it would have at max_turns — so nothing is fail-opened; it simply fails
+                # sooner and cheaper, and the founder reaches the partial-answer surface faster.
+                return {}
             return {
                 "decision": "block",
                 "reason": (
@@ -1452,8 +1549,17 @@ async def _run_sdk_turn(
         return collected
 
     native_findings: list[dict[str, Any]] = []
-    model_driven_token: str | None = None
-    model_driven_worker_url: str | None = None
+    # DEFECT 7 (SDK-M3 step B). One token per (turn, CAPABILITY), not one per turn. Previously every
+    # worker's inline MCP server pointed at the SAME `?t=<turn-token>` URL and that one scope permitted all
+    # three capabilities, so `run_worker_capability`'s scope check was answering "is this capability allowed
+    # THIS TURN?" when the question it had to answer was "is it allowed for THE SUBAGENT MAKING THE CALL?".
+    # Any worker subagent could invoke a sibling's tool and be authorised (it broke Canary 10a and silently
+    # distorted Canary 9-retry — `04B-D2-FINDINGS.md` §11). Handing each worker a token scoped to its own
+    # capability makes the EXISTING refusal reject the cross-worker call: no new authorization logic, no new
+    # surface, nothing for a future change to forget to call.
+    model_driven_tokens: dict[str, str] = {}
+    model_driven_scope: TurnScope | None = None
+    model_driven_worker_urls: dict[str, str] = {}
     if native_mode and not model_driven:
         try:
             native_findings = await run_app_owned_workers()
@@ -1499,7 +1605,7 @@ async def _run_sdk_turn(
             return {}
 
         base_url = os.environ.get("VCSO_WORKER_MCP_BASE_URL") or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}"
-        model_driven_token = TURN_REGISTRY.mint(
+        model_driven_scope = (
             TurnScope(
                 user_id=tool_context.user_id,
                 parent_surface=str(tool_context.metadata.get("surface") or "virtual_cso"),
@@ -1529,7 +1635,19 @@ async def _run_sdk_turn(
                 "fault_injection_armed",
                 reason_code=f"{native_fault_injection_mode_key}:{','.join(native_fault_injection)}"[:120],
             )
-        model_driven_worker_url = worker_server_url(base_url, model_driven_token)
+        # One token per capability. The derived scopes SHARE this scope's mutable state by reference
+        # (prior_findings, completed_results, dispatch_locks, diagnostics), so app-owned findings chaining
+        # across the worker hop, the v0.6.84 dispatch dedupe, and the single diagnostics drain all keep
+        # working exactly as they did on one token — only `allowed_capabilities` narrows.
+        for key in required_agents:
+            token = TURN_REGISTRY.mint_capability_scoped(model_driven_scope, key)
+            model_driven_tokens[key] = token
+            model_driven_worker_urls[key] = worker_server_url(base_url, token)
+        record_lifecycle(
+            "worker_token_scoping",
+            decision="per_capability",
+            reason_code=f"tokens={len(model_driven_tokens)}",
+        )
         hooks["PreToolUse"] = [
             HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
             HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
@@ -1565,7 +1683,7 @@ async def _run_sdk_turn(
         max_budget_usd=max_budget_usd,
         enable_native_subagents=model_driven,
         native_subagent_tools=native_subagent_tools,
-        model_driven_worker_server_url=model_driven_worker_url,
+        model_driven_worker_server_urls=model_driven_worker_urls,
     )
     options = compiled.options
     if native_mode and not model_driven:
@@ -1582,8 +1700,9 @@ async def _run_sdk_turn(
             compiled, required_agents=required_agents, worker_server_name=MODEL_DRIVEN_WORKER_SERVER
         )
         if runtime_manifest["violations"]:
-            if model_driven_token:
-                TURN_REGISTRY.unregister(model_driven_token)
+            for token in model_driven_tokens.values():
+                TURN_REGISTRY.unregister(token)
+            model_driven_tokens.clear()
             record_lifecycle("runtime_manifest", decision="model_driven", reason_code="invalid_surface")
             raise RuntimeError(
                 "Model-driven lead surface invalid; refusing to spend a turn: "
@@ -1618,96 +1737,117 @@ async def _run_sdk_turn(
     total_cost_usd: Decimal | None = None
     session_id: str | None = None
     final_result_text: str | None = None
+    diagnostics_drained = False
 
-    async for message in query_impl(prompt=prompt, options=options):
-        if isinstance(message, StreamEvent):
-            if message.parent_tool_use_id:
-                # Child text/tool payloads stay inside the native subagent context. Curated handler
-                # progress is emitted separately through sub_agent_step events.
-                continue
-            event = message.event
-            if event.get("type") == "content_block_start":
-                block = event.get("content_block") or {}
-                if block.get("type") == "tool_use":
-                    if native_mode and str(block.get("name") or "") == DELEGATION_TOOL_RUNTIME_NAME:
-                        continue
-                    emit_tool_start(
-                        str(block.get("name") or "tool"),
-                        str(block.get("id") or block.get("name") or "tool"),
-                    )
-            elif event.get("type") == "content_block_delta":
-                delta = event.get("delta") or {}
-                if delta.get("type") == "text_delta":
-                    text = str(delta.get("text") or "")
-                    if text:
-                        for channel, visible_text, segment_id in text_normalizer.feed(text):
-                            if channel == "answer":
-                                answer_parts.append(visible_text)
-                            elif segment_id is not None:
-                                narration_by_segment[segment_id] = (
-                                    narration_by_segment.get(segment_id, "") + visible_text
-                                )
-                            token_data: dict[str, Any] = {
-                                "text": visible_text,
-                                "channel": channel,
-                                "sdkMode": True,
-                            }
-                            if segment_id is not None:
-                                token_data["segmentId"] = segment_id
-                            events.put({"event": "token", "data": token_data})
-        elif isinstance(message, ResultMessage):
-            session_id = message.session_id
-            final_result_text = message.result
-            usage = message.usage or {}
-            input_tokens = _usage_input_total(usage)
-            output_tokens = _usage_int(usage, "output_tokens", "outputTokens")
-            if message.total_cost_usd is not None:
-                total_cost_usd = Decimal(str(message.total_cost_usd))
-            if usage_sink is not None:
-                try:
-                    usage_sink(
-                        VcsoSdkUsage(
-                            input_tokens=input_tokens,
-                            output_tokens=output_tokens,
-                            total_cost_usd=total_cost_usd,
-                            session_id=session_id,
+    def _drain_model_driven_diagnostics() -> None:
+        """Record the out-of-process worker endpoint's diagnostics, then release every per-turn token.
+
+        Idempotent (the `finally` below is the only caller today, but a second call must not double-record)
+        and defensive: this runs on the failure path, so it must never raise over the top of the real error
+        that got us here. The derived per-capability scopes all share ONE `diagnostics` list by reference,
+        so reading the base scope drains every worker's entries."""
+
+        nonlocal diagnostics_drained
+        if diagnostics_drained:
+            return
+        diagnostics_drained = True
+        try:
+            for entry in list(getattr(model_driven_scope, "diagnostics", []) or []):
+                record_lifecycle("worker_hop", **entry)
+        except Exception:  # noqa: BLE001 - diagnostics must never mask the turn's real outcome
+            logger.debug("model-driven worker_hop drain failed; ignored", exc_info=True)
+        for token in model_driven_tokens.values():
+            TURN_REGISTRY.unregister(token)
+        model_driven_tokens.clear()
+
+    try:
+        async for message in query_impl(prompt=prompt, options=options):
+            if isinstance(message, StreamEvent):
+                if message.parent_tool_use_id:
+                    # Child text/tool payloads stay inside the native subagent context. Curated handler
+                    # progress is emitted separately through sub_agent_step events.
+                    continue
+                event = message.event
+                if event.get("type") == "content_block_start":
+                    block = event.get("content_block") or {}
+                    if block.get("type") == "tool_use":
+                        if native_mode and str(block.get("name") or "") == DELEGATION_TOOL_RUNTIME_NAME:
+                            continue
+                        emit_tool_start(
+                            str(block.get("name") or "tool"),
+                            str(block.get("id") or block.get("name") or "tool"),
                         )
-                    )
-                    usage_recorded = True
-                except Exception as exc:  # noqa: BLE001 - metering failure must not erase the founder answer
-                    logger.warning("SDK ResultMessage usage sink failed open: %s", exc)
-        elif isinstance(message, AssistantMessage) and native_mode and message.parent_tool_use_id:
-            usage = message.usage or {}
-            child_usage_records.append(
-                {
-                    "task_id": str(message.parent_tool_use_id),
-                    "model": str(message.model or ""),
-                    "input_tokens": _usage_input_total(usage),
-                    "output_tokens": _usage_int(usage, "output_tokens", "outputTokens"),
-                }
-            )
+                elif event.get("type") == "content_block_delta":
+                    delta = event.get("delta") or {}
+                    if delta.get("type") == "text_delta":
+                        text = str(delta.get("text") or "")
+                        if text:
+                            for channel, visible_text, segment_id in text_normalizer.feed(text):
+                                if channel == "answer":
+                                    answer_parts.append(visible_text)
+                                elif segment_id is not None:
+                                    narration_by_segment[segment_id] = (
+                                        narration_by_segment.get(segment_id, "") + visible_text
+                                    )
+                                token_data: dict[str, Any] = {
+                                    "text": visible_text,
+                                    "channel": channel,
+                                    "sdkMode": True,
+                                }
+                                if segment_id is not None:
+                                    token_data["segmentId"] = segment_id
+                                events.put({"event": "token", "data": token_data})
+            elif isinstance(message, ResultMessage):
+                session_id = message.session_id
+                final_result_text = message.result
+                usage = message.usage or {}
+                input_tokens = _usage_input_total(usage)
+                output_tokens = _usage_int(usage, "output_tokens", "outputTokens")
+                if message.total_cost_usd is not None:
+                    total_cost_usd = Decimal(str(message.total_cost_usd))
+                if usage_sink is not None:
+                    try:
+                        usage_sink(
+                            VcsoSdkUsage(
+                                input_tokens=input_tokens,
+                                output_tokens=output_tokens,
+                                total_cost_usd=total_cost_usd,
+                                session_id=session_id,
+                            )
+                        )
+                        usage_recorded = True
+                    except Exception as exc:  # noqa: BLE001 - metering failure must not erase the founder answer
+                        logger.warning("SDK ResultMessage usage sink failed open: %s", exc)
+            elif isinstance(message, AssistantMessage) and native_mode and message.parent_tool_use_id:
+                usage = message.usage or {}
+                child_usage_records.append(
+                    {
+                        "task_id": str(message.parent_tool_use_id),
+                        "model": str(message.model or ""),
+                        "input_tokens": _usage_input_total(usage),
+                        "output_tokens": _usage_int(usage, "output_tokens", "outputTokens"),
+                    }
+                )
 
-    for channel, visible_text, segment_id in text_normalizer.finish():
-        if channel == "answer":
-            answer_parts.append(visible_text)
-        elif segment_id is not None:
-            narration_by_segment[segment_id] = narration_by_segment.get(segment_id, "") + visible_text
-        token_data = {"text": visible_text, "channel": channel, "sdkMode": True}
-        if segment_id is not None:
-            token_data["segmentId"] = segment_id
-        events.put({"event": "token", "data": token_data})
+        for channel, visible_text, segment_id in text_normalizer.finish():
+            if channel == "answer":
+                answer_parts.append(visible_text)
+            elif segment_id is not None:
+                narration_by_segment[segment_id] = narration_by_segment.get(segment_id, "") + visible_text
+            token_data = {"text": visible_text, "channel": channel, "sdkMode": True}
+            if segment_id is not None:
+                token_data["segmentId"] = segment_id
+            events.put({"event": "token", "data": token_data})
+    finally:
+        # DIAGNOSTICS SURVIVE FAILURE (SDK-M3 step A4). The worker_hop drain used to run only after a
+        # clean query; a turn that raised — max_turns, a required-worker block, a client disconnect —
+        # skipped it and lost the worker-level evidence on precisely the turns that most needed
+        # explaining (Canary 10a carries zero worker_hop entries for exactly this reason). In `finally`
+        # it runs on every path. Draining BEFORE unregistering keeps the distinction the drain exists
+        # for: no worker_hop entries at all ⇒ the loopback request never landed; a `received` with no
+        # `completed` ⇒ it landed and execution failed.
+        _drain_model_driven_diagnostics()
 
-    if model_driven_token:
-        # Drain the endpoint's same-process diagnostics BEFORE unregistering. Without this a worker call
-        # that never reached the endpoint looks identical to one that arrived and failed — the ambiguity
-        # that left canary 3 undiagnosable. No `worker_hop` events at all ⇒ the loopback request never
-        # landed; a `received` with no `completed` ⇒ it landed and the execution failed.
-        _hop_scope = TURN_REGISTRY.get(model_driven_token)
-        for entry in list(getattr(_hop_scope, "diagnostics", []) or []):
-            record_lifecycle("worker_hop", **entry)
-        # Release the per-turn worker scope. Exception paths are covered by TurnRegistry's stale-eviction
-        # backstop; a finally-wrap around the query loop is the clean M4 follow-up.
-        TURN_REGISTRY.unregister(model_driven_token)
     missing_after_query = [key for key in required_agents if key not in completed_agents]
     if missing_after_query and model_driven:
         # Same DB completion bridge the stop_hook and post_tool_use use: a model-driven worker that

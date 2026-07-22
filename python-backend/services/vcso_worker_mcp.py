@@ -37,7 +37,7 @@ import logging
 import secrets
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
 from services.sub_agent_orchestrator import (
@@ -151,6 +151,25 @@ class TurnRegistry:
             self._evict_stale_locked()
             self._scopes[token] = scope
         return token
+
+    def mint_capability_scoped(self, scope: TurnScope, capability_key: str) -> str:
+        """Mint a token that permits EXACTLY ONE capability — the Defect 7 fix (04B-D2-FINDINGS §11).
+
+        The derived scope is a SHALLOW copy: every mutable field (``prior_findings``,
+        ``completed_results``, ``dispatch_locks``, ``dispatched_objectives``, ``diagnostics``,
+        ``context_scopes``, the store and the progress bridge) is the *same object* as on the base scope, so
+        findings chaining, the v0.6.84 dispatch dedupe and the single diagnostics drain behave exactly as
+        they did under one shared token. Only ``allowed_capabilities`` narrows — which is the whole fix:
+        ``run_worker_capability``'s existing "Capability X is not permitted for this turn" refusal now
+        rejects a worker subagent reaching for a sibling's tool, with no new authorization logic.
+
+        Do NOT deep-copy here. Independent per-capability state would silently break findings chaining (the
+        sandbox worker would read an empty ``prior_findings``) — the failure would look like a model
+        regression, not a plumbing one."""
+
+        if capability_key not in WORKER_CAPABILITY_KEYS:
+            raise WorkerScopeError(f"Unknown worker capability: {capability_key}")
+        return self.mint(replace(scope, allowed_capabilities=frozenset({capability_key})))
 
     def get(self, token: str) -> TurnScope | None:
         if not token:

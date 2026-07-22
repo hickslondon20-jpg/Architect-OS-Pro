@@ -76,7 +76,7 @@ def compile_founder_sdk_options(
     max_budget_usd: float,
     enable_native_subagents: bool = False,
     native_subagent_tools: dict[str, Any] | None = None,
-    model_driven_worker_server_url: str | None = None,
+    model_driven_worker_server_urls: dict[str, str] | None = None,
 ) -> CompiledFounderSdkOptions:
     """Compile one founder's callable tools, bounded agents, models, and MCP servers.
 
@@ -87,10 +87,16 @@ def compile_founder_sdk_options(
 
     client = getattr(store, "client", None)
     native_subagent_tools = native_subagent_tools or {}
-    # Model-driven delegation (D2): when a worker-server URL is supplied, expose each worker handler from
+    # Model-driven delegation (D2): when worker-server URLs are supplied, expose each worker handler from
     # the EXTERNAL per-agent server instead of the in-process session server. Path-A/Fix-C behavior is
-    # byte-identical when this is None.
-    model_driven = bool(model_driven_worker_server_url)
+    # byte-identical when this is None/empty.
+    #
+    # SDK-M3 (Defect 7): this is a MAPPING capability_key -> url, not one shared url. Each URL carries that
+    # capability's OWN turn token, so a worker subagent that reaches for a sibling's tool is refused by the
+    # existing scope check in `run_worker_capability`. A single shared URL is what made every worker's token
+    # permit all three capabilities.
+    model_driven_worker_server_urls = model_driven_worker_server_urls or {}
+    model_driven = bool(model_driven_worker_server_urls)
     enabled_catalog = _enabled_catalog_names(client) if client is not None else None
     connected_servers = _connected_sdk_servers(client, user_id=user_id) if client is not None else []
     selected, excluded = _select_definitions(
@@ -153,11 +159,20 @@ def compile_founder_sdk_options(
             # not silently deny the subagent's call under dontAsk.
             agent_tools = [f"mcp__{MODEL_DRIVEN_WORKER_SERVER}__{handler_name}"]
             model_driven_worker_tools.extend(agent_tools)
+            # This agent's OWN token-bearing URL (Defect 7). Missing means the caller minted tokens for a
+            # different agent set than it is compiling — fail here rather than silently handing this worker
+            # a surface it cannot call, or worse, someone else's token.
+            worker_url = model_driven_worker_server_urls.get(capability.capability_key)
+            if not worker_url:
+                raise ValueError(
+                    "Model-driven compile is missing a per-capability worker server URL for "
+                    f"{capability.capability_key}; refusing to build an unscoped worker surface."
+                )
             # The worker tool-call timeout is delivered via the `MCP_TOOL_TIMEOUT` env var (Railway),
             # NOT a per-server config key: the deployed CLI rejects an unknown `timeout` key on the http
             # server config, which stranded the lead with no valid delegation target (see 04B-D2 findings).
             agent_mcp_servers: list[Any] | None = [
-                {MODEL_DRIVEN_WORKER_SERVER: {"type": "http", "url": model_driven_worker_server_url}}
+                {MODEL_DRIVEN_WORKER_SERVER: {"type": "http", "url": worker_url}}
             ]
         elif handler_name:
             agent_tools = [f"mcp__{SDK_INTERNAL_SERVER}__{handler_name}"]

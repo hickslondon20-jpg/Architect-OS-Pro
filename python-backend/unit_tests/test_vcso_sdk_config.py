@@ -90,7 +90,7 @@ def _capability(key, tools, *, routing_tier=None):
     }
 
 
-def _compile_for(user_id, *, connection_user_id=None, native_subagents=False, model_driven_url=None):
+def _compile_for(user_id, *, connection_user_id=None, native_subagents=False, model_driven_urls=None):
     tables = {
         "tool_registry": [
             {"slug": "wiki_search", "enabled": True, "is_code_registered": True},
@@ -158,7 +158,7 @@ def _compile_for(user_id, *, connection_user_id=None, native_subagents=False, mo
             if native_subagents
             else None
         ),
-        model_driven_worker_server_url=model_driven_url,
+        model_driven_worker_server_urls=model_driven_urls,
     )
 
 
@@ -244,8 +244,12 @@ def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead
         "services.vcso_sdk_config.create_sdk_mcp_server",
         lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
     )
-    url = "http://127.0.0.1:8000/internal/mcp/workers/?t=TESTTOKEN"
-    compiled = _compile_for("founder-12", native_subagents=True, model_driven_url=url)
+    # SDK-M3 (Defect 7): one URL PER CAPABILITY, each carrying that worker's own token.
+    urls = {
+        "wiki_agent": "http://127.0.0.1:8000/internal/mcp/workers/?t=TOKEN_WIKI",
+        "sandbox_agent": "http://127.0.0.1:8000/internal/mcp/workers/?t=TOKEN_SANDBOX",
+    }
+    compiled = _compile_for("founder-12", native_subagents=True, model_driven_urls=urls)
 
     # Lead pre-approves Task AND every provisioned worker handler tool (required under dontAsk). The handler
     # names must NOT be provisioned into the lead's `tools` availability list (isolation is on the exposure
@@ -268,7 +272,14 @@ def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead
     for key, handler in (("sandbox_agent", "run_sandbox_agent"), ("wiki_agent", "run_wiki_agent")):
         agent = compiled.options.agents[key]
         assert agent.tools == [f"mcp__vcso_workers__{handler}"]
-        assert agent.mcpServers == [{"vcso_workers": {"type": "http", "url": url}}]
+        assert agent.mcpServers == [{"vcso_workers": {"type": "http", "url": urls[key]}}]
+
+    # Defect 7: the two workers must NOT share a URL — a shared URL is a shared token, and a shared token
+    # permits every capability of the turn to every worker subagent.
+    scoped_urls = [
+        agent.mcpServers[0]["vcso_workers"]["url"] for agent in compiled.options.agents.values()
+    ]
+    assert len(set(scoped_urls)) == len(scoped_urls)
 
     # The inline external config must JSON-serialize (unlike the in-process McpSdkServerConfig instance),
     # which is exactly why the SDK can deliver it per-agent in the initialize request.
@@ -280,7 +291,9 @@ def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead
             }
         )
     )
-    assert serialized["sandbox_agent"]["mcpServers"] == [{"vcso_workers": {"type": "http", "url": url}}]
+    assert serialized["sandbox_agent"]["mcpServers"] == [
+        {"vcso_workers": {"type": "http", "url": urls["sandbox_agent"]}}
+    ]
 
 
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():

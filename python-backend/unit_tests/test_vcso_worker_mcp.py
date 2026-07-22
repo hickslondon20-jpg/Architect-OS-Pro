@@ -530,3 +530,142 @@ def test_completion_bridge_counts_parent_linked_completed_children():
 
 def test_completion_bridge_is_empty_without_parent_run_id():
     assert model_driven_completed_children(object(), parent_run_id=None, required_agents=("x",)) == set()
+
+
+# ---------------------------------------------------------------------------------------------------
+# Defect 7 (SDK-M3) — a worker subagent must not be able to call a sibling worker's tool
+# ---------------------------------------------------------------------------------------------------
+# The live shape this locks: on the per-turn token, the sandbox subagent called
+# `run_structured_data_agent`, was authorised, got the dedupe's cached structured result, accepted it as
+# its own answer and returned WITHOUT ever running the sandbox — so `sandbox_execution_agent` had no child
+# row at all and Canary 10a ground out at max_turns for $0.2196 and no answer (04B-D2-FINDINGS §11).
+
+
+def _turn_scope_for_all_three():
+    """The base scope a model-driven turn mints: all three thin-slice capabilities in play."""
+
+    return _scope(allowed_capabilities=frozenset(WORKER_CAPABILITY_KEYS))
+
+
+def test_capability_scoped_token_permits_only_its_own_capability():
+    reg = TurnRegistry()
+    base = _turn_scope_for_all_three()
+    token = reg.mint_capability_scoped(base, "sandbox_execution_agent")
+    assert reg.get(token).allowed_capabilities == frozenset({"sandbox_execution_agent"})
+    # The base scope is untouched — narrowing is per token, not a mutation.
+    assert base.allowed_capabilities == frozenset(WORKER_CAPABILITY_KEYS)
+
+
+def test_worker_cannot_invoke_a_sibling_workers_tool():
+    """THE Defect-7 proof. The sandbox worker's own token must refuse the structured-data tool."""
+
+    reg = TurnRegistry()
+    base = _turn_scope_for_all_three()
+    sandbox_token = reg.mint_capability_scoped(base, "sandbox_execution_agent")
+
+    with pytest.raises(WorkerScopeError) as excinfo:
+        _run(
+            run_worker_capability(
+                sandbox_token, "structured_data_agent", {"objective": "quantify concentration"}, registry=reg
+            )
+        )
+    assert "not permitted" in str(excinfo.value)
+    # The refusal happens BEFORE any orchestrator work: no child run, no cost, no cached result to poison
+    # the sibling's own later dispatch.
+    assert _Orchestrator.calls == []
+    assert base.completed_results == {}
+
+
+def test_each_worker_token_still_runs_its_own_capability():
+    """The lock must not over-refuse: every worker still runs on its own token."""
+
+    reg = TurnRegistry()
+    base = _turn_scope_for_all_three()
+    for key in WORKER_CAPABILITY_KEYS:
+        token = reg.mint_capability_scoped(base, key)
+        result = _run(run_worker_capability(token, key, {"objective": f"do {key}"}, registry=reg))
+        assert result["status"] == "completed"
+    assert [request.capability_key for request in _Orchestrator.calls] == list(WORKER_CAPABILITY_KEYS)
+
+
+def test_capability_scoped_tokens_share_findings_chaining_and_dedupe_state():
+    """The narrowing is SHALLOW on purpose. Deep-copying per token would give each worker its own
+    prior_findings and silently break the app-owned findings chain — a plumbing regression that would read
+    as a model regression on a canary."""
+
+    reg = TurnRegistry()
+    base = _turn_scope_for_all_three()
+    structured_token = reg.mint_capability_scoped(base, "structured_data_agent")
+    sandbox_token = reg.mint_capability_scoped(base, "sandbox_execution_agent")
+
+    _run(run_worker_capability(structured_token, "structured_data_agent", {"objective": "quantify"}, registry=reg))
+
+    # The structured worker's compact finding is visible to the sandbox worker's SEPARATE token/scope.
+    assert reg.get(sandbox_token).prior_findings.get("sandbox_execution_agent")
+    # Dedupe state is shared too: a re-sent structured call is still coalesced.
+    _run(run_worker_capability(structured_token, "structured_data_agent", {"objective": "quantify"}, registry=reg))
+    assert len(_Orchestrator.calls) == 1
+    # And the diagnostics all land on one list, so a single drain still sees every worker's entries.
+    assert base.diagnostics is reg.get(sandbox_token).diagnostics
+
+
+def test_capability_scoped_mint_rejects_an_unknown_capability():
+    reg = TurnRegistry()
+    with pytest.raises(WorkerScopeError):
+        reg.mint_capability_scoped(_turn_scope_for_all_three(), "not_a_worker")
+
+
+def test_model_driven_manifest_flags_two_workers_sharing_one_token_url():
+    """Defect 7 as a STATIC guard: a shared inline URL is a shared token, and a shared token permits every
+    capability of the turn to every worker. Catch the regression at compile time rather than paying for
+    another canary to discover it."""
+
+    shared = "http://127.0.0.1:8000/internal/mcp/workers/?t=ONE_TOKEN_FOR_ALL"
+    compiled = _compiled(
+        allowed_tools=[
+            "Task",
+            "mcp__vcso_workers__run_structured_data_agent",
+            "mcp__vcso_workers__run_sandbox_execution_agent",
+        ],
+        mcp_servers={"architectos": {"tools": []}},
+        agent_servers={
+            "structured_data_agent": [{"vcso_workers": {"type": "http", "url": shared}}],
+            "sandbox_execution_agent": [{"vcso_workers": {"type": "http", "url": shared}}],
+        },
+        agent_tools={
+            "structured_data_agent": ["mcp__vcso_workers__run_structured_data_agent"],
+            "sandbox_execution_agent": ["mcp__vcso_workers__run_sandbox_execution_agent"],
+        },
+    )
+    manifest = build_model_driven_manifest(
+        compiled,
+        required_agents=("structured_data_agent", "sandbox_execution_agent"),
+        worker_server_name="vcso_workers",
+    )
+    shared_violations = [v for v in manifest["violations"] if v.startswith("model_driven_worker_token_shared")]
+    assert shared_violations
+
+
+def test_model_driven_manifest_passes_per_capability_token_urls():
+    compiled = _compiled(
+        allowed_tools=[
+            "Task",
+            "mcp__vcso_workers__run_structured_data_agent",
+            "mcp__vcso_workers__run_sandbox_execution_agent",
+        ],
+        mcp_servers={"architectos": {"tools": []}},
+        agent_servers={
+            "structured_data_agent": [{"vcso_workers": {"type": "http", "url": "http://x/?t=TOKEN_A"}}],
+            "sandbox_execution_agent": [{"vcso_workers": {"type": "http", "url": "http://x/?t=TOKEN_B"}}],
+        },
+        agent_tools={
+            "structured_data_agent": ["mcp__vcso_workers__run_structured_data_agent"],
+            "sandbox_execution_agent": ["mcp__vcso_workers__run_sandbox_execution_agent"],
+        },
+    )
+    manifest = build_model_driven_manifest(
+        compiled,
+        required_agents=("structured_data_agent", "sandbox_execution_agent"),
+        worker_server_name="vcso_workers",
+    )
+    assert manifest["violations"] == []
