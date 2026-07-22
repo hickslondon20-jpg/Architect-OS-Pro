@@ -41,6 +41,10 @@ commits per `CLAUDE.md`. **Decisive unknown gated first:** SDK token-streaming g
 8. **Work from live; one phase at a time; founder-gated flips.** `main` → auto-deploy → verify on
    `architectospro.com` / `api.architectospro.com`; version-tagged commits; do not batch phases.
 9. **The North Star wins** on any conflict; this changes the engine, not the target shape.
+10. **Reliability before "closed."** Reserve **"closed"** for *reliably reproduced*; a single live run is
+    **"proven once."** Any capability the rest of the migration depends on — above all the lead reliably
+    delegating — exits on **N consecutive passes on a pinned anchor**, not one green run. (Adopted
+    2026-07-20 after delegation ran 3 passes / 2 failures across five live runs on an uncontrolled anchor.)
 
 ## Phases
 
@@ -51,7 +55,7 @@ commits per `CLAUDE.md`. **Decisive unknown gated first:** SDK token-streaming g
 | C | Registry → SDK-config compiler + extensions | Per-founder `ClaudeAgentOptions` compiled from `tool_registry` × `agent_capabilities` × active `mcp_connections`; `persistence_semantics` live and enforcing read-only-vs-write guardrails; tier→model resolver resolved (Q2 resolved — see detail). |
 | C2 | Streaming surface redesign (UI/UX) | The transparency/streaming surface matches the target screenshots: token-by-token answer + streamed curated narration, drill-down step chips (not blocky accordions), living right-hand plan panel. Visual-only against the stable SSE schema (one normalizer tweak). The migration's first `src/` phase. |
 | D | Native subagents — the P4 re-approach | The P4 thin-slice strategic question decomposes **correctly** (spawns the mandatory structured-data **and** sandbox children), plan + workers visible via MA-05, correct tiers, budget/depth caps enforced. **STOP-and-review checkpoint** — the one P4 never reached. **Delegation plumbing proven via Path A (interim); model-driven delegation moved to D2.** |
-| D2 | Model-driven delegation (restore reasoning-driven worker selection) | The **lead** reasons the decomposition and delegates via `Task` (worker tools scoped invisible to the lead), not the app deterministically; workers run, sandbox fires (working smoke), effort-scaling + delegation contracts, coverage safety-net retained. Restores the migration's intent after Path A proved the plumbing. **STOP-and-review checkpoint.** |
+| D2 | Model-driven delegation (restore reasoning-driven worker selection) | The **lead** reasons the decomposition and delegates via `Task` (worker tools scoped invisible to the lead), not the app deterministically; workers run, sandbox fires (working smoke), effort-scaling + delegation contracts, coverage safety-net retained. Restores the migration's intent after Path A proved the plumbing. **STOP-and-review checkpoint** — plus a **reliability bar** (N consecutive delegations on a pinned anchor) and **Defect 7** (worker cross-tool isolation) closed before the flag leaves dark. |
 | E | Sessions + Deep Mode reconciliation | A Deep Mode thread pauses on `ask_user` and resumes with full context via SDK sessions; `agent_todos` plan + workspace persist with no double-bookkeeping against resume-state. |
 | F | First live MCP (QuickBooks) | Live QuickBooks P&L pull through a bounded worker, cited, **read-only**, founder-scoped via vault auth, ephemeral; freshness policy chose the live source; write/privileged blocked at runtime. Ties to harness Phase 5. |
 | G | Generalize, verify, cut over | Co-equal gates proven on live (cost ↓ vs. baseline, cited CFO/CSO quality, native legible UX, safety under adversarial prompts); hand-rolled path retired on parity; harness root `ROADMAP.md` updated (founder-gated). |
@@ -125,6 +129,19 @@ Sandbox real computation stays deferred (financial-series storage + MCP, Phase F
 (not the app) reasons and delegates; workers run; sandbox fires (working smoke); nested UI + traces +
 tiers intact; **STOP-and-review checkpoint.** Full plan: `04B-D2-PLAN.md`.
 
+**Status (2026-07-20): proven once, not yet reliable.** Tier 1 (SDK-M2, Canary 5) and Tier 2 (Canary 8,
+full three-worker chain) each passed on a **single** live run; the backlog batch (v0.6.84–v0.6.91) closed
+items 1 (dispatch idempotency), 2b (partial-answer surface) and 3 (`per_user_wiki` semantic-ranking) live.
+But delegation is **3 passes / 2 failures across five live runs** with an **uncontrolled anchor prompt**,
+and **Defect 7** — worker subagents able to call each other's tools (a bounded-worker **isolation** lock
+violation, live and unseen through the Tier-2 close; it broke Canary 10a and was the real cause of the
+"duplicate `per_user_wiki`" first misread as a dedupe artifact) — is open. **SDK-M3 is load-bearing:**
+effort-scaling + explicit per-worker delegation contracts, and it must (a) close Defect 7 as a
+**dark-exit gate**, (b) pin the anchor + add the stream keepalive / give-up / diagnostics-drain fixes as
+the *instrumentation* that makes reliability measurable, and (c) exit on a **reliability bar (N
+consecutive delegations on the pinned anchor)**, not one green run. Nothing downstream (E/F/G, any
+non-dark exposure) depends on reliable delegation until M3 clears that bar.
+
 ### Phase E — Sessions + Deep Mode reconciliation
 Map SDK **sessions** (resume/fork) onto Deep Mode: the `ask_user` pause/resume, the `agent_todos`
 editable plan, and workspace files. Reconcile so there is a single source of truth for resume state
@@ -178,7 +195,7 @@ root `ROADMAP.md` (founder-gated).
 | C. Registry → SDK-config compiler + extensions | **Done — live-dark; guardrail/compiler gate passed** | 2026-07-15 |
 | C2. Streaming surface redesign (UI/UX) | **Done — live canary + reload gate passed; flag dark** | 2026-07-15 |
 | D. Native subagents — P4 re-approach (checkpoint) | **Delegation plumbing proven via Path A (interim, v0.6.57–59); flag dark** | 2026-07-16 |
-| D2. Model-driven delegation (restore reasoning-driven selection) | **SDK-M2 CLOSED (2026-07-20, Canary 5 PASS, deployed `56c8d604`/v0.6.76). TIER 2 CLOSED (2026-07-20, Canary 8 PASS, deployed `72ababb8`/v0.6.82) — full `structured → wiki → sandbox` three-worker chain proven live end-to-end, with the progress bridge (`sub_agent_step`) and app-owned findings-chaining, and a founder-visible cited answer (parent run `f0f5add5-c71f-476f-82e7-95a6d3187766`; four children all completed, all `Task allow` first-try / zero denials; sandbox ran 113s in-band under the 240s `MCP_TOOL_TIMEOUT`; 8,577-char / 33-citation answer, compose $0.1454). Flag re-darkened; `vcso_planner` retired. Non-blocking follow-up: duplicate `per_user_wiki` dispatch (both completed) — make idempotent. See `04B-D2-M2-FINISH-LOG.md` → "Canary 8" and `04B-D2-TIER2-CLOSE-HANDOFF.md`. Tiers 1 & 2 done; SDK-M3 not started.** | 2026-07-20 |
+| D2. Model-driven delegation (restore reasoning-driven selection) | **SDK-M2 CLOSED (2026-07-20, Canary 5 PASS, deployed `56c8d604`/v0.6.76). TIER 2 PROVEN ONCE — not yet reliable (2026-07-20, Canary 8 PASS on a **single** run, deployed `72ababb8`/v0.6.82) — full `structured → wiki → sandbox` three-worker chain proven live end-to-end, with the progress bridge (`sub_agent_step`) and app-owned findings-chaining, and a founder-visible cited answer (parent run `f0f5add5-c71f-476f-82e7-95a6d3187766`; four children all completed, all `Task allow` first-try / zero denials; sandbox ran 113s in-band under the 240s `MCP_TOOL_TIMEOUT`; 8,577-char / 33-citation answer, compose $0.1454). Flag re-darkened; `vcso_planner` retired. Backlog batch (v0.6.84–v0.6.91): items 1 (dispatch idempotency), 2b (partial-answer surface), 3 (`per_user_wiki` semantic-ranking) closed live; item 2a (fault-injection rescue) owed behind Defect 7. **Defect 7 — worker subagents can call each other's tools** (bounded-worker isolation lock violation, live and unseen through this Tier-2 close; the "duplicate `per_user_wiki`" above was actually a cross-worker call, not a dedupe artifact) **gates the flag's dark-exit; fix scoped into SDK-M3.** See `04B-D2-M2-FINISH-LOG.md` → "Canary 8" and `04B-D2-TIER2-CLOSE-HANDOFF.md`. Tiers 1 & 2 **proven once, not yet reliable** — delegation is 3 passes / 2 failures across five live runs with an uncontrolled anchor; **SDK-M3 is load-bearing** (effort-scaling + delegation contracts + Defect 7 dark-exit gate + pin-anchor instrumentation) and exits on a **reliability bar** (N consecutive delegations on a pinned anchor), not one run. Not started.** | 2026-07-20 |
 | E. Sessions + Deep Mode reconciliation | **Proposed — not started** | — |
 | F. First live MCP (QuickBooks) | **Proposed — not started** | — |
 | G. Generalize, verify, cut over | **Proposed — not started** | — |
