@@ -321,6 +321,37 @@ def native_fault_injection_capabilities(
     return tuple(dict.fromkeys(requested))
 
 
+def stream_disconnect_injection_after(
+    settings: dict[str, Any] | None, user_id: str | None
+) -> int | None:
+    """How many SSE events to DELIVER before this turn's stream goes dark (Gate 2 rehearsal, dark only).
+
+    Gate 2 is open because run 4's stream died mid-turn and the founder saw an error for a turn that had
+    actually succeeded. Chasing that intermittent disconnect is open-ended and burns canaries; *injecting*
+    it is deterministic and cheap — the same trade the fault-injection modes already make for the
+    graceful-compose path. The route stops writing to the client at this event index but keeps draining
+    the turn, so the backend still finishes and still persists. That is precisely run 4's shape, on demand.
+
+    Gated exactly like `native_fault_injection_capabilities`: an explicit enable bool AND the founder
+    `diagnostic_user_ids` allowlist. Either missing ⇒ None ⇒ the mechanism does not exist for that turn.
+
+    **Never returns 0.** The client needs the `ready` event to learn the thread id and the user message,
+    and the Defect-8 recovery needs both to find this turn's persisted answer without risking an older
+    one. Cutting before `ready` would test nothing except that recovery is impossible without inputs."""
+
+    settings = settings or {}
+    if not bool(settings.get("diagnostic_stream_disconnect_enabled")):
+        return None
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    if not user_id or str(user_id) not in diagnostic_user_ids:
+        return None
+    try:
+        after = int(settings.get("diagnostic_stream_disconnect_after_events") or 0)
+    except (TypeError, ValueError):
+        return None
+    return after if after >= 1 else None
+
+
 FAULT_INJECTION_MODES: tuple[str, ...] = ("before_start", "after_completion")
 
 
@@ -491,11 +522,30 @@ def stream_vcso_sdk_turn(
     # caller's `heartbeat_seconds` (TOOL_HEARTBEAT_SECONDS = 10s in production).
     keepalive_seconds = max(0.01, heartbeat_seconds)
     idle_seconds = 0.0
+    # OBSERVABILITY (Gate 2). The keepalive was shipped "code-verified, not observed": SSE frames are not
+    # visible from the database, so the only proof it ever fired lived in Railway request logs. Counting it
+    # here and reporting through the SAME lifecycle sink the delegation events use puts the evidence in
+    # `agent_delegation_runs.metadata->sdk_native_lifecycle`, where every other M3 claim is already checked
+    # from. Two entries only — the first firing (proves it happens, and when) and a total (proves how much)
+    # — so this stays cheap and does not drown the 14 delegation entries it sits beside.
+    keepalive_count = 0
+
+    def _report_keepalive(stage: str, **details: Any) -> None:
+        if native_lifecycle_sink is None:
+            return
+        try:
+            native_lifecycle_sink({"event": "stream_keepalive", "stage": stage, **details})
+        except Exception:  # noqa: BLE001 - observability must never break the stream it observes
+            logger.debug("stream keepalive lifecycle report failed; ignored", exc_info=True)
+
     while True:
         try:
             item = events.get(timeout=keepalive_seconds)
         except queue.Empty:
             idle_seconds += keepalive_seconds
+            keepalive_count += 1
+            if keepalive_count == 1:
+                _report_keepalive("first", idle_seconds=round(idle_seconds, 2))
             yield {
                 "event": "heartbeat",
                 "data": {
@@ -509,8 +559,12 @@ def stream_vcso_sdk_turn(
         if item is _WORKER_DONE:
             break
         if isinstance(item, _WorkerFailure):
+            # Report before propagating: a turn that dies mid-stream is exactly when knowing whether the
+            # keepalive was holding the connection open matters most.
+            _report_keepalive("total", count=keepalive_count)
             raise item.error
         yield item
+    _report_keepalive("total", count=keepalive_count)
     worker.join(timeout=1)
     if not result_box:
         raise RuntimeError("Claude Agent SDK turn ended without a result.")

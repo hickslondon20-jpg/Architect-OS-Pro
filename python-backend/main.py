@@ -59,6 +59,10 @@ from services.sub_agent_orchestrator import SubAgentOrchestrator
 from services.tool_registry_sync import sync_native_tools
 from services.vector_store import VectorStore, VectorStoreError
 from services.vcso_chat_service import VcsoChatPayload, VcsoChatService
+from services.vcso_sdk_loop import (
+    read_sdk_loop_settings,
+    stream_disconnect_injection_after,
+)
 from services.web_search import WebSearchService
 from services.wiki_compilation import CompileResult, WikiCompilationError, WikiCompilationService
 from services.wiki_consolidation import ConsolidationResult, WikiConsolidationError, WikiConsolidationService
@@ -1267,7 +1271,26 @@ def stream_vcso_chat(
                 project_id=payload.projectId,
                 deep_mode=payload.deepMode,
             )
+            # DARK, FOUNDER-ONLY stream-disconnect rehearsal (04B-D2 Gate 2). Inert unless the
+            # `vcso_sdk_loop` diagnostic sub-flag names this founder, so every normal turn is byte-identical.
+            disconnect_after: int | None = None
+            try:
+                disconnect_after = stream_disconnect_injection_after(
+                    read_sdk_loop_settings(service.supabase, str(user_id)).get("settings"),
+                    str(user_id),
+                )
+            except Exception:  # noqa: BLE001 - a diagnostic must never be able to break a real turn
+                disconnect_after = None
+            delivered = 0
             for item in service.stream_chat(user_id=str(user_id), payload=chat_payload):
+                if disconnect_after is not None and delivered >= disconnect_after:
+                    # Stop DELIVERING, keep DRAINING. `continue` (not `break`) is the whole point: breaking
+                    # would close the generator and abort the turn, which is a different and worse failure
+                    # than the one under test. Draining lets the backend finish and persist exactly as it
+                    # did on run 4, so the founder's client faces a real "stream stopped, answer exists"
+                    # condition and the Defect-8 recovery has something true to recover.
+                    continue
+                delivered += 1
                 yield _sse(item["event"], item["data"])
         except Exception as exc:
             yield _sse("error", {"message": str(exc) or "Virtual CSO stream failed."})

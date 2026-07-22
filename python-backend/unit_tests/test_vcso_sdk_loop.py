@@ -1502,3 +1502,59 @@ def test_stream_emits_a_keepalive_while_an_out_of_process_worker_runs(monkeypatc
     # The keepalive is additive: the real answer still arrives unchanged.
     assert result.answer_text == "Cited 90-day recommendation."
 
+
+def test_keepalive_reports_to_the_lifecycle_sink_so_it_is_observable_in_the_db(monkeypatch):
+    """Gate 2 observability. The keepalive shipped 'code-verified, not observed' because SSE frames are not
+    visible from the database. Reporting it through the SAME lifecycle sink as the delegation events puts
+    the proof in `agent_delegation_runs.metadata->sdk_native_lifecycle`, where every other M3 claim is
+    already checked -- no Railway log pull required."""
+
+    async def fake_query(*, options, **_kwargs):
+        await asyncio.sleep(0.12)  # silent worker hop -> the keepalive must fire during it
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-keepalive-obs",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-keepalive-obs",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 10, "output_tokens": 5},
+            result="Cited 90-day recommendation.",
+        )
+
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    lifecycle_events: list[dict] = []
+    _events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="Founder prompt",
+            system_prompt="System",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(user_id="founder-1"),
+            trace_metadata={"run_id": "run-keepalive-obs"},
+            heartbeat_seconds=0.01,
+            native_lifecycle_sink=lifecycle_events.append,
+            query_impl=fake_query,
+        )
+    )
+
+    keepalive_lifecycle = [e for e in lifecycle_events if e["event"] == "stream_keepalive"]
+    stages = [e["stage"] for e in keepalive_lifecycle]
+    # 'first' proves it fired (and carries when); 'total' proves how many, on the clean-completion path.
+    assert "first" in stages
+    assert "total" in stages
+    total_entry = next(e for e in keepalive_lifecycle if e["stage"] == "total")
+    assert total_entry["count"] >= 1
+    assert result.answer_text == "Cited 90-day recommendation."
+

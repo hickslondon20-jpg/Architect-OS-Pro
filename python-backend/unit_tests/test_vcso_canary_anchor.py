@@ -153,3 +153,57 @@ def test_distinct_objectives_are_accepted_for_different_workers():
             "structured_data_agent": "Quantify client-concentration and margin trend from the dataset"
         },
     )
+
+
+# ---------------------------------------------------------------------------------------------------
+# Gate 2 delivery-close — stream-disconnect injection gate + keepalive observability
+# ---------------------------------------------------------------------------------------------------
+
+from services.vcso_sdk_loop import stream_disconnect_injection_after  # noqa: E402
+
+_FOUNDER = "cd490873-99aa-4533-9240-f0aa04deb54f"
+
+
+def _disconnect_settings(**over):
+    base = {
+        "diagnostic_stream_disconnect_enabled": True,
+        "diagnostic_user_ids": [_FOUNDER],
+        "diagnostic_stream_disconnect_after_events": 4,
+    }
+    base.update(over)
+    return base
+
+
+def test_disconnect_injection_returns_cut_point_for_the_enrolled_founder():
+    assert stream_disconnect_injection_after(_disconnect_settings(), _FOUNDER) == 4
+
+
+def test_disconnect_injection_is_inert_when_the_enable_bool_is_off():
+    assert (
+        stream_disconnect_injection_after(
+            _disconnect_settings(diagnostic_stream_disconnect_enabled=False), _FOUNDER
+        )
+        is None
+    )
+
+
+def test_disconnect_injection_is_inert_for_a_user_not_on_the_allowlist():
+    assert stream_disconnect_injection_after(_disconnect_settings(), "4ef80000-0000-0000-0000-000000000000") is None
+    assert stream_disconnect_injection_after(_disconnect_settings(), None) is None
+
+
+def test_disconnect_injection_never_cuts_before_ready():
+    """0 or negative must yield None: the client needs `ready` (thread id + user message) for the Defect-8
+    recovery to find this turn's answer without risking an older one. Cutting before ready tests nothing."""
+
+    assert stream_disconnect_injection_after(_disconnect_settings(diagnostic_stream_disconnect_after_events=0), _FOUNDER) is None
+    assert stream_disconnect_injection_after(_disconnect_settings(diagnostic_stream_disconnect_after_events=-3), _FOUNDER) is None
+
+
+def test_disconnect_injection_tolerates_a_garbage_after_value():
+    assert stream_disconnect_injection_after(_disconnect_settings(diagnostic_stream_disconnect_after_events="nope"), _FOUNDER) is None
+
+
+def test_disconnect_injection_is_inert_on_empty_settings():
+    assert stream_disconnect_injection_after(None, _FOUNDER) is None
+    assert stream_disconnect_injection_after({}, _FOUNDER) is None
