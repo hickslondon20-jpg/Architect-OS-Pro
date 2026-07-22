@@ -76,7 +76,7 @@ not met — that is the whole point of the rule.
 | # | Date | Deployed SHA | Parent run | Children (status / duration) | Cost | Verdict |
 |---|---|---|---|---|---|---|
 | 1 | 2026-07-22 | `b3dab271` | `734b61fc` (completed, 3m22s) | structured `417523bb` 0.5s · wiki `57ff15dd` 2.1s · sandbox `0df539b6` 98.2s — all completed | $0.1427 compose | **PASS** |
-| 2 | | | | | | |
+| 2 | 2026-07-22 | `b3dab271` | `beba1825` (completed, 2m03s) | structured `4ab2ee8f` 0.5s · sandbox `61ecd789` 26.7s · wiki `f47705e2` 1.9s — all completed | $0.1369 compose | **PASS** |
 | 3 | | | | | | |
 | 4 | | | | | | |
 | 5 | | | | | | |
@@ -128,3 +128,42 @@ produced 2 rows both on `e48905fd`, Canary 9-retry 2 rows both on `9a97d559`. So
 met to exactly the standard the Tier-2 close was accepted on, and no worse. **Log it as an M4 item**
 (child usage attribution collapses onto one child) rather than a reliability failure — but do not let the
 completion doc claim per-child pairing it does not have.
+
+---
+
+## Run 2 — 2026-07-22, deployed `b3dab271`, `ok=true` · **PASS (2/5)**
+
+Armed 17:05:10Z, re-darkened and both flags read back off before evidence. Anchor verbatim (103 chars).
+
+**Runs.** Parent `beba1825-bf8d-4a37-a301-705a8fcaee75` completed in **2m03s** — a minute faster than run
+1. `structured_data_agent` `4ab2ee8f` (0.5s) → `sandbox_execution_agent` `61ecd789` (**26.7s**) →
+`per_user_wiki` `f47705e2` (1.9s). All completed.
+
+**Lifecycle (14 entries), same clean shape as run 1.** `worker_token_scoping tokens=3`;
+`runtime_manifest reason_code=none`; **3× `task_pre_tool_use` → allow first attempt, zero denials**;
+**3× `pre_tool_probe`, each worker on its OWN tool**; 3 received + 3 completed hops. No duplicate
+dispatch, no cross-worker call.
+
+**Tiers.** Haiku workers / Sonnet compose. **Answer.** 5,908 chars, **33 citations**, compose $0.13693.
+
+**Nested UI — CONFIRMED VISUALLY (criterion 5, previously unverifiable from the DB).** Founder
+screenshots show the progress panel at 8/8 with the worker steps rendered nested and paired: "Structured
+data worker" → "Run Structured Data Agent", "Sandbox compute worker" → "Run Sandbox Execution Agent",
+"Strategic context worker" → "Run Per User Wiki", then "Answer prepared". Curated narration streamed
+between them ("Structured data confirmed the aggregate P&L snapshot; now running sandbox exposure
+modeling…"). No raw payloads or chain-of-thought surfaced.
+
+### The delegation ORDER changed between runs — and that is a good sign
+
+Run 1 went structured → **wiki** → sandbox. Run 2 went structured → **sandbox** → wiki. Both satisfy the
+only hard ordering constraint (sandbox must follow structured, and it did — the `pre_task_use` clause
+requiring a non-empty inherited `prior_findings` was allowed first try in both). A fixed script would
+produce the same order every time. Two different valid orders is evidence the **lead is genuinely
+reasoning the decomposition** rather than replaying a sequence — which is the whole point of D2.
+
+Sandbox also ran 26.7s here vs 98.2s in run 1, so the worker's cost is genuinely variable; the 240s
+`MCP_TOOL_TIMEOUT` headroom matters and must not be lost.
+
+**Carried forward:** `ai_usage_log` again shows 2 `sub_agent` rows both on the sandbox child
+(`61ecd789`). Same pre-existing attribution collapse as runs 1 / Canary 8 / Canary 9-retry. M4 item.
+
