@@ -14,6 +14,8 @@ export const Composer: React.FC<{
   onChange?: (value: string) => void;
   textareaRef?: React.Ref<HTMLTextAreaElement>;
   streaming?: boolean;
+  deepMode?: boolean;
+  onDeepModeChange?: (enabled: boolean) => void;
 }> = ({
   onSubmit,
   linkedFolder,
@@ -23,6 +25,8 @@ export const Composer: React.FC<{
   onChange,
   textareaRef,
   streaming = false,
+  deepMode = false,
+  onDeepModeChange,
 }) => {
   const [localText, setLocalText] = useState('');
   const text = value ?? localText;
@@ -61,6 +65,21 @@ export const Composer: React.FC<{
             </span>
           </div>
         )}
+        <div className="mb-2 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={() => onDeepModeChange?.(!deepMode)}
+            disabled={streaming}
+            aria-pressed={deepMode}
+            className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              deepMode
+                ? 'border-[var(--aos-brass)] bg-[var(--aos-brass-soft)] text-[var(--fg-1)]'
+                : 'border-[var(--aos-mist)] bg-[var(--bg-surface)] text-[var(--fg-3)]'
+            }`}
+          >
+            Deep Mode {deepMode ? 'on' : 'off'}
+          </button>
+        </div>
 
         <div className="flex items-end gap-2 rounded-[var(--radius-sm)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] px-3 py-2 focus-within:border-[var(--aos-brass)] focus-within:ring-1 focus-within:ring-[var(--aos-brass)]">
           <button

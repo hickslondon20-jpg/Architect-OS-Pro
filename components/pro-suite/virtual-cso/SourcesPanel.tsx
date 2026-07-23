@@ -14,6 +14,7 @@ interface TurnProgress {
   steps: AgentStep[];
   todos: AgentTodo[];
   streaming: boolean;
+  workspaceFileCount?: number;
 }
 
 interface ProgressItem {
@@ -76,6 +77,11 @@ const ProgressPanel: React.FC<{ progress: TurnProgress }> = ({ progress }) => {
           {completeCount}/{items.length}
         </span>
       </div>
+      {(progress.workspaceFileCount ?? 0) > 0 && (
+        <p className="mt-1 text-[10px] text-[var(--fg-4)]">
+          {progress.workspaceFileCount} persisted workspace file{progress.workspaceFileCount === 1 ? '' : 's'}
+        </p>
+      )}
       <ol className="mt-3 space-y-2.5">
         {items.map((item, index) => (
           <li key={item.id}>

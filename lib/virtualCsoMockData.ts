@@ -24,6 +24,9 @@ export interface Chat {
   pinned?: boolean;
   /** ISO-ish display string; mock only. */
   lastMessageAt: string;
+  agentStatus?: 'working' | 'waiting_for_user' | 'complete';
+  pendingQuestion?: string | null;
+  activeSdkSessionId?: string | null;
 }
 
 export interface AgentStep {

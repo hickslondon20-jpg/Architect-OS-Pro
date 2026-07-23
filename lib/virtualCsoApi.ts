@@ -47,11 +47,15 @@ export interface Ws5AssembledContextMeta {
 export interface SendUserMessageOptions {
   linkedFolder?: string | null;
   projectId?: string | null;
+  deepMode?: boolean;
+  forkSessionId?: string | null;
   onUserMessage?: (message: Message) => void;
   onToken?: (text: string, meta: { channel: 'answer' | 'narration'; sdkMode: boolean }) => void;
   onActivity?: (items: AgentActivityItem[]) => void;
   onAgentSteps?: (steps: AgentStep[]) => void;
   onPlanUpdate?: (todos: AgentTodo[]) => void;
+  onWorkspaceUpdate?: (files: WorkspaceFileMetadata[]) => void;
+  onAskUser?: (question: string) => void;
   onSourcesUpdate?: (sources: SourceRef[]) => void;
   onReady?: (meta: { threadId: string; route: Ws5RouteMeta; assembledContext: Ws5AssembledContextMeta; agentSteps?: AgentStep[]; sdkMode: boolean }) => void;
 }
@@ -59,12 +63,23 @@ export interface SendUserMessageOptions {
 export interface SendUserMessageResult {
   chat: Chat;
   userMessage: Message;
-  assistantMessage: Message;
+  assistantMessage: Message | null;
   sources: SourceRef[];
   sourcePages: SourcePage[];
   route: Ws5RouteMeta | null;
   assembledContext: Ws5AssembledContextMeta | null;
   sdkMode: boolean;
+  waitingForUser: boolean;
+  pendingQuestion: string | null;
+}
+
+export interface WorkspaceFileMetadata {
+  id: string;
+  filePath: string;
+  source?: string | null;
+  size?: number | null;
+  storagePath?: string | null;
+  updatedAt?: string | null;
 }
 
 const sourceRefsByChat = new Map<string, SourceRef[]>();
@@ -109,6 +124,9 @@ const toChat = (row: any): Chat => ({
   projectId: row.project_id,
   pinned: row.pinned,
   lastMessageAt: formatDate(row.last_message_at),
+  agentStatus: row.agent_status ?? 'complete',
+  pendingQuestion: row.sdk_pending_question ?? null,
+  activeSdkSessionId: row.active_sdk_session_id ?? null,
 });
 
 type AgentDelegationStepRow = {
@@ -640,6 +658,46 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
   return messages;
 };
 
+export const getDeepModePersistedState = async (
+  chatId: string,
+): Promise<{ todos: AgentTodo[]; workspaceFiles: WorkspaceFileMetadata[] }> => {
+  const userId = await requireUserId();
+  const [todosResult, workspaceResult] = await Promise.all([
+    supabase
+      .from('agent_todos')
+      .select('id,content,status,position')
+      .eq('thread_id', chatId)
+      .eq('user_id', userId)
+      .order('position', { ascending: true }),
+    supabase
+      .from('workspace_files')
+      .select('id,file_path,source,size,storage_path,updated_at')
+      .eq('owner_type', 'thread')
+      .eq('owner_id', chatId)
+      .eq('user_id', userId)
+      .order('file_path', { ascending: true }),
+  ]);
+  if (todosResult.error) throw todosResult.error;
+  if (workspaceResult.error) throw workspaceResult.error;
+  const todos = (todosResult.data ?? []).map((row, index) => ({
+    id: String(row.id ?? `todo-${index}`),
+    content: String(row.content ?? ''),
+    status: ['pending', 'in_progress', 'completed'].includes(row.status)
+      ? row.status
+      : 'pending',
+    position: typeof row.position === 'number' ? row.position : index,
+  })) as AgentTodo[];
+  const workspaceFiles = (workspaceResult.data ?? []).map((row) => ({
+    id: String(row.id),
+    filePath: String(row.file_path),
+    source: row.source ?? null,
+    size: row.size ?? null,
+    storagePath: row.storage_path ?? null,
+    updatedAt: row.updated_at ?? null,
+  }));
+  return { todos, workspaceFiles };
+};
+
 export const createProject = async (name: string): Promise<Project> => {
   const userId = await requireUserId();
   const result = await supabase
@@ -726,6 +784,8 @@ export const sendUserMessage = async (
       text,
       linkedFolder: options.linkedFolder ?? null,
       projectId: options.projectId ?? null,
+      deepMode: options.deepMode ?? false,
+      forkSessionId: options.forkSessionId ?? null,
     }),
   });
 
@@ -744,6 +804,8 @@ export const sendUserMessage = async (
   let artifactDelivery: ArtifactDelivery | null = null;
   let sdkMode = false;
   let readyThreadId: string | null = threadId;
+  let waitingForUser = false;
+  let pendingQuestion: string | null = null;
   const liveAgentSteps = new Map<number, AgentStep>();
   const liveActivityItems: AgentActivityItem[] = [];
   const stepActivityOrders = new Map<number, number>();
@@ -784,6 +846,19 @@ export const sendUserMessage = async (
         kind: allowedKinds.includes(row.kind) ? row.kind : 'context',
         label: String(row.label).slice(0, 160),
         pageId: typeof row.pageId === 'string' ? row.pageId : undefined,
+      }));
+  };
+  const normalizeWorkspaceFiles = (payload: any): WorkspaceFileMetadata[] => {
+    const rows = Array.isArray(payload?.files) ? payload.files : [];
+    return rows
+      .filter((row: any) => row && typeof (row.file_path ?? row.filePath) === 'string')
+      .map((row: any) => ({
+        id: String(row.id ?? row.file_path ?? row.filePath),
+        filePath: String(row.file_path ?? row.filePath),
+        source: row.source ?? null,
+        size: row.size ?? null,
+        storagePath: row.storage_path ?? row.storagePath ?? null,
+        updatedAt: row.updated_at ?? row.updatedAt ?? null,
       }));
   };
   const mergeLiveSources = (incoming: SourceRef[]) => {
@@ -952,6 +1027,19 @@ export const sendUserMessage = async (
       if (event === 'todos_updated') {
         options.onPlanUpdate?.(normalizeTodos(payload));
       }
+      if (event === 'workspace_updated') {
+        options.onWorkspaceUpdate?.(normalizeWorkspaceFiles(payload));
+      }
+      if (event === 'ask_user') {
+        waitingForUser = true;
+        pendingQuestion = typeof payload.question === 'string' ? payload.question : null;
+        options.onAskUser?.(pendingQuestion ?? 'What should I know before I continue?');
+      }
+      if (event === 'done_waiting') {
+        waitingForUser = true;
+        sdkMode = payload.sdkMode === true || sdkMode;
+        chat = payload.chat;
+      }
       if (event === 'sources_updated') {
         mergeLiveSources(normalizeLiveSources(payload));
       }
@@ -1003,7 +1091,7 @@ export const sendUserMessage = async (
     streamError = error;
   }
 
-  if (!assistantMessage && readyThreadId) {
+  if (!assistantMessage && readyThreadId && !waitingForUser) {
     // DEFECT 8 (04B-D2 SDK-M3, run 4). The SSE stream can die while the backend keeps working and
     // finishes normally — the assistant message is written, the run completes, the founder is billed.
     // The old code inferred "no `done` event" ⇒ "the turn was not saved" and threw. That inference is
@@ -1032,7 +1120,7 @@ export const sendUserMessage = async (
     }
   }
 
-  if (!chat || !userMessage || !assistantMessage) {
+  if (!chat || !userMessage || (!assistantMessage && !waitingForUser)) {
     // Nothing was recoverable from the record. Keep the friendly, honest copy (it guides the founder to
     // reopen, which is what surfaced the answer on 2026-07-23) rather than a bare "network error", and
     // preserve the original stream failure as the cause for diagnostics.
@@ -1052,7 +1140,18 @@ export const sendUserMessage = async (
     }
   }
 
-  return { chat, userMessage, assistantMessage, sources, sourcePages, route, assembledContext, sdkMode };
+  return {
+    chat,
+    userMessage,
+    assistantMessage,
+    sources,
+    sourcePages,
+    route,
+    assembledContext,
+    sdkMode,
+    waitingForUser,
+    pendingQuestion,
+  };
 };
 
 export const requestThreadWriteback = async (threadId: string): Promise<{ webhookPosted: boolean }> => {

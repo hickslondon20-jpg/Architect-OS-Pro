@@ -16,6 +16,7 @@ import {
   deleteThread,
   getChatById,
   getChatsForProject,
+  getDeepModePersistedState,
   getMessagesForChat,
   getProjectById,
   getSourcePage,
@@ -31,6 +32,7 @@ import {
   type ArtifactDelivery,
   type Message,
   type Project,
+  type WorkspaceFileMetadata,
 } from '../../../lib/virtualCsoApi';
 
 type View = 'chat' | 'project' | 'new';
@@ -113,6 +115,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
   const [streaming, setStreaming] = useState(false);
   const [sdkSurfaceActive, setSdkSurfaceActive] = useState(false);
   const [liveTodos, setLiveTodos] = useState<AgentTodo[]>([]);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileMetadata[]>([]);
+  const [deepMode, setDeepMode] = useState(false);
   const [awaitingFirstToken, setAwaitingFirstToken] = useState(false);
   const [sourcesByChat, setSourcesByChat] = useState<Record<string, ReturnType<typeof getSourceRefsForChat>>>({});
   const [loading, setLoading] = useState(true);
@@ -138,11 +142,21 @@ export const VirtualCSOWorkspace: React.FC = () => {
       setMessages([]);
       return;
     }
-    const nextMessages = await getMessagesForChat(chatId);
+    const [nextMessages, persistedDeepState] = await Promise.all([
+      getMessagesForChat(chatId),
+      getDeepModePersistedState(chatId),
+    ]);
     setMessages(nextMessages);
     const latestAssistant = [...nextMessages].reverse().find((message) => message.role === 'assistant');
     setSdkSurfaceActive(latestAssistant?.surfaceMode === 'sdk');
-    setLiveTodos(rebuildPersistedWorkerTodos(latestAssistant?.agentSteps));
+    setLiveTodos(
+      persistedDeepState.todos.length > 0
+        ? persistedDeepState.todos
+        : rebuildPersistedWorkerTodos(latestAssistant?.agentSteps),
+    );
+    setWorkspaceFiles(persistedDeepState.workspaceFiles);
+    const chat = getChatById(chats, chatId);
+    setDeepMode(Boolean(chat?.activeSdkSessionId || chat?.agentStatus === 'waiting_for_user'));
   };
 
   useEffect(() => {
@@ -189,6 +203,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setMessages([]);
     setSdkSurfaceActive(false);
     setLiveTodos([]);
+    setWorkspaceFiles([]);
+    setDeepMode(false);
     setReaderPageId(null);
     setReaderArtifact(null);
     setNotice(null);
@@ -240,6 +256,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
       const result = await sendUserMessage(activeChatId, text, {
         linkedFolder,
         projectId: activeProjectId,
+        deepMode,
         onUserMessage: (message) => {
           targetChatId = message.chatId;
           setActiveChatId(message.chatId);
@@ -301,6 +318,11 @@ export const VirtualCSOWorkspace: React.FC = () => {
           );
         },
         onPlanUpdate: setLiveTodos,
+        onWorkspaceUpdate: setWorkspaceFiles,
+        onAskUser: (question) => {
+          setNotice(question);
+          setDeepMode(true);
+        },
         onSourcesUpdate: (sources) => {
           if (!targetChatId) return;
           setSourcesByChat((current) => ({ ...current, [targetChatId!]: sources }));
@@ -311,11 +333,19 @@ export const VirtualCSOWorkspace: React.FC = () => {
       setActiveChatId(result.chat.id);
       setActiveProjectId(result.chat.projectId ?? null);
       setMessages((current) =>
-        current.map((message) => (message.id === assistantTempId ? result.assistantMessage : message)),
+        result.assistantMessage
+          ? current.map((message) =>
+              message.id === assistantTempId ? result.assistantMessage! : message,
+            )
+          : current.filter((message) => message.id !== assistantTempId),
       );
       setSdkSurfaceActive(result.sdkMode);
       setSourcesByChat((current) => ({ ...current, [result.chat.id]: result.sources }));
       await refreshLists();
+      if (result.waitingForUser) {
+        setNotice(result.pendingQuestion ?? 'Founder input is needed before Deep Mode can continue.');
+        window.setTimeout(() => composerRef.current?.focus(), 0);
+      }
       if (!result.sdkMode) {
         setNotice('Response saved. Founder-page sources are available in the Sources panel.');
       }
@@ -501,6 +531,13 @@ export const VirtualCSOWorkspace: React.FC = () => {
           onChange={setComposerText}
           textareaRef={composerRef}
           streaming={streaming}
+          deepMode={deepMode}
+          onDeepModeChange={setDeepMode}
+          placeholder={
+            activeChat?.agentStatus === 'waiting_for_user'
+              ? activeChat.pendingQuestion ?? 'Answer the founder question to continue...'
+              : undefined
+          }
         />
         {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
       </div>
@@ -540,6 +577,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
               steps: latestSdkMessage?.agentSteps ?? [],
               todos: liveTodos,
               streaming,
+              workspaceFileCount: workspaceFiles.length,
             } : undefined}
           />
         )}
