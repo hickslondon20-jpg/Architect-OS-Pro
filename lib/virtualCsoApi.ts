@@ -565,8 +565,8 @@ export const sendUserMessage = async (
     options.onSourcesUpdate?.(sources);
   };
 
-  await parseSseStream(response, {
-    onEvent: (event, payload) => {
+  const streamHandlers = {
+    onEvent: (event: string, payload: any) => {
       if (event === 'ready') {
         sdkMode = payload.sdkMode === true;
         // Defect 8: remembered so a turn whose stream dies mid-flight can still be recovered from the
@@ -774,7 +774,21 @@ export const sendUserMessage = async (
         throw new Error(payload.message ?? 'Virtual CSO stream failed.');
       }
     },
-  });
+  };
+
+  // DEFECT 8 — the SSE stream can fail two ways and only ONE was handled before. A CLEAN end without a
+  // `done` event falls through to the recovery below. But a silent connection KILLED by the edge/proxy
+  // surfaces as a THROWN network error out of reader.read() — the actual run-4 shape — which used to
+  // escape past the recovery entirely and show the founder a bare "network error" (confirmed live by the
+  // injected-disconnect canary, 2026-07-23: the answer had persisted with 33 citations, yet the founder
+  // saw an error and had to reload). Catch it so BOTH shapes reach the same record-backed recovery; the
+  // backend may have finished and persisted the answer regardless of how the client's stream died.
+  let streamError: unknown = null;
+  try {
+    await parseSseStream(response, streamHandlers);
+  } catch (error) {
+    streamError = error;
+  }
 
   if (!assistantMessage && readyThreadId) {
     // DEFECT 8 (04B-D2 SDK-M3, run 4). The SSE stream can die while the backend keeps working and
@@ -806,9 +820,13 @@ export const sendUserMessage = async (
   }
 
   if (!chat || !userMessage || !assistantMessage) {
+    // Nothing was recoverable from the record. Keep the friendly, honest copy (it guides the founder to
+    // reopen, which is what surfaced the answer on 2026-07-23) rather than a bare "network error", and
+    // preserve the original stream failure as the cause for diagnostics.
     throw new Error(
       'Virtual CSO stream ended before the turn could be delivered. If the answer was saved it will '
         + 'appear when you reopen this conversation.',
+      streamError ? { cause: streamError } : undefined,
     );
   }
 
