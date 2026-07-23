@@ -697,6 +697,49 @@ def _make_worker_progress_bridge(
     return bridge_worker_progress
 
 
+def _assistant_worker_capability(
+    message: Any,
+    *,
+    task_capabilities: dict[str, str],
+    allowed_capabilities: tuple[str, ...],
+) -> str | None:
+    """Resolve an SDK child message to the worker that actually produced it.
+
+    ``AssistantMessage.parent_tool_use_id`` proved unstable as the sole production attribution key.
+    The child's capability-specific MCP handler is stronger because each bounded worker sees only its
+    own ``run_<capability>`` tool. Final child messages contain no tool call, so the approved Task map
+    remains the safe fallback.
+    """
+
+    allowed = set(allowed_capabilities)
+    handler_prefix = f"mcp__{MODEL_DRIVEN_WORKER_SERVER}__run_"
+    for block in list(getattr(message, "content", None) or []):
+        tool_name = str(getattr(block, "name", "") or "")
+        if tool_name.startswith(handler_prefix):
+            capability_key = tool_name[len(handler_prefix):]
+            if capability_key in allowed:
+                return capability_key
+    fallback = task_capabilities.get(str(getattr(message, "parent_tool_use_id", "") or ""))
+    return fallback if fallback in allowed else None
+
+
+def _child_run_id_for_capability(
+    capability_key: str,
+    *,
+    model_driven_scope: Any,
+    worker_results: dict[str, Any],
+) -> str | None:
+    """Return the authoritative parent-linked child id for one worker."""
+
+    completed_results = getattr(model_driven_scope, "completed_results", {}) or {}
+    compact = completed_results.get(capability_key)
+    if isinstance(compact, dict) and compact.get("run_id"):
+        return str(compact["run_id"])
+    result = worker_results.get(capability_key)
+    run_id = getattr(result, "run_id", None)
+    return str(run_id) if run_id else None
+
+
 def build_model_driven_manifest(
     compiled: Any, *, required_agents: tuple[str, ...], worker_server_name: str
 ) -> dict[str, Any]:
@@ -2034,6 +2077,11 @@ async def _run_sdk_turn(
                 child_usage_records.append(
                     {
                         "task_id": str(message.parent_tool_use_id),
+                        "capability_key": _assistant_worker_capability(
+                            message,
+                            task_capabilities=task_capabilities,
+                            allowed_capabilities=required_agents,
+                        ),
                         "model": str(message.model or ""),
                         "input_tokens": _usage_input_total(usage),
                         "output_tokens": _usage_int(usage, "output_tokens", "outputTokens"),
@@ -2077,11 +2125,20 @@ async def _run_sdk_turn(
             + ", ".join(missing_after_query)
         )
     for child_usage in child_usage_records:
-        capability_key = task_capabilities.get(child_usage["task_id"])
-        result = worker_results.get(capability_key or "")
-        if not capability_key or result is None:
+        capability_key = child_usage.get("capability_key") or task_capabilities.get(child_usage["task_id"])
+        if not capability_key:
             continue
-        child_run_id = str(result.run_id)
+        child_run_id = _child_run_id_for_capability(
+            capability_key,
+            model_driven_scope=model_driven_scope,
+            worker_results=worker_results,
+        )
+        if not child_run_id:
+            logger.warning(
+                "SDK child usage could not resolve a parent-linked run id; skipped capability=%s",
+                capability_key,
+            )
+            continue
         if usage_sink is not None:
             try:
                 usage_sink(

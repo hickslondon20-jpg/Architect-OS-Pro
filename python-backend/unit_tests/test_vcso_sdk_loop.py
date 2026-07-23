@@ -8,19 +8,87 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from claude_agent_sdk.types import ResultMessage, StreamEvent
+from claude_agent_sdk.types import AssistantMessage, ResultMessage, StreamEvent, ToolUseBlock
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolResultEnvelope, ToolSourceRef
 from services.vcso_sdk_loop import (
+    _assistant_worker_capability,
+    _child_run_id_for_capability,
     _make_worker_progress_bridge,
     _native_synthesis_prompt,
     native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
 )
+
+
+def test_child_usage_prefers_the_worker_tool_over_an_unstable_parent_tool_id():
+    """The SDK's parent_tool_use_id is not a stable per-worker attribution key in production.
+
+    The handler tool embedded in the child AssistantMessage is capability-specific, so it must win
+    when the two disagree (the pre-M4 defect collapsed both rows onto the sandbox Task id).
+    """
+
+    message = AssistantMessage(
+        content=[
+            ToolUseBlock(
+                id="worker-tool-1",
+                name="mcp__vcso_workers__run_structured_data_agent",
+                input={},
+            )
+        ],
+        model="claude-haiku-test",
+        parent_tool_use_id="task-sandbox",
+    )
+
+    assert _assistant_worker_capability(
+        message,
+        task_capabilities={
+            "task-sandbox": "sandbox_execution_agent",
+            "task-structured": "structured_data_agent",
+        },
+        allowed_capabilities=(
+            "structured_data_agent",
+            "sandbox_execution_agent",
+            "per_user_wiki",
+        ),
+    ) == "structured_data_agent"
+
+
+def test_child_usage_falls_back_to_task_id_for_the_workers_final_message():
+    message = AssistantMessage(
+        content=[],
+        model="claude-haiku-test",
+        parent_tool_use_id="task-wiki",
+    )
+
+    assert _assistant_worker_capability(
+        message,
+        task_capabilities={"task-wiki": "per_user_wiki"},
+        allowed_capabilities=("per_user_wiki",),
+    ) == "per_user_wiki"
+
+
+def test_child_usage_run_id_comes_from_the_authoritative_worker_result_map():
+    scope = SimpleNamespace(
+        completed_results={
+            "structured_data_agent": {"run_id": "child-structured"},
+            "sandbox_execution_agent": {"run_id": "child-sandbox"},
+        }
+    )
+
+    assert _child_run_id_for_capability(
+        "structured_data_agent",
+        model_driven_scope=scope,
+        worker_results={
+            # The in-process placeholder can carry the wrong/empty id for external workers.
+            "structured_data_agent": SimpleNamespace(run_id=None),
+            "sandbox_execution_agent": SimpleNamespace(run_id="child-sandbox"),
+        },
+    ) == "child-structured"
 
 
 class _Registry:
