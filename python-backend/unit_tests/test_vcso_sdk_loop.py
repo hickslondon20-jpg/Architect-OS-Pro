@@ -15,9 +15,12 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolResultEnvelope, ToolSourceRef
 from services.vcso_sdk_loop import (
+    G_GATE_CANDIDATE_AGENTS,
+    G_GATE_MODEL_CHOICE_SCOPE,
     _assistant_worker_capability,
     _child_run_id_for_capability,
     _make_worker_progress_bridge,
+    _native_generalization_prompt,
     _native_synthesis_prompt,
     native_subagent_requirements,
     read_sdk_loop_settings,
@@ -480,6 +483,49 @@ def test_native_subagent_effort_scaling_is_limited_to_the_p4_thin_slice():
     ) == required
 
 
+def test_g_gate_model_choice_scope_is_exact_and_founder_scoped():
+    armed = {
+        "native_subagent_scope": G_GATE_MODEL_CHOICE_SCOPE,
+        "native_model_driven_enabled": True,
+        "diagnostic_user_ids": ["founder-1"],
+    }
+
+    assert native_subagent_requirements(
+        message="What's the difference between AGI and gross revenue?",
+        intent={"move_type": "lookup", "depth": "shallow"},
+        user_id="founder-1",
+        settings=armed,
+    ) == G_GATE_CANDIDATE_AGENTS
+    assert native_subagent_requirements(
+        message="Should I raise my prices?",
+        intent={"move_type": "reflect_and_steer", "depth": "standard"},
+        user_id="founder-other",
+        settings=armed,
+    ) == ()
+    assert native_subagent_requirements(
+        message="Should I raise my prices?",
+        intent={"move_type": "reflect_and_steer", "depth": "standard"},
+        user_id="founder-1",
+        settings={**armed, "native_model_driven_enabled": False},
+    ) == ()
+    assert native_subagent_requirements(
+        message="Should I raise my prices?",
+        intent={"move_type": "reflect_and_steer", "depth": "standard"},
+        user_id="founder-1",
+        settings={**armed, "native_subagent_scope": "p4_thin_slice_only"},
+    ) == ()
+
+
+def test_g_gate_prompt_requires_smallest_sufficient_worker_set():
+    prompt = _native_generalization_prompt(G_GATE_CANDIDATE_AGENTS)
+
+    assert "smallest sufficient set" in prompt
+    assert "none, one, or more" in prompt
+    assert "clarify the founder's goal" in prompt
+    assert "Sandbox may run only after structured_data_agent completes" in prompt
+    assert "must delegate exactly once to each approved worker" not in prompt
+
+
 def test_app_owned_synthesis_prompt_carries_compact_cited_findings():
     prompt = _native_synthesis_prompt(
         ("structured_data_agent",),
@@ -922,6 +968,140 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
     assert len(probes) == 1
     assert probes[0]["agent_id_present"] is True
     assert "objective" not in str(lifecycle_events)
+
+
+def test_g_gate_model_choice_allows_a_direct_answer_with_zero_children(monkeypatch):
+    _capture_sdk_tools(monkeypatch)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in G_GATE_CANDIDATE_AGENTS],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _reject_orchestrator())
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+
+    async def fake_query(*, options, **_kwargs):
+        assert set(options.agents) == set(G_GATE_CANDIDATE_AGENTS)
+        assert "smallest sufficient set" in options.system_prompt
+        assert await options.hooks["Stop"][0].hooks[0]({}, None, None) == {}
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-direct",
+            total_cost_usd=0.01,
+            usage={"input_tokens": 20, "output_tokens": 8},
+            result="AGI is adjusted gross income; gross revenue is top-line receipts.",
+        )
+
+    events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="What's the difference between AGI and gross revenue?",
+            system_prompt="System\n\nRules remain bounded.",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=_NoChildrenStore(),
+                thread_id="thread-1",
+                metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+            ),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=G_GATE_CANDIDATE_AGENTS,
+            native_subagent_scopes={},
+            native_model_driven=True,
+            native_model_choice=True,
+            query_impl=fake_query,
+        )
+    )
+
+    assert result.answer_text.startswith("AGI is adjusted gross income")
+    assert not [event for event in events if event["event"] == "todos_updated"]
+    assert not result.worker_runs
+
+
+def test_g_gate_model_choice_enforces_only_the_workers_the_lead_selected(monkeypatch):
+    _capture_sdk_tools(monkeypatch)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in G_GATE_CANDIDATE_AGENTS],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _reject_orchestrator())
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    contract = json.dumps(
+        {
+            "objective": "Retrieve the founder's compiled growth constraint and explain its evidence.",
+            "output_format": "compact cited findings",
+            "tools_sources": ["founder_wiki"],
+            "boundaries": ["founder isolation", "citations required", "compact output"],
+            "context_scope": {"wiki_page": "growth_constraints"},
+        }
+    )
+
+    async def fake_query(*, options, **_kwargs):
+        pre = options.hooks["PreToolUse"][0].hooks[0]
+        decision = await pre(
+            {
+                "tool_name": "Agent",
+                "tool_input": {"subagent_type": "per_user_wiki", "prompt": contract},
+                "agent_id": None,
+            },
+            "task-wiki",
+            None,
+        )
+        assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+        post = options.hooks["PostToolUse"][0].hooks[0]
+        await post({"tool_name": "Agent"}, "task-wiki", None)
+        assert await options.hooks["Stop"][0].hooks[0]({}, None, None) == {}
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-wiki",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 30, "output_tokens": 10},
+            result="The compiled diagnostic identifies one binding growth constraint.",
+        )
+
+    events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="What did my diagnostics flag as the biggest growth constraint?",
+            system_prompt="System\n\nRules remain bounded.",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=_AllCompletedStore(),
+                thread_id="thread-1",
+                metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+            ),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=G_GATE_CANDIDATE_AGENTS,
+            native_subagent_scopes={"per_user_wiki": {"wiki_page": "growth_constraints"}},
+            native_model_driven=True,
+            native_model_choice=True,
+            query_impl=fake_query,
+        )
+    )
+
+    assert result.answer_text.startswith("The compiled diagnostic")
+    task_steps = [
+        event["data"]
+        for event in events
+        if event["event"] == "tool_result" and event["data"].get("tool") == "Task"
+    ]
+    assert [step["capabilityKey"] for step in task_steps] == ["per_user_wiki"]
+    final_todos = [event["data"]["todos"] for event in events if event["event"] == "todos_updated"][-1]
+    assert [todo["id"] for todo in final_todos] == ["per_user_wiki", "compose"]
 
 
 def _reject_orchestrator():

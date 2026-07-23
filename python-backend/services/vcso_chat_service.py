@@ -44,6 +44,7 @@ from services.vcso_working_state import WorkingStateService, assemble, normalize
 from services.vcso_source_router import SourceRouter, TIER_LABELS
 from services.vcso_planner import PLANNER_FLAG, VcsoPlanner, planner_entry_allowed
 from services.vcso_sdk_loop import (
+    G_GATE_MODEL_CHOICE_SCOPE,
     SDK_NATIVE_SUBAGENT_SCHEMA_VERSION,
     SDK_STANDARD_SCHEMA_VERSION,
     VCSO_SDK_CAPABILITY_KEY,
@@ -420,6 +421,17 @@ class VcsoChatService:
             and bool(_sdk_settings.get("native_model_driven_enabled"))
             and str(user_id) in _md_user_ids
         )
+        native_model_choice = (
+            native_model_driven
+            and str(_sdk_settings.get("native_subagent_scope") or "") == G_GATE_MODEL_CHOICE_SCOPE
+        )
+        sdk_phase = (
+            "04B-G-GATE"
+            if native_model_choice
+            else "04B-D"
+            if sdk_native_subagent_mode
+            else "04B-C"
+        )
         # Tier 3 graceful-failure rehearsal: dark, founder-only, and only ever non-empty on a model-driven
         # turn. Off by default, so this is inert on every real turn.
         native_fault_injection = (
@@ -713,7 +725,7 @@ class VcsoChatService:
                 trace_metadata={
                     **trace_metadata,
                     "capability_key": VCSO_SDK_CAPABILITY_KEY,
-                    "sdk_phase": "04B-D" if sdk_native_subagent_mode else "04B-C",
+                    "sdk_phase": sdk_phase,
                 },
                 initial_sources=list(context.get("prefetched_source_refs") or []),
                 step_index_offset=len(initial_trace_steps),
@@ -735,6 +747,7 @@ class VcsoChatService:
                 ),
                 native_lifecycle_sink=persist_sdk_lifecycle if sdk_native_subagent_mode else None,
                 native_model_driven=native_model_driven,
+                native_model_choice=native_model_choice,
                 native_fault_injection=native_fault_injection,
                 native_fault_injection_mode_key=native_fault_mode,
                 native_cross_worker_probe=native_cross_worker_probe,
@@ -765,14 +778,17 @@ class VcsoChatService:
                 ),
                 metadata={
                     "sdk_session_id": sdk_result.session_id,
-                    "sdk_phase": "04B-D" if sdk_native_subagent_mode else "04B-C",
+                    "sdk_phase": sdk_phase,
                     "streaming": "partial_text_delta",
                     "sdk_compaction_count": sdk_result.compaction_count,
                     "sdk_turn_trace_emitted": sdk_result.turn_trace_emitted,
                     "sdk_usage_recorded": sdk_result.usage_recorded,
                     "narration_segments": sdk_result.narration_segments,
                     "native_subagent_mode": sdk_native_subagent_mode,
-                    "required_subagents": list(native_required_agents),
+                    "native_subagent_scope": str(_sdk_settings.get("native_subagent_scope") or ""),
+                    "delegation_selection": "model_choice" if native_model_choice else "fixed_required",
+                    "available_subagents": list(native_required_agents),
+                    "required_subagents": [] if native_model_choice else list(native_required_agents),
                     "worker_runs": sdk_result.worker_runs,
                     "delegation_depth_cap": 1,
                     "delegation_count_cap": len(native_required_agents),

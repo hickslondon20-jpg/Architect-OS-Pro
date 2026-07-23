@@ -70,6 +70,8 @@ P4_THIN_SLICE_REQUIRED_AGENTS = (
     "sandbox_execution_agent",
     "per_user_wiki",
 )
+G_GATE_MODEL_CHOICE_SCOPE = "g_gate_model_choice"
+G_GATE_CANDIDATE_AGENTS = P4_THIN_SLICE_REQUIRED_AGENTS
 P4_THIN_SLICE_SIGNALS = re.compile(
     r"(?=.*\b(?:financial|p&l|margin|revenue)\b)(?=.*\bconcentration\b)(?=.*\b90\s+days?\b)",
     re.IGNORECASE | re.DOTALL,
@@ -113,6 +115,46 @@ WORKER_DELEGATION_CONTRACTS: dict[str, dict[str, str]] = {
         ),
         "output_format": "compact cited findings; quote the founder's own framing where it exists",
         "tools_sources": "the founder's per-user wiki only",
+        "boundaries": (
+            "founder isolation, cite every claim, compact output, no raw payloads, no wiki writes, "
+            "no recursion, no external writes"
+        ),
+    },
+}
+G_GATE_WORKER_DELEGATION_CONTRACTS: dict[str, dict[str, str]] = {
+    "structured_data_agent": {
+        "objective": (
+            "retrieve and quantify the founder's relevant structured business records for the question"
+        ),
+        "output_format": "compact cited findings; figures with the period and scope they cover",
+        "tools_sources": "the founder's structured datasets only",
+        "boundaries": (
+            "founder isolation, cite every claim, compact output, no raw payloads, no wiki writes, "
+            "no recursion, no external writes"
+        ),
+    },
+    "sandbox_execution_agent": {
+        "objective": (
+            "perform the specific derivation or scenario computation required by the question from a "
+            "compact structured-data finding"
+        ),
+        "output_format": "compact cited findings; show the computed figures and derivation, not code",
+        "tools_sources": (
+            "only the compact structured-data finding passed in context_scope.prior_findings; never a "
+            "raw dataset"
+        ),
+        "boundaries": (
+            "founder isolation, cite every claim, compact output, no raw payloads, no wiki writes, "
+            "no recursion, no external writes, no network access"
+        ),
+    },
+    "per_user_wiki": {
+        "objective": (
+            "retrieve the founder's compiled strategic, diagnostic, decision, or constraint context "
+            "relevant to the question"
+        ),
+        "output_format": "compact cited findings; preserve the founder's own framing where it exists",
+        "tools_sources": "the founder's per-user compiled wiki only",
         "boundaries": (
             "founder isolation, cite every claim, compact output, no raw payloads, no wiki writes, "
             "no recursion, no external writes"
@@ -270,17 +312,30 @@ def native_subagent_requirements(
     settings: dict[str, Any] | None = None,
     user_id: str | None = None,
 ) -> tuple[str, ...]:
-    """Return the single Phase-D delegation contract; do not generalize before London."""
+    """Return the founder-scoped native worker surface.
+
+    The original P4 path remains pinned to its exact app gate. The Phase-G generalization surface is
+    separately dark-gated and returns only the bounded candidate pool; the loop decides whether those
+    candidates are mandatory or model-selected from the explicit selection mode passed by the caller.
+    """
 
     intent = intent or {}
+    settings = settings or {}
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    if str(settings.get("native_subagent_scope") or "") == G_GATE_MODEL_CHOICE_SCOPE:
+        if (
+            bool(settings.get("native_model_driven_enabled"))
+            and bool(user_id)
+            and str(user_id) in diagnostic_user_ids
+        ):
+            return G_GATE_CANDIDATE_AGENTS
+        return ()
     if str(intent.get("move_type") or intent.get("intent") or "") != "strategic_synthesis":
         return ()
     if str(intent.get("depth") or "") != "deep":
         return ()
     if not P4_THIN_SLICE_SIGNALS.search(message):
         return ()
-    settings = settings or {}
-    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
     diagnostic_worker = str(settings.get("diagnostic_single_worker") or "").strip()
     if (
         bool(settings.get("diagnostic_single_worker_enabled"))
@@ -516,6 +571,7 @@ def stream_vcso_sdk_turn(
     native_subagent_scopes: dict[str, dict[str, Any]] | None = None,
     native_lifecycle_sink: LifecycleSink | None = None,
     native_model_driven: bool = False,
+    native_model_choice: bool = False,
     native_fault_injection: tuple[str, ...] = (),
     native_fault_injection_mode_key: str = "before_start",
     native_cross_worker_probe: bool = False,
@@ -551,6 +607,7 @@ def stream_vcso_sdk_turn(
                         native_subagent_scopes=native_subagent_scopes or {},
                         native_lifecycle_sink=native_lifecycle_sink,
                         native_model_driven=native_model_driven,
+                        native_model_choice=native_model_choice,
                         native_fault_injection=native_fault_injection,
                         native_fault_injection_mode_key=native_fault_injection_mode_key,
                         native_cross_worker_probe=native_cross_worker_probe,
@@ -877,6 +934,7 @@ async def _run_sdk_turn(
     native_subagent_scopes: dict[str, dict[str, Any]],
     native_lifecycle_sink: LifecycleSink | None,
     native_model_driven: bool = False,
+    native_model_choice: bool = False,
     native_fault_injection: tuple[str, ...] = (),
     native_fault_injection_mode_key: str = "before_start",
     native_cross_worker_probe: bool = False,
@@ -896,9 +954,11 @@ async def _run_sdk_turn(
     # the lead). Gated: model_driven is only ever True behind the dark `native_model_driven_enabled`
     # sub-flag. When False, every branch below is byte-identical to Path A.
     model_driven = bool(native_model_driven) and native_mode
-    required_agents = tuple(
+    provisioned_agents = tuple(
         key for key in native_subagent_required_agents if key in P4_NATIVE_SUBAGENT_KEYS
     )
+    model_choice = bool(native_model_choice) and model_driven
+    required_agents = () if model_choice else provisioned_agents
     task_capabilities: dict[str, str] = {}
     task_contracts: dict[str, dict[str, Any]] = {}
     task_sources: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -906,7 +966,7 @@ async def _run_sdk_turn(
     child_usage_records: list[dict[str, Any]] = []
     completed_agents: set[str] = set()
     delegation_count = 0
-    max_delegations = len(required_agents)
+    max_delegations = len(provisioned_agents)
     plan_statuses = {key: "pending" for key in required_agents}
     lifecycle_sequence = 0
     # CHEAP GIVE-UP (SDK-M3 step A3). When the lead will not delegate, the stop_hook blocks, the lead tries
@@ -966,6 +1026,10 @@ async def _run_sdk_turn(
     def emit_plan_update() -> None:
         if not native_mode:
             return
+        selected_agents = tuple(dict.fromkeys(task_capabilities.values()))
+        plan_agents = selected_agents if model_choice else required_agents
+        if model_choice and not plan_agents:
+            return
         labels = {
             "structured_data_agent": "Bind the latest founder financial dataset",
             "sandbox_execution_agent": "Compute concentration and margin trend",
@@ -978,13 +1042,17 @@ async def _run_sdk_turn(
                 "status": plan_statuses[key],
                 "position": index,
             }
-            for index, key in enumerate(required_agents)
+            for index, key in enumerate(plan_agents)
         ]
         todos.append(
             {
                 "id": "compose",
-                "content": "Compose the cited 90-day recommendation",
-                "status": "in_progress" if completed_agents.issuperset(required_agents) else "pending",
+                "content": (
+                    "Compose the cited answer"
+                    if model_choice
+                    else "Compose the cited 90-day recommendation"
+                ),
+                "status": "in_progress" if completed_agents.issuperset(plan_agents) else "pending",
                 "position": len(todos),
             }
         )
@@ -1092,12 +1160,12 @@ async def _run_sdk_turn(
                     for key, existing in task_contracts.items()
                 },
             )
-            if capability_key not in required_agents:
-                raise ValueError("This Phase-D canary may delegate only the approved thin-slice workers.")
+            if capability_key not in provisioned_agents:
+                raise ValueError("This canary may delegate only to the approved bounded worker pool.")
             if capability_key in task_capabilities.values():
-                raise ValueError("Each approved thin-slice worker may run only once per turn.")
+                raise ValueError("Each approved worker may run only once per turn.")
             if delegation_count >= max_delegations:
-                raise ValueError("The Phase-D per-turn delegation cap has been reached.")
+                raise ValueError("The bounded per-turn delegation cap has been reached.")
             if capability_key == "sandbox_execution_agent":
                 if "structured_data_agent" not in completed_agents:
                     raise ValueError("Run structured_data_agent to completion before sandbox_execution_agent.")
@@ -1242,7 +1310,7 @@ async def _run_sdk_turn(
             capability_key = task_capabilities.get(task_id, "bounded_worker")
             step_index = allocate_step(task_id, sdk_tool_name)
             result = worker_results.get(capability_key)
-            if result is None and model_driven and capability_key in required_agents:
+            if result is None and model_driven and capability_key in provisioned_agents:
                 # Completion bridge: the model-driven worker ran OUT of process (external endpoint), so the
                 # in-process worker_results is empty. The orchestrator has already written a parent-linked
                 # completed child row (ordering: worker completes before the Task result returns), so confirm
@@ -1250,7 +1318,7 @@ async def _run_sdk_turn(
                 done = model_driven_completed_children(
                     getattr(tool_context.store, "client", None),
                     parent_run_id=tool_context.metadata.get("parent_run_id"),
-                    required_agents=required_agents,
+                    required_agents=provisioned_agents,
                 )
                 if capability_key in done:
                     result = SimpleNamespace(
@@ -1321,7 +1389,9 @@ async def _run_sdk_turn(
 
     async def stop_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
         nonlocal turn_trace_emitted, stop_block_count, stop_block_completed_watermark, gave_up_early
-        missing = [key for key in required_agents if key not in completed_agents]
+        selected_agents = tuple(dict.fromkeys(task_capabilities.values()))
+        enforced_agents = selected_agents if model_choice else required_agents
+        missing = [key for key in enforced_agents if key not in completed_agents]
         if missing and model_driven:
             # Model-driven workers run OUT of process, so a worker whose Task tool-call was abandoned early
             # (e.g. a slow worker timing out in-band) is absent from the in-memory `completed_agents` even
@@ -1331,7 +1401,7 @@ async def _run_sdk_turn(
             db_completed = model_driven_completed_children(
                 getattr(tool_context.store, "client", None),
                 parent_run_id=tool_context.metadata.get("parent_run_id"),
-                required_agents=required_agents,
+                required_agents=enforced_agents,
             )
             missing = [key for key in missing if key not in db_completed]
             # TODO (M4, optional): for a DB-completed worker whose finding never reached the lead in-band
@@ -1386,6 +1456,7 @@ async def _run_sdk_turn(
         _record_turn_trace(metadata=trace_metadata, status="completed")
         turn_trace_emitted = True
         if native_mode:
+            plan_agents = selected_agents if model_choice else required_agents
             todos = [
                 {
                     "id": key,
@@ -1393,17 +1464,18 @@ async def _run_sdk_turn(
                     "status": "completed",
                     "position": index,
                 }
-                for index, key in enumerate(required_agents)
+                for index, key in enumerate(plan_agents)
             ]
-            todos.append(
-                {
-                    "id": "compose",
-                    "content": "Compose the cited 90-day recommendation",
-                    "status": "completed",
-                    "position": len(todos),
-                }
-            )
-            events.put({"event": "todos_updated", "data": {"todos": todos, "sdkMode": True}})
+            if plan_agents:
+                todos.append(
+                    {
+                        "id": "compose",
+                        "content": "Compose the cited recommendation",
+                        "status": "completed",
+                        "position": len(todos),
+                    }
+                )
+                events.put({"event": "todos_updated", "data": {"todos": todos, "sdkMode": True}})
         return {}
 
     async def pre_compact_hook(_input_data: dict[str, Any], _tool_use_id: str | None, _context: Any) -> dict[str, Any]:
@@ -1788,7 +1860,7 @@ async def _run_sdk_turn(
     # lead + exposes each worker via an EXTERNAL per-agent MCP server (invisible to the lead), so the lead
     # must reason the decomposition and delegate via Task.
     native_subagent_tools: dict[str, Any] = (
-        {key: {"name": f"run_{key}"} for key in required_agents} if model_driven else {}
+        {key: {"name": f"run_{key}"} for key in provisioned_agents} if model_driven else {}
     )
     hooks: dict[str, Any] = {
         "PostToolUse": [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])],
@@ -1824,7 +1896,7 @@ async def _run_sdk_turn(
                 thread_id=tool_context.thread_id,
                 parent_message_id=tool_context.metadata.get("parent_message_id"),
                 parent_run_id=tool_context.metadata.get("parent_run_id"),
-                allowed_capabilities=frozenset(required_agents),
+                allowed_capabilities=frozenset(provisioned_agents),
                 store=tool_context.store,
                 # App-owned findings channel: start empty; run_worker_capability writes each completing
                 # worker's compact finding under the NEXT worker's key during the turn, and the next
@@ -1832,7 +1904,7 @@ async def _run_sdk_turn(
                 # TURN_REGISTRY). Explicit here so the intent — the loop bridge populates it — is visible.
                 prior_findings={},
                 context_scopes={
-                    key: dict(native_subagent_scopes.get(key) or {}) for key in required_agents
+                    key: dict(native_subagent_scopes.get(key) or {}) for key in provisioned_agents
                 },
                 progress_bridge=_make_worker_progress_bridge(events, task_capabilities, step_indexes),
                 # Dark, founder-only, and empty on every normal turn (see
@@ -1851,7 +1923,7 @@ async def _run_sdk_turn(
         # (prior_findings, completed_results, dispatch_locks, diagnostics), so app-owned findings chaining
         # across the worker hop, the v0.6.84 dispatch dedupe, and the single diagnostics drain all keep
         # working exactly as they did on one token — only `allowed_capabilities` narrows.
-        for key in required_agents:
+        for key in provisioned_agents:
             token = TURN_REGISTRY.mint_capability_scoped(model_driven_scope, key)
             model_driven_tokens[key] = token
             model_driven_worker_urls[key] = worker_server_url(base_url, token)
@@ -1860,7 +1932,7 @@ async def _run_sdk_turn(
             decision="per_capability",
             reason_code=f"tokens={len(model_driven_tokens)}",
         )
-        if native_cross_worker_probe and len(required_agents) >= 2:
+        if native_cross_worker_probe and len(provisioned_agents) >= 2:
             # DEFECT 7 GUARD — watched refusing (dark diagnostic). Mint a throwaway token scoped to the
             # FIRST capability ONLY, then use it to call a SIBLING'S tool — exactly as Canary 10a's sandbox
             # subagent did by accident. With the per-`(turn, capability)` fix the sibling is not in this
@@ -1868,7 +1940,7 @@ async def _run_sdk_turn(
             # work. The probe token carries its OWN empty diagnostics list (not the shared one) so its
             # internal "received" append cannot pollute the real `worker_hop` drain, and it is unregistered
             # immediately. A refusal is the guard firing; a success would be a live isolation leak.
-            probe_owner, probe_sibling = required_agents[0], required_agents[1]
+            probe_owner, probe_sibling = provisioned_agents[0], provisioned_agents[1]
             probe_token = TURN_REGISTRY.mint(
                 replace(
                     model_driven_scope,
@@ -1907,7 +1979,11 @@ async def _run_sdk_turn(
             HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
         ]
     native_prompt = (
-        _native_lead_prompt(required_agents)
+        (
+            _native_generalization_prompt(provisioned_agents)
+            if model_choice
+            else _native_lead_prompt(required_agents)
+        )
         if model_driven
         else (_native_synthesis_prompt(required_agents, native_findings) if native_mode else "")
     )
@@ -1951,7 +2027,7 @@ async def _run_sdk_turn(
         # Inverted safety manifest: abort before spending a canary if any run_<agent> tool leaked into the
         # lead's schema or the external worker server was registered top-level (04B-D2-FINDINGS §8).
         runtime_manifest = build_model_driven_manifest(
-            compiled, required_agents=required_agents, worker_server_name=MODEL_DRIVEN_WORKER_SERVER
+            compiled, required_agents=provisioned_agents, worker_server_name=MODEL_DRIVEN_WORKER_SERVER
         )
         if runtime_manifest["violations"]:
             for token in model_driven_tokens.values():
@@ -1978,6 +2054,8 @@ async def _run_sdk_turn(
             "sdk_compiled_connector_count": len(compiled.connector_names),
             "sdk_native_subagent_mode": native_mode,
             "sdk_required_subagents": list(required_agents),
+            "sdk_available_subagents": list(provisioned_agents),
+            "sdk_delegation_selection": "model_choice" if model_choice else "fixed_required",
             "sdk_agent_model_routes": compiled.agent_model_routes if native_mode else {},
             "sdk_runtime_manifest": runtime_manifest if native_mode else {},
         }
@@ -2078,9 +2156,9 @@ async def _run_sdk_turn(
                     {
                         "task_id": str(message.parent_tool_use_id),
                         "capability_key": _assistant_worker_capability(
-                            message,
-                            task_capabilities=task_capabilities,
-                            allowed_capabilities=required_agents,
+                        message,
+                        task_capabilities=task_capabilities,
+                        allowed_capabilities=provisioned_agents,
                         ),
                         "model": str(message.model or ""),
                         "input_tokens": _usage_input_total(usage),
@@ -2107,7 +2185,9 @@ async def _run_sdk_turn(
         # `completed` ⇒ it landed and execution failed.
         _drain_model_driven_diagnostics()
 
-    missing_after_query = [key for key in required_agents if key not in completed_agents]
+    delegated_agents = tuple(dict.fromkeys(task_capabilities.values()))
+    enforced_agents = delegated_agents if model_choice else required_agents
+    missing_after_query = [key for key in enforced_agents if key not in completed_agents]
     if missing_after_query and model_driven:
         # Same DB completion bridge the stop_hook and post_tool_use use: a model-driven worker that
         # completed server-side but never returned its Task result in-band is DB-completed and must not
@@ -2115,7 +2195,7 @@ async def _run_sdk_turn(
         db_completed = model_driven_completed_children(
             getattr(tool_context.store, "client", None),
             parent_run_id=tool_context.metadata.get("parent_run_id"),
-            required_agents=required_agents,
+            required_agents=enforced_agents,
         )
         missing_after_query = [key for key in missing_after_query if key not in db_completed]
     if missing_after_query:
@@ -2130,7 +2210,7 @@ async def _run_sdk_turn(
     # curated Task steps before they are persisted so a reopened founder thread retains the same
     # parent/child grouping as the live C2 stream.
     resolved_child_run_ids: dict[str, str] = {}
-    for capability_key in required_agents:
+    for capability_key in (delegated_agents if model_choice else required_agents):
         child_run_id = _child_run_id_for_capability(
             capability_key,
             model_driven_scope=model_driven_scope,
@@ -2431,7 +2511,11 @@ def _native_synthesis_prompt(required_agents: tuple[str, ...], findings: list[di
     )
 
 
-def _per_worker_contract_brief(required_agents: tuple[str, ...]) -> str:
+def _per_worker_contract_brief(
+    required_agents: tuple[str, ...],
+    *,
+    contracts: dict[str, dict[str, str]] = WORKER_DELEGATION_CONTRACTS,
+) -> str:
     """SDK-M3 step C2 — render ONE explicit delegation contract per worker.
 
     Until M3 the lead got a single generic schema and had to invent each worker's job from the schema plus
@@ -2442,12 +2526,12 @@ def _per_worker_contract_brief(required_agents: tuple[str, ...]) -> str:
 
     Kept as data, not prose, so the three contracts cannot drift apart in the prompt string."""
 
-    specs = [WORKER_DELEGATION_CONTRACTS[key] for key in required_agents if key in WORKER_DELEGATION_CONTRACTS]
+    specs = [contracts[key] for key in required_agents if key in contracts]
     if not specs:
         return ""
     blocks = []
     for key, spec in zip(
-        [key for key in required_agents if key in WORKER_DELEGATION_CONTRACTS], specs, strict=False
+        [key for key in required_agents if key in contracts], specs, strict=False
     ):
         blocks.append(
             f"\n\n  {key}\n"
@@ -2502,6 +2586,38 @@ def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
         '"output_format":"compact cited findings","tools_sources":["founder_dataset"],'
         '"boundaries":["founder isolation","cite every claim","compact output","no raw payloads",'
         '"no wiki writes","no recursion","no external writes"],"context_scope":{"quarter":"current"}}'
+    )
+
+
+def _native_generalization_prompt(provisioned_agents: tuple[str, ...]) -> str:
+    """Phase-G dark-canary contract: the model chooses the smallest appropriate worker set."""
+
+    available = ", ".join(provisioned_agents)
+    return (
+        "\n\nPHASE-G GENERALIZATION CANARY. You have a bounded candidate worker pool: "
+        f"{available}. Decide whether the founder's actual question needs none, one, or more of these "
+        "workers. Use the smallest sufficient set. This is a judgment test: do not delegate merely because "
+        "a worker is available, and do not skip a worker when grounded retrieval or computation is necessary. "
+        "Answer definitions, acknowledgements, and questions already answerable without founder evidence "
+        "directly with zero Tasks. When the strategic ask is genuinely ambiguous, clarify the founder's goal "
+        "or scope before doing expensive work; a light, clearly scoped evidence pull is acceptable only when "
+        "it materially improves the steer. Use structured_data_agent for the founder's structured business "
+        "records, per_user_wiki for compiled strategic or diagnostic context, and sandbox_execution_agent "
+        "only for a real derivation or scenario computation from a compact structured-data finding. "
+        "Sandbox may run only after structured_data_agent completes, and its Task contract must carry that "
+        "compact finding in context_scope.prior_findings. Never send a raw dataset to the sandbox. Each "
+        "worker may run at most once; never recurse or write externally. Compose factual founder claims only "
+        "from cited worker findings, and state missing evidence honestly instead of inventing it."
+        + _per_worker_contract_brief(
+            provisioned_agents,
+            contracts=G_GATE_WORKER_DELEGATION_CONTRACTS,
+        )
+        + "\n\nTASK CONTRACT SCHEMA. Every Task prompt must be exactly one JSON object with no prose or "
+        "markdown around it. Required keys: objective (non-empty string), output_format (present), "
+        "tools_sources (non-empty list), boundaries (non-empty list), and context_scope (object). "
+        "Boundaries must include founder isolation, citations, compact output, no raw payloads, no wiki "
+        "writes, no recursion, and no external writes. Write a distinct objective for the specific worker "
+        "and this founder question. Do not expose raw tool payloads or hidden chain-of-thought."
     )
 
 
