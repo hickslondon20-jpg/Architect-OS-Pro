@@ -129,6 +129,7 @@ type AgentDelegationRunWithSteps = {
   capability_key?: string | null;
   status?: string | null;
   result_summary?: string | null;
+  citations?: Array<Record<string, unknown>> | null;
   agent_delegation_steps?: AgentDelegationStepRow[] | null;
   structured_result?: Record<string, unknown> | null;
 };
@@ -147,9 +148,11 @@ const childRunIdFromOutput = (output: unknown): string | null => {
 
 const sourceKindForWorkerRef = (source: Record<string, unknown>): SourceKind => {
   const rawKind = String(source.kind ?? source.source_kind ?? '').toLowerCase();
-  if (['wiki', 'wiki_page', 'per_user_wiki'].includes(rawKind)) return 'wiki';
+  if (['wiki', 'wiki_page', 'wiki_claim', 'wiki_evidence', 'per_user_wiki'].includes(rawKind)) return 'wiki';
   if (['ip', 'global_ip', 'architect_os_ip'].includes(rawKind)) return 'ip';
-  if (['platform', 'founder_dataset', 'founder_dataset_row', 'structured_data'].includes(rawKind)) {
+  if (
+    ['platform', 'founder_dataset', 'founder_dataset_row', 'structured_data', 'computation'].includes(rawKind)
+  ) {
     return 'platform';
   }
   return 'context';
@@ -160,7 +163,11 @@ export const normalizeWorkerSourceRefs = (
 ): SourceRef[] =>
   refs
     .map((source) => {
-      const rawLabel = source.label ?? source.title ?? source.source_title ?? source.resource_label;
+      const rawLabel = source.label
+        ?? source.source_label
+        ?? source.title
+        ?? source.source_title
+        ?? source.resource_label;
       if (typeof rawLabel !== 'string' || !rawLabel.trim()) return null;
       const kind = sourceKindForWorkerRef(source);
       const rawPageId = source.pageId ?? source.page_id ?? (kind === 'wiki' ? source.source_id : undefined);
@@ -171,6 +178,20 @@ export const normalizeWorkerSourceRefs = (
       };
     })
     .filter((source): source is SourceRef => Boolean(source));
+
+/**
+ * The `done` payload carries the persisted flat SDK trace, while the live stream carries the richer
+ * C2 child hierarchy. Completion must not replace the hierarchy the founder just watched with the
+ * older flat trace. Persisted steps still win for ordinary turns and as a fallback when no nested
+ * worker detail arrived.
+ */
+export const preserveNestedAgentSteps = (
+  liveSteps: AgentStep[],
+  persistedSteps: AgentStep[] = [],
+): AgentStep[] =>
+  liveSteps.some((step) => (step.children?.length ?? 0) > 0)
+    ? liveSteps
+    : persistedSteps;
 
 export interface NestedWorkerGroup {
   parentToolUseId: string;
@@ -270,30 +291,50 @@ export const applySubAgentStepEvent = (
   };
 };
 
-const toAgentStep = (step: AgentDelegationStepRow, childRun?: AgentDelegationRunWithSteps): AgentStep => ({
-  stepIndex: step.step_index ?? undefined,
-  stepType: step.tool_name === 'delegate_to_sub_agent' ? 'sub_agent' : step.step_type ?? undefined,
-  title: step.title ?? undefined,
-  summary: step.summary ?? undefined,
-  tool: String(step.tool_name ?? step.title ?? step.step_type ?? ''),
-  input: step.input_summary ?? {},
-  output: outputToString(step.output_summary ?? step.summary ?? ''),
-  status: step.status ?? undefined,
-  sourceRefs: step.source_refs ?? undefined,
-  children: childRun?.agent_delegation_steps
-    ?.sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0))
-    .map((childStep) => toAgentStep(childStep)),
-  subAgent: childRun
-    ? {
-        runId: childRun.id ?? undefined,
-        capabilityKey: childRun.capability_key ?? undefined,
-        status: childRun.status ?? undefined,
-        summary: childRun.result_summary ?? undefined,
-      }
-    : step.tool_name === 'delegate_to_sub_agent'
-      ? { runId: childRunIdFromOutput(step.output_summary) ?? undefined }
-      : undefined,
-});
+const toAgentStep = (step: AgentDelegationStepRow, childRun?: AgentDelegationRunWithSteps): AgentStep => {
+  const output = step.output_summary && typeof step.output_summary === 'object' && !Array.isArray(step.output_summary)
+    ? step.output_summary as Record<string, unknown>
+    : {};
+  const isSubAgent = step.tool_name === 'delegate_to_sub_agent' || step.tool_name === 'Task';
+  const sourceRefs = [
+    ...(step.source_refs ?? []),
+    ...(childRun?.citations ?? []),
+  ];
+  return {
+    stepIndex: step.step_index ?? undefined,
+    stepType: isSubAgent ? 'sub_agent' : step.step_type ?? undefined,
+    title: step.title ?? undefined,
+    summary: step.summary ?? undefined,
+    tool: String(step.tool_name ?? step.title ?? step.step_type ?? ''),
+    input: {},
+    output: '',
+    status: step.status ?? undefined,
+    parentToolUseId: typeof output.parent_tool_use_id === 'string'
+      ? output.parent_tool_use_id
+      : childRun?.id
+        ? `persisted:${childRun.id}`
+        : undefined,
+    sourceRefs,
+    children: childRun?.agent_delegation_steps
+      ?.sort((a, b) => (a.step_index ?? 0) - (b.step_index ?? 0))
+      .map((childStep) => toAgentStep(childStep)),
+    subAgent: childRun
+      ? {
+          runId: childRun.id ?? undefined,
+          capabilityKey: childRun.capability_key ?? undefined,
+          status: childRun.status ?? undefined,
+          summary: childRun.result_summary ?? undefined,
+        }
+      : isSubAgent
+        ? {
+            runId: childRunIdFromOutput(step.output_summary) ?? undefined,
+            capabilityKey: typeof output.capability_key === 'string' ? output.capability_key : undefined,
+            status: typeof output.status === 'string' ? output.status : step.status ?? undefined,
+            summary: typeof output.result_summary === 'string' ? output.result_summary : step.summary ?? undefined,
+          }
+        : undefined,
+  };
+};
 
 const toMessage = (
   row: any,
@@ -474,7 +515,7 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
     if (childRunIds.length > 0) {
       const childRunsResult = await supabase
         .from('agent_delegation_runs')
-        .select('id,capability_key,status,result_summary,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary,source_refs)')
+        .select('id,capability_key,status,result_summary,citations,agent_delegation_steps(step_index,tool_name,title,step_type,status,input_summary,output_summary,summary,source_refs)')
         .eq('user_id', userId)
         .in('id', childRunIds);
       if (childRunsResult.error) throw childRunsResult.error;
@@ -517,7 +558,7 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
     );
   }
 
-  return messageRows.map((row) => {
+  const messages = messageRows.map((row) => {
     const artifactId = artifactIdsByMessageId.get(row.id);
     const artifact = artifactId ? artifactsById.get(artifactId) : undefined;
     const steps = stepsByMessageId.get(row.id);
@@ -535,6 +576,13 @@ export const getMessagesForChat = async (chatId: string): Promise<Message[]> => 
         : undefined,
     );
   });
+  const latestAssistantWithSources = [...messageRows]
+    .reverse()
+    .find((row) => row.role === 'assistant' && Array.isArray(row.citations) && row.citations.length > 0);
+  if (latestAssistantWithSources) {
+    rememberSources(chatId, normalizeWorkerSourceRefs(latestAssistantWithSources.citations));
+  }
+  return messages;
 };
 
 export const createProject = async (name: string): Promise<Project> => {
@@ -855,21 +903,28 @@ export const sendUserMessage = async (
       if (event === 'done') {
         sdkMode = payload.sdkMode === true || sdkMode;
         chat = payload.chat;
-        for (const step of payload.assistantMessage?.agentSteps ?? []) {
-          if (typeof step.stepIndex === 'number') {
-            liveAgentSteps.set(step.stepIndex, step);
-            ensureStepActivity(step.stepIndex);
-          }
+        const persistedSteps = Array.isArray(payload.assistantMessage?.agentSteps)
+          ? payload.assistantMessage.agentSteps as AgentStep[]
+          : [];
+        const completedSteps = preserveNestedAgentSteps(orderedSteps(), persistedSteps);
+        liveAgentSteps.clear();
+        for (const step of completedSteps) {
+          if (typeof step.stepIndex !== 'number') continue;
+          liveAgentSteps.set(step.stepIndex, step);
+          ensureStepActivity(step.stepIndex);
         }
         assistantMessage = toMessage(
           payload.assistantMessage,
-          payload.assistantMessage?.agentSteps,
+          orderedSteps(),
           undefined,
           sdkMode ? 'sdk' : undefined,
           sdkMode ? [...liveActivityItems].sort((a, b) => a.order - b.order) : undefined,
         );
         artifactId = typeof payload.artifactId === 'string' ? payload.artifactId : null;
-        sources = payload.sources?.length ? payload.sources : sources;
+        const completedSources = normalizeWorkerSourceRefs(
+          Array.isArray(payload.sources) ? payload.sources : [],
+        );
+        sources = completedSources.length > 0 ? completedSources : sources;
         sourcePages = payload.sourcePages ?? [];
         if (assistantMessage) rememberSources(assistantMessage.chatId, sources, sourcePages);
       }

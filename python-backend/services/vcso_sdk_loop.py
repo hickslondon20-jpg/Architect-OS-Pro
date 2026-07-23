@@ -2124,15 +2124,47 @@ async def _run_sdk_turn(
             "Claude Agent SDK native-subagent turn ended before required workers completed: "
             + ", ".join(missing_after_query)
         )
-    for child_usage in child_usage_records:
-        capability_key = child_usage.get("capability_key") or task_capabilities.get(child_usage["task_id"])
-        if not capability_key:
-            continue
+    # The model-driven completion bridge can finish a Task with a placeholder result before the
+    # out-of-process child run id is available in-band. By turn completion the authoritative
+    # capability -> child mapping has arrived through the worker-hop drain. Backfill it into the
+    # curated Task steps before they are persisted so a reopened founder thread retains the same
+    # parent/child grouping as the live C2 stream.
+    resolved_child_run_ids: dict[str, str] = {}
+    for capability_key in required_agents:
         child_run_id = _child_run_id_for_capability(
             capability_key,
             model_driven_scope=model_driven_scope,
             worker_results=worker_results,
         )
+        if not child_run_id:
+            continue
+        resolved_child_run_ids[capability_key] = child_run_id
+        result = worker_results.get(capability_key)
+        if result is not None and not getattr(result, "run_id", None):
+            result.run_id = child_run_id
+        for step in trace_steps:
+            if step.get("capabilityKey") != capability_key:
+                continue
+            try:
+                safe_output = json.loads(str(step.get("output") or "{}"))
+            except (TypeError, json.JSONDecodeError):
+                safe_output = {}
+            safe_output.update(
+                {
+                    "run_id": child_run_id,
+                    "capability_key": capability_key,
+                    "parent_tool_use_id": step.get("parentToolUseId"),
+                }
+            )
+            step["output"] = json.dumps(safe_output)
+            task_id = str(step.get("parentToolUseId") or "")
+            if task_id and task_sources.get(task_id):
+                step["sourceRefs"] = list(task_sources[task_id])
+    for child_usage in child_usage_records:
+        capability_key = child_usage.get("capability_key") or task_capabilities.get(child_usage["task_id"])
+        if not capability_key:
+            continue
+        child_run_id = resolved_child_run_ids.get(capability_key)
         if not child_run_id:
             logger.warning(
                 "SDK child usage could not resolve a parent-linked run id; skipped capability=%s",

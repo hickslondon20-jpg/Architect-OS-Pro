@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   applySubAgentStepEvent,
   buildNestedWorkerGroups,
+  normalizeWorkerSourceRefs,
+  preserveNestedAgentSteps,
   type AgentStep,
 } from './virtualCsoApi';
 
@@ -131,5 +133,44 @@ describe('nested worker event surface', () => {
       summary: 'Reviewed a bounded dataset finding.',
     });
     expect(JSON.stringify(applied.parent)).not.toContain('never render');
+  });
+
+  it('keeps the richer live hierarchy when the done payload carries a flat trace', () => {
+    const nested = applySubAgentStepEvent(
+      parentStep(4, 'task-structured', 'structured_data_agent'),
+      {
+        parentToolUseId: 'task-structured',
+        capabilityKey: 'structured_data_agent',
+        status: 'completed',
+        step: {
+          step_index: 1,
+          title: 'Dataset reviewed',
+          summary: 'Reviewed a bounded founder dataset.',
+          status: 'completed',
+        },
+      },
+    ).parent!;
+    const persistedFlat = [{ ...parentStep(4, 'task-structured', 'structured_data_agent'), children: [] }];
+
+    expect(preserveNestedAgentSteps([nested], persistedFlat)).toEqual([nested]);
+    expect(preserveNestedAgentSteps([], persistedFlat)).toEqual(persistedFlat);
+  });
+
+  it('normalizes persisted citation labels into the SOURCES rail', () => {
+    expect(normalizeWorkerSourceRefs([
+      {
+        source_kind: 'wiki_claim',
+        source_id: 'claim-1',
+        source_label: 'Concentration is material.',
+      },
+      {
+        source_kind: 'computation',
+        source_id: 'compute-1',
+        source_label: 'Sandbox scenario',
+      },
+    ])).toEqual([
+      { kind: 'wiki', label: 'Concentration is material.', pageId: 'claim-1' },
+      { kind: 'platform', label: 'Sandbox scenario' },
+    ]);
   });
 });

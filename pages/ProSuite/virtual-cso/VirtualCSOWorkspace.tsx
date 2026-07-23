@@ -161,7 +161,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
     loadMessages(activeChatId).catch((err) =>
       setError(err instanceof Error ? err.message : 'Could not load messages.'),
     );
-  }, [activeChatId, streaming]);
+  }, [activeChatId]);
 
   const openChat = async (chatId: string) => {
     const chat = getChatById(chats, chatId);
