@@ -235,6 +235,61 @@ export const buildNestedWorkerGroups = (steps: AgentStep[]): NestedWorkerGroup[]
   return [...groups.values()];
 };
 
+const PERSISTED_WORKER_PLAN: Array<{ capabilityKey: string; content: string }> = [
+  {
+    capabilityKey: 'structured_data_agent',
+    content: 'Bind the latest founder financial dataset',
+  },
+  {
+    capabilityKey: 'sandbox_execution_agent',
+    content: 'Compute concentration and margin trend',
+  },
+  {
+    capabilityKey: 'per_user_wiki',
+    content: 'Review strategic pricing and constraint context',
+  },
+];
+
+/**
+ * `todos_updated` is an in-flight SSE projection, so it is not stored with the thread. Rebuild the
+ * same four-item native-subagent plan from the persisted parent/child hierarchy when a thread loads.
+ * Returning no todos for ordinary SDK traces preserves their existing flat progress treatment.
+ */
+export const rebuildPersistedWorkerTodos = (steps: AgentStep[] = []): AgentTodo[] => {
+  const groups = buildNestedWorkerGroups(steps);
+  if (groups.length === 0) return [];
+
+  const groupsByCapability = new Map(
+    groups
+      .filter((group) => group.capabilityKey)
+      .map((group) => [group.capabilityKey as string, group]),
+  );
+  const orderedGroups = PERSISTED_WORKER_PLAN
+    .map((item) => ({ ...item, group: groupsByCapability.get(item.capabilityKey) }))
+    .filter((item): item is typeof item & { group: NestedWorkerGroup } => Boolean(item.group));
+
+  if (orderedGroups.length === 0) return [];
+
+  const todos: AgentTodo[] = orderedGroups.map(({ capabilityKey, content, group }, position) => ({
+    id: capabilityKey,
+    content,
+    status: group.status === 'completed'
+      ? 'completed'
+      : group.status === 'running'
+        ? 'in_progress'
+        : 'pending',
+    position,
+  }));
+  const workersCompleted = orderedGroups.every(({ group }) => group.status === 'completed');
+  todos.push({
+    id: 'compose',
+    content: 'Compose the cited 90-day recommendation',
+    status: workersCompleted ? 'completed' : 'pending',
+    position: todos.length,
+  });
+  return todos;
+};
+
 export const applySubAgentStepEvent = (
   parent: AgentStep | undefined,
   payload: Record<string, any>,

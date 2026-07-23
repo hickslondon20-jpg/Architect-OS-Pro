@@ -21,6 +21,7 @@ import {
   getSourcePage,
   getSourceRefsForChat,
   loadVirtualCsoData,
+  rebuildPersistedWorkerTodos,
   renameThread,
   requestThreadWriteback,
   sendUserMessage,
@@ -141,7 +142,7 @@ export const VirtualCSOWorkspace: React.FC = () => {
     setMessages(nextMessages);
     const latestAssistant = [...nextMessages].reverse().find((message) => message.role === 'assistant');
     setSdkSurfaceActive(latestAssistant?.surfaceMode === 'sdk');
-    setLiveTodos([]);
+    setLiveTodos(rebuildPersistedWorkerTodos(latestAssistant?.agentSteps));
   };
 
   useEffect(() => {

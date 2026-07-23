@@ -5,6 +5,7 @@ import {
   buildNestedWorkerGroups,
   normalizeWorkerSourceRefs,
   preserveNestedAgentSteps,
+  rebuildPersistedWorkerTodos,
   type AgentStep,
 } from './virtualCsoApi';
 
@@ -172,5 +173,70 @@ describe('nested worker event surface', () => {
       { kind: 'wiki', label: 'Concentration is material.', pageId: 'claim-1' },
       { kind: 'platform', label: 'Sandbox scenario' },
     ]);
+  });
+
+  it('rebuilds the grouped four-item plan when a completed native thread reloads', () => {
+    const persistedParents = [
+      parentStep(4, 'toolu-structured', 'structured_data_agent'),
+      parentStep(6, 'toolu-wiki', 'per_user_wiki'),
+      parentStep(8, 'toolu-sandbox', 'sandbox_execution_agent'),
+    ].map((step, index) => ({
+      ...step,
+      status: 'completed',
+      children: [{
+        stepIndex: index + 1,
+        stepType: 'tool_call',
+        title: 'Curated worker result',
+        summary: 'A bounded finding was prepared.',
+        tool: 'worker_tool',
+        input: {},
+        output: '',
+        status: 'completed',
+        parentToolUseId: step.parentToolUseId,
+      }],
+      subAgent: {
+        ...step.subAgent,
+        status: 'completed',
+      },
+    } satisfies AgentStep));
+
+    expect(rebuildPersistedWorkerTodos(persistedParents)).toEqual([
+      {
+        id: 'structured_data_agent',
+        content: 'Bind the latest founder financial dataset',
+        status: 'completed',
+        position: 0,
+      },
+      {
+        id: 'sandbox_execution_agent',
+        content: 'Compute concentration and margin trend',
+        status: 'completed',
+        position: 1,
+      },
+      {
+        id: 'per_user_wiki',
+        content: 'Review strategic pricing and constraint context',
+        status: 'completed',
+        position: 2,
+      },
+      {
+        id: 'compose',
+        content: 'Compose the cited 90-day recommendation',
+        status: 'completed',
+        position: 3,
+      },
+    ]);
+  });
+
+  it('does not synthesize a grouped plan for an ordinary flat SDK trace', () => {
+    expect(rebuildPersistedWorkerTodos([{
+      stepIndex: 1,
+      stepType: 'context_build',
+      title: 'Context prepared',
+      tool: 'context',
+      input: {},
+      output: '',
+      status: 'completed',
+    }])).toEqual([]);
   });
 });
