@@ -77,6 +77,21 @@ P4_THIN_SLICE_SIGNALS = re.compile(
     r"(?=.*\b(?:financial|p&l|margin|revenue)\b)(?=.*\bconcentration\b)(?=.*\b90\s+days?\b)",
     re.IGNORECASE | re.DOTALL,
 )
+COMPUTE_INTEGRITY_REFUSAL = (
+    "I cannot compute from current data because the required source series is missing or the "
+    "calculation could not be completed with cited evidence. I can still identify the data needed "
+    "for a sound calculation."
+)
+COMPUTE_REQUEST_SIGNALS = re.compile(
+    r"\b(?:calculate|compute|derive|forecast|model|project|scenario|simulate)\b"
+    r"|\bhow\s+much\s+(?:would|will|does|do)\b"
+    r"|\b(?:what|how)\s+(?:would|will|does)\b.{0,160}"
+    r"\b(?:margin|runway|revenue|profit|cash|cost|ratio|rate|percentage|months?)\b"
+    r"|\bif\b.{0,160}\b(?:churn|leave|lost|lose|increase|decrease|cut|drop|rise|fall)\b"
+    r".{0,160}\b(?:margin|runway|revenue|profit|cash|cost|ratio|rate|percentage|months?)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+ANSWER_CITATION_MARKER = re.compile(r"\[(?:\d+|[A-Za-z][A-Za-z0-9_.:-]*)\]")
 # SDK-M3 step C2 — the explicit per-worker delegation contract each Task must carry. Data, not prose, so
 # the lead prompt, the contract validator and the docs cannot drift apart. `objective` here is a
 # DESCRIPTION of the worker's job that the lead rewrites for the founder's actual question; the other three
@@ -576,6 +591,7 @@ def stream_vcso_sdk_turn(
     native_fault_injection: tuple[str, ...] = (),
     native_fault_injection_mode_key: str = "before_start",
     native_cross_worker_probe: bool = False,
+    founder_question: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -612,6 +628,7 @@ def stream_vcso_sdk_turn(
                         native_fault_injection=native_fault_injection,
                         native_fault_injection_mode_key=native_fault_injection_mode_key,
                         native_cross_worker_probe=native_cross_worker_probe,
+                        founder_question=founder_question,
                     )
                 )
             )
@@ -717,6 +734,84 @@ def model_driven_completed_children(
         if str(row.get("capability_key")) in wanted
         and semantic_worker_status(row.get("status"), row.get("structured_result")) == "completed"
     }
+
+
+def _requires_compute_integrity_gate(question: str | None) -> bool:
+    """Whether the founder explicitly asked for a new derivation or scenario calculation.
+
+    This is an output-integrity classification only. It does not select a capability, require a worker,
+    or alter the native-reasoning-first delegation surface.
+    """
+
+    return bool(COMPUTE_REQUEST_SIGNALS.search(str(question or "")))
+
+
+def _successful_cited_compute_result(
+    *,
+    worker_results: dict[str, Any],
+    model_driven_scope: Any = None,
+    client: Any = None,
+    parent_run_id: str | None = None,
+) -> bool:
+    """Reuse semantic_worker_status and require citations before compute can authorize derived figures."""
+
+    candidates: list[Any] = []
+    direct = worker_results.get("sandbox_execution_agent")
+    if direct is not None:
+        candidates.append(direct)
+    completed_results = getattr(model_driven_scope, "completed_results", {}) or {}
+    compact = completed_results.get("sandbox_execution_agent")
+    if compact is not None:
+        candidates.append(compact)
+    if client is not None and parent_run_id:
+        try:
+            rows = (
+                client.table("agent_delegation_runs")
+                .select("capability_key,status,structured_result,citations")
+                .eq("parent_run_id", str(parent_run_id))
+                .eq("capability_key", "sandbox_execution_agent")
+                .eq("status", "completed")
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            candidates.extend(rows)
+        except Exception as exc:  # noqa: BLE001 - a failed evidence read must fail closed
+            logger.warning("composer compute-evidence lookup failed closed: %s", exc)
+
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            transport_status = candidate.get("status")
+            structured_result = candidate.get("structured_result")
+            citations = candidate.get("citations") or []
+        else:
+            transport_status = getattr(candidate, "status", None)
+            structured_result = getattr(candidate, "structured_result", None)
+            citations = getattr(candidate, "citations", None) or []
+        if (
+            semantic_worker_status(transport_status, structured_result) == "completed"
+            and any(isinstance(item, dict) for item in citations)
+        ):
+            return True
+    return False
+
+
+def _enforce_composer_integrity(
+    answer_text: str,
+    *,
+    founder_question: str | None,
+    successful_cited_compute: bool,
+) -> tuple[str, str]:
+    """Return the founder-safe answer and a compact decision code for lifecycle evidence."""
+
+    if not _requires_compute_integrity_gate(founder_question):
+        return answer_text, "not_required"
+    if not successful_cited_compute:
+        return COMPUTE_INTEGRITY_REFUSAL, "refused_missing_compute"
+    if not ANSWER_CITATION_MARKER.search(answer_text):
+        return COMPUTE_INTEGRITY_REFUSAL, "refused_uncited_compute"
+    return answer_text, "passed_cited_compute"
 
 
 def _make_worker_progress_bridge(
@@ -944,6 +1039,7 @@ async def _run_sdk_turn(
     native_fault_injection: tuple[str, ...] = (),
     native_fault_injection_mode_key: str = "before_start",
     native_cross_worker_probe: bool = False,
+    founder_question: str | None = None,
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -964,6 +1060,8 @@ async def _run_sdk_turn(
         key for key in native_subagent_required_agents if key in P4_NATIVE_SUBAGENT_KEYS
     )
     model_choice = bool(native_model_choice) and model_driven
+    integrity_question = founder_question if founder_question is not None else prompt
+    compute_integrity_required = _requires_compute_integrity_gate(integrity_question)
     required_agents = () if model_choice else provisioned_agents
     task_capabilities: dict[str, str] = {}
     task_contracts: dict[str, dict[str, Any]] = {}
@@ -2144,7 +2242,11 @@ async def _run_sdk_turn(
                                 }
                                 if segment_id is not None:
                                     token_data["segmentId"] = segment_id
-                                events.put({"event": "token", "data": token_data})
+                                # A compute-sensitive answer is buffered until the deterministic final
+                                # seam can verify a successful, cited compute result. Narration and every
+                                # non-compute turn keep their existing real-time stream.
+                                if not (compute_integrity_required and channel == "answer"):
+                                    events.put({"event": "token", "data": token_data})
             elif isinstance(message, ResultMessage):
                 session_id = message.session_id
                 final_result_text = message.result
@@ -2190,7 +2292,8 @@ async def _run_sdk_turn(
             token_data = {"text": visible_text, "channel": channel, "sdkMode": True}
             if segment_id is not None:
                 token_data["segmentId"] = segment_id
-            events.put({"event": "token", "data": token_data})
+            if not (compute_integrity_required and channel == "answer"):
+                events.put({"event": "token", "data": token_data})
     finally:
         # DIAGNOSTICS SURVIVE FAILURE (SDK-M3 step A4). The worker_hop drain used to run only after a
         # clean query; a turn that raised — max_turns, a required-worker block, a client disconnect —
@@ -2302,7 +2405,7 @@ async def _run_sdk_turn(
         answer_text = "".join(
             text for channel, text, _segment in fallback_pieces if channel == "answer"
         ).strip()
-        if answer_text:
+        if answer_text and not compute_integrity_required:
             events.put(
                 {
                     "event": "token",
@@ -2311,6 +2414,35 @@ async def _run_sdk_turn(
             )
     if not answer_text:
         raise RuntimeError("Claude Agent SDK returned no assistant text.")
+    successful_cited_compute = (
+        _successful_cited_compute_result(
+            worker_results=worker_results,
+            model_driven_scope=model_driven_scope,
+            client=getattr(tool_context.store, "client", None),
+            parent_run_id=tool_context.metadata.get("parent_run_id"),
+        )
+        if compute_integrity_required
+        else False
+    )
+    answer_text, integrity_decision = _enforce_composer_integrity(
+        answer_text,
+        founder_question=integrity_question,
+        successful_cited_compute=successful_cited_compute,
+    )
+    record_lifecycle(
+        "composer_integrity_gate",
+        decision=integrity_decision,
+        compute_required=compute_integrity_required,
+        successful_cited_compute=successful_cited_compute,
+    )
+    if compute_integrity_required:
+        # No answer token from a compute-sensitive turn is founder-visible before this point.
+        events.put(
+            {
+                "event": "token",
+                "data": {"text": answer_text, "channel": "answer", "sdkMode": True},
+            }
+        )
     return VcsoSdkTurnResult(
         answer_text=answer_text,
         input_tokens=input_tokens,

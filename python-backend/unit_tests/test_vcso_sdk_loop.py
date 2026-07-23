@@ -15,13 +15,16 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolResultEnvelope, ToolSourceRef
 from services.vcso_sdk_loop import (
+    COMPUTE_INTEGRITY_REFUSAL,
     G_GATE_CANDIDATE_AGENTS,
     G_GATE_MODEL_CHOICE_SCOPE,
     _assistant_worker_capability,
     _child_run_id_for_capability,
+    _enforce_composer_integrity,
     _make_worker_progress_bridge,
     _native_generalization_prompt,
     _native_synthesis_prompt,
+    _successful_cited_compute_result,
     native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
@@ -183,6 +186,94 @@ def test_sdk_flag_is_fail_closed_and_founder_scoped():
     client = _FlagClient(rows=[{"is_enabled": True, "settings": settings}])
     assert read_sdk_loop_settings(client, "founder-1")["enabled"] is True
     assert read_sdk_loop_settings(client, "other-founder")["enabled"] is False
+
+
+def test_composer_integrity_refuses_missing_compute_without_substitute_arithmetic():
+    answer, decision = _enforce_composer_integrity(
+        "Margin falls 20% and runway is 8.7 months based on $45k monthly revenue.",
+        founder_question="If my top two clients churn, what would it do to margin and runway?",
+        successful_cited_compute=False,
+    )
+
+    assert answer == COMPUTE_INTEGRITY_REFUSAL
+    assert decision == "refused_missing_compute"
+    assert "20%" not in answer
+    assert "8.7" not in answer
+    assert "$45k" not in answer
+
+
+def test_composer_integrity_passes_successful_cited_compute():
+    result = SimpleNamespace(
+        status="completed",
+        structured_result={"status": "completed", "margin_change_pct": -12},
+        citations=[{"source_id": "compute-run-1", "label": "Sandbox computation"}],
+    )
+    assert _successful_cited_compute_result(
+        worker_results={"sandbox_execution_agent": result}
+    ) is True
+
+    answer, decision = _enforce_composer_integrity(
+        "The cited scenario reduces margin by 12% [1].",
+        founder_question="Calculate the margin impact if the top two clients churn.",
+        successful_cited_compute=True,
+    )
+    assert answer == "The cited scenario reduces margin by 12% [1]."
+    assert decision == "passed_cited_compute"
+
+
+def test_composer_integrity_refuses_successful_but_uncited_compute():
+    answer, decision = _enforce_composer_integrity(
+        "The scenario reduces margin by 12%.",
+        founder_question="Calculate the margin impact if the top two clients churn.",
+        successful_cited_compute=True,
+    )
+
+    assert answer == COMPUTE_INTEGRITY_REFUSAL
+    assert decision == "refused_uncited_compute"
+
+
+def test_composer_integrity_does_not_misclassify_qualitative_what_would_you_do():
+    answer = "I would protect the renewal conversation before changing the offer."
+    guarded, decision = _enforce_composer_integrity(
+        answer,
+        founder_question="What would you do about this client relationship?",
+        successful_cited_compute=False,
+    )
+
+    assert guarded == answer
+    assert decision == "not_required"
+
+
+def test_composer_integrity_passes_cited_retrieval_and_qualitative_answer():
+    answer = "Stored revenue is $480k [economic_foundation]. Protect the renewal conversation first."
+
+    guarded, decision = _enforce_composer_integrity(
+        answer,
+        founder_question="What revenue is currently on record, and what should I prioritize?",
+        successful_cited_compute=False,
+    )
+
+    assert guarded == answer
+    assert decision == "not_required"
+
+
+def test_composer_integrity_refuses_degraded_compute():
+    result = SimpleNamespace(
+        status="completed",
+        structured_result={"status": "could_not_compute", "needs_review": True},
+        citations=[{"source_id": "stale-input", "label": "Incomplete input"}],
+    )
+    assert _successful_cited_compute_result(
+        worker_results={"sandbox_execution_agent": result}
+    ) is False
+
+    answer, decision = _enforce_composer_integrity(
+        "Using assumptions, runway is 2.5 months.",
+        founder_question="Project runway if my two largest clients churn.",
+        successful_cited_compute=False,
+    )
+    assert answer == COMPUTE_INTEGRITY_REFUSAL
+    assert decision == "refused_missing_compute"
 
 
 def test_standard_sdk_turn_compiles_registry_tools_and_normalizes_lifecycle(monkeypatch):
@@ -783,14 +874,17 @@ def test_app_owned_worker_failure_fails_open_to_standard_flat_sdk_path(monkeypat
             is_error=False,
             num_turns=1,
             session_id="session-flat",
-            result="Flat fallback answer.",
+            result=(
+                "If the top two clients churn, margin falls 20% and runway drops to "
+                "8.7 months based on $45k monthly revenue."
+            ),
         )
 
     monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", FailingOrchestrator)
     monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
     _events, result = _consume(
         stream_vcso_sdk_turn(
-            prompt="P4 thin-slice prompt",
+            prompt="If my top 2 clients churned this year, what would it do to my margin and runway?",
             system_prompt="System",
             model="claude-sonnet-test",
             api_key="test-key",
@@ -808,7 +902,10 @@ def test_app_owned_worker_failure_fails_open_to_standard_flat_sdk_path(monkeypat
     assert len(failures) == 1
     assert failures[0]["capability_key"] == "structured_data_agent"
     assert failures[0]["delegated"] is True
-    assert result.answer_text == "Flat fallback answer."
+    assert result.answer_text == COMPUTE_INTEGRITY_REFUSAL
+    assert "20%" not in result.answer_text
+    assert "8.7" not in result.answer_text
+    assert "$45k" not in result.answer_text
 
 
 class _ModelDrivenClient:
