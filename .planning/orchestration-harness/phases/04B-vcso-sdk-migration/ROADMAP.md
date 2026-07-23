@@ -176,6 +176,19 @@ budgets, runtime-enforced policy under adversarial prompts) — traces paired wi
 Retire the hand-rolled loop **only** on parallel-run parity evidence. Then thread 04B into the harness
 root `ROADMAP.md` (founder-gated).
 
+**Generalization-proof content — deferred to a future agent + the full-fledged testing pass; the gate
+before any wider founder exposure.** D2 proved delegation reliability on *one* pinned anchor shape + a
+simple control (Gate 1, 5/5). Generalization is the unproven step: does the lead delegate *appropriately*
+across genuinely different strategic questions? The proof is a **controlled question-shape expansion** — a
+small set of deliberately-varied strategic questions spanning the delegation archetypes
+(structured+sandbox / structured-only / wiki-only / simple-direct / reflect-and-steer), each with an
+expected-acceptable delegation defined up front, scored on an **appropriateness rubric** (right worker
+set, no over/under-decomposition, correct dependencies, sound cited answer) — likely requiring the
+currently **app-gated effort-scaling to be relaxed** so the lead chooses across question types, which is
+itself the thing under test. Parked deliberately: judgment-heavy and founder-specific (the question set
+reflects real founder-strategy shapes), so it belongs with a dedicated future session + full-fledged
+testing, **not** the operational M4 close. Nothing widens past the dark founder canary until this clears.
+
 ## Registry extensions (Phase C detail)
 
 | Move | Change | Drives |
