@@ -455,3 +455,23 @@ zero-click delivery for a mid-turn death, because the answer does not exist at t
 normal thread loading — **not** the Defect-8 in-flight code path. So canary 1 proves the answer persists
 and is never lost; it does **not** yet observe the v0.6.104 in-flight recovery running. That observation is
 what a confirming canary on the deployed fix would add.
+
+## Gate 2 — CLOSED on founder ruling (2026-07-23)
+
+**London's decision:** accept Gate 2 as met on **code + canary-1 substance**, no further canaries
+(cost discipline; the marginal observation did not justify another live run).
+
+**What is proven:** the backend completes and persists the answer on a real disconnect (canary 1, 33
+citations); the keepalive holds the stream and is observed firing 11× in the DB; the answer is **never
+lost**; and the two ways a stream can die (clean EOF and thrown network error) now **both** reach the
+record-backed recovery (v0.6.100 + v0.6.104), typechecked and unit-tested.
+
+**What is explicitly NOT claimed:** the v0.6.104 in-flight recovery has **not been observed running** —
+canary 1 recovered via a normal page reload, which bypasses that code path. Its correctness rests on code
+inspection + the `selectRecoverableAssistantMessage` unit tests, not a live observation. Recorded as such;
+the completion doc must not overstate it.
+
+**Net delivery guarantee (honest):** a founder is never falsely told the turn failed and never shown a
+bare unguided error; they are shown the answer or correctly guided to reopen (where it appears once
+persisted). Zero-click no-reopen delivery is inherently limited to disconnects that occur after
+persistence, which is the turn's last step.

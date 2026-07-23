@@ -1,32 +1,39 @@
 # State: Orchestration Harness — VCSO Planner — ArchitectOS Pro
 
-**Updated:** 2026-07-22
+**Updated:** 2026-07-23
 
 ## Current Focus
 
-**04B PHASE D2 · SDK-M3 — DELEGATION RELIABILITY CLOSED (5/5); DELIVERY GATE OPEN (4/5); AT
-STOP-AND-REVIEW** (2026-07-22). Deployed `5041fa10`, `/api/health ok=true`. Model-driven delegation now
-meets the Process Rule 10 bar: **five consecutive passing runs on a PINNED anchor** — 15 Task
-delegations all allowed on the first attempt with zero denials, 15 worker child runs all completed, 15
-worker tool calls each on the worker's own tool, correct tiers throughout (Haiku workers / Sonnet
-compose), cited answers every run. The delegation ORDER varied between runs while the
-sandbox-after-structured constraint held every time, which is the evidence that the lead reasons the
-decomposition rather than replaying a fixed sequence.
+**04B PHASE D2 · SDK-M3 — RELIABLE/CLOSED ON BOTH GATES; AT STOP-AND-REVIEW** (2026-07-23). Deployed
+backend `2370c48f`, `/api/health ok=true`; the v0.6.104 frontend fix is on Vercel.
+
+**Gate 1 — delegation reliability CLOSED (5/5).** Model-driven delegation met the Process Rule 10 bar:
+five consecutive passing runs on a PINNED anchor — 15 Task delegations all allowed on the first attempt
+with zero denials, 15 worker child runs all completed, 15 worker tool calls each on the worker's own
+tool, correct tiers throughout (Haiku workers / Sonnet compose), cited answers every run. The delegation
+ORDER varied between runs while the sandbox-after-structured constraint held every time — the evidence
+that the lead reasons the decomposition rather than replaying a fixed sequence.
 
 **Defect 7 (worker subagents able to call each other's tools) is closed in code** — the worker token is
 now minted per `(turn, capability)`, so the existing scope check refuses a cross-worker call with no new
-authorization logic. Unit-proven; the live evidence is *negative* (no run attempted a cross-worker call,
-so the guard has not been observed firing).
+authorization logic. Unit-proven; live evidence is *negative* (no run attempted a cross-worker call, so
+the guard has not been observed firing).
 
-**What is NOT closed:** founder-visible delivery sits at 4/5. Run 4's SSE stream died ~12s in and the
-founder was shown an error for a turn that had actually succeeded and been persisted with 33 citations.
-**Defect 8** (the UI asserting a saved turn was unsaved) is fixed in v0.6.100, but that addresses the
-consequence, not the still-undetermined cause of the disconnect. The stream keepalive shipped but has
-**not** been directly observed. Child usage attribution collapses onto one child (pre-existing, M4).
+**Gate 2 — founder-visible delivery CLOSED on London's ruling (2026-07-23)** on code + canary-1
+substance. A dark stream-disconnect injection reproduced run 4's shape on demand (backend completed and
+persisted, 33 citations), and the **stream keepalive is now OBSERVED** firing 11× in
+`agent_delegation_runs.metadata` (v0.6.103). The injection also found the v0.6.100 Defect-8 fix was
+incomplete — it missed the *thrown* network-error disconnect shape a killed connection produces — and
+that is **fixed in v0.6.104** so both shapes reach the record-backed recovery. Honest carries: the
+v0.6.104 in-flight recovery is not yet *observed* running (canary 1 recovered via a page reload, which
+bypasses it); zero-click recovery is inherently limited to post-persistence disconnects (persistence is
+the turn's last step); run 4's disconnect *cause* is undetermined (not chased, per founder); child usage
+attribution collapses onto one child (pre-existing, M4).
 
-`vcso_sdk_loop` is **dark**, both allowlists empty, `native_model_driven_enabled=false`; `vcso_planner`
-dark/retired; Path A untouched as the fallback. M4 and Phases E/F/G are **not started**. Evidence:
-`phases/04B-vcso-sdk-migration/04B-D2-M3-COMPLETION.md` and `04B-D2-M3-CANARY-RUNBOOK.md`.
+`vcso_sdk_loop` is **dark**, both allowlists empty, `native_model_driven_enabled=false`, all three
+diagnostic sub-flags (disconnect / fault / single-worker) off; `vcso_planner` dark/retired; Path A
+untouched as the fallback. M4 and Phases E/F/G are **not started**. Evidence:
+`phases/04B-vcso-sdk-migration/04B-D2-M3-COMPLETION.md` and `04B-D2-M3-CANARY-RUNBOOK.md` (Gate-2 section).
 
 ---
 
