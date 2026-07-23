@@ -1,9 +1,11 @@
 import React from 'react';
 import { BookOpen, Check, ChevronRight, FolderInput, Layers, Library, LoaderCircle } from 'lucide-react';
 import {
+  buildNestedWorkerGroups,
   SOURCE_KIND_LABELS,
   type AgentStep,
   type AgentTodo,
+  type NestedWorkerGroup,
   type SourceKind,
   type SourceRef,
 } from '../../../lib/virtualCsoApi';
@@ -18,17 +20,21 @@ interface ProgressItem {
   id: string;
   label: string;
   status: 'pending' | 'in_progress' | 'completed';
-  children?: AgentStep[];
+  workerGroup?: NestedWorkerGroup;
 }
 
 const progressItems = ({ steps, todos, streaming }: TurnProgress): ProgressItem[] => {
+  const workerGroups = buildNestedWorkerGroups(steps);
   if (todos.length > 0) {
-    return todos.map((todo) => ({
-      id: todo.id,
-      label: todo.content,
-      status: todo.status,
-      children: steps.find((step) => step.subAgent?.capabilityKey === todo.id)?.children,
-    }));
+    return todos.map((todo) => {
+      const workerGroup = workerGroups.find((group) => group.capabilityKey === todo.id);
+      return {
+        id: todo.id,
+        label: todo.content,
+        status: todo.status,
+        workerGroup,
+      };
+    });
   }
 
   const uniqueSteps = new Map<number, AgentStep>();
@@ -40,7 +46,9 @@ const progressItems = ({ steps, todos, streaming }: TurnProgress): ProgressItem[
   const items = [...uniqueSteps.values()].slice(0, 7).map((step) => ({
     id: `step-${step.stepIndex}`,
     label: step.title ?? step.summary ?? 'Review evidence',
-    children: step.children,
+    workerGroup: step.parentToolUseId
+      ? workerGroups.find((group) => group.parentToolUseId === step.parentToolUseId)
+      : undefined,
     status: step.status === 'running'
       ? 'in_progress' as const
       : step.status === 'failed'
@@ -98,26 +106,41 @@ const ProgressPanel: React.FC<{ progress: TurnProgress }> = ({ progress }) => {
                 {item.label}
               </span>
             </div>
-            {item.children && item.children.length > 0 && (
-              <details className="group ml-2.5 mt-1.5 border-l border-[var(--aos-mist)] pl-4">
+            {item.workerGroup && item.workerGroup.steps.length > 0 && (
+              <details
+                className="group ml-2.5 mt-1.5 border-l border-[var(--aos-mist)] pl-4"
+                data-parent-tool-use-id={item.workerGroup.parentToolUseId}
+              >
                 <summary className="flex cursor-pointer list-none items-center gap-1.5 py-1 text-[10px] font-medium uppercase tracking-wide text-[var(--fg-4)] marker:content-none">
                   <ChevronRight size={11} className="transition-transform group-open:rotate-90" />
-                  {item.children.length} worker {item.children.length === 1 ? 'step' : 'steps'}
+                  {item.workerGroup.title} · {item.workerGroup.status}
                 </summary>
                 <ol className="mt-1 space-y-2 pb-1">
-                  {item.children.map((child, childIndex) => (
-                    <li key={`${child.parentToolUseId ?? item.id}-${child.stepIndex ?? childIndex}`} className="flex gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--aos-brass)]" />
-                      <span className="min-w-0">
-                        <span className="block text-[11px] font-medium leading-4 text-[var(--fg-2)]">
-                          {child.title ?? child.tool}
-                        </span>
-                        {child.summary && (
-                          <span className="mt-0.5 block text-[10px] leading-4 text-[var(--fg-4)]">
-                            {child.summary}
+                  {item.workerGroup.steps.map((child, childIndex) => (
+                    <li key={`${item.workerGroup!.parentToolUseId}-${child.stepIndex ?? childIndex}`}>
+                      <details className="group/child rounded-[var(--radius-xs)] bg-[var(--bg-sunken)]">
+                        <summary className="flex cursor-pointer list-none items-start gap-2 px-2 py-1.5 marker:content-none">
+                          <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+                            child.status === 'failed'
+                              ? 'bg-[var(--aos-risk)]'
+                              : child.status === 'running'
+                                ? 'bg-[var(--aos-brass)]'
+                                : 'bg-[var(--aos-success)]'
+                          }`} />
+                          <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-4 text-[var(--fg-2)]">
+                            {child.title ?? child.tool}
                           </span>
+                          <ChevronRight
+                            size={10}
+                            className="mt-0.5 shrink-0 text-[var(--fg-4)] transition-transform group-open/child:rotate-90"
+                          />
+                        </summary>
+                        {child.summary && (
+                          <p className="border-t border-[var(--aos-mist)] px-2 py-1.5 text-[10px] leading-4 text-[var(--fg-4)]">
+                            {child.summary}
+                          </p>
                         )}
-                      </span>
+                      </details>
                     </li>
                   ))}
                 </ol>

@@ -145,6 +145,131 @@ const childRunIdFromOutput = (output: unknown): string | null => {
   return typeof runId === 'string' && runId ? runId : null;
 };
 
+const sourceKindForWorkerRef = (source: Record<string, unknown>): SourceKind => {
+  const rawKind = String(source.kind ?? source.source_kind ?? '').toLowerCase();
+  if (['wiki', 'wiki_page', 'per_user_wiki'].includes(rawKind)) return 'wiki';
+  if (['ip', 'global_ip', 'architect_os_ip'].includes(rawKind)) return 'ip';
+  if (['platform', 'founder_dataset', 'founder_dataset_row', 'structured_data'].includes(rawKind)) {
+    return 'platform';
+  }
+  return 'context';
+};
+
+export const normalizeWorkerSourceRefs = (
+  refs: Array<Record<string, unknown>> = [],
+): SourceRef[] =>
+  refs
+    .map((source) => {
+      const rawLabel = source.label ?? source.title ?? source.source_title ?? source.resource_label;
+      if (typeof rawLabel !== 'string' || !rawLabel.trim()) return null;
+      const kind = sourceKindForWorkerRef(source);
+      const rawPageId = source.pageId ?? source.page_id ?? (kind === 'wiki' ? source.source_id : undefined);
+      return {
+        kind,
+        label: rawLabel.trim().slice(0, 160),
+        pageId: typeof rawPageId === 'string' && rawPageId ? rawPageId : undefined,
+      };
+    })
+    .filter((source): source is SourceRef => Boolean(source));
+
+export interface NestedWorkerGroup {
+  parentToolUseId: string;
+  capabilityKey?: string;
+  title: string;
+  summary?: string;
+  status: 'running' | 'completed' | 'failed';
+  steps: AgentStep[];
+  sources: SourceRef[];
+}
+
+const workerStatus = (status?: string): NestedWorkerGroup['status'] => {
+  if (status === 'failed') return 'failed';
+  if (status === 'completed') return 'completed';
+  return 'running';
+};
+
+export const buildNestedWorkerGroups = (steps: AgentStep[]): NestedWorkerGroup[] => {
+  const groups = new Map<string, NestedWorkerGroup>();
+  steps
+    .filter((step) => step.stepType === 'sub_agent' && step.parentToolUseId)
+    .forEach((step) => {
+      const parentToolUseId = step.parentToolUseId as string;
+      const childSteps = step.children ?? [];
+      const sourceMap = new Map<string, SourceRef>();
+      normalizeWorkerSourceRefs([
+        ...(step.sourceRefs ?? []),
+        ...childSteps.flatMap((child) => child.sourceRefs ?? []),
+      ]).forEach((source) => sourceMap.set(`${source.kind}:${source.label}`, source));
+      const existing = groups.get(parentToolUseId);
+      groups.set(parentToolUseId, {
+        parentToolUseId,
+        capabilityKey: step.subAgent?.capabilityKey ?? existing?.capabilityKey,
+        title: step.title ?? existing?.title ?? 'Delegated analysis',
+        summary: step.subAgent?.summary ?? step.summary ?? existing?.summary,
+        status: workerStatus(step.subAgent?.status ?? step.status),
+        steps: [...(existing?.steps ?? []), ...childSteps],
+        sources: [...(existing?.sources ?? []), ...sourceMap.values()],
+      });
+    });
+  return [...groups.values()];
+};
+
+export const applySubAgentStepEvent = (
+  parent: AgentStep | undefined,
+  payload: Record<string, any>,
+): { parent: AgentStep | null; sources: SourceRef[] } => {
+  if (!parent) return { parent: null, sources: [] };
+  const rawStep = payload.step && typeof payload.step === 'object'
+    ? payload.step as Record<string, any>
+    : {};
+  const parentToolUseId = String(payload.parentToolUseId ?? parent.parentToolUseId ?? '');
+  const rawSourceRefs = Array.isArray(rawStep.source_refs)
+    ? rawStep.source_refs.filter((ref: unknown): ref is Record<string, unknown> =>
+        Boolean(ref) && typeof ref === 'object' && !Array.isArray(ref))
+    : [];
+  const childStep: AgentStep = {
+    stepIndex: typeof rawStep.step_index === 'number' ? rawStep.step_index : undefined,
+    stepType: typeof rawStep.step_type === 'string' ? rawStep.step_type : 'sub_agent',
+    title: String(rawStep.title ?? payload.title ?? 'Worker update').slice(0, 160),
+    summary: typeof (rawStep.summary ?? payload.summary) === 'string'
+      ? String(rawStep.summary ?? payload.summary).slice(0, 500)
+      : undefined,
+    tool: String(rawStep.tool_name ?? rawStep.title ?? payload.title ?? 'Worker update').slice(0, 160),
+    // Curated-only contract: child drill-down never receives raw input/output payloads.
+    input: {},
+    output: '',
+    status: workerStatus(rawStep.status ?? payload.status),
+    parentToolUseId,
+    sourceRefs: rawSourceRefs,
+  };
+  const children = [...(parent.children ?? [])];
+  const existingIndex = children.findIndex((step) =>
+    step.parentToolUseId === parentToolUseId
+    && step.stepIndex !== undefined
+    && step.stepIndex === childStep.stepIndex);
+  if (existingIndex >= 0) children[existingIndex] = childStep;
+  else children.push(childStep);
+  children.sort((a, b) =>
+    (a.stepIndex ?? Number.MAX_SAFE_INTEGER) - (b.stepIndex ?? Number.MAX_SAFE_INTEGER));
+  const status = workerStatus(payload.status ?? parent.subAgent?.status ?? parent.status);
+  return {
+    parent: {
+      ...parent,
+      parentToolUseId,
+      children,
+      subAgent: {
+        runId: payload.runId ?? parent.subAgent?.runId,
+        capabilityKey: payload.capabilityKey ?? parent.subAgent?.capabilityKey,
+        status,
+        summary: typeof payload.summary === 'string'
+          ? payload.summary.slice(0, 500)
+          : parent.subAgent?.summary,
+      },
+    },
+    sources: normalizeWorkerSourceRefs(rawSourceRefs),
+  };
+};
+
 const toAgentStep = (step: AgentDelegationStepRow, childRun?: AgentDelegationRunWithSteps): AgentStep => ({
   stepIndex: step.step_index ?? undefined,
   stepType: step.tool_name === 'delegate_to_sub_agent' ? 'sub_agent' : step.step_type ?? undefined,
@@ -665,37 +790,12 @@ export const sendUserMessage = async (
         ensureStepActivity(payload.stepIndex);
         publishSteps();
       }
-      if (event === 'sub_agent_step' && typeof payload.parentStepIndex === 'number' && payload.step) {
+      if (event === 'sub_agent_step' && typeof payload.parentStepIndex === 'number') {
         const current = liveAgentSteps.get(payload.parentStepIndex);
-        if (current) {
-          const rawStep = payload.step as Record<string, any>;
-          const childStep: AgentStep = {
-            stepIndex: rawStep.step_index,
-            stepType: rawStep.step_type,
-            title: rawStep.title,
-            summary: rawStep.summary,
-            tool: rawStep.tool_name ?? rawStep.title ?? 'Sub-agent step',
-            input: rawStep.input_summary ?? {},
-            output: outputToString(rawStep.output_summary ?? rawStep.summary ?? ''),
-            status: rawStep.status ?? 'completed',
-            parentToolUseId: payload.parentToolUseId,
-            sourceRefs: rawStep.source_refs ?? [],
-          };
-          const children = [...(current.children ?? [])];
-          const existingIndex = children.findIndex((step) => step.stepIndex === childStep.stepIndex);
-          if (existingIndex >= 0) children[existingIndex] = childStep;
-          else children.push(childStep);
-          children.sort((a, b) => (a.stepIndex ?? 0) - (b.stepIndex ?? 0));
-          liveAgentSteps.set(payload.parentStepIndex, {
-            ...current,
-            children,
-            subAgent: {
-              runId: payload.runId ?? current.subAgent?.runId,
-              capabilityKey: payload.capabilityKey ?? current.subAgent?.capabilityKey,
-              status: payload.status ?? current.subAgent?.status ?? 'running',
-              summary: current.subAgent?.summary,
-            },
-          });
+        const applied = applySubAgentStepEvent(current, payload);
+        if (applied.parent) {
+          liveAgentSteps.set(payload.parentStepIndex, applied.parent);
+          mergeLiveSources(applied.sources);
           publishSteps();
         }
       }
@@ -729,6 +829,9 @@ export const sendUserMessage = async (
             : undefined,
           children: current?.children,
         });
+        if ((payload.stepType ?? current?.stepType) === 'sub_agent') {
+          mergeLiveSources(normalizeWorkerSourceRefs(payload.sourceRefs ?? []));
+        }
         ensureStepActivity(payload.stepIndex);
         publishSteps();
       }

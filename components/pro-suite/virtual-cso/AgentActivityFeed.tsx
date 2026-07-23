@@ -1,6 +1,11 @@
 import React from 'react';
 import { Check, ChevronRight, CircleAlert, LoaderCircle } from 'lucide-react';
-import type { AgentActivityItem, AgentStep } from '../../../lib/virtualCsoApi';
+import {
+  buildNestedWorkerGroups,
+  type AgentActivityItem,
+  type AgentStep,
+  type NestedWorkerGroup,
+} from '../../../lib/virtualCsoApi';
 
 interface AgentActivityFeedProps {
   items?: AgentActivityItem[];
@@ -33,40 +38,57 @@ const StepStatusIcon: React.FC<{ status?: string }> = ({ status }) => {
   );
 };
 
-const NestedWorkerSteps: React.FC<{ steps: AgentStep[] }> = ({ steps }) => (
-  <ol className="mt-3 space-y-2 border-l border-[var(--aos-mist)] pl-3" aria-label="Worker activity">
-    {steps.map((child, index) => {
+const NestedWorkerSteps: React.FC<{ group: NestedWorkerGroup }> = ({ group }) => (
+  <ol
+    className="mt-3 space-y-2 border-l border-[var(--aos-mist)] pl-3"
+    aria-label={`${group.title} activity`}
+    data-parent-tool-use-id={group.parentToolUseId}
+  >
+    {group.steps.map((child, index) => {
       const labels = sourceLabels(child);
       return (
-        <li key={`${child.parentToolUseId ?? 'worker'}-${child.stepIndex ?? index}`} className="flex gap-2.5">
-          <span className="mt-0.5 shrink-0"><StepStatusIcon status={child.status} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs font-medium text-[var(--fg-2)]">
-              {child.title ?? child.tool}
-            </span>
-            {child.summary && (
-              <span className="mt-0.5 block text-xs leading-5 text-[var(--fg-3)]">{child.summary}</span>
-            )}
-            {labels.length > 0 && (
-              <span className="mt-1.5 flex flex-wrap gap-1.5" aria-label="Worker sources">
-                {labels.map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full border border-[var(--aos-sage)] bg-[var(--aos-sage-soft)] px-2 py-0.5 text-[10px] text-[var(--fg-3)]"
-                  >
-                    {label}
-                  </span>
-                ))}
+        <li key={`${group.parentToolUseId}-${child.stepIndex ?? index}`}>
+          <details className="group/child rounded-[var(--radius-xs)] bg-[var(--bg-sunken)]">
+            <summary className="flex cursor-pointer list-none items-start gap-2.5 px-2.5 py-2 marker:content-none">
+              <span className="mt-0.5 shrink-0"><StepStatusIcon status={child.status} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium text-[var(--fg-2)]">
+                  {child.title ?? child.tool}
+                </span>
+                {child.summary && (
+                  <span className="mt-0.5 block truncate text-xs text-[var(--fg-3)]">{child.summary}</span>
+                )}
               </span>
-            )}
-          </span>
+              <ChevronRight
+                size={12}
+                className="mt-0.5 shrink-0 text-[var(--fg-4)] transition-transform group-open/child:rotate-90"
+              />
+            </summary>
+            <div className="border-t border-[var(--aos-mist)] px-2.5 pb-2.5 pt-2">
+              <p className="text-xs leading-5 text-[var(--fg-3)]">
+                {child.summary ?? `${child.title ?? child.tool} ${child.status ?? 'completed'}.`}
+              </p>
+              {labels.length > 0 && (
+                <span className="mt-1.5 flex flex-wrap gap-1.5" aria-label="Worker sources">
+                  {labels.map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full border border-[var(--aos-sage)] bg-[var(--aos-sage-soft)] px-2 py-0.5 text-[10px] text-[var(--fg-3)]"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </div>
+          </details>
         </li>
       );
     })}
   </ol>
 );
 
-const StepChip: React.FC<{ step: AgentStep }> = ({ step }) => {
+const StepChip: React.FC<{ step: AgentStep; workerGroup?: NestedWorkerGroup }> = ({ step, workerGroup }) => {
   const labels = sourceLabels(step);
   const statusLabel = step.status === 'running'
     ? 'In progress'
@@ -75,7 +97,10 @@ const StepChip: React.FC<{ step: AgentStep }> = ({ step }) => {
       : 'Complete';
 
   return (
-    <details className="group min-w-0 rounded-[var(--radius-sm)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft-1)] open:border-[var(--aos-sage)]">
+    <details
+      className="group min-w-0 rounded-[var(--radius-sm)] border border-[var(--aos-mist)] bg-[var(--bg-surface)] shadow-[var(--shadow-soft-1)] open:border-[var(--aos-sage)]"
+      data-parent-tool-use-id={workerGroup?.parentToolUseId}
+    >
       <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2.5 text-left marker:content-none">
         <StepStatusIcon status={step.status} />
         <span className="min-w-0 flex-1">
@@ -112,13 +137,17 @@ const StepChip: React.FC<{ step: AgentStep }> = ({ step }) => {
             ))}
           </div>
         )}
-        {step.children && step.children.length > 0 && <NestedWorkerSteps steps={step.children} />}
+        {workerGroup && workerGroup.steps.length > 0 && <NestedWorkerSteps group={workerGroup} />}
       </div>
     </details>
   );
 };
 
 export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({ items, steps }) => {
+  const workerGroups = buildNestedWorkerGroups(steps);
+  const workerGroupsByParentId = new Map(
+    workerGroups.map((group) => [group.parentToolUseId, group]),
+  );
   const stepsByIndex = new Map(
     steps
       .filter((step) => typeof step.stepIndex === 'number')
@@ -146,7 +175,17 @@ export const AgentActivityFeed: React.FC<AgentActivityFeedProps> = ({ items, ste
           );
         }
         const step = item.stepIndex === undefined ? undefined : stepsByIndex.get(item.stepIndex);
-        return step ? <StepChip key={item.id} step={step} /> : null;
+        return step
+          ? (
+              <StepChip
+                key={item.id}
+                step={step}
+                workerGroup={step.parentToolUseId
+                  ? workerGroupsByParentId.get(step.parentToolUseId)
+                  : undefined}
+              />
+            )
+          : null;
       })}
     </div>
   );
