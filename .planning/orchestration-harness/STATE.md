@@ -4,8 +4,8 @@
 
 ## Current Focus
 
-**04B PHASE D2 · SDK-M3 — RELIABLE/CLOSED ON BOTH GATES; AT STOP-AND-REVIEW** (2026-07-23). Deployed
-backend `2370c48f`, `/api/health ok=true`; the v0.6.104 frontend fix is on Vercel.
+**04B PHASE D2 · SDK-M3 — RELIABLE/CLOSED ON BOTH GATES, CARRIES OBSERVED; AT STOP-AND-REVIEW**
+(2026-07-23). Deployed backend `33fcde21`, `/api/health ok=true`; frontend on Vercel.
 
 **Gate 1 — delegation reliability CLOSED (5/5).** Model-driven delegation met the Process Rule 10 bar:
 five consecutive passing runs on a PINNED anchor — 15 Task delegations all allowed on the first attempt
@@ -19,20 +19,27 @@ now minted per `(turn, capability)`, so the existing scope check refuses a cross
 authorization logic. Unit-proven; live evidence is *negative* (no run attempted a cross-worker call, so
 the guard has not been observed firing).
 
-**Gate 2 — founder-visible delivery CLOSED on London's ruling (2026-07-23)** on code + canary-1
-substance. A dark stream-disconnect injection reproduced run 4's shape on demand (backend completed and
-persisted, 33 citations), and the **stream keepalive is now OBSERVED** firing 11× in
-`agent_delegation_runs.metadata` (v0.6.103). The injection also found the v0.6.100 Defect-8 fix was
-incomplete — it missed the *thrown* network-error disconnect shape a killed connection produces — and
-that is **fixed in v0.6.104** so both shapes reach the record-backed recovery. Honest carries: the
-v0.6.104 in-flight recovery is not yet *observed* running (canary 1 recovered via a page reload, which
-bypasses it); zero-click recovery is inherently limited to post-persistence disconnects (persistence is
-the turn's last step); run 4's disconnect *cause* is undetermined (not chased, per founder); child usage
-attribution collapses onto one child (pre-existing, M4).
+**Gate 2 — founder-visible delivery CLOSED, every claim observation-backed (2026-07-23).** A dark
+stream-disconnect injection reproduced run 4's shape on demand (backend persisted, 33 citations) and the
+**stream keepalive is OBSERVED** firing 11× in `agent_delegation_runs.metadata` (v0.6.103). The injection
+also found the v0.6.100 Defect-8 fix was incomplete — it missed the *thrown* network-error disconnect shape
+a killed connection produces — **fixed in v0.6.104**. A second injection canary then **observed both
+carries**: the **in-flight recovery was watched firing** (drop-done withheld the answer tokens + `done`;
+founder confirmed the cited answer "appeared all at once after a pause," no reload) and the **Defect-7 guard
+was watched refusing** a cross-worker call (`cross_worker_probe decision=refused`). Remaining honest notes,
+not blockers: zero-click recovery is inherently limited to post-persistence disconnects (persistence is the
+turn's last step); run 4's disconnect *cause* is undetermined (not chased); child usage attribution
+collapses onto one child (pre-existing, M4).
 
-`vcso_sdk_loop` is **dark**, both allowlists empty, `native_model_driven_enabled=false`, all three
-diagnostic sub-flags (disconnect / fault / single-worker) off; `vcso_planner` dark/retired; Path A
-untouched as the fallback. M4 and Phases E/F/G are **not started**. Evidence:
+**The next gate is GENERALIZATION, not the flag flip.** D2 proved delegation on ONE pinned anchor shape +
+a simple control; the lead's delegation quality across varied strategic questions is unproven — Phase-G's
+job, not done. Wider founder exposure without it is a bet on unproven generalization. Founder's direction
+(2026-07-23): carries closed ✓ → prove generalization via a controlled question-*shape* expansion on the
+dark canary → only then widen the founder gate.
+
+`vcso_sdk_loop` is **dark**, both allowlists empty, `native_model_driven_enabled=false`, ALL diagnostic
+sub-flags (disconnect / drop-done / cross-worker-probe / fault / single-worker) off; `vcso_planner`
+dark/retired; Path A untouched as the fallback. M4 and Phases E/F/G are **not started**. Evidence:
 `phases/04B-vcso-sdk-migration/04B-D2-M3-COMPLETION.md` and `04B-D2-M3-CANARY-RUNBOOK.md` (Gate-2 section).
 
 ---

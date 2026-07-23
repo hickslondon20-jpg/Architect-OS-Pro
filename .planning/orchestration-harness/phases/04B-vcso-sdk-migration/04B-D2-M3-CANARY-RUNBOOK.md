@@ -475,3 +475,58 @@ the completion doc must not overstate it.
 bare unguided error; they are shown the answer or correctly guided to reopen (where it appears once
 persisted). Zero-click no-reopen delivery is inherently limited to disconnects that occur after
 persistence, which is the turn's last step.
+
+---
+
+## Injection canary 2 — 2026-07-23, deployed `33fcde21`, `ok=true` · BOTH carries CLOSED, observed
+
+Armed founder-only with **two** dark sub-flags: `diagnostic_stream_drop_done_enabled` (late-cut, in-flight
+recovery) and `diagnostic_cross_worker_probe_enabled` (Defect-7 guard), model_driven on, the early-cut
+`diagnostic_stream_disconnect_enabled` explicitly **off**. Re-darkened (all sub-flags) and both flags read
+back off before evidence.
+
+**Backend clean.** Parent `6c800bbc-5673-483d-aa03-8e378b2ee373` completed in 204.3s; three children all
+completed (structured `e15ad579` 0.5s → sandbox `4673834a` **107.3s** → wiki `a732b6c7` 2.2s). Answer
+persisted **5,770 chars, 33 citations**. `worker_token_scoping tokens=3`. Keepalive observed again
+(`first idle_seconds=10.0`, `total count=11`).
+
+### Carry #2 — Defect 7 guard WATCHED refusing · **CLOSED (definitive, DB-observed)**
+
+Lifecycle entry:
+```
+cross_worker_probe  decision=refused  capability_key=sandbox_execution_agent
+  reason_code="structured_data_agent_token->sandbox_execution_agent:
+               Capability sandbox_execution_agent is not permitted for this turn."
+```
+The probe minted a throwaway token scoped to `structured_data_agent` only and used it to call
+`run_sandbox_execution_agent` — the exact Canary-10a cross-worker shape — and the existing scope check
+**refused it before any orchestrator work**. Defect 7's evidence is no longer negative ("no run attempted
+it"); the guard is observed rejecting a real attempt.
+
+**Probe isolation confirmed.** The real `worker_hop` drain shows `sandbox_execution_agent` with exactly
+one `received`+`completed` pair (the real 107s worker) and **no** spurious probe entry — the throwaway
+empty-diagnostics token kept the probe out of the real evidence, as designed. (The one extra
+`received structured_data_agent` with no second child is the pre-existing v0.6.84 dedupe pattern — a
+re-sent CLI `tools/call`, coalesced; child count is exactly 3, same benign shape as Canary 9-retry.)
+
+### Carry #1 — in-flight recovery WATCHED firing · **CLOSED (observed)**
+
+`diagnostic_stream_drop_done_enabled` was verified armed, so the route withheld the answer `token`s and the
+terminal `done` while keeping the keepalives flowing (connection stayed alive → clean end-of-stream, answer
+persisted, no `done`). The founder confirmed the **recovery signature**: *"appeared all at once after a
+pause"* — steps completed, a pause with no answer text, then the full cited answer materialised in one go.
+Because the tokens were withheld from the stream, the answer could only have reached the screen via the
+Defect-8 in-flight recovery fetching the persisted record — **no reload**. This is the observation canary 1
+lacked (there the founder recovered by a manual page reload, bypassing the code).
+
+**Path note (honest):** this exercises the **clean-EOF** recovery entry (v0.6.100), which the drop-done
+mode produces deterministically. The **thrown-error** entry (v0.6.104) was exercised by canary 1 (which
+showed the pre-fix bare "network error") and is now covered by the fix + unit tests. Both recovery entry
+points are therefore accounted for — one observed live, one observed occurring-then-fixed-and-unit-tested.
+
+### Net
+
+**Gate 2 delivery is now closed on live observation, not just code + inference.** Keepalive observed
+(canary 1 + 2), Defect-7 guard observed refusing (canary 2), in-flight recovery observed delivering
+(canary 2). Total Gate-2 spend: **2 canaries** (~$0.30). D2 is reliable/closed on both gates with every
+Gate-2 claim now backed by observation.

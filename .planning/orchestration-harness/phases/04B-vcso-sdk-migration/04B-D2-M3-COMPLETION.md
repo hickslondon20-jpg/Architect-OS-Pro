@@ -1,10 +1,10 @@
 # 04B Phase D2 · SDK-M3 — Completion
 
-**Date:** 2026-07-22 (Gate 1) · 2026-07-23 (Gate 2) · **Deployed backend at close:** `2370c48f`
-(`/api/health ok=true`); the v0.6.104 frontend fix is on Vercel.
+**Date:** 2026-07-22 (Gate 1) · 2026-07-23 (Gate 2 + carries observed) · **Deployed backend at close:**
+`33fcde21` (`/api/health ok=true`); frontend on Vercel.
 **Flag state at close:** `vcso_sdk_loop` **dark**, both allowlists `[]`, `native_model_driven_enabled=false`,
-diagnostic sub-flags (disconnect / fault / single-worker) all off; `vcso_planner` dark/retired. Read back
-off after the final turn.
+ALL diagnostic sub-flags (disconnect / drop-done / cross-worker-probe / fault / single-worker) off;
+`vcso_planner` dark/retired. Read back off after the final turn.
 **Plan:** `04B-D2-M3-PLAN.md` · **Run evidence:** `04B-D2-M3-CANARY-RUNBOOK.md` (per-run detail, final
 tally, and the Gate-2 injection-canary section)
 
@@ -91,25 +91,30 @@ could not either. This is the migration's original intent, evidenced.
 
 ## Honest limits — read these before treating anything as closed
 
-1. **Defect 7's guard has never been seen firing.** Per-capability tokens are live on all five runs
-   (`worker_token_scoping tokens=3`) and no cross-worker call occurred in 15 worker tool calls — versus
-   Canary 9-retry and 10a, which each showed one. But **no run attempted a cross-worker call**, so the
-   refusal path is proven only by unit test. The live evidence is *negative* (the leak stopped), which is
-   what a closed gap should look like, and is not the same as watching the lock reject an attempt.
+1. ~~**Defect 7's guard has never been seen firing.**~~ **CLOSED — now observed (2026-07-23, injection
+   canary 2).** A dark `cross_worker_probe` used `structured_data_agent`'s per-capability token to call
+   `run_sandbox_execution_agent` (the exact Canary-10a shape) and the scope check **refused it**, recorded
+   as `cross_worker_probe decision=refused ... "Capability sandbox_execution_agent is not permitted for
+   this turn."` The guard is watched rejecting a real attempt; the earlier negative evidence is upgraded to
+   a positive observation. Probe isolation confirmed (no spurious `worker_hop` entry).
 
 2. **The stream keepalive is now OBSERVED** (updated 2026-07-23). The Gate-2 delivery pass made it
    report to the lifecycle sink; the injection canary recorded it firing **11×** in
    `agent_delegation_runs.metadata`. What remains unobserved is the v0.6.104 **in-flight recovery** code
    itself — canary 1 recovered via a normal page reload, which bypasses it (see limit 3).
 
-3. **Gate 2 is closed on founder ruling, with the in-flight recovery unobserved.** London accepted Gate 2
-   on code + canary-1 substance (2026-07-23). Proven: the backend persists on a real disconnect (canary 1,
-   33 citations), the answer is never lost, and both disconnect shapes (clean EOF + thrown network error)
-   now reach the record-backed recovery (v0.6.100 + v0.6.104). **Not** claimed: the v0.6.104 in-flight
-   recovery has not been watched running, and — because persistence is the turn's last step — zero-click
-   recovery is inherently limited to post-persistence disconnects. Run 4's early-disconnect **cause**
-   remains undetermined and unreproduced; Defect 8's fix addresses the consequence (a lost/misreported
-   answer), not the cause.
+3. **Gate 2 is closed, and the in-flight recovery is now OBSERVED (2026-07-23, injection canary 2).**
+   London first accepted Gate 2 on code + canary-1 substance, then approved one more canary to *watch* the
+   recovery fire (the discipline this session earned). With `diagnostic_stream_drop_done_enabled` armed the
+   route withheld the answer tokens + terminal `done` (keepalives kept the connection alive → clean EOF,
+   answer persisted, no `done`), and the founder confirmed the recovery signature — the cited answer
+   **"appeared all at once after a pause," no reload**. Since the tokens were withheld from the stream, the
+   answer could only have arrived via the Defect-8 recovery fetching the record. This exercises the
+   **clean-EOF** recovery entry (v0.6.100); the **thrown-error** entry (v0.6.104) was exercised by canary 1
+   (pre-fix bare error) and is covered by the fix + unit tests — both entries accounted for. Still true and
+   unchanged: zero-click recovery is inherently limited to post-persistence disconnects (persistence is the
+   turn's last step), and run 4's early-disconnect **cause** remains undetermined (not chased, per founder);
+   Defect 8 handles the consequence.
 
 4. **The effort-scaling control is app-gated.** A lookup/shallow intent never reaches the model-driven
    branch, so the control evidences **system-level** restraint, not model-level. The model-level claim
@@ -142,9 +147,10 @@ defaults flipped; the harness-root `ROADMAP.md` not edited.
 
 | Item | Where |
 |---|---|
+| ~~Defect 8 in-flight recovery unobserved~~ | **CLOSED** — observed, injection canary 2 (drop-done) |
+| ~~Defect 7 refusal never observed live~~ | **CLOSED** — observed, injection canary 2 (cross-worker probe refused) |
 | **Run-4 disconnect cause** — undetermined, unreproduced | not chased (founder call); Defect 8 recovery makes it non-fatal |
-| **Defect 8 in-flight recovery unobserved live** | a `drop-done` injection variant would observe zero-click recovery (deferred; founder declined the extra canary) |
-| **Defect 7 refusal never observed live** | consider a dark diagnostic that deliberately attempts a cross-worker call |
+| **GENERALIZATION unproven** (delegation shown on ONE anchor shape + a control) | **the true gate before wider founder exposure** — Phase-G-shaped; controlled question-shape expansion, not question count |
 | **Child usage attribution collapse** | M4 |
 | Item 2(a) fault-injection rescue (`after_completion`) — still owed | was blocked behind Defect 7; now unblocked |
 | Progress-bridge full C2 surface | M4 |
@@ -153,10 +159,18 @@ defaults flipped; the harness-root `ROADMAP.md` not edited.
 
 ## STOP-and-review
 
-**D2 is reliable/closed on both gates** — Gate 1 (delegation reliability) at 5/5, Gate 2 (founder-visible
-delivery) on London's 2026-07-23 ruling. **M3 and the Gate-2 delivery pass stop here.** M4, and Phases
-E / F / G, are **not started**. The flag is dark and both allowlists are empty; the three diagnostic
-sub-flags (disconnect, fault, single-worker) are off; `vcso_planner` untouched. Deployed backend
-`2370c48f`; the v0.6.104 frontend fix is on Vercel. Next decision is London's: whether D2-closed clears
-the flag for a wider (still-founder-gated) exposure, or whether the unobserved-in-flight-recovery and
-undetermined-disconnect-cause items should be burned down first.
+**D2 is reliable/closed on both gates, with every Gate-2 claim now backed by live observation** — Gate 1
+(delegation reliability) at 5/5; Gate 2 (founder-visible delivery) with keepalive observed (canary 1+2),
+Defect-7 guard observed refusing (canary 2), and in-flight recovery observed delivering (canary 2). Total
+Gate-2 spend: 2 canaries (~$0.30). **M3 and the Gate-2 delivery pass stop here.** M4 and Phases E / F / G
+are **not started**. Flag dark, all allowlists empty, all diagnostic sub-flags off, `vcso_planner`
+untouched, Path A intact, harness-root `ROADMAP.md` not edited.
+
+**The next gate is NOT the flag flip — it is GENERALIZATION.** D2 proved delegation reliability on **one**
+pinned anchor shape plus a simple control; it did **not** prove the lead delegates sensibly across varied
+strategic questions (different structures, different data needs). That is Phase-G's job and it has not
+happened. Wider founder exposure without it is a bet on unproven generalization — the "a green thin-slice
+doesn't mean it generalizes" trap flagged at the start of this work. **Recommended sequence (founder's
+2026-07-23 direction):** (1) carries closed ✓; (2) prove generalization via a controlled expansion of
+question *shapes* on the dark canary before any beta founder asks an unrehearsed one; (3) only then widen
+the founder gate. Next decision is London's: scope the generalization pass, or hold.
