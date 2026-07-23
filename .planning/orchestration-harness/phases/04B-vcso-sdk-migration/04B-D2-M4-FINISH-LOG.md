@@ -1,7 +1,8 @@
 # 04B Phase D2 · SDK-M4 — Finish log
 
-**Status:** OPEN — Canary 1 found a founder-surface completion defect; fixed in code, live re-proof
-requires a new London GO. D2 is **not yet recorded done on M1–M5**.
+**Status:** CLOSED — the authorized surface re-proof held through completion, and the M4.1 zero-canary
+reload verification passed on deployed `20f8ca1c` (`v0.6.113`). D2 is **done on M1–M5**: operational,
+a step beyond MVP. The flag remains dark; generalization remains Phase G.
 
 ## Canary 1 — 2026-07-23
 
@@ -79,7 +80,64 @@ Verification after repair:
 - production frontend build: passed
 - `git diff --check`: passed
 
-No second canary was run: the hand-off authorizes one dark founder canary followed by London review.
+No second canary was run at this point: the hand-off authorized one dark founder canary followed by
+London review.
+
+## Authorized surface re-proof — 2026-07-23
+
+London authorized exactly one M4 surface-completion re-proof on deployed `f7e2ad3c`. The pinned anchor
+was sent once from the signed-in founder account. Cost attribution and tiers were deliberately not
+re-proven; Canary 1 had already closed those observations.
+
+Observed before reload:
+
+- all three nested worker groups rendered in flight;
+- all three remained grouped at completion instead of reverting to the flat trace;
+- SOURCES populated from cited worker findings;
+- no raw payloads or chain-of-thought appeared.
+
+The authorized reload then exposed one remaining defect: the persisted steps retained all three
+`parent_tool_use_id` values, but thread loading cleared the live four-item plan, so the rail selected
+its legacy flat `8/8` reconstruction. Per the authorization, the run stopped with no retry. The flag
+was re-darkened immediately.
+
+Evidence:
+
+- `evidence/04B-D2-M4/reproof-in-flight.png`
+- `evidence/04B-D2-M4/reproof-after-reload-regression.png`
+
+## M4.1 reload repair + zero-canary verification
+
+`v0.6.113` (`20f8ca1c`) rebuilds the same four-item native-worker plan during ordinary thread loading
+from the persisted nested groups' `parent_tool_use_id` and capability keys. Ordinary non-nested SDK
+traces retain their existing flat treatment.
+
+Local verification:
+
+- focused nested-surface suite: 7 passed;
+- production frontend build: passed;
+- `git diff --check`: passed.
+
+Production verification used no new canary:
+
+- Vercel production deployment `dpl_BCQkAPVH24YEPVUBjT5vc8YCcAWq`: READY on `20f8ca1c`;
+- `/api/health`: `ok=true`, `commit_sha_short=20f8ca1c`;
+- `vcso_sdk_loop`: disabled, unenrolled, native mode off, every diagnostic sub-flag off;
+- `vcso_planner`: disabled and unenrolled;
+- the existing canary thread `bd034f8a-8cde-4057-ae93-a7f349559e97` was reloaded in the signed-in
+  founder browser without sending a message or arming any flag;
+- Progress reconstructed as `4/4`, in the original plan order, with all three completed worker groups:
+  `toolu_01E5LzRWgQLR6zgNJcDGvwwC`, `toolu_01FRcGQ26Sim9zSYajvmUgJn`,
+  `toolu_01Q7oicuzXJJ43ZZjEAUcNzJ`;
+- SOURCES retained 24 visible rows;
+- no raw payload or chain-of-thought text appeared.
+
+Passing evidence:
+
+- `evidence/04B-D2-M4/m4-1-after-reload-pass.png`
+
+M4 is closed. D2 is done on M1–M5. Generalization and the appropriateness rubric remain parked in
+Phase G; nothing widens past the dark canary until that gate clears.
 
 ## Version-log housekeeping — two `v0.6.89` commits
 
@@ -91,4 +149,3 @@ The historical collision remains explicitly recorded here for the M4 close:
 | `29742abe` | `v0.6.89` | Canary 9-retry PASS |
 
 The retry should have incremented. All M4 commits continue forward; no version is reused.
-

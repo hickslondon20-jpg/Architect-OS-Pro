@@ -4,43 +4,26 @@
 
 ## Current Focus
 
-**04B PHASE D2 · SDK-M3 — RELIABLE/CLOSED ON BOTH GATES, CARRIES OBSERVED; AT STOP-AND-REVIEW**
-(2026-07-23). Deployed backend `33fcde21`, `/api/health ok=true`; frontend on Vercel.
+**04B PHASE D2 — DONE ON M1–M5; OPERATIONAL, A STEP BEYOND MVP** (2026-07-23).
+Deployed `20f8ca1c` (`v0.6.113`); `/api/health ok=true`; Vercel production READY.
 
-**Gate 1 — delegation reliability CLOSED (5/5).** Model-driven delegation met the Process Rule 10 bar:
-five consecutive passing runs on a PINNED anchor — 15 Task delegations all allowed on the first attempt
-with zero denials, 15 worker child runs all completed, 15 worker tool calls each on the worker's own
-tool, correct tiers throughout (Haiku workers / Sonnet compose), cited answers every run. The delegation
-ORDER varied between runs while the sandbox-after-structured constraint held every time — the evidence
-that the lead reasons the decomposition rather than replaying a fixed sequence.
+M1 confirmed scoped SDK workers, M2 proved lead-driven model delegation, M3 closed the reliability and
+worker-isolation bars, M5 proved the checkpoint, and M4 closed the final surface/observability hold.
+The founder surface now preserves the same `4/4` grouped nested-worker plan in flight, at completion,
+and after ordinary thread reload. SOURCES remain populated; detail stays curated with no raw payloads
+or chain-of-thought. Worker usage rows and traces are attributable per child, with Haiku workers and
+Sonnet compose.
 
-**Defect 7 (worker subagents able to call each other's tools) is closed in code** — the worker token is
-now minted per `(turn, capability)`, so the existing scope check refuses a cross-worker call with no new
-authorization logic. Unit-proven; live evidence is *negative* (no run attempted a cross-worker call, so
-the guard has not been observed firing).
+M4.1's last-mile verification used no new canary: after the deployed health SHA matched, the existing
+signed-in founder thread was reloaded with the flag dark. All three persisted `parent_tool_use_id`
+groups reconstructed, 24 SOURCES rows remained visible, and no message was sent.
 
-**Gate 2 — founder-visible delivery CLOSED, every claim observation-backed (2026-07-23).** A dark
-stream-disconnect injection reproduced run 4's shape on demand (backend persisted, 33 citations) and the
-**stream keepalive is OBSERVED** firing 11× in `agent_delegation_runs.metadata` (v0.6.103). The injection
-also found the v0.6.100 Defect-8 fix was incomplete — it missed the *thrown* network-error disconnect shape
-a killed connection produces — **fixed in v0.6.104**. A second injection canary then **observed both
-carries**: the **in-flight recovery was watched firing** (drop-done withheld the answer tokens + `done`;
-founder confirmed the cited answer "appeared all at once after a pause," no reload) and the **Defect-7 guard
-was watched refusing** a cross-worker call (`cross_worker_probe decision=refused`). Remaining honest notes,
-not blockers: zero-click recovery is inherently limited to post-persistence disconnects (persistence is the
-turn's last step); run 4's disconnect *cause* is undetermined (not chased); child usage attribution
-collapses onto one child (pre-existing, M4).
-
-**The next gate is GENERALIZATION, not the flag flip.** D2 proved delegation on ONE pinned anchor shape +
-a simple control; the lead's delegation quality across varied strategic questions is unproven — Phase-G's
-job, not done. Wider founder exposure without it is a bet on unproven generalization. Founder's direction
-(2026-07-23): carries closed ✓ → prove generalization via a controlled question-*shape* expansion on the
-dark canary → only then widen the founder gate.
-
-`vcso_sdk_loop` is **dark**, both allowlists empty, `native_model_driven_enabled=false`, ALL diagnostic
-sub-flags (disconnect / drop-done / cross-worker-probe / fault / single-worker) off; `vcso_planner`
-dark/retired; Path A untouched as the fallback. M4 and Phases E/F/G are **not started**. Evidence:
-`phases/04B-vcso-sdk-migration/04B-D2-M3-COMPLETION.md` and `04B-D2-M3-CANARY-RUNBOOK.md` (Gate-2 section).
+`vcso_sdk_loop` is **dark**, both allowlists empty, `native_model_driven_enabled=false`, every diagnostic
+sub-flag off; `vcso_planner` is dark/retired; Path A remains intact. The next gate is **GENERALIZATION,
+not a flag flip**: Phase G owns question-shape expansion and the appropriateness rubric, and nothing
+widens past the dark canary until it clears. Mid-stream finding injection remains deferred; Phases E/F/G
+are not started. Evidence: `phases/04B-vcso-sdk-migration/04B-D2-M3-COMPLETION.md`,
+`04B-D2-M4-COMPLETION.md`, and `04B-D2-M4-FINISH-LOG.md`.
 
 ---
 
@@ -92,10 +75,9 @@ annotations remain off. Evidence:
 
 ## Current Phase
 
-**04B Phase D is implemented but its live checkpoint proof failed; Phase E is not started.** The
-deployed path remains dark. A narrowly scoped remediation must make the handler-backed native worker
-tools callable inside the SDK Task lifecycle, after which London must authorize another exact-anchor
-proof. Do not broaden question types or start Phase E before the Phase D gate passes.
+**04B Phase D2 is complete on M1–M5; Phase E is not started.** The deployed model-driven path is
+operational but remains dark. Do not broaden question types or begin Phase E/F/G as part of this close;
+the Phase G generalization gate must clear before wider founder exposure.
 
 The original **Phase 4 restart 2 failed at planner coverage (2026-07-15).** The sandbox-compute and child-tracing
 defects remain closed at worker level, but decomposition did not preserve the required structured-data

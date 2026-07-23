@@ -129,29 +129,19 @@ Sandbox real computation stays deferred (financial-series storage + MCP, Phase F
 (not the app) reasons and delegates; workers run; sandbox fires (working smoke); nested UI + traces +
 tiers intact; **STOP-and-review checkpoint.** Full plan: `04B-D2-PLAN.md`.
 
-**Status (2026-07-23): D2 reliable/closed on BOTH gates.** Gate 1 (delegation reliability) met the
-reliability bar — **5/5 consecutive passes on a pinned anchor** (15/15 delegations allowed first-try, zero
-denials; 15/15 workers completed; correct tiers). The load-bearing evidence is *not* the pass rate: the
-**delegation order varied run-to-run (structured→wiki→sandbox ×3, structured→sandbox→wiki ×2) while the
-sandbox-waits-for-structured dependency held every time** — the lead genuinely reasons the decomposition,
-which a hardcoded sequence or Path A cannot, and which D2 existed to restore, evidenced for the first time.
-**Defect 7 is closed in code** (per-`(turn,capability)` worker tokens; the existing scope check now refuses
-cross-worker calls; unit-proven — the guard has not been *seen* firing since no run attempted a
-cross-worker call). Effort-scaling holds both ways (app-gated → system-level restraint, not proof the model
-would self-restrain — a Phase-G question). **Gate 2 (founder-visible delivery) closed on London's ruling
-(2026-07-23)** on code + canary-1 substance: a dark stream-disconnect injection reproduced run 4's shape
-(backend persisted, 33 citations), the **keepalive is now OBSERVED firing 11× in the DB metadata**, and the
-Defect-8 recovery was found incomplete (it missed the *thrown*-error disconnect shape) and **fixed in
-v0.6.104** so both shapes reach recovery. **Both carries then CLOSED on live observation (2026-07-23,
-injection canary 2):** the in-flight recovery was **watched firing** (drop-done injection withheld the answer
-tokens + `done`; founder confirmed the cited answer "appeared all at once after a pause," no reload) and the
-Defect-7 guard was **watched refusing** a cross-worker call (`cross_worker_probe decision=refused`). Total
-Gate-2 spend 2 canaries (~$0.30). Remaining honest notes (not blockers): zero-click recovery is inherently
-limited to post-persistence disconnects; run 4's disconnect *cause* stays undetermined (not chased). **The
-next gate is GENERALIZATION, not the flag flip** — D2 proved delegation on ONE anchor shape + a control, not
-across varied strategic questions (Phase-G's job, not done). Nothing downstream (M4/E/F/G, any non-dark
-exposure) starts here — STOP-and-review. Plans: `04B-D2-M3-PLAN.md`; evidence: `04B-D2-M3-COMPLETION.md` +
-`04B-D2-M3-CANARY-RUNBOOK.md` (Gate-2 section).
+**Status (2026-07-23): D2 DONE ON M1–M5 — operational, a step beyond MVP.** M1 confirmed the scoped
+SDK worker mechanism; M2 proved lead-driven `Task` delegation; M3 closed the reliability, effort-scaling,
+contract, and worker-isolation bars; M5 proved the live checkpoint; and M4 now closes the last outstanding
+surface/observability hold. The full C2 worker surface renders grouped by `parent_tool_use_id`, survives
+completion and ordinary thread reload, retains cited SOURCES, and exposes curated summaries only. Each
+worker's usage and trace remain attributable to its own child run, with Haiku workers and Sonnet compose.
+The zero-canary reload proof passed on deployed `20f8ca1c` by reloading the existing signed-in founder
+thread; no flag arming or new turn occurred. `vcso_sdk_loop` is dark and unenrolled; Path A remains.
+Evidence: `04B-D2-M3-COMPLETION.md`, `04B-D2-M4-COMPLETION.md`, and `04B-D2-M4-FINISH-LOG.md`.
+
+**The next gate remains GENERALIZATION, not a flag flip.** D2 proved one pinned strategic question shape
+plus a direct-answer control. Phase G owns the controlled question-shape expansion and appropriateness
+rubric. Nothing widens past the dark canary until that clears; Phases E/F/G are not started here.
 
 ### Phase E — Sessions + Deep Mode reconciliation
 Map SDK **sessions** (resume/fork) onto Deep Mode: the `ask_user` pause/resume, the `agent_todos`
@@ -220,6 +210,7 @@ testing, **not** the operational M4 close. Nothing widens past the dark founder 
 | C2. Streaming surface redesign (UI/UX) | **Done — live canary + reload gate passed; flag dark** | 2026-07-15 |
 | D. Native subagents — P4 re-approach (checkpoint) | **Delegation plumbing proven via Path A (interim, v0.6.57–59); flag dark** | 2026-07-16 |
 | D2. Model-driven delegation (restore reasoning-driven selection) | **SDK-M2 CLOSED (2026-07-20, Canary 5 PASS, deployed `56c8d604`/v0.6.76). TIER 2 PROVEN ONCE — not yet reliable (2026-07-20, Canary 8 PASS on a **single** run, deployed `72ababb8`/v0.6.82) — full `structured → wiki → sandbox` three-worker chain proven live end-to-end, with the progress bridge (`sub_agent_step`) and app-owned findings-chaining, and a founder-visible cited answer (parent run `f0f5add5-c71f-476f-82e7-95a6d3187766`; four children all completed, all `Task allow` first-try / zero denials; sandbox ran 113s in-band under the 240s `MCP_TOOL_TIMEOUT`; 8,577-char / 33-citation answer, compose $0.1454). Flag re-darkened; `vcso_planner` retired. Backlog batch (v0.6.84–v0.6.91): items 1 (dispatch idempotency), 2b (partial-answer surface), 3 (`per_user_wiki` semantic-ranking) closed live; item 2a (fault-injection rescue) owed behind Defect 7. **Defect 7 — worker subagents can call each other's tools** (bounded-worker isolation lock violation, live and unseen through this Tier-2 close; the "duplicate `per_user_wiki`" above was actually a cross-worker call, not a dedupe artifact) **gates the flag's dark-exit; fix scoped into SDK-M3.** See `04B-D2-M2-FINISH-LOG.md` → "Canary 8" and `04B-D2-TIER2-CLOSE-HANDOFF.md`. Tiers 1 & 2 **proven once, not yet reliable** — delegation is 3 passes / 2 failures across five live runs with an uncontrolled anchor; **SDK-M3 is load-bearing** (effort-scaling + delegation contracts + Defect 7 dark-exit gate + pin-anchor instrumentation) and exits on a **reliability bar** (N consecutive delegations on a pinned anchor), not one run. — **SDK-M3 (2026-07-22, deployed `5041fa10`) MET THAT BAR. GATE 1 — DELEGATION RELIABILITY CLOSED at 5/5 consecutive passes on the PINNED anchor** (15 Task delegations, 15 allowed first attempt, ZERO denials; 15 child runs, 15 completed; 15 worker tool calls each on its own tool; correct tiers throughout; delegation ORDER varied run to run while the ordering constraint held every time - the lead reasons, it does not replay). **Defect 7 CLOSED in code** (per-`(turn, capability)` worker tokens; existing scope check now refuses cross-worker calls; unit-proven; live evidence is negative - no run attempted a cross-worker call, so the guard has not been seen firing). Effort-scaling proven both ways (anchor decomposed 5/5; paired control answered directly, zero children, $0.031 vs $0.133 - app-gated, so system-level not model-level restraint). Per-worker delegation contracts enforced. Instrumentation shipped: pinned anchor, stream keepalive (code-verified, NOT directly observed), cheap give-up, diagnostics drain in `try/finally`. **GATE 2 - FOUNDER-VISIBLE DELIVERY CLOSED on London's ruling (2026-07-23)** on code + canary-1 substance. A dark stream-disconnect injection (deployed `2370c48f`) reproduced run 4's shape on demand - backend completed and persisted the answer (33 citations) - and the **keepalive is now OBSERVED firing 11x in `agent_delegation_runs.metadata`** (v0.6.103 instrumentation; no Railway pull). The injection also FOUND that the v0.6.100 Defect-8 fix was incomplete (it only handled a clean stream end, not the *thrown* network error a killed connection produces, so the founder saw a bare "network error"); **fixed in v0.6.104** - both disconnect shapes now reach the record-backed recovery. **Both carries then CLOSED on live observation (2026-07-23, injection canary 2, deployed `33fcde21`):** the in-flight recovery was WATCHED firing (drop-done injection withheld the answer tokens + `done`; founder confirmed the cited answer "appeared all at once after a pause," no reload) and the Defect-7 guard was WATCHED refusing a cross-worker call (`cross_worker_probe decision=refused ... "Capability sandbox_execution_agent is not permitted for this turn."`, probe isolated so no spurious worker_hop). Total Gate-2 spend 2 canaries. Remaining honest notes (not blockers): zero-click recovery is inherently limited to post-persistence disconnects; run 4's disconnect CAUSE stays undetermined (not chased). **D2 reliable/closed on both gates, every Gate-2 claim now observation-backed. NEXT GATE IS GENERALIZATION, not the flag flip** — delegation proven on ONE anchor shape + a control, not across varied questions (Phase-G-shaped). Flag dark, all diagnostic sub-flags off; STOP-and-review with London. | 2026-07-23 |
+| D2 close addendum — SDK-M4 | **DONE ON M1–M5 — grouped nested surface and SOURCES hold in flight, at completion, and after zero-canary reload on deployed `20f8ca1c`; per-child attribution and tiers proven; flag dark. Operational, a step beyond MVP.** | 2026-07-23 |
 | E. Sessions + Deep Mode reconciliation | **Proposed — not started** | — |
 | F. First live MCP (QuickBooks) | **Proposed — not started** | — |
 | G. Generalize, verify, cut over | **Proposed — not started** | — |
