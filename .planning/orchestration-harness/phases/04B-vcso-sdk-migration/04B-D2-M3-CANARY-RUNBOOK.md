@@ -403,3 +403,55 @@ tool calls there was **not one cross-worker call** — versus Canary 9-retry and
 showed the sandbox subagent calling `run_structured_data_agent`. The refusal path itself is proven by
 unit test, not by canary: no run attempted a cross-worker call for the guard to reject.
 
+
+---
+
+# GATE 2 — DELIVERY CLOSE (injected-disconnect canaries)
+
+## Injection canary 1 — 2026-07-23, deployed `2370c48f`, `ok=true` · keepalive OBSERVED; Defect-8 gap FOUND
+
+Armed founder-only with the dark stream-disconnect injection (`diagnostic_stream_disconnect_enabled=true`,
+`after_events=8`) + model_driven. Re-darkened (injection sub-flag included) and both flags read back off
+before evidence.
+
+**Backend completed and persisted — run 4's shape, on demand.** Parent
+`99cf76c6-9e08-4391-9077-beca24981905` completed in **212.1s**; three children all completed
+(structured `0b51b7bb` 0.5s → sandbox `b7a7bba4` **109.8s** → wiki `8db7515f` 1.7s). Assistant message
+**persisted: 5,326 chars, 33 citations**, written 00:50:16 (~3.5 min after send).
+
+**Keepalive OBSERVED (item 1 closed).** The run's `metadata->sdk_native_lifecycle` now carries
+`stream_keepalive` entries: `stage=first idle_seconds=10.0` and `stage=total count=11`. The keepalive
+fired **11 times** during the turn's silent sandbox stretch — converting "code-verified, not observed" to
+**observed, in the DB**, with no Railway log pull. This is the durable evidence the instrumentation (v0.6.103)
+was built to produce.
+
+**What the founder saw — and the gap it exposed.** Setup steps rendered, the stream went silent, then the
+browser showed a bare **"network error"**; the full answer appeared only after a manual page reload.
+
+That is a **real defect in the v0.6.100 Defect-8 fix**, surfaced exactly as "observe, don't chase" intends:
+the recovery sat AFTER `parseSseStream` returned, so it only ran on a **clean EOF** without a `done` event.
+A silent connection **killed** by the edge/proxy — run 4's actual shape — throws a network error out of
+`reader.read()`, which **escaped past the recovery** and showed the bare error. **Fixed in v0.6.104**: the
+call is wrapped in try/catch and a thrown error now falls through to the same record-backed recovery.
+
+### The timing finding — why "in-flight, no-reopen" recovery is inherently limited
+
+Persistence is the **last** thing a turn does: the answer streams as tokens, then the assistant row is
+inserted, then `done` is emitted. So:
+
+- **Mid-turn death** (client cut early, e.g. N=8): the answer is **not persisted yet** at death-time
+  (here: death ~2 min, persist ~3.5 min). In-flight recovery finds nothing → the honest friendly copy
+  ("if the answer was saved it will appear when you reopen") stands → the answer appears on reopen. This is
+  the **correct** behavior — you cannot show an answer that isn't written yet.
+- **Late death** (client cut at/after persistence): the client has already received the answer content;
+  recovery merely finalizes it.
+
+**So the Defect-8 fix's real, achievable guarantee is:** the founder is **never falsely told the turn
+failed / "was not saved"** (run 4's harm) and **never shown a bare unguided "network error"** (v0.6.100's
+gap) — they are either shown the answer or correctly guided to it. It does **not**, and cannot, guarantee
+zero-click delivery for a mid-turn death, because the answer does not exist at that instant.
+
+**Honest note on canary 1's reopen:** the founder recovered the answer by a **page reload**, which is
+normal thread loading — **not** the Defect-8 in-flight code path. So canary 1 proves the answer persists
+and is never lost; it does **not** yet observe the v0.6.104 in-flight recovery running. That observation is
+what a confirming canary on the deployed fix would add.
