@@ -8,7 +8,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from claude_agent_sdk.types import AssistantMessage, ResultMessage, StreamEvent, ToolUseBlock
+from claude_agent_sdk.types import (
+    AssistantMessage,
+    DeferredToolUse,
+    ResultMessage,
+    StreamEvent,
+    ToolUseBlock,
+)
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -1987,3 +1993,131 @@ def test_cross_worker_probe_fires_and_records_a_refusal(monkeypatch):
     assert probes[0]["capability_key"] == "sandbox_execution_agent"
     # And no per-turn token is left reachable after the turn.
     assert TURN_REGISTRY.active_count() == 0
+
+
+def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(monkeypatch):
+    captured: dict[str, object] = {}
+    session_store = object()
+
+    async def fake_query(*, options, **_kwargs):
+        captured["options"] = options
+        pause_hook = options.hooks["PreToolUse"][0].hooks[0]
+        decision = await pause_hook(
+            {
+                "tool_name": "mcp__architectos__ask_user",
+                "tool_input": {"question": "Which market should I prioritize?"},
+            },
+            "tool-question-1",
+            None,
+        )
+        assert decision["hookSpecificOutput"]["permissionDecision"] == "defer"
+        yield StreamEvent(
+            uuid="answer-before-defer",
+            session_id="11111111-1111-1111-1111-111111111111",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "This must not reach the founder."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="11111111-1111-1111-1111-111111111111",
+            result="This must not reach the founder.",
+            deferred_tool_use=DeferredToolUse(
+                id="tool-question-1",
+                name="mcp__architectos__ask_user",
+                input={"question": "Which market should I prioritize?"},
+            ),
+        )
+
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="Start the deep task.",
+            system_prompt="System",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(user_id="founder-1"),
+            trace_metadata={"run_id": "run-pause"},
+            query_impl=fake_query,
+            session_store=session_store,
+            enable_ask_user_pause=True,
+        )
+    )
+
+    options = captured["options"]
+    assert options.session_store is session_store
+    assert options.session_store_flush == "batched"
+    assert not [event for event in events if event["event"] == "token"]
+    assert result.answer_text == ""
+    assert result.deferred_tool_use_id == "tool-question-1"
+    assert result.deferred_question == "Which market should I prioritize?"
+
+
+def test_deep_resume_allows_only_persisted_question_replay_and_emits_final_answer(monkeypatch):
+    captured: dict[str, object] = {}
+    session_store = object()
+
+    async def fake_query(*, prompt, options):
+        captured["options"] = options
+        assert prompt == "Prioritize healthcare."
+        pause_hook = options.hooks["PreToolUse"][0].hooks[0]
+        replay = await pause_hook(
+            {
+                "tool_name": "mcp__architectos__ask_user",
+                "tool_input": {"question": "Which market should I prioritize?"},
+            },
+            "tool-question-1",
+            None,
+        )
+        assert replay["hookSpecificOutput"]["permissionDecision"] == "allow"
+        yield StreamEvent(
+            uuid="final-answer",
+            session_id="11111111-1111-1111-1111-111111111111",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Healthcare is now the priority."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="11111111-1111-1111-1111-111111111111",
+            result="Healthcare is now the priority.",
+        )
+
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="Prioritize healthcare.",
+            system_prompt="System",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=_Registry(),
+            tool_names=[],
+            tool_context=ToolExecutionContext(user_id="founder-1"),
+            trace_metadata={"run_id": "run-resume"},
+            query_impl=fake_query,
+            session_store=session_store,
+            resume_session_id="11111111-1111-1111-1111-111111111111",
+            pending_ask_user_tool_use_id="tool-question-1",
+            enable_ask_user_pause=True,
+        )
+    )
+
+    options = captured["options"]
+    assert options.resume == "11111111-1111-1111-1111-111111111111"
+    assert options.fork_session is False
+    assert [event["data"]["text"] for event in events if event["event"] == "token"] == [
+        "Healthcare is now the priority."
+    ]
+    assert result.answer_text == "Healthcare is now the priority."

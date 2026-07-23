@@ -371,6 +371,7 @@ class VcsoChatRequest(BaseModel):
     linkedFolder: str | None = None
     projectId: str | None = None
     deepMode: bool = False
+    forkSessionId: str | None = None
 
 
 class VcsoCompactRequest(BaseModel):
@@ -1272,6 +1273,7 @@ def stream_vcso_chat(
                 linked_folder=payload.linkedFolder,
                 project_id=payload.projectId,
                 deep_mode=payload.deepMode,
+                fork_session_id=payload.forkSessionId,
             )
             # DARK, FOUNDER-ONLY stream rehearsals (04B-D2 Gate 2). Both inert unless the `vcso_sdk_loop`
             # diagnostic sub-flags name this founder, so every normal turn is byte-identical. One settings

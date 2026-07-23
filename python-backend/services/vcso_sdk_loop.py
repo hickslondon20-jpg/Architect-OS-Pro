@@ -223,6 +223,8 @@ class VcsoSdkTurnResult:
     compaction_count: int = 0
     turn_trace_emitted: bool = False
     usage_recorded: bool = False
+    deferred_tool_use_id: str | None = None
+    deferred_question: str | None = None
 
     @property
     def tool_step_count(self) -> int:
@@ -592,6 +594,11 @@ def stream_vcso_sdk_turn(
     native_fault_injection_mode_key: str = "before_start",
     native_cross_worker_probe: bool = False,
     founder_question: str | None = None,
+    session_store: Any | None = None,
+    resume_session_id: str | None = None,
+    fork_session: bool = False,
+    pending_ask_user_tool_use_id: str | None = None,
+    enable_ask_user_pause: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -629,6 +636,11 @@ def stream_vcso_sdk_turn(
                         native_fault_injection_mode_key=native_fault_injection_mode_key,
                         native_cross_worker_probe=native_cross_worker_probe,
                         founder_question=founder_question,
+                        session_store=session_store,
+                        resume_session_id=resume_session_id,
+                        fork_session=fork_session,
+                        pending_ask_user_tool_use_id=pending_ask_user_tool_use_id,
+                        enable_ask_user_pause=enable_ask_user_pause,
                     )
                 )
             )
@@ -1040,6 +1052,11 @@ async def _run_sdk_turn(
     native_fault_injection_mode_key: str = "before_start",
     native_cross_worker_probe: bool = False,
     founder_question: str | None = None,
+    session_store: Any | None = None,
+    resume_session_id: str | None = None,
+    fork_session: bool = False,
+    pending_ask_user_tool_use_id: str | None = None,
+    enable_ask_user_pause: bool = False,
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -1085,6 +1102,8 @@ async def _run_sdk_turn(
     stop_block_completed_watermark = 0
     task_denial_count = 0
     gave_up_early = False
+    deferred_ask_user: dict[str, str] | None = None
+    resumed_ask_user_consumed = False
 
     def record_lifecycle(event: str, **details: Any) -> None:
         """Persist bounded lifecycle facts without prompts, tool inputs, or model output."""
@@ -2092,6 +2111,44 @@ async def _run_sdk_turn(
             HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
             HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
         ]
+    if enable_ask_user_pause:
+        async def pause_or_resume_ask_user(
+            input_data: dict[str, Any],
+            tool_use_id: str | None,
+            _context: Any,
+        ) -> dict[str, Any]:
+            nonlocal deferred_ask_user, resumed_ask_user_consumed
+            current_id = str(tool_use_id or "")
+            if (
+                pending_ask_user_tool_use_id
+                and current_id == pending_ask_user_tool_use_id
+                and not resumed_ask_user_consumed
+            ):
+                resumed_ask_user_consumed = True
+                return {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "allow",
+                        "permissionDecisionReason": "Resume the persisted founder question exactly once.",
+                    }
+                }
+            question = str(input_data.get("tool_input", {}).get("question") or "").strip()
+            deferred_ask_user = {"id": current_id, "question": question}
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "defer",
+                    "permissionDecisionReason": "Wait for the founder response before continuing.",
+                }
+            }
+
+        hooks["PreToolUse"] = [
+            HookMatcher(
+                matcher=f"{SDK_TOOL_PREFIX}ask_user",
+                hooks=[pause_or_resume_ask_user],
+            ),
+            *(hooks.get("PreToolUse") or []),
+        ]
     native_prompt = (
         (
             _native_generalization_prompt(provisioned_agents)
@@ -2128,6 +2185,9 @@ async def _run_sdk_turn(
         enable_native_subagents=model_driven,
         native_subagent_tools=native_subagent_tools,
         model_driven_worker_server_urls=model_driven_worker_urls,
+        session_store=session_store,
+        resume_session_id=resume_session_id,
+        fork_session=fork_session,
     )
     options = compiled.options
     if native_mode and not model_driven:
@@ -2183,6 +2243,7 @@ async def _run_sdk_turn(
     total_cost_usd: Decimal | None = None
     session_id: str | None = None
     final_result_text: str | None = None
+    result_deferred_tool_use: Any | None = None
     diagnostics_drained = False
 
     def _drain_model_driven_diagnostics() -> None:
@@ -2245,11 +2306,15 @@ async def _run_sdk_turn(
                                 # A compute-sensitive answer is buffered until the deterministic final
                                 # seam can verify a successful, cited compute result. Narration and every
                                 # non-compute turn keep their existing real-time stream.
-                                if not (compute_integrity_required and channel == "answer"):
+                                if not (
+                                    (compute_integrity_required or enable_ask_user_pause)
+                                    and channel == "answer"
+                                ):
                                     events.put({"event": "token", "data": token_data})
             elif isinstance(message, ResultMessage):
                 session_id = message.session_id
                 final_result_text = message.result
+                result_deferred_tool_use = message.deferred_tool_use
                 usage = message.usage or {}
                 input_tokens = _usage_input_total(usage)
                 output_tokens = _usage_int(usage, "output_tokens", "outputTokens")
@@ -2292,7 +2357,10 @@ async def _run_sdk_turn(
             token_data = {"text": visible_text, "channel": channel, "sdkMode": True}
             if segment_id is not None:
                 token_data["segmentId"] = segment_id
-            if not (compute_integrity_required and channel == "answer"):
+            if not (
+                (compute_integrity_required or enable_ask_user_pause)
+                and channel == "answer"
+            ):
                 events.put({"event": "token", "data": token_data})
     finally:
         # DIAGNOSTICS SURVIVE FAILURE (SDK-M3 step A4). The worker_hop drain used to run only after a
@@ -2398,6 +2466,35 @@ async def _run_sdk_turn(
     if not turn_trace_emitted:
         _record_turn_trace(metadata=trace_metadata, status="completed")
         turn_trace_emitted = True
+    if result_deferred_tool_use is not None:
+        deferred_id = str(getattr(result_deferred_tool_use, "id", "") or "")
+        deferred_input = getattr(result_deferred_tool_use, "input", {}) or {}
+        deferred_question = str(deferred_input.get("question") or "").strip()
+        if deferred_ask_user:
+            deferred_id = deferred_id or deferred_ask_user["id"]
+            deferred_question = deferred_question or deferred_ask_user["question"]
+        if not session_id or not deferred_id or not deferred_question:
+            raise RuntimeError("SDK ask_user pause ended without a durable session, tool id, or question.")
+        return VcsoSdkTurnResult(
+            answer_text="",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_cost_usd=total_cost_usd,
+            session_id=session_id,
+            sources=source_refs,
+            tool_steps=sorted(trace_steps, key=lambda step: int(step.get("stepIndex") or 0)),
+            narration_segments=[
+                {"segmentId": segment_id, "text": text.strip()}
+                for segment_id, text in sorted(narration_by_segment.items())
+                if text.strip()
+            ],
+            worker_runs=[],
+            compaction_count=compaction_count,
+            turn_trace_emitted=turn_trace_emitted,
+            usage_recorded=usage_recorded,
+            deferred_tool_use_id=deferred_id,
+            deferred_question=deferred_question,
+        )
     answer_text = "".join(answer_parts).strip()
     if not answer_text and final_result_text:
         fallback_normalizer = _NarrationStreamNormalizer()
@@ -2435,7 +2532,7 @@ async def _run_sdk_turn(
         compute_required=compute_integrity_required,
         successful_cited_compute=successful_cited_compute,
     )
-    if compute_integrity_required:
+    if compute_integrity_required or enable_ask_user_pause:
         # No answer token from a compute-sensitive turn is founder-visible before this point.
         events.put(
             {

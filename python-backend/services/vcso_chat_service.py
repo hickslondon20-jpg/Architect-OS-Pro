@@ -56,6 +56,7 @@ from services.vcso_sdk_loop import (
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
 )
+from services.vcso_session_store import SupabaseVcsoSessionStore
 from services.wiki_read import WikiReadError, WikiReadService
 from services.doc_wiki_read_service import DocWikiReadError, DocWikiReadService
 
@@ -146,6 +147,7 @@ class VcsoChatPayload:
     linked_folder: str | None = None
     project_id: str | None = None
     deep_mode: bool = False
+    fork_session_id: str | None = None
 
 
 class VcsoChatService:
@@ -194,8 +196,34 @@ class VcsoChatService:
         self._resolve_model()
         thread = self._load_or_create_thread(user_id, payload)
         thread_id = str(thread["id"])
-        deep_mode = bool(payload.deep_mode)
-        resume_state = _deep_resume_state(thread) if deep_mode else None
+        pending_sdk_resume = bool(
+            thread.get("agent_status") == "waiting_for_user"
+            and thread.get("active_sdk_session_id")
+            and thread.get("sdk_pending_tool_use_id")
+        )
+        deep_mode = bool(payload.deep_mode or pending_sdk_resume)
+        sdk_flag = self._sdk_loop_settings(user_id)
+        sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
+        forced_sdk_fail_open = _sdk_force_fail_open(sdk_settings, user_id)
+        sdk_deep_mode = bool(deep_mode and sdk_flag.get("enabled") and not forced_sdk_fail_open)
+        sdk_resume_session_id = (
+            str(payload.fork_session_id)
+            if sdk_deep_mode and payload.fork_session_id
+            else str(thread.get("active_sdk_session_id") or "")
+            if sdk_deep_mode
+            else ""
+        )
+        sdk_fork_session = bool(sdk_deep_mode and payload.fork_session_id)
+        is_sdk_deep_resume = bool(
+            sdk_deep_mode
+            and not sdk_fork_session
+            and sdk_resume_session_id
+            and thread.get("agent_status") == "waiting_for_user"
+            and thread.get("sdk_pending_tool_use_id")
+        )
+        # Authority boundary: SDK Deep Mode never reads the legacy JSON resume payload.
+        # That payload remains byte-for-byte available to the dark fallback / Path A only.
+        resume_state = _deep_resume_state(thread) if deep_mode and not sdk_deep_mode else None
         is_deep_resume = bool(resume_state and thread.get("agent_status") == "waiting_for_user")
         if deep_mode:
             user_message = self._insert_message(thread_id, user_id, "user", payload.text, deep_mode=True)
@@ -203,7 +231,7 @@ class VcsoChatService:
             user_message = self._insert_message(thread_id, user_id, "user", payload.text)
         turn_intent: dict[str, Any] | None = None
         intent_flag = self._intent_read_settings(user_id)
-        if intent_flag["enabled"] and not is_deep_resume:
+        if intent_flag["enabled"] and not is_deep_resume and not is_sdk_deep_resume:
             try:
                 turn_intent = self._read_turn_intent(
                     user_id=user_id,
@@ -329,7 +357,12 @@ class VcsoChatService:
             for page in context["founder_pages"]
         ]
 
-        if is_deep_resume and resume_state:
+        if is_sdk_deep_resume:
+            run_id = str(thread.get("sdk_pending_run_id") or "")
+            if not run_id:
+                raise RuntimeError("SDK Deep Mode resume is missing its persisted run id.")
+            initial_trace_steps = self._load_run_trace_steps(run_id, user_id)
+        elif is_deep_resume and resume_state:
             run_id = str(resume_state.get("run_id") or "")
             if not run_id:
                 raise RuntimeError("Deep Mode resume state is missing its run id.")
@@ -402,7 +435,6 @@ class VcsoChatService:
             "capability_key": "vcso_chat",
         }
 
-        sdk_flag = self._sdk_loop_settings(user_id)
         native_required_agents = (
             native_subagent_requirements(
                 message=payload.text,
@@ -433,6 +465,8 @@ class VcsoChatService:
             if native_model_choice
             else "04B-D"
             if sdk_native_subagent_mode
+            else "04B-E"
+            if sdk_deep_mode
             else "04B-C"
         )
         # Tier 3 graceful-failure rehearsal: dark, founder-only, and only ever non-empty on a model-driven
@@ -457,6 +491,8 @@ class VcsoChatService:
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
         planner_path_selected = (
+            not deep_mode
+            and
             not sdk_native_subagent_mode
             and bool(planner_flag.get("enabled"))
             and planner_entry_allowed(turn_intent, planner_threshold)
@@ -618,11 +654,8 @@ class VcsoChatService:
             }
             return
 
-        sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
-        forced_sdk_fail_open = _sdk_force_fail_open(sdk_settings, user_id)
         sdk_mode = (
             bool(sdk_flag.get("enabled"))
-            and not deep_mode
             and not is_deep_resume
             and not planner_path_selected
             and not forced_sdk_fail_open
@@ -683,7 +716,7 @@ class VcsoChatService:
                             "metadata": {
                                 "output_schema_version": "vcso_tool_loop_v1",
                                 "reasoning_visibility": "summary_only",
-                                "deep_mode": False,
+                                "deep_mode": sdk_deep_mode,
                                 "sdk_native_lifecycle": snapshot,
                                 **sdk_run_attribution,
                             },
@@ -709,9 +742,41 @@ class VcsoChatService:
                     cost_usd=usage.total_cost_usd,
                 )
 
+            sdk_session_store = (
+                SupabaseVcsoSessionStore(
+                    self.supabase,
+                    user_id=user_id,
+                    thread_id=thread_id,
+                    turn_message_id=str(user_message["id"]),
+                )
+                if sdk_deep_mode
+                else None
+            )
+            if sdk_deep_mode:
+                persisted_todos = self._load_thread_todos(thread_id, user_id)
+                persisted_workspace = self._load_thread_workspace_metadata(thread_id, user_id)
+                yield {
+                    "event": "todos_updated",
+                    "data": {"todos": persisted_todos, "sdkMode": True, "rehydrated": True},
+                }
+                yield {
+                    "event": "workspace_updated",
+                    "data": {
+                        "files": persisted_workspace,
+                        "count": len(persisted_workspace),
+                        "sdkMode": True,
+                        "rehydrated": True,
+                    },
+                }
+
             sdk_result = yield from stream_vcso_sdk_turn(
-                prompt=context["prompt"],
-                system_prompt=VCSO_TOOL_LOOP_SYSTEM_PROMPT,
+                # A resumed or forked SDK session already owns prior conversation context.
+                # Re-injecting vcso_chat_messages here would create a second transcript authority.
+                prompt=payload.text if sdk_resume_session_id else context["prompt"],
+                system_prompt=(
+                    VCSO_TOOL_LOOP_SYSTEM_PROMPT
+                    + ("\n\n" + VCSO_DEEP_MODE_SYSTEM_PROMPT if sdk_deep_mode else "")
+                ),
                 model=self.model,
                 api_key=self.settings.anthropic_api_key_value,
                 registry=context["registry"],
@@ -726,8 +791,8 @@ class VcsoChatService:
                     metadata={
                         "tool_registry": context["registry"],
                         "surface": "virtual_cso",
-                        "tool_scope_surface": "virtual_cso",
-                        "deep_mode": False,
+                        "tool_scope_surface": "virtual_cso_deep" if sdk_deep_mode else "virtual_cso",
+                        "deep_mode": sdk_deep_mode,
                         "parent_message_id": user_message["id"],
                         "parent_run_id": run_id,
                         "sandbox_execution_service": _optional_sandbox_execution_service(self.supabase),
@@ -763,7 +828,82 @@ class VcsoChatService:
                 native_fault_injection_mode_key=native_fault_mode,
                 native_cross_worker_probe=native_cross_worker_probe,
                 founder_question=payload.text,
+                session_store=sdk_session_store,
+                resume_session_id=sdk_resume_session_id or None,
+                fork_session=sdk_fork_session,
+                pending_ask_user_tool_use_id=(
+                    str(thread.get("sdk_pending_tool_use_id") or "")
+                    if is_sdk_deep_resume
+                    else None
+                ),
+                enable_ask_user_pause=sdk_deep_mode,
             )
+            self._persist_sdk_trace_steps(run_id, user_id, sdk_result.tool_steps)
+            if sdk_result.deferred_tool_use_id:
+                if (
+                    sdk_session_store is None
+                    or not sdk_session_store.confirmed_persisted(sdk_result.session_id)
+                ):
+                    raise RuntimeError(
+                        "SDK Deep Mode refused to wait because its session was not durably flushed."
+                    )
+                question_step_index = max(
+                    [int(step.get("stepIndex") or 0) for step in [*initial_trace_steps, *sdk_result.tool_steps]]
+                    or [0]
+                ) + 1
+                self._create_step(
+                    run_id,
+                    user_id,
+                    question_step_index,
+                    step_type="human_input",
+                    title="Founder input requested",
+                    summary=str(sdk_result.deferred_question),
+                    input_summary={},
+                    output_summary={
+                        "status": "waiting_for_user",
+                        "question": sdk_result.deferred_question,
+                        "sdk_session_id": sdk_result.session_id,
+                    },
+                    tool_name="ask_user",
+                )
+                self._set_sdk_session_state(
+                    thread_id=thread_id,
+                    user_id=user_id,
+                    session_id=str(sdk_result.session_id),
+                    pending_tool_use_id=sdk_result.deferred_tool_use_id,
+                    pending_question=sdk_result.deferred_question,
+                    pending_run_id=run_id,
+                    status="waiting_for_user",
+                )
+                self._update_thread_count(
+                    thread_id,
+                    user_id,
+                    int(thread.get("message_count") or 0) + 1,
+                )
+                self._active_turn["trace_steps"] = [
+                    *initial_trace_steps,
+                    *sdk_result.tool_steps,
+                ]
+                self._active_turn["completed"] = True
+                yield {
+                    "event": "ask_user",
+                    "data": {
+                        "question": sdk_result.deferred_question,
+                        "threadId": thread_id,
+                        "toolUseId": sdk_result.deferred_tool_use_id,
+                        "agentStatus": "waiting_for_user",
+                        "sdkMode": True,
+                    },
+                }
+                yield {
+                    "event": "done_waiting",
+                    "data": {
+                        "chat": _chat_payload(self._get_thread(thread_id, user_id)),
+                        "agentStatus": "waiting_for_user",
+                        "sdkMode": True,
+                    },
+                }
+                return
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))
             )
@@ -773,6 +913,7 @@ class VcsoChatService:
                 "assistant",
                 sdk_result.answer_text,
                 token_count=sdk_result.output_tokens,
+                deep_mode=sdk_deep_mode,
                 citations=sdk_citations,
             )
             self._active_turn["assistant_message"] = assistant_message
@@ -807,7 +948,7 @@ class VcsoChatService:
                 run_metadata={
                     "output_schema_version": "vcso_tool_loop_v1",
                     "reasoning_visibility": "summary_only",
-                    "deep_mode": False,
+                    "deep_mode": sdk_deep_mode,
                     "sdk_native_lifecycle": final_sdk_lifecycle,
                     **sdk_run_attribution,
                 },
@@ -821,24 +962,6 @@ class VcsoChatService:
                 assistant_text=sdk_result.answer_text,
             )
             trace_steps = [*initial_trace_steps, *sdk_result.tool_steps]
-            for step in sdk_result.tool_steps:
-                try:
-                    persisted_output = json.loads(step.get("output") or "{}")
-                except (TypeError, json.JSONDecodeError):
-                    persisted_output = {}
-                self._create_step(
-                    run_id,
-                    user_id,
-                    int(step.get("stepIndex") or 0),
-                    step_type=str(step.get("stepType") or "tool_call"),
-                    title=str(step.get("title") or "SDK step"),
-                    summary=str(step.get("summary") or "SDK step complete."),
-                    input_summary={},
-                    output_summary=persisted_output,
-                    source_refs=step.get("sourceRefs") if isinstance(step.get("sourceRefs"), list) else [],
-                    tool_name=step.get("tool"),
-                    status="failed" if step.get("status") == "failed" else "completed",
-                )
             result_step = _result_trace_step(
                 step_index=max([int(step.get("stepIndex") or 0) for step in trace_steps] or [0]) + 1,
                 answer_chars=len(sdk_result.answer_text),
@@ -854,6 +977,16 @@ class VcsoChatService:
                 output_summary=json.loads(result_step["output"]),
             )
             trace_steps.append(result_step)
+            if sdk_deep_mode and sdk_result.session_id:
+                self._set_sdk_session_state(
+                    thread_id=thread_id,
+                    user_id=user_id,
+                    session_id=sdk_result.session_id,
+                    pending_tool_use_id=None,
+                    pending_question=None,
+                    pending_run_id=None,
+                    status="complete",
+                )
             fresh_thread = self._get_thread(thread_id, user_id)
             yield {
                 "event": "context",
@@ -875,7 +1008,7 @@ class VcsoChatService:
                         "inputTokens": sdk_result.input_tokens,
                         "outputTokens": sdk_result.output_tokens,
                     },
-                    "deepMode": False,
+                    "deepMode": sdk_deep_mode,
                     "agentStatus": "complete",
                     "sdkMode": True,
                     "plannerMode": sdk_native_subagent_mode,
@@ -2491,6 +2624,107 @@ class VcsoChatService:
             {"agent_status": status, "last_message_at": _now()}
         ).eq("id", thread_id).eq("user_id", user_id).execute()
 
+    def _set_sdk_session_state(
+        self,
+        *,
+        thread_id: str,
+        user_id: str,
+        session_id: str,
+        pending_tool_use_id: str | None,
+        pending_question: str | None,
+        pending_run_id: str | None,
+        status: str,
+    ) -> None:
+        """Persist only the SDK pointer/lifecycle marker; transcript context stays in SessionStore."""
+
+        self.supabase.table("vcso_chat_threads").update(
+            {
+                "active_sdk_session_id": session_id,
+                "sdk_pending_tool_use_id": pending_tool_use_id,
+                "sdk_pending_question": pending_question,
+                "sdk_pending_run_id": pending_run_id,
+                "sdk_session_updated_at": _now(),
+                "agent_status": status,
+                "last_message_at": _now(),
+            }
+        ).eq("id", thread_id).eq("user_id", user_id).execute()
+
+    def _load_thread_todos(self, thread_id: str, user_id: str) -> list[dict[str, Any]]:
+        response = (
+            self.supabase.table("agent_todos")
+            .select("id,content,status,position,created_at,updated_at")
+            .eq("thread_id", thread_id)
+            .eq("user_id", user_id)
+            .order("position")
+            .execute()
+        )
+        return list(response.data or [])
+
+    def _load_thread_workspace_metadata(
+        self, thread_id: str, user_id: str
+    ) -> list[dict[str, Any]]:
+        response = (
+            self.supabase.table("workspace_files")
+            .select("id,file_path,source,size,storage_path,created_at,updated_at")
+            .eq("owner_type", "thread")
+            .eq("owner_id", thread_id)
+            .eq("user_id", user_id)
+            .order("file_path")
+            .execute()
+        )
+        return list(response.data or [])
+
+    def _load_run_trace_steps(self, run_id: str, user_id: str) -> list[dict[str, Any]]:
+        response = (
+            self.supabase.table("agent_delegation_steps")
+            .select(
+                "step_index,step_type,title,summary,tool_name,status,"
+                "input_summary,output_summary,source_refs"
+            )
+            .eq("run_id", run_id)
+            .eq("user_id", user_id)
+            .order("step_index")
+            .execute()
+        )
+        return [
+            {
+                "stepIndex": row.get("step_index"),
+                "stepType": row.get("step_type"),
+                "title": row.get("title"),
+                "summary": row.get("summary"),
+                "tool": row.get("tool_name"),
+                "status": row.get("status"),
+                "input": row.get("input_summary") or {},
+                "output": json.dumps(row.get("output_summary") or {}),
+                "sourceRefs": row.get("source_refs") or [],
+            }
+            for row in (response.data or [])
+        ]
+
+    def _persist_sdk_trace_steps(
+        self, run_id: str, user_id: str, steps: list[dict[str, Any]]
+    ) -> None:
+        for step in steps:
+            try:
+                persisted_output = json.loads(step.get("output") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                persisted_output = {}
+            self._create_step(
+                run_id,
+                user_id,
+                int(step.get("stepIndex") or 0),
+                step_type=str(step.get("stepType") or "tool_call"),
+                title=str(step.get("title") or "SDK step"),
+                summary=str(step.get("summary") or "SDK step complete."),
+                input_summary={},
+                output_summary=persisted_output,
+                source_refs=step.get("sourceRefs")
+                if isinstance(step.get("sourceRefs"), list)
+                else [],
+                tool_name=step.get("tool"),
+                status="failed" if step.get("status") == "failed" else "completed",
+            )
+
     def _persist_deep_resume(
         self,
         *,
@@ -3581,6 +3815,8 @@ def _chat_payload(row: dict[str, Any]) -> dict[str, Any]:
         "pinned": row.get("pinned"),
         "lastMessageAt": str(row.get("last_message_at") or "")[:10],
         "agentStatus": row.get("agent_status") or "complete",
+        "pendingQuestion": row.get("sdk_pending_question"),
+        "activeSdkSessionId": row.get("active_sdk_session_id"),
     }
 
 

@@ -77,6 +77,9 @@ def compile_founder_sdk_options(
     enable_native_subagents: bool = False,
     native_subagent_tools: dict[str, Any] | None = None,
     model_driven_worker_server_urls: dict[str, str] | None = None,
+    session_store: Any | None = None,
+    resume_session_id: str | None = None,
+    fork_session: bool = False,
 ) -> CompiledFounderSdkOptions:
     """Compile one founder's callable tools, bounded agents, models, and MCP servers.
 
@@ -266,6 +269,10 @@ def compile_founder_sdk_options(
         setting_sources=[],
         env={"ANTHROPIC_API_KEY": api_key},
         thinking={"type": "disabled"},
+        session_store=session_store,
+        session_store_flush="batched",
+        resume=resume_session_id,
+        fork_session=bool(fork_session),
     )
     return CompiledFounderSdkOptions(
         options=options,
