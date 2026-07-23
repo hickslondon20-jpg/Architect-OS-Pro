@@ -215,6 +215,25 @@ class WorkerFaultInjected(RuntimeError):
     the lead would see from a genuinely broken worker."""
 
 
+def semantic_worker_status(
+    transport_status: Any,
+    structured_result: dict[str, Any] | None,
+) -> str:
+    """Resolve a worker's founder-visible outcome without conflating transport and semantic success."""
+
+    outer_status = str(transport_status or "").strip().lower()
+    if outer_status != "completed":
+        return outer_status or "failed"
+
+    structured = structured_result if isinstance(structured_result, dict) else {}
+    semantic_status = str(structured.get("status") or "").strip().lower()
+    if structured.get("needs_review") is True:
+        return semantic_status if semantic_status and semantic_status != "completed" else "needs_review"
+    if semantic_status and semantic_status not in {"completed", "success", "succeeded", "ok"}:
+        return semantic_status
+    return "completed"
+
+
 def _compact_result(result: SubAgentRunResult) -> dict[str, Any]:
     """Bounded, citation-carrying payload returned to the lead as the Task tool result. Mirrors the
     in-process handler's safe_result so the lead composes identically regardless of transport."""
@@ -222,7 +241,7 @@ def _compact_result(result: SubAgentRunResult) -> dict[str, Any]:
     citations = [item for item in (result.citations or []) if isinstance(item, dict)]
     return {
         "run_id": result.run_id,
-        "status": result.status,
+        "status": semantic_worker_status(result.status, result.structured_result),
         "result_summary": result.result_summary,
         "structured_result": result.structured_result,
         "citations": citations,
@@ -399,6 +418,37 @@ async def _dispatch_worker_capability(
         }
     )
     compact = _compact_result(result)
+    if compact["status"] != "completed":
+        scope.diagnostics.append(
+            {
+                "stage": "degraded",
+                "capability_key": capability_key,
+                "child_run_id": compact.get("run_id"),
+                "semantic_status": compact["status"],
+            }
+        )
+        if scope.progress_bridge is not None:
+            try:
+                scope.progress_bridge(
+                    capability_key,
+                    {
+                        "runId": compact.get("run_id"),
+                        "capabilityKey": capability_key,
+                        "status": "failed",
+                        "summary": str(compact.get("result_summary") or "Worker result requires review.")[:500],
+                        "step": {
+                            "step_type": "result",
+                            "title": "Result requires review",
+                            "summary": str(
+                                compact.get("result_summary") or "The bounded worker did not produce a usable result."
+                            )[:500],
+                            "status": "failed",
+                        },
+                    },
+                )
+            except Exception:  # noqa: BLE001 - the surface bridge must never break result propagation
+                logger.debug("vcso degraded worker progress bridge raised; ignored", exc_info=True)
+        return compact
     # Findings chaining (app-owned): write this worker's compact finding where the NEXT worker in the
     # ordered chain reads it (scope.prior_findings keyed by the running capability, read above). This runs
     # in the same process and on the SAME scope instance the next worker's loopback call recovers from the

@@ -744,7 +744,12 @@ def test_app_owned_workers_run_before_synthesis_with_no_lead_delegation_surface(
     assert "objective" not in str(lifecycle_events)
 
 
-def test_app_owned_worker_failure_fails_open_to_standard_flat_sdk_path(monkeypatch):
+@pytest.mark.parametrize(
+    "worker_outcome",
+    ["exception", "semantic_degraded"],
+    ids=["exception", "could-not-compute"],
+)
+def test_app_owned_worker_failure_fails_open_to_standard_flat_sdk_path(monkeypatch, worker_outcome):
     required = ("structured_data_agent",)
     lifecycle_events = []
     query_called = False
@@ -754,7 +759,16 @@ def test_app_owned_worker_failure_fails_open_to_standard_flat_sdk_path(monkeypat
             pass
 
         def start_run(self, _request):
-            raise RuntimeError("worker unavailable")
+            if worker_outcome == "exception":
+                raise RuntimeError("worker unavailable")
+            return SimpleNamespace(
+                run_id="run-degraded",
+                status="completed",
+                result_summary="No computed result is available.",
+                structured_result={"status": "could_not_compute", "needs_review": True},
+                citations=[],
+                trace=[],
+            )
 
     async def fake_query(*, options, **_kwargs):
         nonlocal query_called

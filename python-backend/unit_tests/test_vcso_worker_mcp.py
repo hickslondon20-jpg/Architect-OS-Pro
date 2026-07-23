@@ -171,6 +171,63 @@ def test_permitted_call_reuses_orchestrator_contract_and_returns_compact_cited_r
     assert req.enforce_compact_contract is True
 
 
+def test_semantically_degraded_worker_result_is_not_propagated_as_completed(monkeypatch):
+    """A child row can be transport-complete while its structured result explicitly says no result was
+    computed. The scoped worker transport must preserve that semantic status, must not cache or chain it
+    as a successful finding, and must surface a failed progress state to the parent."""
+
+    class _DegradedOrchestrator(_Orchestrator):
+        def start_run(self, request):
+            _Orchestrator.calls.append(request)
+            return SubAgentRunResult(
+                run_id="child-degraded",
+                status="completed",
+                result_summary="Could not compute the requested result.",
+                structured_result={
+                    "status": "could_not_compute",
+                    "needs_review": True,
+                    "summary": "No computed result is available.",
+                },
+                trace=[],
+                citations=[],
+            )
+
+    monkeypatch.setattr(core, "SubAgentOrchestrator", _DegradedOrchestrator)
+    progress = []
+    reg = TurnRegistry()
+    scope = _scope(
+        allowed_capabilities=frozenset({"sandbox_execution_agent"}),
+        progress_bridge=lambda _capability, event: progress.append(event),
+    )
+    token = reg.mint(scope)
+
+    out = _run(
+        run_worker_capability(
+            token,
+            "sandbox_execution_agent",
+            {"objective": "Compute margin and runway."},
+            registry=reg,
+        )
+    )
+
+    assert out["status"] == "could_not_compute"
+    assert out["structured_result"]["needs_review"] is True
+    assert "sandbox_execution_agent" not in scope.completed_results
+    assert "per_user_wiki" not in scope.prior_findings
+    assert progress[-1]["status"] == "failed"
+    assert progress[-1]["step"]["status"] == "failed"
+
+
+def test_needs_review_overrides_semantic_completed_status():
+    assert (
+        core.semantic_worker_status(
+            "completed",
+            {"status": "completed", "needs_review": True},
+        )
+        == "needs_review"
+    )
+
+
 def test_prior_findings_are_forwarded_as_untrusted_context():
     reg = TurnRegistry()
     token = reg.mint(_scope(prior_findings={"structured_data_agent": {"summary": "upstream"}}))
@@ -526,6 +583,40 @@ def test_completion_bridge_counts_parent_linked_completed_children():
         client, parent_run_id="parent-1", required_agents=("structured_data_agent", "per_user_wiki")
     )
     assert done == {"structured_data_agent", "per_user_wiki"}
+
+
+def test_completion_bridge_excludes_semantically_degraded_children():
+    client = _CompletionClient(
+        [
+            {
+                "capability_key": "structured_data_agent",
+                "status": "completed",
+                "structured_result": {"status": "completed", "needs_review": False},
+            },
+            {
+                "capability_key": "sandbox_execution_agent",
+                "status": "completed",
+                "structured_result": {"status": "could_not_compute", "needs_review": True},
+            },
+            {
+                "capability_key": "per_user_wiki",
+                "status": "completed",
+                "structured_result": {"needs_review": True},
+            },
+        ]
+    )
+
+    done = model_driven_completed_children(
+        client,
+        parent_run_id="parent-1",
+        required_agents=(
+            "structured_data_agent",
+            "sandbox_execution_agent",
+            "per_user_wiki",
+        ),
+    )
+
+    assert done == {"structured_data_agent"}
 
 
 def test_completion_bridge_is_empty_without_parent_run_id():

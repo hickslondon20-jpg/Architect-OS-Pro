@@ -38,6 +38,7 @@ from services.vcso_worker_mcp import (
     TurnScope,
     WorkerScopeError,
     run_worker_capability,
+    semantic_worker_status,
 )
 from services.vcso_worker_mcp_server import worker_server_url
 from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
@@ -699,7 +700,7 @@ def model_driven_completed_children(
     try:
         rows = (
             client.table("agent_delegation_runs")
-            .select("capability_key,status")
+            .select("capability_key,status,structured_result")
             .eq("parent_run_id", str(parent_run_id))
             .eq("status", "completed")
             .execute()
@@ -710,7 +711,12 @@ def model_driven_completed_children(
         logger.warning("model-driven completion lookup failed open (no children counted): %s", exc)
         return set()
     wanted = set(required_agents)
-    return {str(row.get("capability_key")) for row in rows if str(row.get("capability_key")) in wanted}
+    return {
+        str(row.get("capability_key"))
+        for row in rows
+        if str(row.get("capability_key")) in wanted
+        and semantic_worker_status(row.get("status"), row.get("structured_result")) == "completed"
+    }
 
 
 def _make_worker_progress_bridge(
@@ -1600,6 +1606,11 @@ async def _run_sdk_turn(
                         progress_callback=emit_worker_progress,
                     ),
                 )
+                semantic_status = semantic_worker_status(result.status, result.structured_result)
+                if semantic_status != "completed":
+                    raise RuntimeError(
+                        f"Worker {capability_key} returned semantic status {semantic_status}."
+                    )
             except Exception as exc:  # noqa: BLE001 - the Task receives a bounded worker failure
                 logger.warning("SDK native subagent %s failed safely: %s", capability_key, exc)
                 record_lifecycle(
@@ -1760,6 +1771,11 @@ async def _run_sdk_turn(
                         progress_callback=emit_worker_progress,
                     ),
                 )
+                semantic_status = semantic_worker_status(result.status, result.structured_result)
+                if semantic_status != "completed":
+                    raise RuntimeError(
+                        f"Worker {capability_key} returned semantic status {semantic_status}."
+                    )
             except Exception as exc:  # noqa: BLE001 - mandatory fails open; best-effort continues
                 logger.warning("app-owned worker %s failed: %s", capability_key, exc)
                 is_mandatory = capability_key in mandatory_workers

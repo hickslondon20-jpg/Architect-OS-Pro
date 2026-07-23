@@ -657,6 +657,13 @@ class VcsoChatService:
             except (TypeError, ValueError):
                 sdk_max_turns = max_rounds + 1
             sdk_max_budget_usd = max(0.01, min(_safe_float(sdk_settings.get("max_budget_usd"), 0.25), 1.0))
+            sdk_run_attribution = {
+                "sdk_phase": sdk_phase,
+                "native_subagent_scope": str(_sdk_settings.get("native_subagent_scope") or ""),
+                "delegation_selection": "model_choice" if native_model_choice else "fixed_required",
+                "available_subagents": list(native_required_agents),
+                "required_subagents": [] if native_model_choice else list(native_required_agents),
+            }
             sdk_lifecycle_events: list[dict[str, Any]] = []
             sdk_lifecycle_lock = threading.Lock()
 
@@ -675,6 +682,7 @@ class VcsoChatService:
                                 "reasoning_visibility": "summary_only",
                                 "deep_mode": False,
                                 "sdk_native_lifecycle": snapshot,
+                                **sdk_run_attribution,
                             },
                             "updated_at": _now(),
                         }
@@ -765,6 +773,8 @@ class VcsoChatService:
             )
             self._active_turn["assistant_message"] = assistant_message
             self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 2)
+            with sdk_lifecycle_lock:
+                final_sdk_lifecycle = list(sdk_lifecycle_events)
             self._complete_main_run(
                 run_id,
                 user_id,
@@ -785,13 +795,17 @@ class VcsoChatService:
                     "sdk_usage_recorded": sdk_result.usage_recorded,
                     "narration_segments": sdk_result.narration_segments,
                     "native_subagent_mode": sdk_native_subagent_mode,
-                    "native_subagent_scope": str(_sdk_settings.get("native_subagent_scope") or ""),
-                    "delegation_selection": "model_choice" if native_model_choice else "fixed_required",
-                    "available_subagents": list(native_required_agents),
-                    "required_subagents": [] if native_model_choice else list(native_required_agents),
+                    **sdk_run_attribution,
                     "worker_runs": sdk_result.worker_runs,
                     "delegation_depth_cap": 1,
                     "delegation_count_cap": len(native_required_agents),
+                },
+                run_metadata={
+                    "output_schema_version": "vcso_tool_loop_v1",
+                    "reasoning_visibility": "summary_only",
+                    "deep_mode": False,
+                    "sdk_native_lifecycle": final_sdk_lifecycle,
+                    **sdk_run_attribution,
                 },
             )
             self._active_turn["run_completed"] = True
@@ -2553,23 +2567,25 @@ class VcsoChatService:
         *,
         result_schema_version: str = "vcso_tool_loop_v1",
         metadata: dict[str, Any] | None = None,
+        run_metadata: dict[str, Any] | None = None,
     ) -> None:
-        self.supabase.table("agent_delegation_runs").update(
-            {
-                "status": "completed",
-                "assistant_message_id": assistant_message_id,
-                "result_summary": summary[:500],
-                "structured_result": {
-                    "schema_version": result_schema_version,
-                    "summary": summary[:500],
-                    "reasoning_visibility": "summary_only",
-                    "source_count": len(sources),
-                    **(metadata or {}),
-                },
-                "completed_at": _now(),
-                "updated_at": _now(),
-            }
-        ).eq("id", run_id).eq("user_id", user_id).execute()
+        values = {
+            "status": "completed",
+            "assistant_message_id": assistant_message_id,
+            "result_summary": summary[:500],
+            "structured_result": {
+                "schema_version": result_schema_version,
+                "summary": summary[:500],
+                "reasoning_visibility": "summary_only",
+                "source_count": len(sources),
+                **(metadata or {}),
+            },
+            "completed_at": _now(),
+            "updated_at": _now(),
+        }
+        if run_metadata is not None:
+            values["metadata"] = run_metadata
+        self.supabase.table("agent_delegation_runs").update(values).eq("id", run_id).eq("user_id", user_id).execute()
 
 
 def _optional_sandbox_service() -> Any | None:
