@@ -11,7 +11,7 @@ import re
 import threading
 from types import SimpleNamespace
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any, AsyncIterator, Callable, Iterator
 
@@ -33,7 +33,12 @@ from services.vcso_sdk_config import (
     MODEL_DRIVEN_WORKER_SERVER,
     compile_founder_sdk_options,
 )
-from services.vcso_worker_mcp import TURN_REGISTRY, TurnScope
+from services.vcso_worker_mcp import (
+    TURN_REGISTRY,
+    TurnScope,
+    WorkerScopeError,
+    run_worker_capability,
+)
 from services.vcso_worker_mcp_server import worker_server_url
 from services.sub_agent_orchestrator import SubAgentOrchestrator, SubAgentRunRequest
 
@@ -352,6 +357,52 @@ def stream_disconnect_injection_after(
     return after if after >= 1 else None
 
 
+def stream_drop_done_injection(settings: dict[str, Any] | None, user_id: str | None) -> bool:
+    """Whether to DROP the final `done`/`token` events while keeping the connection alive (dark only).
+
+    Carry #1 of the Gate-2 close: the Defect-8 **in-flight recovery has never been watched firing** — the
+    first injection canary's founder recovered by a manual page reload, which is ordinary thread loading and
+    bypasses the recovery code entirely. This mode reproduces Defect 8's *exact* condition deterministically
+    and lets the recovery run in-flight: the route delivers every event EXCEPT the answer `token`s and the
+    terminal `done` (and keeps the `heartbeat` keepalives flowing so the connection is **not** killed). The
+    client therefore reaches a clean end-of-stream with the answer already persisted server-side but with no
+    `done` — so the recovery block fetches the record and delivers the cited answer **without a reload**.
+    Contrast with `stream_disconnect_injection_after`, which cuts EARLY (before persistence) and exercises
+    the reopen path; this one cuts at the END (after persistence) and exercises the in-flight path.
+
+    Gated identically: an explicit enable bool AND the founder `diagnostic_user_ids` allowlist."""
+
+    settings = settings or {}
+    if not bool(settings.get("diagnostic_stream_drop_done_enabled")):
+        return False
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    return bool(user_id) and str(user_id) in diagnostic_user_ids
+
+
+# Events the drop-done rehearsal withholds. `token` so the answer visibly arrives via the record-backed
+# recovery rather than the live stream; `done` because withholding the terminal event IS Defect 8's
+# condition. Everything else (steps, sub_agent_step, heartbeat) still flows, so the connection stays alive.
+STREAM_DROP_DONE_EVENTS: frozenset[str] = frozenset({"token", "done"})
+
+
+def cross_worker_probe_enabled(settings: dict[str, Any] | None, user_id: str | None) -> bool:
+    """Whether to fire ONE deterministic cross-worker call so Defect 7's guard is *watched* refusing it.
+
+    Carry #2 of the Gate-2 close: Defect 7 is closed in code and unit-tested, but across all six live runs
+    the guard has only ever been confirmed by ABSENCE (no run happened to attempt a cross-worker call). This
+    arms a single server-side probe — one worker's per-capability token used to call a *sibling's* tool —
+    so the existing scope refusal executes on a real turn and is recorded to the lifecycle. It is the same
+    mechanism Canary 10a exploited by accident, now triggered on purpose and expected to be refused.
+
+    Gated identically: an explicit enable bool AND the founder `diagnostic_user_ids` allowlist."""
+
+    settings = settings or {}
+    if not bool(settings.get("diagnostic_cross_worker_probe_enabled")):
+        return False
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    return bool(user_id) and str(user_id) in diagnostic_user_ids
+
+
 FAULT_INJECTION_MODES: tuple[str, ...] = ("before_start", "after_completion")
 
 
@@ -467,6 +518,7 @@ def stream_vcso_sdk_turn(
     native_model_driven: bool = False,
     native_fault_injection: tuple[str, ...] = (),
     native_fault_injection_mode_key: str = "before_start",
+    native_cross_worker_probe: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
 
@@ -501,6 +553,7 @@ def stream_vcso_sdk_turn(
                         native_model_driven=native_model_driven,
                         native_fault_injection=native_fault_injection,
                         native_fault_injection_mode_key=native_fault_injection_mode_key,
+                        native_cross_worker_probe=native_cross_worker_probe,
                     )
                 )
             )
@@ -783,6 +836,7 @@ async def _run_sdk_turn(
     native_model_driven: bool = False,
     native_fault_injection: tuple[str, ...] = (),
     native_fault_injection_mode_key: str = "before_start",
+    native_cross_worker_probe: bool = False,
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
     trace_steps: list[dict[str, Any]] = []
@@ -1763,6 +1817,48 @@ async def _run_sdk_turn(
             decision="per_capability",
             reason_code=f"tokens={len(model_driven_tokens)}",
         )
+        if native_cross_worker_probe and len(required_agents) >= 2:
+            # DEFECT 7 GUARD — watched refusing (dark diagnostic). Mint a throwaway token scoped to the
+            # FIRST capability ONLY, then use it to call a SIBLING'S tool — exactly as Canary 10a's sandbox
+            # subagent did by accident. With the per-`(turn, capability)` fix the sibling is not in this
+            # token's scope, so `run_worker_capability` must raise `WorkerScopeError` before any orchestrator
+            # work. The probe token carries its OWN empty diagnostics list (not the shared one) so its
+            # internal "received" append cannot pollute the real `worker_hop` drain, and it is unregistered
+            # immediately. A refusal is the guard firing; a success would be a live isolation leak.
+            probe_owner, probe_sibling = required_agents[0], required_agents[1]
+            probe_token = TURN_REGISTRY.mint(
+                replace(
+                    model_driven_scope,
+                    allowed_capabilities=frozenset({probe_owner}),
+                    diagnostics=[],
+                )
+            )
+            try:
+                await run_worker_capability(
+                    probe_token,
+                    probe_sibling,
+                    {"objective": "cross-worker isolation probe (dark diagnostic)"},
+                )
+                record_lifecycle(
+                    "cross_worker_probe",
+                    decision="LEAKED",
+                    capability_key=probe_sibling,
+                    reason_code=f"{probe_owner}_token_called_{probe_sibling}_NOT_refused",
+                )
+                logger.error(
+                    "vcso_sdk DEFECT-7 LEAK: %s-scoped token invoked %s and was NOT refused",
+                    probe_owner,
+                    probe_sibling,
+                )
+            except WorkerScopeError as exc:
+                record_lifecycle(
+                    "cross_worker_probe",
+                    decision="refused",
+                    capability_key=probe_sibling,
+                    reason_code=f"{probe_owner}_token->{probe_sibling}: {exc}"[:120],
+                )
+            finally:
+                TURN_REGISTRY.unregister(probe_token)
         hooks["PreToolUse"] = [
             HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
             HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),

@@ -1558,3 +1558,73 @@ def test_keepalive_reports_to_the_lifecycle_sink_so_it_is_observable_in_the_db(m
     assert total_entry["count"] >= 1
     assert result.answer_text == "Cited 90-day recommendation."
 
+
+
+def test_cross_worker_probe_fires_and_records_a_refusal(monkeypatch):
+    """Defect 7 guard, WATCHED refusing. With native_cross_worker_probe armed, the loop uses the first
+    worker's per-capability token to call a sibling's tool; the existing scope check must refuse it and the
+    refusal must land in the lifecycle. This turns Defect 7's negative live evidence (no run ever attempted
+    a cross-worker call) into an observed rejection."""
+
+    required = ("structured_data_agent", "sandbox_execution_agent", "per_user_wiki")
+
+    async def fake_query(*, options, **_kwargs):
+        yield StreamEvent(
+            uuid="answer",
+            session_id="session-probe",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "Cited 90-day recommendation."},
+            },
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-probe",
+            total_cost_usd=0.02,
+            usage={"input_tokens": 10, "output_tokens": 5},
+            result="Cited 90-day recommendation.",
+        )
+
+    _capture_sdk_tools(monkeypatch)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    # The probe must be refused BEFORE any orchestrator work — a firing orchestrator would be a leak.
+    monkeypatch.setattr("services.vcso_sdk_loop.SubAgentOrchestrator", _reject_orchestrator())
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    lifecycle_events: list[dict] = []
+    generator = stream_vcso_sdk_turn(
+        prompt="P4 thin-slice prompt",
+        system_prompt="System\n\nRules remain bounded.",
+        model="claude-sonnet-test",
+        api_key="test-key",
+        registry=_Registry(),
+        tool_names=[],
+        tool_context=ToolExecutionContext(
+            user_id="founder-1",
+            store=_AllCompletedStore(),
+            thread_id="thread-1",
+            metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+        ),
+        trace_metadata={"run_id": "lead-run"},
+        native_subagent_required_agents=required,
+        native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
+        native_lifecycle_sink=lifecycle_events.append,
+        native_model_driven=True,
+        native_cross_worker_probe=True,
+        query_impl=fake_query,
+    )
+    _consume(generator)
+
+    probes = [e for e in lifecycle_events if e["event"] == "cross_worker_probe"]
+    assert len(probes) == 1, "the probe must fire exactly once"
+    assert probes[0]["decision"] == "refused", "the guard must refuse the cross-worker call"
+    assert probes[0]["capability_key"] == "sandbox_execution_agent"
+    # And no per-turn token is left reachable after the turn.
+    assert TURN_REGISTRY.active_count() == 0

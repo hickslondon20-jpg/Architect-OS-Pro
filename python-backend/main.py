@@ -60,8 +60,10 @@ from services.tool_registry_sync import sync_native_tools
 from services.vector_store import VectorStore, VectorStoreError
 from services.vcso_chat_service import VcsoChatPayload, VcsoChatService
 from services.vcso_sdk_loop import (
+    STREAM_DROP_DONE_EVENTS,
     read_sdk_loop_settings,
     stream_disconnect_injection_after,
+    stream_drop_done_injection,
 )
 from services.web_search import WebSearchService
 from services.wiki_compilation import CompileResult, WikiCompilationError, WikiCompilationService
@@ -1271,18 +1273,27 @@ def stream_vcso_chat(
                 project_id=payload.projectId,
                 deep_mode=payload.deepMode,
             )
-            # DARK, FOUNDER-ONLY stream-disconnect rehearsal (04B-D2 Gate 2). Inert unless the
-            # `vcso_sdk_loop` diagnostic sub-flag names this founder, so every normal turn is byte-identical.
+            # DARK, FOUNDER-ONLY stream rehearsals (04B-D2 Gate 2). Both inert unless the `vcso_sdk_loop`
+            # diagnostic sub-flags name this founder, so every normal turn is byte-identical. One settings
+            # read serves both, so the live path is not taxed twice.
             disconnect_after: int | None = None
+            drop_done = False
             try:
-                disconnect_after = stream_disconnect_injection_after(
-                    read_sdk_loop_settings(service.supabase, str(user_id)).get("settings"),
-                    str(user_id),
-                )
+                _diag_settings = read_sdk_loop_settings(service.supabase, str(user_id)).get("settings")
+                disconnect_after = stream_disconnect_injection_after(_diag_settings, str(user_id))
+                drop_done = stream_drop_done_injection(_diag_settings, str(user_id))
             except Exception:  # noqa: BLE001 - a diagnostic must never be able to break a real turn
                 disconnect_after = None
+                drop_done = False
             delivered = 0
             for item in service.stream_chat(user_id=str(user_id), payload=chat_payload):
+                if drop_done and item["event"] in STREAM_DROP_DONE_EVENTS:
+                    # Carry #1 rehearsal: withhold the answer `token`s and the terminal `done` while every
+                    # other event (steps, sub_agent_step, and crucially the `heartbeat` keepalives) still
+                    # flows. The connection stays ALIVE and reaches a clean end-of-stream with the answer
+                    # already persisted but no `done` — so the client's in-flight Defect-8 recovery fetches
+                    # the record and delivers the cited answer without a reload. Keep draining.
+                    continue
                 if disconnect_after is not None and delivered >= disconnect_after:
                     # Stop DELIVERING, keep DRAINING. `continue` (not `break`) is the whole point: breaking
                     # would close the generator and abort the turn, which is a different and worse failure

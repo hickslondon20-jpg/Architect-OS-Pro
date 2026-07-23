@@ -207,3 +207,57 @@ def test_disconnect_injection_tolerates_a_garbage_after_value():
 def test_disconnect_injection_is_inert_on_empty_settings():
     assert stream_disconnect_injection_after(None, _FOUNDER) is None
     assert stream_disconnect_injection_after({}, _FOUNDER) is None
+
+
+# ---------------------------------------------------------------------------------------------------
+# Gate 2 delivery-close, follow-up — drop-done (in-flight recovery) + cross-worker probe gates
+# ---------------------------------------------------------------------------------------------------
+
+from services.vcso_sdk_loop import (  # noqa: E402
+    STREAM_DROP_DONE_EVENTS,
+    cross_worker_probe_enabled,
+    stream_drop_done_injection,
+)
+
+
+def test_drop_done_gate_on_for_the_enrolled_founder():
+    assert stream_drop_done_injection(
+        {"diagnostic_stream_drop_done_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
+    ) is True
+
+
+def test_drop_done_gate_inert_when_disabled_or_off_allowlist():
+    assert stream_drop_done_injection(
+        {"diagnostic_stream_drop_done_enabled": False, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
+    ) is False
+    assert stream_drop_done_injection(
+        {"diagnostic_stream_drop_done_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, "someone-else"
+    ) is False
+    assert stream_drop_done_injection(None, _FOUNDER) is False
+
+
+def test_drop_done_event_set_withholds_answer_and_terminal_but_not_keepalive():
+    # The connection must stay alive (heartbeat kept) and steps must still render; only the answer tokens
+    # and the terminal done are withheld so the answer arrives via recovery.
+    assert "token" in STREAM_DROP_DONE_EVENTS
+    assert "done" in STREAM_DROP_DONE_EVENTS
+    assert "heartbeat" not in STREAM_DROP_DONE_EVENTS
+    assert "step" not in STREAM_DROP_DONE_EVENTS
+    assert "sub_agent_step" not in STREAM_DROP_DONE_EVENTS
+    assert "ready" not in STREAM_DROP_DONE_EVENTS
+
+
+def test_cross_worker_probe_gate_on_for_the_enrolled_founder():
+    assert cross_worker_probe_enabled(
+        {"diagnostic_cross_worker_probe_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
+    ) is True
+
+
+def test_cross_worker_probe_gate_inert_when_disabled_or_off_allowlist():
+    assert cross_worker_probe_enabled(
+        {"diagnostic_cross_worker_probe_enabled": False, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
+    ) is False
+    assert cross_worker_probe_enabled(
+        {"diagnostic_cross_worker_probe_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, "someone-else"
+    ) is False
+    assert cross_worker_probe_enabled(None, _FOUNDER) is False

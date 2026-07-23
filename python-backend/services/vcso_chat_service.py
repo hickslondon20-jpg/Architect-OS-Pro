@@ -48,6 +48,7 @@ from services.vcso_sdk_loop import (
     SDK_STANDARD_SCHEMA_VERSION,
     VCSO_SDK_CAPABILITY_KEY,
     VcsoSdkUsage,
+    cross_worker_probe_enabled,
     native_fault_injection_capabilities,
     native_fault_injection_mode,
     native_subagent_requirements,
@@ -433,6 +434,11 @@ class VcsoChatService:
         native_fault_mode = (
             native_fault_injection_mode(_sdk_settings) if native_fault_injection else "before_start"
         )
+        # Defect-7 guard observation: dark, founder-only, model-driven only. Fires one cross-worker call
+        # server-side so the scope refusal is watched executing. Inert on every real turn.
+        native_cross_worker_probe = (
+            cross_worker_probe_enabled(_sdk_settings, user_id) if native_model_driven else False
+        )
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
         planner_path_selected = (
@@ -731,6 +737,7 @@ class VcsoChatService:
                 native_model_driven=native_model_driven,
                 native_fault_injection=native_fault_injection,
                 native_fault_injection_mode_key=native_fault_mode,
+                native_cross_worker_probe=native_cross_worker_probe,
             )
             sdk_citations = serialize_numbered_refs(
                 number_citation_refs(normalize_vcso_turn_sources([], sdk_result.sources))
