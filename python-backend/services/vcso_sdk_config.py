@@ -15,6 +15,24 @@ from services.tool_registry import ToolDefinition, ToolRegistry
 
 
 SDK_INTERNAL_SERVER = "architectos"
+MODE_B_LEAD_TOOL_NAMES = (
+    "wiki_list",
+    "wiki_get_page",
+    "get_dataset_periods",
+    "execute_code",
+)
+NATIVE_GRANULAR_AGENT_TOOL_GRANTS: dict[str, tuple[str, ...]] = {
+    "structured_data_agent": (
+        "list_founder_datasets",
+        "get_dataset_periods",
+        "run_structured_query",
+    ),
+    "per_user_wiki": (
+        "wiki_search",
+        "wiki_get_page",
+        "wiki_list",
+    ),
+}
 # Phase D2 (SDK-M2): the external (loopback HTTP) worker MCP server name. Must match the FastMCP `name`
 # in services/vcso_worker_mcp_server.py. In model-driven mode the worker handlers are exposed from this
 # EXTERNAL server, referenced inline per-agent and kept OUT of top-level mcp_servers, so the lead cannot
@@ -54,6 +72,7 @@ DISALLOWED_SDK_BUILTINS = [
 class CompiledFounderSdkOptions:
     options: ClaudeAgentOptions
     tool_names: list[str]
+    lead_tool_names: list[str] = field(default_factory=list)
     agent_tool_grants: dict[str, list[str]] = field(default_factory=dict)
     agent_model_routes: dict[str, dict[str, str]] = field(default_factory=dict)
     agent_handler_tools: dict[str, str] = field(default_factory=dict)
@@ -76,6 +95,7 @@ def compile_founder_sdk_options(
     max_budget_usd: float,
     enable_native_subagents: bool = False,
     native_subagent_tools: dict[str, Any] | None = None,
+    native_agent_tool_grants: dict[str, tuple[str, ...] | list[str]] | None = None,
     model_driven_worker_server_urls: dict[str, str] | None = None,
     session_store: Any | None = None,
     resume_session_id: str | None = None,
@@ -90,6 +110,8 @@ def compile_founder_sdk_options(
 
     client = getattr(store, "client", None)
     native_subagent_tools = native_subagent_tools or {}
+    native_agent_tool_grants = native_agent_tool_grants or {}
+    granular_native = bool(enable_native_subagents and native_agent_tool_grants)
     # Model-driven delegation (D2): when worker-server URLs are supplied, expose each worker handler from
     # the EXTERNAL per-agent server instead of the in-process session server. Path-A/Fix-C behavior is
     # byte-identical when this is None/empty.
@@ -109,9 +131,17 @@ def compile_founder_sdk_options(
         connected_servers=set(connected_servers),
     )
     if enable_native_subagents:
-        # Native leads coordinate through Task only. Do not register selected registry tools on
-        # their session MCP surface; handler-backed workers execute through their single handler.
-        selected = []
+        if granular_native:
+            selected, native_excluded = _select_definitions(
+                registry,
+                list(MODE_B_LEAD_TOOL_NAMES),
+                enabled_catalog=enabled_catalog,
+                connected_servers=set(connected_servers),
+            )
+            excluded.extend(name for name in native_excluded if name not in excluded)
+        else:
+            # Path A / legacy handler-backed surface: the lead composes or delegates through handlers only.
+            selected = []
 
     capabilities = (
         [
@@ -123,13 +153,15 @@ def compile_founder_sdk_options(
         else []
     )
     if enable_native_subagents:
-        # Native mode exposes only the explicitly required Task agents. Registering every active
-        # capability here widens the lead's Task choices and pulls unrelated registry tools into
-        # the session even though handler-backed workers never call those tools directly.
+        selected_agent_keys = (
+            set(native_agent_tool_grants)
+            if granular_native
+            else set(native_subagent_tools)
+        )
         capabilities = [
             capability
             for capability in capabilities
-            if capability.capability_key in native_subagent_tools
+            if capability.capability_key in selected_agent_keys
         ]
     agents: dict[str, AgentDefinition] = {}
     agent_tool_grants: dict[str, list[str]] = {}
@@ -151,10 +183,15 @@ def compile_founder_sdk_options(
         else set()
     )
     for capability in capabilities:
-        grant_names = [name for name in capability.allowed_tools if name in selectable_names]
+        configured_grants = (
+            list(native_agent_tool_grants.get(capability.capability_key) or [])
+            if granular_native
+            else list(capability.allowed_tools)
+        )
+        grant_names = [name for name in configured_grants if name in selectable_names]
         sdk_grants = [_sdk_tool_name(registry.get(name)) for name in grant_names]
         route = resolve_capability_model(store, capability=capability, fallback_model=main_model)
-        handler_tool = native_subagent_tools.get(capability.capability_key)
+        handler_tool = None if granular_native else native_subagent_tools.get(capability.capability_key)
         handler_name = _native_handler_name(capability.capability_key) if handler_tool is not None else None
         if handler_name and model_driven:
             # External per-agent worker server: the worker handler is scoped to this agent (not the lead's
@@ -179,6 +216,9 @@ def compile_founder_sdk_options(
             ]
         elif handler_name:
             agent_tools = [f"mcp__{SDK_INTERNAL_SERVER}__{handler_name}"]
+            agent_mcp_servers = [SDK_INTERNAL_SERVER]
+        elif granular_native:
+            agent_tools = sdk_grants
             agent_mcp_servers = [SDK_INTERNAL_SERVER]
         else:
             agent_tools = sdk_grants
@@ -247,6 +287,14 @@ def compile_founder_sdk_options(
         # denied) under dontAsk. Isolation is preserved on the exposure surface: the worker server stays out
         # of top-level mcp_servers and the handler names stay out of the lead's `tools` availability list.
         main_allowed_tools.extend(model_driven_worker_tools)
+    if granular_native:
+        for grant_names in agent_tool_grants.values():
+            for name in grant_names:
+                sdk_name = _sdk_tool_name(registry.get(name))
+                if sdk_name not in main_allowed_tools:
+                    # Under dontAsk this pre-approves the subagent call. The access hook, not this
+                    # list, decides whether the lead or a particular subagent may execute it.
+                    main_allowed_tools.append(sdk_name)
     options = ClaudeAgentOptions(
         # `tools` PROVISIONS built-in tools. Path A stays `[]` (compose-only: it deliberately wants no
         # tools at all). Model-driven MUST provision the delegation built-in here — putting it only in
@@ -277,6 +325,7 @@ def compile_founder_sdk_options(
     return CompiledFounderSdkOptions(
         options=options,
         tool_names=[definition.name for definition in selected],
+        lead_tool_names=[definition.name for definition in selected],
         agent_tool_grants=agent_tool_grants,
         agent_model_routes=agent_model_routes,
         agent_handler_tools=agent_handler_tools,

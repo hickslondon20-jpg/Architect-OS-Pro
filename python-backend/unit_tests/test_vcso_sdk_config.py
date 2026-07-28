@@ -20,6 +20,10 @@ from services.tool_registry import (
     ToolResultEnvelope,
 )
 from services.vcso_sdk_config import compile_founder_sdk_options
+from services.vcso_sdk_config import (
+    MODE_B_LEAD_TOOL_NAMES,
+    NATIVE_GRANULAR_AGENT_TOOL_GRANTS,
+)
 
 
 class _Query:
@@ -294,6 +298,77 @@ def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead
     assert serialized["sandbox_agent"]["mcpServers"] == [
         {"vcso_workers": {"type": "http", "url": urls["sandbox_agent"]}}
     ]
+
+
+def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server(monkeypatch):
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.create_sdk_mcp_server",
+        lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
+    )
+    all_tools = {
+        *MODE_B_LEAD_TOOL_NAMES,
+        *(name for names in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.values() for name in names),
+    }
+    client = _Client(
+        {
+            "tool_registry": [
+                {"slug": name, "enabled": True, "is_code_registered": True}
+                for name in all_tools
+            ],
+            "agent_capabilities": [
+                _capability("structured_data_agent", ["legacy_structured_handler"], routing_tier="worker"),
+                _capability("per_user_wiki", ["legacy_wiki_handler"], routing_tier="worker"),
+                _capability("sandbox_execution_agent", ["execute_code"], routing_tier="worker"),
+            ],
+            "mcp_connections": [],
+        }
+    )
+    store = _Store(client)
+    registry = ToolRegistry(store=store)
+    compiled = compile_founder_sdk_options(
+        store=store,
+        user_id="founder-1",
+        registry=registry,
+        requested_tool_names=[],
+        sdk_tools_by_name={name: {"name": name} for name in all_tools},
+        system_prompt="VCSO",
+        main_model="claude-sonnet-test",
+        api_key="test-key",
+        hooks={},
+        max_turns=12,
+        max_budget_usd=0.5,
+        enable_native_subagents=True,
+        native_agent_tool_grants=NATIVE_GRANULAR_AGENT_TOOL_GRANTS,
+    )
+
+    assert compiled.tool_names == list(MODE_B_LEAD_TOOL_NAMES)
+    assert compiled.lead_tool_names == list(MODE_B_LEAD_TOOL_NAMES)
+    assert compiled.agent_tool_grants == {
+        key: list(value) for key, value in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.items()
+    }
+    assert set(compiled.options.agents) == {"structured_data_agent", "per_user_wiki"}
+    assert compiled.options.agents["structured_data_agent"].tools == [
+        "mcp__architectos__list_founder_datasets",
+        "mcp__architectos__get_dataset_periods",
+        "mcp__architectos__run_structured_query",
+    ]
+    assert compiled.options.agents["per_user_wiki"].tools == [
+        "mcp__architectos__wiki_search",
+        "mcp__architectos__wiki_get_page",
+        "mcp__architectos__wiki_list",
+    ]
+    assert all(
+        agent.mcpServers == ["architectos"]
+        for agent in compiled.options.agents.values()
+    )
+    assert compiled.options.tools == ["Task"]
+    assert set(compiled.options.allowed_tools) == {
+        "Task",
+        *(f"mcp__architectos__{name}" for name in all_tools),
+    }
+    assert set(compiled.options.mcp_servers) == {"architectos"}
+    assert {tool["name"] for tool in compiled.options.mcp_servers["architectos"]["tools"]} == all_tools
+    assert compiled.agent_handler_tools == {}
 
 
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():
