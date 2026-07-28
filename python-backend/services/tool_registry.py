@@ -529,7 +529,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             description=(
                 "List the immediate contents of a Knowledge Base folder. "
                 "Returns folders first (alphabetical), then files (alphabetical). "
-                "Use this to explore one level at a time."
+                "Use this to explore one level at a time. Authoritative for locating raw source "
+                "documents, not for interpreting them or asserting current business figures."
             ),
             json_schema={
                 "type": "object",
@@ -553,7 +554,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             name="kb_tree",
             description=(
                 "Get a nested tree view of the Knowledge Base from a starting folder. "
-                "Use depth=2 for an overview, depth=3 or more for detailed exploration."
+                "Use depth=2 for an overview, depth=3 or more for detailed exploration. "
+                "Authoritative for the raw-document hierarchy, not for document meaning or current figures."
             ),
             json_schema={
                 "type": "object",
@@ -588,7 +590,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             description=(
                 "Search the extracted text of all documents for a regex pattern. "
                 "Returns matching document names and IDs - not content excerpts. "
-                "Use kb_read to inspect matching documents."
+                "Use kb_read to inspect matching documents. Authoritative for locating raw source "
+                "evidence, not for current state when newer structured records exist."
             ),
             json_schema={
                 "type": "object",
@@ -621,7 +624,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             name="kb_glob",
             description=(
                 "Find documents whose filenames match a glob pattern. "
-                "Supports *, ?, [seq] wildcards. Case-insensitive. Filename only - no folder path."
+                "Supports *, ?, [seq] wildcards. Case-insensitive. Filename only - no folder path. "
+                "Authoritative for locating raw documents by filename, not for their contents or interpretation."
             ),
             json_schema={
                 "type": "object",
@@ -656,7 +660,9 @@ def _native_tool_definitions() -> list[ToolDefinition]:
                 "Read the extracted text content of a document. "
                 "Omit start_line and end_line for the full document (max 2000 lines). "
                 "Provide both start_line and end_line for a specific range (max 500 lines, 1-indexed inclusive). "
-                "Use the document_id from kb_grep, kb_glob, kb_ls, or kb_tree results."
+                "Use the document_id from kb_grep, kb_glob, kb_ls, or kb_tree results. "
+                "Authoritative for what the source document stated as of its date. Not authoritative "
+                "for current state when newer structured records exist, or for interpretation."
             ),
             json_schema={
                 "type": "object",
@@ -685,6 +691,107 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             keywords=["read", "document", "content", "source"],
         ),
         ToolDefinition(
+            name="list_founder_datasets",
+            description=(
+                "List structured datasets owned by the current founder, with status and summary findings. "
+                "Authoritative for which structured records are available and their current ingestion state. "
+                "Not authoritative for interpretation; use the returned dataset id with get_dataset_periods."
+            ),
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum datasets to return (1-100). Default: 50.",
+                        "default": 50,
+                    }
+                },
+                "required": [],
+            },
+            source="native",
+            executor_kind="native",
+            persistence_semantics="read_only",
+            executor=_execute_list_founder_datasets,
+            citation={"source_kind": "founder_dataset", "mode": "metadata"},
+            capability_hints=["structured_data_agent"],
+            surface_tags=["virtual_cso", "domain_agent"],
+            keywords=["dataset", "structured data", "financial records", "list"],
+        ),
+        ToolDefinition(
+            name="get_dataset_periods",
+            description=(
+                "Read period-bounded rows from a founder's structured dataset, with provenance and explicit "
+                "truncation accounting. Authoritative for figures and current state. Prefer this over a wiki "
+                "page when the two disagree; a wiki figure may be stale. Not authoritative for interpretation."
+            ),
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "dataset_id": {
+                        "type": "string",
+                        "description": "Founder-owned dataset UUID returned by list_founder_datasets.",
+                    },
+                    "period_start": {
+                        "type": ["string", "null"],
+                        "description": "Optional inclusive lower period bound in YYYY-MM-DD form.",
+                    },
+                    "period_end": {
+                        "type": ["string", "null"],
+                        "description": "Optional inclusive upper period bound in YYYY-MM-DD form.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum rows to return (1-100). Default: 20.",
+                        "default": 20,
+                    },
+                },
+                "required": ["dataset_id"],
+            },
+            source="native",
+            executor_kind="native",
+            persistence_semantics="read_only",
+            executor=_execute_get_dataset_periods,
+            citation={"source_kind": "founder_dataset", "mode": "verbatim"},
+            capability_hints=["structured_data_agent"],
+            surface_tags=["virtual_cso", "domain_agent"],
+            keywords=["dataset", "period", "revenue", "margin", "figures"],
+        ),
+        ToolDefinition(
+            name="run_structured_query",
+            description=(
+                "Run a validated, read-only, row-capped SQL query against approved founder dataset surfaces. "
+                "Authoritative for the returned structured figures and current state. Not authoritative for "
+                "interpretation, and never permits model-supplied founder identity or write operations."
+            ),
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "The business question the validated query answers.",
+                    },
+                    "generated_sql": {
+                        "type": "string",
+                        "description": "A single SELECT over an approved structured dataset surface.",
+                    },
+                    "max_rows": {
+                        "type": "integer",
+                        "description": "Maximum rows to return (1-100). Default: 25.",
+                        "default": 25,
+                    },
+                },
+                "required": ["question", "generated_sql"],
+            },
+            source="native",
+            executor_kind="native",
+            persistence_semantics="read_only",
+            executor=_execute_run_structured_query,
+            citation={"source_kind": "founder_dataset", "mode": "verbatim"},
+            capability_hints=["structured_data_agent"],
+            surface_tags=["virtual_cso", "domain_agent"],
+            keywords=["structured query", "sql", "dataset", "analysis"],
+        ),
+        ToolDefinition(
             name="wiki_search",
             description=(
                 "Search the founder's compiled wiki by keyword query. "
@@ -692,7 +799,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
                 "Use this to find synthesized knowledge about business context, diagnostics, "
                 "sprint history, clients, offers, and conversation threads. "
                 "Prefer wiki_search over kb_grep when looking for synthesized intelligence "
-                "rather than raw document content."
+                "rather than raw document content. Authoritative for locating and connecting narrative "
+                "context. Not authoritative for figures; verify numbers against structured records."
             ),
             json_schema={
                 "type": "object",
@@ -722,7 +830,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             description=(
                 "Retrieve a specific wiki page by its canonical key. "
                 "Use this when you know the exact page key from a wiki_search or wiki_list result. "
-                "Returns the full page content."
+                "Returns the full page content. Authoritative for narrative context and for locating and "
+                "connecting information. Not authoritative for figures; verify numbers against structured records."
             ),
             json_schema={
                 "type": "object",
@@ -750,7 +859,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             description=(
                 "List wiki pages available for this founder, optionally filtered by page kind. "
                 "Use this to discover what synthesized knowledge exists before searching. "
-                "Returns page titles, kinds, and canonical keys."
+                "Returns page titles, kinds, and canonical keys. Authoritative for discovering available "
+                "narrative context. Not authoritative for figures or current structured state."
             ),
             json_schema={
                 "type": "object",
@@ -784,7 +894,9 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             description=(
                 "Run Python code in the persistent sandbox session for this task. Variables and "
                 "imports persist across calls. Returns stdout, stderr, and exit code. If your code "
-                "writes an output file, report it in the final summary using the PRODUCED_FILE line."
+                "writes an output file, report it in the final summary using the PRODUCED_FILE line. "
+                "Authoritative for the derivation it actually executes, not for source data; compute only "
+                "from successfully retrieved, cited evidence."
             ),
             json_schema={
                 "type": "object",
@@ -1088,6 +1200,286 @@ def _int_or(value: Any, default: int) -> int:
     if value is None:
         return default
     return int(value)
+
+
+def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = _int_or(value, default)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(parsed, maximum))
+
+
+def _agent_result_envelope(
+    *,
+    summary: str,
+    findings: list[dict[str, Any]],
+    sources: list[ToolSourceRef],
+    confidence: float = 0.7,
+    needs_review: bool = False,
+    extra: dict[str, Any] | None = None,
+) -> ToolResultEnvelope:
+    structured_result = {
+        "schema_version": "agent_result_v1",
+        "summary": summary,
+        "findings": findings,
+        "confidence": confidence,
+        "needs_review": needs_review,
+        "reasoning_visibility": "summary_only",
+        "source_count": len(sources),
+        **(extra or {}),
+    }
+    citations = [source.to_dict() for source in sources]
+    return ToolResultEnvelope(
+        content={
+            "result_summary": summary,
+            "structured_result": structured_result,
+            "citations": citations,
+        },
+        sources=sources,
+    )
+
+
+def _dataset_source(
+    dataset: dict[str, Any],
+    *,
+    row: dict[str, Any] | None = None,
+) -> ToolSourceRef:
+    row = row or {}
+    provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
+    return ToolSourceRef(
+        source_kind="founder_dataset",
+        source_id=str(dataset.get("id")) if dataset.get("id") else None,
+        label=str(dataset.get("dataset_name") or row.get("row_label") or "Founder dataset"),
+        metadata={
+            "dataset_type": dataset.get("dataset_type"),
+            "status": dataset.get("status"),
+            "row_id": row.get("id"),
+            "row_label": row.get("row_label"),
+            "period_start": row.get("period_start"),
+            "period_end": row.get("period_end"),
+            "provenance": provenance,
+        },
+    )
+
+
+def _execute_list_founder_datasets(
+    context: ToolExecutionContext,
+    tool_input: dict[str, Any],
+) -> ToolResultEnvelope:
+    limit = _bounded_int(tool_input.get("limit"), default=50, minimum=1, maximum=100)
+    response = (
+        context.client.table("founder_datasets")
+        .select("id,user_id,source_document_id,dataset_name,dataset_type,status,summary,confidence,metadata")
+        .eq("user_id", context.user_id)
+        .order("updated_at", desc=True)
+        .limit(limit + 1)
+        .execute()
+    )
+    rows = list(response.data or [])
+    truncated = len(rows) > limit
+    datasets = rows[:limit]
+    findings = [
+        {
+            "type": "dataset_summary",
+            "title": dataset.get("dataset_name"),
+            "summary": dataset.get("summary") or f"Dataset status is {dataset.get('status')}.",
+            "source_id": dataset.get("id"),
+            "dataset_type": dataset.get("dataset_type"),
+            "status": dataset.get("status"),
+            "confidence": dataset.get("confidence"),
+            "metadata": dataset.get("metadata") or {},
+        }
+        for dataset in datasets
+    ]
+    if not findings:
+        findings.append(
+            {
+                "type": "no_sources",
+                "summary": "No founder-owned structured datasets are currently available.",
+                "source_id": None,
+            }
+        )
+    summary = f"Found {len(datasets)} founder-owned structured dataset(s)."
+    sources = [_dataset_source(dataset) for dataset in datasets]
+    return _agent_result_envelope(
+        summary=summary,
+        findings=findings,
+        sources=sources,
+        extra={
+            "returned_count": len(datasets),
+            "requested_limit": limit,
+            "truncated": truncated,
+        },
+    )
+
+
+def _execute_get_dataset_periods(
+    context: ToolExecutionContext,
+    tool_input: dict[str, Any],
+) -> ToolResultEnvelope:
+    dataset_id = str(tool_input.get("dataset_id") or "").strip()
+    if not dataset_id:
+        raise ToolRegistryError("dataset_id is required.")
+    limit = _bounded_int(tool_input.get("limit"), default=20, minimum=1, maximum=100)
+    dataset_response = (
+        context.client.table("founder_datasets")
+        .select("id,user_id,source_document_id,dataset_name,dataset_type,status,summary,confidence,metadata")
+        .eq("user_id", context.user_id)
+        .eq("id", dataset_id)
+        .limit(1)
+        .execute()
+    )
+    datasets = list(dataset_response.data or [])
+    if not datasets:
+        raise ToolRegistryError("Dataset was not found for the current founder.")
+    dataset = datasets[0]
+    findings: list[dict[str, Any]] = [
+        {
+            "type": "dataset_summary",
+            "title": dataset.get("dataset_name"),
+            "summary": dataset.get("summary") or f"Dataset status is {dataset.get('status')}.",
+            "source_id": dataset.get("id"),
+        }
+    ]
+    sources: list[ToolSourceRef] = [_dataset_source(dataset)]
+    period_start = tool_input.get("period_start")
+    period_end = tool_input.get("period_end")
+    try:
+        query = (
+            context.client.table("founder_dataset_rows")
+            .select("id,dataset_id,row_label,period_start,period_end,values,normalized_values,provenance")
+            .eq("user_id", context.user_id)
+            .eq("dataset_id", dataset_id)
+        )
+        if period_start:
+            query = query.gte("period_end", str(period_start))
+        if period_end:
+            query = query.lte("period_start", str(period_end))
+        rows_response = query.order("source_row_index").limit(limit + 1).execute()
+        fetched_rows = list(rows_response.data or [])
+        truncated = len(fetched_rows) > limit
+        rows = fetched_rows[:limit]
+    except Exception:
+        rows = []
+        truncated = False
+        findings.append(
+            {
+                "type": "dataset_row_error",
+                "title": dataset.get("dataset_name"),
+                "summary": "Could not load bounded dataset rows for this tool call.",
+                "source_id": dataset.get("id"),
+            }
+        )
+    for row in rows:
+        normalized = row.get("normalized_values")
+        values = normalized if normalized else (row.get("values") or {})
+        provenance = row.get("provenance") or {}
+        findings.append(
+            {
+                "type": "dataset_row",
+                "title": row.get("row_label") or dataset.get("dataset_name"),
+                "summary": (
+                    f"Dataset row period {row.get('period_start') or 'unknown'} to "
+                    f"{row.get('period_end') or 'unknown'}."
+                ),
+                "source_id": dataset.get("id"),
+                "row_id": row.get("id"),
+                "period_start": row.get("period_start"),
+                "period_end": row.get("period_end"),
+                "values": values,
+                "provenance": provenance,
+            }
+        )
+        sources.append(_dataset_source(dataset, row=row))
+    numeric_rows = sum(1 for finding in findings if finding.get("type") == "dataset_row")
+    summary = f"Reviewed 1 dataset and returned {numeric_rows} bounded numeric row(s)."
+    return _agent_result_envelope(
+        summary=summary,
+        findings=findings,
+        sources=sources,
+        needs_review=any(finding.get("type") == "dataset_row_error" for finding in findings),
+        extra={
+            "returned_count": numeric_rows,
+            "requested_limit": limit,
+            "truncated": truncated,
+            "period_start": period_start,
+            "period_end": period_end,
+        },
+    )
+
+
+def _execute_run_structured_query(
+    context: ToolExecutionContext,
+    tool_input: dict[str, Any],
+) -> ToolResultEnvelope:
+    from services.structured_query import (
+        StructuredQueryRequest,
+        StructuredQueryService,
+        validate_structured_sql,
+    )
+
+    question = str(tool_input.get("question") or "").strip()
+    generated_sql = str(tool_input.get("generated_sql") or "").strip()
+    if not question or not generated_sql:
+        raise ToolRegistryError("question and generated_sql are required.")
+    max_rows = _bounded_int(tool_input.get("max_rows"), default=25, minimum=1, maximum=100)
+    validated = validate_structured_sql(generated_sql, max_rows=max_rows)
+    result = StructuredQueryService(context.store).execute(
+        StructuredQueryRequest(
+            user_id=context.user_id,
+            question=question,
+            generated_sql=generated_sql,
+            thread_id=context.thread_id,
+            tool_call_id=str(context.metadata.get("tool_call_id") or "") or None,
+            max_rows=max_rows,
+        )
+    )
+    if not result.accepted:
+        raise ToolRegistryError(result.rejection_reason or "Structured query was rejected.")
+    findings = [
+        {
+            "type": "structured_query_result",
+            "summary": f"Approved structured query returned {len(result.rows)} row(s).",
+            "query_id": result.query_id,
+            "row_count": len(result.rows),
+            "rows": result.rows,
+        }
+    ]
+    sources: list[ToolSourceRef] = []
+    seen_dataset_ids: set[str] = set()
+    for row in result.rows:
+        dataset_id = str(row.get("dataset_id") or "")
+        if not dataset_id or dataset_id in seen_dataset_ids:
+            continue
+        seen_dataset_ids.add(dataset_id)
+        sources.append(
+            ToolSourceRef(
+                source_kind="founder_dataset",
+                source_id=dataset_id,
+                label="Structured query dataset",
+                metadata={
+                    "query_id": result.query_id,
+                    "period_start": row.get("period_start"),
+                    "period_end": row.get("period_end"),
+                    "provenance": row.get("provenance") or {},
+                },
+            )
+        )
+    summary = f"Approved structured query returned {len(result.rows)} row(s)."
+    return _agent_result_envelope(
+        summary=summary,
+        findings=findings,
+        sources=sources,
+        extra={
+            "query_id": result.query_id,
+            "query_surface": validated["surface"],
+            "row_count": len(result.rows),
+            "row_limit": validated["limit"],
+            "truncated": len(result.rows) >= validated["limit"],
+            "execution_ms": result.execution_ms,
+        },
+    )
 
 
 def _execute_kb_ls(context: ToolExecutionContext, tool_input: dict[str, Any]) -> ToolResultEnvelope:
