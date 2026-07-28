@@ -264,7 +264,7 @@ def compile_founder_sdk_options(
         if server_name != SDK_INTERNAL_SERVER and server_name not in connected_set:
             continue
         grouped_tools.setdefault(server_name, []).append(sdk_tool)
-    if not model_driven:
+    if not model_driven or granular_native:
         # In-process worker tools attach to the session server only for the Path-A/Fix-C surface. Model-
         # driven scoping exposes workers via the external per-agent server instead (D2), so they are never
         # added to any top-level server — keeping run_<agent> out of the lead's tool schema.

@@ -30,7 +30,9 @@ from services.vcso_sdk_config import (
     DELEGATION_TOOL_NAMES,
     DELEGATION_TOOL_PROVISION_NAME,
     DELEGATION_TOOL_RUNTIME_NAME,
+    MODE_B_LEAD_TOOL_NAMES,
     MODEL_DRIVEN_WORKER_SERVER,
+    NATIVE_GRANULAR_AGENT_TOOL_GRANTS,
     compile_founder_sdk_options,
 )
 from services.vcso_worker_mcp import (
@@ -69,6 +71,10 @@ P4_NATIVE_SUBAGENT_KEYS = (
 P4_THIN_SLICE_REQUIRED_AGENTS = (
     "structured_data_agent",
     "sandbox_execution_agent",
+    "per_user_wiki",
+)
+NATIVE_SURFACE_REQUIRED_AGENTS = (
+    "structured_data_agent",
     "per_user_wiki",
 )
 G_GATE_MODEL_CHOICE_SCOPE = "g_gate_model_choice"
@@ -362,6 +368,12 @@ def native_subagent_requirements(
         and diagnostic_worker in P4_THIN_SLICE_REQUIRED_AGENTS
     ):
         return (diagnostic_worker,)
+    if (
+        bool(settings.get("native_model_driven_enabled"))
+        and bool(user_id)
+        and str(user_id) in diagnostic_user_ids
+    ):
+        return NATIVE_SURFACE_REQUIRED_AGENTS
     return P4_THIN_SLICE_REQUIRED_AGENTS
 
 
@@ -556,6 +568,60 @@ def build_native_runtime_manifest(compiled: Any, *, required_agents: tuple[str, 
         },
         "violations": violations,
     }
+
+
+def native_tool_access_decision(
+    *,
+    tool_name: str,
+    agent_id_present: bool,
+    agent_type: str,
+    lead_tool_names: set[str],
+    agent_tool_grants: dict[str, set[str]],
+) -> tuple[bool, str]:
+    """Authorize founder-data tools by caller identity, not by SDK pre-approval."""
+
+    registry_name = _registry_name(tool_name)
+    owners = sorted(
+        capability
+        for capability, grants in agent_tool_grants.items()
+        if registry_name in grants
+    )
+    if agent_id_present:
+        granted = registry_name in agent_tool_grants.get(agent_type, set())
+        if granted:
+            return True, f"{registry_name} is within the compiled {agent_type} delegation grant."
+        owner_text = ", ".join(owners) if owners else "no approved native worker"
+        return (
+            False,
+            f"{registry_name} is not granted to {agent_type or 'this worker'}; it belongs to "
+            f"{owner_text}. This worker may use only its compiled delegation tools; return control "
+            f"to the lead so it can delegate with Task to {owner_text}.",
+        )
+    if registry_name in lead_tool_names:
+        return True, f"{registry_name} is on the lead's Mode B surface."
+    owner_text = ", ".join(owners) if owners else "an approved bounded worker"
+    return (
+        False,
+        f"{registry_name} performs founder-data work inside an approved {owner_text} delegation. "
+        f"Delegate with Task to {owner_text}; the lead may not call this tool directly.",
+    )
+
+
+def compute_gate_decision(
+    *,
+    tool_name: str,
+    successful_retrieval_tool_use_ids: set[str],
+) -> tuple[bool, str]:
+    if _registry_name(tool_name) != "execute_code":
+        return True, "Compute gate does not apply to this tool."
+    if successful_retrieval_tool_use_ids:
+        retrieval_ids = ", ".join(sorted(successful_retrieval_tool_use_ids))
+        return True, f"A cited read-only retrieval completed successfully in this turn: {retrieval_ids}."
+    return (
+        False,
+        "execute_code requires data with provenance. Complete a successful cited read-only retrieval "
+        "tool call in this turn, then compute from that retrieved evidence.",
+    )
 
 
 def _native_base_system_prompt(system_prompt: str) -> str:
@@ -1024,6 +1090,74 @@ def build_model_driven_manifest(
     }
 
 
+def build_native_model_driven_manifest(
+    compiled: Any,
+    *,
+    required_agents: tuple[str, ...],
+    lead_tool_names: tuple[str, ...],
+    agent_tool_grants: dict[str, tuple[str, ...]],
+) -> dict[str, Any]:
+    """Fail closed when the in-process native surface differs from the approved grant matrix."""
+
+    options = compiled.options
+    allowed_tools = set(map(str, options.allowed_tools or []))
+    provisioned_tools = list(options.tools or []) if isinstance(options.tools, list) else []
+    disallowed_tools = set(map(str, options.disallowed_tools or []))
+    agents = options.agents or {}
+    violations: list[str] = []
+
+    if DELEGATION_TOOL_PROVISION_NAME not in provisioned_tools:
+        violations.append("native_delegation_tool_not_provisioned")
+    for blocked in sorted(DELEGATION_TOOL_NAMES & disallowed_tools):
+        violations.append(f"native_delegation_tool_disallowed:{blocked}")
+
+    actual_lead = tuple(compiled.lead_tool_names)
+    if actual_lead != lead_tool_names:
+        violations.append(
+            "native_lead_surface_mismatch:"
+            + "|".join(actual_lead)
+        )
+
+    expected_agents = set(required_agents)
+    for unexpected in sorted(set(agents) - expected_agents):
+        violations.append(f"native_unexpected_agent:{unexpected}")
+    for capability_key in required_agents:
+        agent = agents.get(capability_key)
+        if agent is None:
+            violations.append(f"native_required_agent_missing:{capability_key}")
+            continue
+        expected_sdk_tools = {
+            f"{SDK_TOOL_PREFIX}{name}"
+            for name in agent_tool_grants.get(capability_key, ())
+        }
+        actual_sdk_tools = set(map(str, getattr(agent, "tools", ()) or ()))
+        if actual_sdk_tools != expected_sdk_tools:
+            violations.append(f"native_worker_grant_mismatch:{capability_key}")
+        if list(getattr(agent, "mcpServers", None) or []) != [SDK_INTERNAL_SERVER]:
+            violations.append(f"native_worker_server_mismatch:{capability_key}")
+        for sdk_tool_name in sorted(actual_sdk_tools):
+            if sdk_tool_name not in allowed_tools:
+                violations.append(f"native_worker_tool_not_preapproved:{sdk_tool_name}")
+
+    if SDK_INTERNAL_SERVER not in dict(options.mcp_servers or {}):
+        violations.append("native_in_process_server_missing")
+    if compiled.agent_handler_tools:
+        violations.append("native_handler_tool_compiled")
+
+    return {
+        "delegation_model": "native_granular",
+        "required_agents": list(required_agents),
+        "lead_tools": list(actual_lead),
+        "agent_tool_grants": {
+            key: list(compiled.agent_tool_grants.get(key, ()))
+            for key in required_agents
+        },
+        "lead_allowed_tools": sorted(allowed_tools),
+        "top_level_servers": sorted(dict(options.mcp_servers or {}).keys()),
+        "violations": violations,
+    }
+
+
 async def _run_sdk_turn(
     *,
     prompt: str,
@@ -1086,6 +1220,10 @@ async def _run_sdk_turn(
     worker_results: dict[str, Any] = {}
     child_usage_records: list[dict[str, Any]] = []
     completed_agents: set[str] = set()
+    successful_retrieval_tool_use_ids: set[str] = set()
+    successful_compute_sources: list[dict[str, Any]] = []
+    compiled_lead_tool_names: set[str] = set()
+    compiled_agent_tool_grants: dict[str, set[str]] = {}
     delegation_count = 0
     max_delegations = len(provisioned_agents)
     plan_statuses = {key: "pending" for key in required_agents}
@@ -1185,6 +1323,12 @@ async def _run_sdk_turn(
 
     definitions = _selected_definitions(registry, tool_names)
     tool_context.metadata["enforce_persistence_guardrail"] = True
+    if model_driven:
+        # execute_code is an approved part of this dark native surface. Its authorization is the
+        # structural compute gate below, not a founder-facing confirmation prompt.
+        confirmed = set(tool_context.metadata.get("confirmed_tool_names") or ())
+        confirmed.add("execute_code")
+        tool_context.metadata["confirmed_tool_names"] = sorted(confirmed)
 
     def allocate_step(tool_use_id: str | None, sdk_tool_name: str) -> int:
         nonlocal next_step_index
@@ -1289,12 +1433,6 @@ async def _run_sdk_turn(
                 raise ValueError("Each approved worker may run only once per turn.")
             if delegation_count >= max_delegations:
                 raise ValueError("The bounded per-turn delegation cap has been reached.")
-            if capability_key == "sandbox_execution_agent":
-                if "structured_data_agent" not in completed_agents:
-                    raise ValueError("Run structured_data_agent to completion before sandbox_execution_agent.")
-                prior = (contract.get("context_scope") or {}).get("prior_findings")
-                if not prior:
-                    raise ValueError("The sandbox contract must inherit the compact structured-data finding.")
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             # Counted for the cheap give-up (step A3): a lead whose every Task is refused never completes a
             # worker, so the stop_hook would otherwise block it all the way to max_turns.
@@ -1338,55 +1476,78 @@ async def _run_sdk_turn(
             }
         }
 
-    async def pre_worker_handler_gate(
+    async def pre_native_access_gate(
         input_data: dict[str, Any],
         tool_use_id: str | None,
         _context: Any,
     ) -> dict[str, Any]:
         tool_name = str(input_data.get("tool_name") or "")
-        handler_prefix = f"{SDK_TOOL_PREFIX}run_"
-        capability_key = tool_name[len(handler_prefix):] if tool_name.startswith(handler_prefix) else ""
         agent_id_present = bool(input_data.get("agent_id"))
         agent_type = str(input_data.get("agent_type") or "")
-        delegated = (
-            agent_id_present
-            and agent_type == capability_key
-            and capability_key in task_contracts
+        allowed, reason = native_tool_access_decision(
+            tool_name=tool_name,
+            agent_id_present=agent_id_present,
+            agent_type=agent_type,
+            lead_tool_names=compiled_lead_tool_names,
+            agent_tool_grants=compiled_agent_tool_grants,
         )
         try:
             logger.info(
-                "vcso_sdk worker pretooluse gate tool=%s agent_id_present=%s agent_type=%s delegated=%s tool_use_id=%s",
+                "vcso_sdk native access gate tool=%s agent_id_present=%s agent_type=%s allowed=%s tool_use_id=%s",
                 tool_name,
                 agent_id_present,
                 agent_type,
-                delegated,
+                allowed,
                 tool_use_id,
             )
             record_lifecycle(
-                "worker_pre_tool_use_gate",
+                "native_access_gate",
                 tool_name=tool_name,
                 tool_use_id=tool_use_id,
-                capability_key=capability_key,
+                capability_key=agent_type,
                 agent_id_present=agent_id_present,
                 agent_type=agent_type,
-                decision="allow" if delegated else "deny",
-                reason_code="approved_task_subagent" if delegated else "lead_or_mismatched_subagent",
+                decision="allow" if allowed else "deny",
+                reason_code=reason,
             )
         except Exception:  # noqa: BLE001 - logging/persistence must not weaken the gate
             pass
-        if not delegated:
+        if not allowed:
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": (
-                        "Worker handlers are available only to their matching approved Task subagent."
-                    ),
+                    "permissionDecisionReason": reason,
                 }
             }
-        # The global allowed_tools entry remains the SDK 0.2.118 permission grant. Returning no
-        # decision here avoids replacing that grant after the lead/subagent boundary is verified.
         return {}
+
+    async def pre_compute_gate(
+        input_data: dict[str, Any],
+        tool_use_id: str | None,
+        _context: Any,
+    ) -> dict[str, Any]:
+        tool_name = str(input_data.get("tool_name") or "")
+        allowed, reason = compute_gate_decision(
+            tool_name=tool_name,
+            successful_retrieval_tool_use_ids=successful_retrieval_tool_use_ids,
+        )
+        record_lifecycle(
+            "compute_gate",
+            tool_name=tool_name,
+            tool_use_id=tool_use_id,
+            decision="allow" if allowed else "deny",
+            reason_code=reason,
+        )
+        if allowed:
+            return {}
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
+            }
+        }
 
     async def subagent_start_hook(
         input_data: dict[str, Any], tool_use_id: str | None, _context: Any
@@ -1491,6 +1652,23 @@ async def _run_sdk_turn(
         registry_name = _registry_name(sdk_tool_name)
         step_index = step_indexes.get(str(tool_use_id or sdk_tool_name)) or allocate_step(tool_use_id, sdk_tool_name)
         outcome = tool_outcomes[sdk_tool_name].popleft() if tool_outcomes[sdk_tool_name] else _ToolOutcome("completed", [])
+        try:
+            definition = registry.get(registry_name)
+        except Exception:
+            definition = None
+        if (
+            outcome.status == "completed"
+            and definition is not None
+            and definition.persistence_semantics == "read_only"
+            and bool(definition.citation)
+        ):
+            successful_retrieval_tool_use_ids.add(str(tool_use_id or sdk_tool_name))
+        if (
+            outcome.status == "completed"
+            and registry_name == "execute_code"
+            and any(source.get("source_kind") == "computation" for source in outcome.sources)
+        ):
+            successful_compute_sources.extend(outcome.sources)
         if running_steps[sdk_tool_name]:
             running_steps[sdk_tool_name].popleft()
         step_type, title, summary = _curated_tool_copy(registry_name, running=False, failed=outcome.status == "failed")
@@ -1515,7 +1693,7 @@ async def _run_sdk_turn(
         selected_agents = tuple(dict.fromkeys(task_capabilities.values()))
         enforced_agents = selected_agents if model_choice else required_agents
         missing = [key for key in enforced_agents if key not in completed_agents]
-        if missing and model_driven:
+        if missing and model_driven and model_driven_scope is not None:
             # Model-driven workers run OUT of process, so a worker whose Task tool-call was abandoned early
             # (e.g. a slow worker timing out in-band) is absent from the in-memory `completed_agents` even
             # though it wrote a completed child row. Consult the authoritative DB completion bridge so
@@ -1531,7 +1709,8 @@ async def _run_sdk_turn(
             # (the timed-out case), inject its compact child finding into the compose so the answer isn't
             # missing that worker's content. Deferred: it needs mid-stream injection into the SDK lead —
             # significant machinery. For now the turn composes from what the lead already holds.
-        if missing:
+        compute_missing = compute_integrity_required and not successful_compute_sources
+        if missing or compute_missing:
             # Cheap give-up (SDK-M3 step A3). "Progress" means at least one required worker completed since
             # the previous block; a lead that is complying just needs the nudge, and each nudge that lands
             # resets the budget. A lead that has been told twice and moved nothing is not going to move, and
@@ -1555,7 +1734,8 @@ async def _run_sdk_turn(
                         decision="stop",
                         reason_code=(
                             f"blocks={stop_block_count},denials={task_denial_count},"
-                            f"delegations={delegation_count},missing={'|'.join(missing)}"
+                            f"delegations={delegation_count},missing={'|'.join(missing)},"
+                            f"compute_missing={compute_missing}"
                         )[:120],
                     )
                 gave_up_early = True
@@ -1572,8 +1752,17 @@ async def _run_sdk_turn(
             return {
                 "decision": "block",
                 "reason": (
-                    "The bounded Phase-D plan is incomplete. Delegate the missing required worker(s): "
-                    + ", ".join(missing)
+                    "The bounded native plan is incomplete. "
+                    + (
+                        "Delegate the missing required worker(s): " + ", ".join(missing) + ". "
+                        if missing
+                        else ""
+                    )
+                    + (
+                        "Run execute_code from successfully retrieved cited evidence before composing."
+                        if compute_missing
+                        else ""
+                    )
                 ),
             }
         _record_turn_trace(metadata=trace_metadata, status="completed")
@@ -1992,9 +2181,7 @@ async def _run_sdk_turn(
     # Path A registers no worker MCP tools and no Task (compose-only). Model-driven registers Task on the
     # lead + exposes each worker via an EXTERNAL per-agent MCP server (invisible to the lead), so the lead
     # must reason the decomposition and delegate via Task.
-    native_subagent_tools: dict[str, Any] = (
-        {key: {"name": f"run_{key}"} for key in provisioned_agents} if model_driven else {}
-    )
+    native_subagent_tools: dict[str, Any] = {}
     hooks: dict[str, Any] = {
         "PostToolUse": [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])],
         "PostToolUseFailure": [
@@ -2003,23 +2190,12 @@ async def _run_sdk_turn(
         "Stop": [HookMatcher(hooks=[stop_hook])],
         "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
     }
-    if model_driven:
+    if model_driven and False:  # Retained dark until Step 3 removes the external worker transport.
         # The completion bridge + subagent-step trace live in post_tool_use's delegation branch, so the
         # PostToolUse matcher must also match the delegation tool (the `^mcp__.*$` default never would).
         hooks["PostToolUse"] = [
             HookMatcher(matcher=_DELEGATION_OR_MCP_MATCHER, hooks=[post_tool_use])
         ]
-
-        async def pre_tool_probe(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
-            # Observe-only: records whether a worker tool call fired from inside a Task-spawned subagent
-            # (agent_id present) vs a lead direct-call. Returns {} so permission stays with the surface.
-            record_lifecycle(
-                "pre_tool_probe",
-                tool_name=input_data.get("tool_name"),
-                tool_use_id=tool_use_id,
-                agent_id_present=bool(input_data.get("agent_id")),
-            )
-            return {}
 
         base_url = os.environ.get("VCSO_WORKER_MCP_BASE_URL") or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}"
         model_driven_scope = (
@@ -2111,6 +2287,19 @@ async def _run_sdk_turn(
             HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
             HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
         ]
+    if model_driven:
+        hooks["PostToolUse"] = [
+            HookMatcher(matcher=_DELEGATION_OR_MCP_MATCHER, hooks=[post_tool_use])
+        ]
+        hooks["PreToolUse"] = [
+            HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
+            HookMatcher(
+                matcher=r"^mcp__.*$",
+                hooks=[pre_native_access_gate, pre_compute_gate],
+            ),
+        ]
+        hooks["SubagentStart"] = [HookMatcher(hooks=[subagent_start_hook])]
+        hooks["SubagentStop"] = [HookMatcher(hooks=[subagent_stop_hook])]
     if enable_ask_user_pause:
         async def pause_or_resume_ask_user(
             input_data: dict[str, Any],
@@ -2185,11 +2374,24 @@ async def _run_sdk_turn(
         enable_native_subagents=model_driven,
         native_subagent_tools=native_subagent_tools,
         model_driven_worker_server_urls=model_driven_worker_urls,
+        native_agent_tool_grants=(
+            NATIVE_GRANULAR_AGENT_TOOL_GRANTS if model_driven else None
+        ),
         session_store=session_store,
         resume_session_id=resume_session_id,
         fork_session=fork_session,
     )
     options = compiled.options
+    compiled_lead_tool_names.update(compiled.lead_tool_names)
+    compiled_agent_tool_grants.update(
+        {
+            capability_key: {
+                _registry_name(tool_name)
+                for tool_name in getattr(agent, "tools", ())
+            }
+            for capability_key, agent in (options.agents or {}).items()
+        }
+    )
     if native_mode and not model_driven:
         # Path A: the lead composes only from the app-run worker findings injected into the system
         # prompt. Remove the agent definitions as well as the grants so the SDK cannot synthesize a
@@ -2200,19 +2402,19 @@ async def _run_sdk_turn(
     if model_driven:
         # Inverted safety manifest: abort before spending a canary if any run_<agent> tool leaked into the
         # lead's schema or the external worker server was registered top-level (04B-D2-FINDINGS §8).
-        runtime_manifest = build_model_driven_manifest(
-            compiled, required_agents=provisioned_agents, worker_server_name=MODEL_DRIVEN_WORKER_SERVER
+        runtime_manifest = build_native_model_driven_manifest(
+            compiled,
+            required_agents=provisioned_agents,
+            lead_tool_names=MODE_B_LEAD_TOOL_NAMES,
+            agent_tool_grants=NATIVE_GRANULAR_AGENT_TOOL_GRANTS,
         )
         if runtime_manifest["violations"]:
-            for token in model_driven_tokens.values():
-                TURN_REGISTRY.unregister(token)
-            model_driven_tokens.clear()
             record_lifecycle("runtime_manifest", decision="model_driven", reason_code="invalid_surface")
             raise RuntimeError(
-                "Model-driven lead surface invalid; refusing to spend a turn: "
+                "Native model-driven surface invalid; refusing to spend a turn: "
                 + ", ".join(runtime_manifest["violations"])
             )
-        record_lifecycle("runtime_manifest", decision="model_driven", reason_code="none")
+        record_lifecycle("runtime_manifest", decision="native_granular", reason_code="none")
     else:
         runtime_manifest = {
             "delegation_model": "app_owned",
@@ -2512,11 +2714,15 @@ async def _run_sdk_turn(
     if not answer_text:
         raise RuntimeError("Claude Agent SDK returned no assistant text.")
     successful_cited_compute = (
-        _successful_cited_compute_result(
-            worker_results=worker_results,
-            model_driven_scope=model_driven_scope,
-            client=getattr(tool_context.store, "client", None),
-            parent_run_id=tool_context.metadata.get("parent_run_id"),
+        (
+            bool(successful_compute_sources)
+            if model_driven
+            else _successful_cited_compute_result(
+                worker_results=worker_results,
+                model_driven_scope=model_driven_scope,
+                client=getattr(tool_context.store, "client", None),
+                parent_run_id=tool_context.metadata.get("parent_run_id"),
+            )
         )
         if compute_integrity_required
         else False
@@ -2797,17 +3003,19 @@ def _per_worker_contract_brief(
 def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
     required = ", ".join(required_agents)
     return (
-        "\n\nPHASE-D NATIVE SUBAGENT CONTRACT. This exact canary is a genuine multi-part synthesis; "
+        "\n\nNATIVE GRANULAR-WORKER CONTRACT. This exact probe is a genuine multi-part synthesis; "
         f"you must delegate exactly once to each approved worker: {required}. "
-        "Use only the SDK Task tool; do not call evidence, wiki, registry, or MCP tools directly. "
-        "Delegate before drafting any answer. Run structured_data_agent first. Its compact Task result must then be "
-        "included under context_scope.prior_findings in the sandbox_execution_agent Task contract; "
-        "never send a raw dataset to the sandbox. The strategic-context worker may run before or after "
-        "structured data, but sandbox must wait for structured data to finish. Every Task prompt must be "
+        "Use the SDK Task tool for founder-data work owned by those workers. The lead has a deliberately "
+        "small Mode B read surface for bounded context and execute_code for derivation; seeing a worker "
+        "tool does not authorize the lead to execute it, and the access hook will refuse a direct call. "
+        "Delegate before drafting any answer. The structured-data worker must retrieve and return the "
+        "cited series needed for the calculation. The wiki worker must retrieve the cited strategic "
+        "context. After a successful cited read-only retrieval, use execute_code on the lead to derive "
+        "the requested number. Never compute from an uncited or silently truncated series. Every Task prompt must be "
         "exactly one JSON object with keys objective, output_format, tools_sources, boundaries, and "
         "context_scope. Boundaries must require founder isolation, citations, compact output, no raw "
-        "payloads, no wiki writes, no recursion, and no external writes. Compose only from the compact Task "
-        "findings after every required Task completes; do not re-crawl sources."
+        "payloads, no wiki writes, no recursion, and no external writes. Compose only after both worker "
+        "findings and a cited computation complete."
         # EFFORT-SCALING, BOTH DIRECTIONS (SDK-M3 step C1). Scaling up is the failure everyone watches for;
         # scaling DOWN is the one that quietly makes the system expensive and slow. Both are stated as one
         # rule so neither reads as an afterthought, and the "already know the answer" clause is explicit
@@ -2818,14 +3026,13 @@ def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
         "clarification, or an acknowledgement must be answered DIRECTLY in one pass -- no Task, no worker, "
         "no plan. Never over-decompose a simple turn. On this turn, do not skip a required worker because "
         "the assembled context appears to already contain the answer: the workers exist to derive the "
-        "numbers and their evidence, and composing from context you were handed instead of from worker "
+        "source evidence and its strategic meaning, and composing from context you were handed instead of from worker "
         "findings is the failure mode this contract exists to prevent."
         + _per_worker_contract_brief(required_agents)
         + "\n\nTASK CONTRACT SCHEMA. Each Task prompt must be EXACTLY one JSON object -- no prose, no markdown "
         "fence, no text before or after the braces. Required keys: objective (non-empty string), "
         "output_format (present), tools_sources (NON-EMPTY list), boundaries (NON-EMPTY list), context_scope "
-        "(object). For sandbox_execution_agent, context_scope.prior_findings must be non-empty (the compact "
-        "structured-data finding). Each approved worker may run only once per turn. Worked example "
+        "(object). Each approved worker may run only once per turn. Worked example "
         "(structured-data delegation): "
         '{"objective":"Quantify client-concentration and margin trend from the founder dataset",'
         '"output_format":"compact cited findings","tools_sources":["founder_dataset"],'

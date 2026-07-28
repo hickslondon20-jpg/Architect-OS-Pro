@@ -31,10 +31,86 @@ from services.vcso_sdk_loop import (
     _native_generalization_prompt,
     _native_synthesis_prompt,
     _successful_cited_compute_result,
+    compute_gate_decision,
+    native_tool_access_decision,
     native_subagent_requirements,
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
 )
+
+
+def test_native_access_gate_allows_only_the_compiled_owner_grant():
+    grants = {
+        "structured_data_agent": {"list_founder_datasets", "get_dataset_periods"},
+        "per_user_wiki": {"wiki_search", "wiki_get_page"},
+    }
+
+    allowed, reason = native_tool_access_decision(
+        tool_name="mcp__architectos__get_dataset_periods",
+        agent_id_present=True,
+        agent_type="structured_data_agent",
+        lead_tool_names={"wiki_list", "get_dataset_periods", "execute_code"},
+        agent_tool_grants=grants,
+    )
+
+    assert allowed is True
+    assert "structured_data_agent" in reason
+
+
+def test_native_access_gate_refuses_a_sibling_tool_with_actionable_wording():
+    allowed, reason = native_tool_access_decision(
+        tool_name="mcp__architectos__wiki_search",
+        agent_id_present=True,
+        agent_type="structured_data_agent",
+        lead_tool_names={"wiki_list", "get_dataset_periods", "execute_code"},
+        agent_tool_grants={
+            "structured_data_agent": {"get_dataset_periods"},
+            "per_user_wiki": {"wiki_search"},
+        },
+    )
+
+    assert allowed is False
+    assert "per_user_wiki" in reason
+    assert "Task" in reason
+
+
+def test_native_access_gate_refuses_lead_worker_work_and_allows_mode_b():
+    grants = {"structured_data_agent": {"run_structured_query"}}
+    denied, refusal = native_tool_access_decision(
+        tool_name="mcp__architectos__run_structured_query",
+        agent_id_present=False,
+        agent_type="",
+        lead_tool_names={"wiki_list", "get_dataset_periods", "execute_code"},
+        agent_tool_grants=grants,
+    )
+    allowed, _reason = native_tool_access_decision(
+        tool_name="mcp__architectos__get_dataset_periods",
+        agent_id_present=False,
+        agent_type="",
+        lead_tool_names={"wiki_list", "get_dataset_periods", "execute_code"},
+        agent_tool_grants=grants,
+    )
+
+    assert denied is False
+    assert "structured_data_agent" in refusal
+    assert "Task" in refusal
+    assert allowed is True
+
+
+def test_compute_gate_requires_a_prior_successful_cited_retrieval():
+    denied, refusal = compute_gate_decision(
+        tool_name="mcp__architectos__execute_code",
+        successful_retrieval_tool_use_ids=set(),
+    )
+    allowed, reason = compute_gate_decision(
+        tool_name="mcp__architectos__execute_code",
+        successful_retrieval_tool_use_ids={"read-tool-use-1"},
+    )
+
+    assert denied is False
+    assert "successful cited read-only retrieval" in refusal
+    assert allowed is True
+    assert "read-tool-use-1" in reason
 
 
 def test_child_usage_prefers_the_worker_tool_over_an_unstable_parent_tool_id():
