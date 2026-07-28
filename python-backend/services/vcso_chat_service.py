@@ -875,6 +875,22 @@ class VcsoChatService:
                     pending_run_id=run_id,
                     status="waiting_for_user",
                 )
+                with sdk_lifecycle_lock:
+                    paused_sdk_lifecycle = list(sdk_lifecycle_events)
+                self.supabase.table("agent_delegation_runs").update(
+                    {
+                        "metadata": {
+                            "output_schema_version": "vcso_tool_loop_v1",
+                            "reasoning_visibility": "summary_only",
+                            "deep_mode": True,
+                            "sdk_session_id": str(sdk_result.session_id),
+                            "sdk_waiting_for_user": True,
+                            "sdk_native_lifecycle": paused_sdk_lifecycle,
+                            **sdk_run_attribution,
+                        },
+                        "updated_at": _now(),
+                    }
+                ).eq("id", run_id).eq("user_id", user_id).execute()
                 self._update_thread_count(
                     thread_id,
                     user_id,
