@@ -1,5 +1,5 @@
 ---
-status: fixing
+status: resolved
 trigger: "Canary 1 submitted as deep_mode=false after the Deep Mode toggle was clicked; determine operator timing versus a real toggle-to-submit race and add a countability guard."
 created: 2026-07-28
 updated: 2026-07-28
@@ -21,7 +21,7 @@ updated: 2026-07-28
 - hypothesis: confirmed. `VirtualCSOWorkspace` renders two Composer branches; only the established-thread branch supplied the controlled `deepMode` value and `onDeepModeChange` callback.
 - test: assert every Workspace Composer branch carries both Deep Mode control props, then verify a deployed brand-new chat changes `aria-pressed=false` to `true`.
 - expecting: the pre-fix structural test fails on the new-chat Composer and passes after the two missing props are wired.
-- next_action: run the broader frontend gate, commit, deploy dark, and repeat the brand-new-chat observation.
+- next_action: hold for London's decision on UI end-to-end versus a decoupled deterministic Deep Mode canary path.
 - reasoning_checkpoint: the earlier green exercised the established-thread Composer. The new-chat Composer used its local defaults (`deepMode=false`, undefined callback), so the button was inert by construction; no async thread race is required.
 - tdd_checkpoint: RED reproduced the missing `deepMode` attribute in the first Composer; GREEN passed after wiring both controlled props.
 
@@ -45,6 +45,12 @@ updated: 2026-07-28
 - timestamp: 2026-07-28
   observation: The new structural regression test failed before the fix with `expected [...] to include 'deepMode'` and passed after both props were added.
   implication: The test reproduces and locks the exact branch-specific wiring defect.
+- timestamp: 2026-07-28
+  observation: Cache-busted `/api/health` returned `ok=true` at `951e7d30`; Railway and Vercel both reported success.
+  implication: The observed UI proof ran against the deployed v0.6.124 repair.
+- timestamp: 2026-07-28
+  observation: In a brand-new deployed chat, the enabled control changed from `aria-pressed=false` / `Deep Mode off` to `aria-pressed=true` / `Deep Mode on`, then was returned to off without submitting a prompt.
+  implication: The exact new-chat defect is repaired live while the canary remains dark.
 
 ## Eliminated
 
@@ -55,5 +61,5 @@ updated: 2026-07-28
 
 - root_cause: The new-chat render branch did not pass the controlled Deep Mode value or setter into `Composer`. Its visible button used `Composer` defaults (`false` plus no callback), unlike the established-thread branch.
 - fix: Supply `deepMode={deepMode}` and `onDeepModeChange={setDeepMode}` to the new-chat Composer. Retain the fail-closed countability verifier.
-- verification: branch-specific RED/GREEN regression passed; production build and deployed brand-new-chat observation pending.
+- verification: branch-specific RED/GREEN regression passed; 14 focused VCSO frontend tests and the production build passed; deployed brand-new-chat latch passed at `951e7d30`.
 - files_changed: `pages/ProSuite/virtual-cso/VirtualCSOWorkspace.tsx`, `pages/ProSuite/virtual-cso/VirtualCSOWorkspace.test.ts`.
