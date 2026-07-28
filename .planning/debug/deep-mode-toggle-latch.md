@@ -1,5 +1,5 @@
 ---
-status: resolved
+status: fixing
 trigger: "Canary 1 submitted as deep_mode=false after the Deep Mode toggle was clicked; determine operator timing versus a real toggle-to-submit race and add a countability guard."
 created: 2026-07-28
 updated: 2026-07-28
@@ -11,18 +11,19 @@ updated: 2026-07-28
 
 - Expected: clicking `Deep Mode off` changes the next submitted request to `deepMode=true`, selecting Phase E.
 - Actual: live canary run `48a2b1c6-830a-4a4e-aa52-6cffe5a46852` persisted `deep_mode=false`, `sdk_phase=04B-C`, no SDK session pointer, no todos, and no workspace files.
+- Actual, corrected 2026-07-28: from a brand-new chat, the enabled `Deep Mode off` button remained `aria-pressed=false` after click. No turn was submitted during this reproduction.
 - Error: no transport error; the request completed successfully on the standard SDK path.
 - Timeline: first Phase E live canary attempt after v0.6.122 deployed.
 - Reproduction: create a new Virtual CSO chat, click the Deep Mode toggle, immediately populate and submit the composer.
 
 ## Current Focus
 
-- hypothesis: eliminated. The deployed toggle commits before the next interaction, and the request builder serializes the committed state without another conversion seam.
-- test: dark deployed UI observation plus persisted-run countability checks.
-- expecting: no canary is submitted until `aria-pressed=true` is observed; a run cannot count unless reloaded DB/session evidence proves Phase E.
-- next_action: deploy the countability guard dark, then await London's explicit re-arm authorization.
-- reasoning_checkpoint: the void run is operator timing because the prior automation never observed the post-click state; no source or deployed reproduction showed a toggle/send defect.
-- tdd_checkpoint: focused countability tests cover valid pause, the void 04B-C shape, pointer mismatch, and completed resume.
+- hypothesis: confirmed. `VirtualCSOWorkspace` renders two Composer branches; only the established-thread branch supplied the controlled `deepMode` value and `onDeepModeChange` callback.
+- test: assert every Workspace Composer branch carries both Deep Mode control props, then verify a deployed brand-new chat changes `aria-pressed=false` to `true`.
+- expecting: the pre-fix structural test fails on the new-chat Composer and passes after the two missing props are wired.
+- next_action: run the broader frontend gate, commit, deploy dark, and repeat the brand-new-chat observation.
+- reasoning_checkpoint: the earlier green exercised the established-thread Composer. The new-chat Composer used its local defaults (`deepMode=false`, undefined callback), so the button was inert by construction; no async thread race is required.
+- tdd_checkpoint: RED reproduced the missing `deepMode` attribute in the first Composer; GREEN passed after wiring both controlled props.
 
 ## Evidence
 
@@ -34,20 +35,25 @@ updated: 2026-07-28
   implication: The product latch commits normally when the click is observed.
 - timestamp: 2026-07-28
   observation: A rapid toggle-then-fill sequence, without submitting a turn, still rendered `Deep Mode on` with `aria-pressed=true`.
-  implication: The reported failure did not reproduce as a toggle/state race.
+  implication: This exercised the established-thread Composer and did not cover the new-chat branch.
 - timestamp: 2026-07-28
   observation: `VirtualCSOWorkspace.sendMessage` passes its `deepMode` state directly and `virtualCsoApi.sendUserMessage` serializes `deepMode: options.deepMode ?? false`.
   implication: There is no intermediate mapping that can convert a committed `true` to `false`.
+- timestamp: 2026-07-28
+  observation: The fresh/new-chat Composer omitted `deepMode={deepMode}` and `onDeepModeChange={setDeepMode}`, while the established-thread Composer supplied both.
+  implication: The new-chat button always rendered the default off state and its click handler had no parent callback to invoke.
+- timestamp: 2026-07-28
+  observation: The new structural regression test failed before the fix with `expected [...] to include 'deepMode'` and passed after both props were added.
+  implication: The test reproduces and locks the exact branch-specific wiring defect.
 
 ## Eliminated
 
 - Backend Phase E routing: it correctly selects 04B-E only after receiving Deep Mode true.
 - API serialization loss: the boolean is copied directly into the request body.
-- Reproducible toggle latch race: both deliberate and rapid dark UI observations latched true.
 
 ## Resolution
 
-- root_cause: Canary 1 was submitted without observing that the toggle had latched. The only durable observation is the false request/run; the deployed control and send path do not reproduce a product defect.
-- fix: Require a visible `aria-pressed=true` preflight before submission. Add a fail-closed persisted countability verifier and stamp paused SDK runs with `deep_mode=true`, `sdk_phase=04B-E`, and `sdk_session_id`.
-- verification: focused unit tests plus build/compile checks; deployed dark verification pending the new release.
-- files_changed: `python-backend/services/vcso_chat_service.py`, `python-backend/services/vcso_phase_e_canary.py`, `python-backend/scripts/verify_phase_e_canary.py`, `python-backend/unit_tests/test_vcso_phase_e_canary.py`.
+- root_cause: The new-chat render branch did not pass the controlled Deep Mode value or setter into `Composer`. Its visible button used `Composer` defaults (`false` plus no callback), unlike the established-thread branch.
+- fix: Supply `deepMode={deepMode}` and `onDeepModeChange={setDeepMode}` to the new-chat Composer. Retain the fail-closed countability verifier.
+- verification: branch-specific RED/GREEN regression passed; production build and deployed brand-new-chat observation pending.
+- files_changed: `pages/ProSuite/virtual-cso/VirtualCSOWorkspace.tsx`, `pages/ProSuite/virtual-cso/VirtualCSOWorkspace.test.ts`.

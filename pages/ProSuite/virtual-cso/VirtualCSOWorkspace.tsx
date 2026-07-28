@@ -476,6 +476,8 @@ export const VirtualCSOWorkspace: React.FC = () => {
             onChange={setComposerText}
             textareaRef={composerRef}
             streaming={streaming}
+            deepMode={deepMode}
+            onDeepModeChange={setDeepMode}
           />
           {notice && <p className="px-6 pb-3 text-center text-xs text-[var(--fg-3)]">{notice}</p>}
         </div>
