@@ -12,8 +12,10 @@ import threading
 from types import SimpleNamespace
 from collections import defaultdict, deque
 from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, AsyncIterator, Callable, Iterator
+from uuid import UUID
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -25,6 +27,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import StreamEvent
 
+from services.agent_capabilities import AgentCapabilityRegistry
 from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
 from services.vcso_sdk_config import (
     DELEGATION_TOOL_NAMES,
@@ -246,6 +249,7 @@ class _WorkerFailure:
 class _ToolOutcome:
     status: str
     sources: list[dict[str, Any]]
+    output_summary: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -1133,13 +1137,13 @@ def build_native_model_driven_manifest(
         actual_sdk_tools = set(map(str, getattr(agent, "tools", ()) or ()))
         if actual_sdk_tools != expected_sdk_tools:
             violations.append(f"native_worker_grant_mismatch:{capability_key}")
-        if list(getattr(agent, "mcpServers", None) or []) != [SDK_INTERNAL_SERVER]:
+        if list(getattr(agent, "mcpServers", None) or []) != [SDK_TOOL_SERVER_NAME]:
             violations.append(f"native_worker_server_mismatch:{capability_key}")
         for sdk_tool_name in sorted(actual_sdk_tools):
             if sdk_tool_name not in allowed_tools:
                 violations.append(f"native_worker_tool_not_preapproved:{sdk_tool_name}")
 
-    if SDK_INTERNAL_SERVER not in dict(options.mcp_servers or {}):
+    if SDK_TOOL_SERVER_NAME not in dict(options.mcp_servers or {}):
         violations.append("native_in_process_server_missing")
     if compiled.agent_handler_tools:
         violations.append("native_handler_tool_compiled")
@@ -1156,6 +1160,193 @@ def build_native_model_driven_manifest(
         "top_level_servers": sorted(dict(options.mcp_servers or {}).keys()),
         "violations": violations,
     }
+
+
+def _native_lifecycle_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _native_source_uuid(value: Any) -> str | None:
+    try:
+        return str(UUID(str(value)))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _native_tool_output_summary(content: dict[str, Any]) -> dict[str, Any]:
+    """Keep evidence-shape facts while excluding raw rows, markdown, SQL, and code."""
+
+    result = content.get("agent_result_v1") if isinstance(content, dict) else None
+    candidate = result if isinstance(result, dict) else content
+    summary: dict[str, Any] = {}
+    for key in (
+        "status",
+        "result_summary",
+        "summary",
+        "needs_review",
+        "confidence",
+        "truncated",
+        "row_count",
+        "returned_count",
+        "total_count",
+    ):
+        value = candidate.get(key) if isinstance(candidate, dict) else None
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            if value is not None:
+                summary[key] = str(value)[:500] if isinstance(value, str) else value
+    findings = candidate.get("findings") if isinstance(candidate, dict) else None
+    if isinstance(findings, list):
+        summary["finding_count"] = len(findings)
+        summary["finding_types"] = [
+            str(item.get("finding_type") or item.get("type") or "finding")[:80]
+            for item in findings[:25]
+            if isinstance(item, dict)
+        ]
+    return summary
+
+
+def create_native_child_run(
+    client: Any,
+    *,
+    user_id: str,
+    capability: Any,
+    parent_surface: str,
+    parent_thread_id: str | None,
+    parent_message_id: str | None,
+    parent_run_id: str | None,
+    task_id: str,
+    task_contract: dict[str, Any],
+    allowed_tools: list[str],
+    sdk_agent_id: str,
+) -> str:
+    """Create the narrow parent-linked child row required by the native evidence surface."""
+
+    objective = str(task_contract.get("objective") or f"Run {capability.capability_key}")[:1000]
+    now = _native_lifecycle_now()
+    row = {
+        "user_id": user_id,
+        "capability_id": capability.id,
+        "capability_key": capability.capability_key,
+        "parent_surface": parent_surface,
+        "parent_thread_id": parent_thread_id,
+        "parent_message_id": parent_message_id,
+        "parent_run_id": parent_run_id,
+        "status": "running",
+        "task_title": str(getattr(capability, "label", None) or capability.capability_key)[:200],
+        "task_summary": objective,
+        "context_scope": dict(task_contract.get("context_scope") or {}),
+        "allowed_tools_snapshot": list(allowed_tools),
+        "structured_result": {},
+        "citations": [],
+        "metadata": {
+            "output_schema_version": "agent_result_v1",
+            "can_spawn_agents": False,
+            "routing_tier": getattr(capability, "routing_tier", None) or "worker",
+            "delegation_depth": 1,
+            "reasoning_visibility": "summary_only",
+            "sdk_agent_id": sdk_agent_id,
+            "parent_tool_use_id": task_id,
+            "evidence_schema": "native_granular_v1",
+        },
+        "started_at": now,
+        "updated_at": now,
+    }
+    response = client.table("agent_delegation_runs").insert(row).execute()
+    data = response.data[0] if isinstance(response.data, list) and response.data else response.data
+    if not isinstance(data, dict) or not data.get("id"):
+        raise RuntimeError("Native SubagentStart could not create the child evidence row.")
+    return str(data["id"])
+
+
+def persist_native_child_step(
+    client: Any,
+    *,
+    user_id: str,
+    run_id: str,
+    step_index: int,
+    tool_name: str,
+    tool_use_id: str,
+    status: str,
+    summary: str,
+    output_summary: dict[str, Any],
+    source_refs: list[dict[str, Any]],
+    error_message: str | None = None,
+) -> None:
+    """Persist one curated worker tool step and its source-reference rows."""
+
+    client.table("agent_delegation_steps").insert(
+        {
+            "user_id": user_id,
+            "run_id": run_id,
+            "step_index": step_index,
+            "step_type": "tool_call",
+            "status": status,
+            "tool_name": tool_name,
+            "title": _curated_tool_copy(tool_name, running=False, failed=status == "failed")[1],
+            "summary": summary[:1000],
+            "input_summary": {"tool_use_id": tool_use_id},
+            "output_summary": dict(output_summary),
+            "source_refs": list(source_refs),
+            "error_message": str(error_message or "")[:2000] or None,
+        }
+    ).execute()
+    for source in source_refs:
+        source_id = _native_source_uuid(source.get("source_id"))
+        source_metadata = dict(source.get("metadata") or {})
+        if source.get("source_id") and source_id is None:
+            source_metadata["canonical_source_id"] = str(source["source_id"])[:500]
+        client.table("agent_context_sources").insert(
+            {
+                "user_id": user_id,
+                "run_id": run_id,
+                "source_kind": str(source.get("source_kind") or "unknown")[:80],
+                "source_id": source_id,
+                "source_label": str(source.get("label") or "")[:500] or None,
+                "source_metadata": source_metadata,
+                "citation_payload": dict(source),
+            }
+        ).execute()
+
+
+def complete_native_child_run(
+    client: Any,
+    *,
+    user_id: str,
+    run_id: str,
+    status: str,
+    result_summary: str,
+    citations: list[dict[str, Any]],
+    finding_summaries: list[dict[str, Any]],
+) -> None:
+    """Complete the child row from in-band SDK lifecycle facts."""
+
+    now = _native_lifecycle_now()
+    structured_result = {
+        "version": "agent_result_v1",
+        "status": status,
+        "result_summary": result_summary[:1000],
+        "findings": list(finding_summaries),
+        "citations": list(citations),
+        "needs_review": status != "completed",
+        "reasoning_visibility": "summary_only",
+    }
+    (
+        client.table("agent_delegation_runs")
+        .update(
+            {
+                "status": status,
+                "result_summary": result_summary[:1000],
+                "structured_result": structured_result,
+                "citations": list(citations),
+                "error_message": None if status == "completed" else result_summary[:2000],
+                "completed_at": now,
+                "updated_at": now,
+            }
+        )
+        .eq("id", run_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
 
 
 async def _run_sdk_turn(
@@ -1224,6 +1415,21 @@ async def _run_sdk_turn(
     successful_compute_sources: list[dict[str, Any]] = []
     compiled_lead_tool_names: set[str] = set()
     compiled_agent_tool_grants: dict[str, set[str]] = {}
+    native_capabilities = (
+        {
+            capability.capability_key: capability
+            for capability in AgentCapabilityRegistry(tool_context.store).list_active()
+        }
+        if model_driven and tool_context.store is not None
+        else {}
+    )
+    native_child_run_ids: dict[str, str] = {}
+    native_child_capabilities: dict[str, str] = {}
+    native_child_task_ids: dict[str, str] = {}
+    native_child_step_indexes: dict[str, int] = defaultdict(int)
+    native_child_sources: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    native_child_findings: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    native_child_failed: set[str] = set()
     delegation_count = 0
     max_delegations = len(provisioned_agents)
     plan_statuses = {key: "pending" for key in required_agents}
@@ -1552,22 +1758,111 @@ async def _run_sdk_turn(
     async def subagent_start_hook(
         input_data: dict[str, Any], tool_use_id: str | None, _context: Any
     ) -> dict[str, Any]:
+        agent_id = str(input_data.get("agent_id") or "")
+        capability_key = str(input_data.get("agent_type") or "")
+        if model_driven:
+            if not agent_id or capability_key not in provisioned_agents:
+                raise RuntimeError(
+                    "Native SubagentStart lacked an approved SDK agent identity; refusing an evidence gap."
+                )
+            if agent_id not in native_child_run_ids:
+                task_id = next(
+                    (
+                        candidate_task_id
+                        for candidate_task_id, candidate_capability in task_capabilities.items()
+                        if candidate_capability == capability_key
+                    ),
+                    "",
+                )
+                capability = native_capabilities.get(capability_key)
+                if not task_id or capability is None:
+                    raise RuntimeError(
+                        f"Native SubagentStart could not bind {capability_key} to its approved Task."
+                    )
+                client = getattr(tool_context.store, "client", None)
+                if client is None:
+                    raise RuntimeError("Native lifecycle persistence requires the founder-scoped store.")
+                child_run_id = create_native_child_run(
+                    client,
+                    user_id=tool_context.user_id,
+                    capability=capability,
+                    parent_surface=str(tool_context.metadata.get("surface") or "virtual_cso"),
+                    parent_thread_id=tool_context.thread_id,
+                    parent_message_id=tool_context.metadata.get("parent_message_id"),
+                    parent_run_id=tool_context.metadata.get("parent_run_id"),
+                    task_id=task_id,
+                    task_contract=task_contracts.get(capability_key) or {},
+                    allowed_tools=list(compiled.agent_tool_grants.get(capability_key) or ()),
+                    sdk_agent_id=agent_id,
+                )
+                native_child_run_ids[agent_id] = child_run_id
+                native_child_capabilities[agent_id] = capability_key
+                native_child_task_ids[agent_id] = task_id
         record_lifecycle(
             "subagent_start",
             tool_use_id=tool_use_id,
-            agent_type=input_data.get("agent_type"),
-            agent_id_present=bool(input_data.get("agent_id")),
+            capability_key=capability_key,
+            agent_type=capability_key,
+            agent_id_present=bool(agent_id),
+            child_run_id=native_child_run_ids.get(agent_id),
         )
         return {}
 
     async def subagent_stop_hook(
         input_data: dict[str, Any], tool_use_id: str | None, _context: Any
     ) -> dict[str, Any]:
+        agent_id = str(input_data.get("agent_id") or "")
+        capability_key = native_child_capabilities.get(agent_id) or str(
+            input_data.get("agent_type") or ""
+        )
+        if model_driven:
+            run_id = native_child_run_ids.get(agent_id)
+            if not agent_id or not run_id or capability_key not in provisioned_agents:
+                raise RuntimeError(
+                    "Native SubagentStop lacked its parent-linked child run; refusing an evidence gap."
+                )
+            citations = list(native_child_sources.get(agent_id) or ())
+            step_count = native_child_step_indexes.get(agent_id, 0)
+            status = "failed" if agent_id in native_child_failed else "completed"
+            result_summary = (
+                f"{_subagent_title(capability_key)} completed {step_count} granular tool "
+                f"call(s) with {len(citations)} cited source reference(s)."
+                if status == "completed"
+                else f"{_subagent_title(capability_key)} stopped after a failed granular tool call."
+            )
+            complete_native_child_run(
+                tool_context.store.client,
+                user_id=tool_context.user_id,
+                run_id=run_id,
+                status=status,
+                result_summary=result_summary,
+                citations=citations,
+                finding_summaries=list(native_child_findings.get(agent_id) or ()),
+            )
+            worker_results[capability_key] = SimpleNamespace(
+                run_id=run_id,
+                status=status,
+                result_summary=result_summary,
+                structured_result={
+                    "version": "agent_result_v1",
+                    "status": status,
+                    "findings": list(native_child_findings.get(agent_id) or ()),
+                    "citations": citations,
+                    "needs_review": status != "completed",
+                    "reasoning_visibility": "summary_only",
+                },
+                citations=citations,
+            )
+            task_id = native_child_task_ids.get(agent_id, "")
+            if task_id:
+                task_sources[task_id].extend(citations)
         record_lifecycle(
             "subagent_stop",
             tool_use_id=tool_use_id,
-            agent_type=input_data.get("agent_type"),
-            agent_id_present=bool(input_data.get("agent_id")),
+            capability_key=capability_key,
+            agent_type=capability_key,
+            agent_id_present=bool(agent_id),
+            child_run_id=native_child_run_ids.get(agent_id),
         )
         return {}
 
@@ -1575,6 +1870,28 @@ async def _run_sdk_turn(
         input_data: dict[str, Any], tool_use_id: str | None, _context: Any
     ) -> dict[str, Any]:
         error = input_data.get("error")
+        agent_id = str(input_data.get("agent_id") or "")
+        if model_driven and agent_id:
+            run_id = native_child_run_ids.get(agent_id)
+            if not run_id:
+                raise RuntimeError(
+                    "Native worker tool failure arrived before its child evidence row."
+                )
+            native_child_step_indexes[agent_id] += 1
+            native_child_failed.add(agent_id)
+            persist_native_child_step(
+                tool_context.store.client,
+                user_id=tool_context.user_id,
+                run_id=run_id,
+                step_index=native_child_step_indexes[agent_id],
+                tool_name=_registry_name(str(input_data.get("tool_name") or "tool")),
+                tool_use_id=str(tool_use_id or ""),
+                status="failed",
+                summary="The granular worker tool call failed safely.",
+                output_summary={"status": "failed"},
+                source_refs=[],
+                error_message=str(error or "SDK tool failure"),
+            )
         record_lifecycle(
             "post_tool_use_failure",
             tool_name=input_data.get("tool_name"),
@@ -1594,7 +1911,12 @@ async def _run_sdk_turn(
             capability_key = task_capabilities.get(task_id, "bounded_worker")
             step_index = allocate_step(task_id, sdk_tool_name)
             result = worker_results.get(capability_key)
-            if result is None and model_driven and capability_key in provisioned_agents:
+            if (
+                result is None
+                and model_driven
+                and model_driven_scope is not None
+                and capability_key in provisioned_agents
+            ):
                 # Completion bridge: the model-driven worker ran OUT of process (external endpoint), so the
                 # in-process worker_results is empty. The orchestrator has already written a parent-linked
                 # completed child row (ordering: worker completes before the Task result returns), so confirm
@@ -1659,8 +1981,8 @@ async def _run_sdk_turn(
         if (
             outcome.status == "completed"
             and definition is not None
-            and definition.persistence_semantics == "read_only"
-            and bool(definition.citation)
+            and getattr(definition, "persistence_semantics", "read_only") == "read_only"
+            and bool(getattr(definition, "citation", None))
         ):
             successful_retrieval_tool_use_ids.add(str(tool_use_id or sdk_tool_name))
         if (
@@ -1669,6 +1991,47 @@ async def _run_sdk_turn(
             and any(source.get("source_kind") == "computation" for source in outcome.sources)
         ):
             successful_compute_sources.extend(outcome.sources)
+        agent_id = str(input_data.get("agent_id") or "")
+        if model_driven and agent_id:
+            run_id = native_child_run_ids.get(agent_id)
+            if not run_id:
+                raise RuntimeError(
+                    "Native worker tool result arrived before its child evidence row."
+                )
+            native_child_step_indexes[agent_id] += 1
+            _lifecycle_step_type, _lifecycle_title, lifecycle_summary = _curated_tool_copy(
+                registry_name,
+                running=False,
+                failed=outcome.status == "failed",
+            )
+            persist_native_child_step(
+                tool_context.store.client,
+                user_id=tool_context.user_id,
+                run_id=run_id,
+                step_index=native_child_step_indexes[agent_id],
+                tool_name=registry_name,
+                tool_use_id=str(tool_use_id or ""),
+                status=outcome.status,
+                summary=lifecycle_summary,
+                output_summary={
+                    **outcome.output_summary,
+                    "status": outcome.status,
+                    "source_count": len(outcome.sources),
+                },
+                source_refs=outcome.sources,
+            )
+            native_child_sources[agent_id].extend(outcome.sources)
+            native_child_findings[agent_id].append(
+                {
+                    "finding_type": "granular_tool_result",
+                    "tool_name": registry_name,
+                    "status": outcome.status,
+                    "source_count": len(outcome.sources),
+                    **outcome.output_summary,
+                }
+            )
+            if outcome.status == "failed":
+                native_child_failed.add(agent_id)
         if running_steps[sdk_tool_name]:
             running_steps[sdk_tool_name].popleft()
         step_type, title, summary = _curated_tool_copy(registry_name, running=False, failed=outcome.status == "failed")
@@ -2577,7 +2940,7 @@ async def _run_sdk_turn(
     delegated_agents = tuple(dict.fromkeys(task_capabilities.values()))
     enforced_agents = delegated_agents if model_choice else required_agents
     missing_after_query = [key for key in enforced_agents if key not in completed_agents]
-    if missing_after_query and model_driven:
+    if missing_after_query and model_driven and model_driven_scope is not None:
         # Same DB completion bridge the stop_hook and post_tool_use use: a model-driven worker that
         # completed server-side but never returned its Task result in-band is DB-completed and must not
         # fail the turn. A worker missing from BOTH memory AND the DB still raises (real failure preserved).
@@ -2814,7 +3177,13 @@ def _make_sdk_tool(
                         raise TimeoutError(f"{definition.name} exceeded the configured VCSO tool deadline.")
             sources = [source.to_dict() for source in envelope.sources]
             source_refs.extend(sources)
-            tool_outcomes[sdk_name].append(_ToolOutcome("completed", sources))
+            tool_outcomes[sdk_name].append(
+                _ToolOutcome(
+                    "completed",
+                    sources,
+                    _native_tool_output_summary(envelope.content),
+                )
+            )
             safe_content = json.dumps(envelope.to_dict(), default=str)
             return {"content": [{"type": "text", "text": safe_content[:12000]}]}
         except Exception as exc:  # noqa: BLE001 - return a bounded tool error to the SDK loop
