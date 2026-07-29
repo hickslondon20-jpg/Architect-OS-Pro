@@ -33,6 +33,12 @@ NATIVE_GRANULAR_AGENT_TOOL_GRANTS: dict[str, tuple[str, ...]] = {
         "wiki_list",
     ),
 }
+# `default_config.max_rounds` limits SubAgentOrchestrator passes on Path A; SDK
+# `maxTurns` limits model turns in a tool-calling loop. They are not interchangeable.
+# Granular workers need up to three discovery/read calls plus composition, with
+# room for one recovery call: structured list -> periods -> optional query -> compose,
+# or wiki list -> search -> page -> compose.
+GRANULAR_NATIVE_AGENT_MAX_TURNS = 6
 # Phase D2 (SDK-M2): the external (loopback HTTP) worker MCP server name. Must match the FastMCP `name`
 # in services/vcso_worker_mcp_server.py. In model-driven mode the worker handlers are exposed from this
 # EXTERNAL server, referenced inline per-agent and kept OUT of top-level mcp_servers, so the lead cannot
@@ -229,9 +235,17 @@ def compile_founder_sdk_options(
             tools=agent_tools,
             disallowedTools=list(DISALLOWED_SDK_BUILTINS),
             model=route["model_name"],
-            # A handler-backed SDK subagent needs one turn to call its implementation
-            # tool and one turn to receive the result and return the compact finding.
-            maxTurns=max(2, _capability_max_turns(capability)) if handler_name else _capability_max_turns(capability),
+            # Handler-backed agents need a call-and-return floor. Granular agents use
+            # the separate SDK turn budget above; Path A keeps its database round cap.
+            maxTurns=(
+                GRANULAR_NATIVE_AGENT_MAX_TURNS
+                if granular_native
+                else (
+                    max(2, _capability_max_turns(capability))
+                    if handler_name
+                    else _capability_max_turns(capability)
+                )
+            ),
             permissionMode="dontAsk",
             # The in-process server is registered once at session level for SDK transport, while
             # the agent definition explicitly declares the only MCP server its worker may use. In

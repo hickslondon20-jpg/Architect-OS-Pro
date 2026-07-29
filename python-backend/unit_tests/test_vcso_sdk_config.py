@@ -21,6 +21,7 @@ from services.tool_registry import (
 )
 from services.vcso_sdk_config import compile_founder_sdk_options
 from services.vcso_sdk_config import (
+    GRANULAR_NATIVE_AGENT_MAX_TURNS,
     MODE_B_LEAD_TOOL_NAMES,
     NATIVE_GRANULAR_AGENT_TOOL_GRANTS,
 )
@@ -309,6 +310,14 @@ def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server
         *MODE_B_LEAD_TOOL_NAMES,
         *(name for names in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.values() for name in names),
     }
+    structured_capability = _capability(
+        "structured_data_agent", ["legacy_structured_handler"], routing_tier="worker"
+    )
+    wiki_capability = _capability(
+        "per_user_wiki", ["legacy_wiki_handler"], routing_tier="worker"
+    )
+    structured_capability["default_config"]["max_rounds"] = 1
+    wiki_capability["default_config"]["max_rounds"] = 1
     client = _Client(
         {
             "tool_registry": [
@@ -316,8 +325,8 @@ def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server
                 for name in all_tools
             ],
             "agent_capabilities": [
-                _capability("structured_data_agent", ["legacy_structured_handler"], routing_tier="worker"),
-                _capability("per_user_wiki", ["legacy_wiki_handler"], routing_tier="worker"),
+                structured_capability,
+                wiki_capability,
                 _capability("sandbox_execution_agent", ["execute_code"], routing_tier="worker"),
             ],
             "mcp_connections": [],
@@ -347,6 +356,10 @@ def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server
         key: list(value) for key, value in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.items()
     }
     assert set(compiled.options.agents) == {"structured_data_agent", "per_user_wiki"}
+    assert all(
+        agent.maxTurns >= GRANULAR_NATIVE_AGENT_MAX_TURNS
+        for agent in compiled.options.agents.values()
+    )
     assert compiled.options.agents["structured_data_agent"].tools == [
         "mcp__architectos__list_founder_datasets",
         "mcp__architectos__get_dataset_periods",
