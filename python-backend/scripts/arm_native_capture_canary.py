@@ -36,6 +36,7 @@ load_dotenv(Path(__file__).parents[1] / ".env")
 ARM_CONFIRMATION = "ARM-ONE-CAPTURE-CANARY"
 DARK_CONFIRMATION = "RE-DARKEN-04B"
 DEFAULT_HEALTH_URL = "https://api.architectospro.com/api/health"
+HEALTH_CHECK_USER_AGENT = "ArchitectOS-04B-Canary-Preflight/1.0"
 DIAGNOSTIC_FALSE_KEYS = (
     "diagnostic_single_worker_enabled",
     "diagnostic_fault_injection_enabled",
@@ -174,7 +175,12 @@ def confirm_deployed_head(health_url: str, expected_sha: str) -> dict[str, Any]:
     url = f"{health_url}{separator}{urllib.parse.urlencode({'preflight': time.time_ns()})}"
     request = urllib.request.Request(
         url,
-        headers={"Cache-Control": "no-cache", "Pragma": "no-cache"},
+        headers={
+            "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "User-Agent": HEALTH_CHECK_USER_AGENT,
+        },
         method="GET",
     )
     with urllib.request.urlopen(request, timeout=20) as response:

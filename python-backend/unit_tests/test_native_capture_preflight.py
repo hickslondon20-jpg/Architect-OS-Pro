@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import sys
 from pathlib import Path
 
@@ -9,15 +10,40 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from scripts.arm_native_capture_canary import (
     DIAGNOSTIC_FALSE_KEYS,
+    HEALTH_CHECK_USER_AGENT,
     assert_armed_state,
     assert_dark_state,
     build_armed_settings,
     build_dark_settings,
+    confirm_deployed_head,
 )
 from scripts.verify_native_activation_smoke import evaluate_activation_smoke
 
 
 FOUNDER_ID = "cd490873-99aa-4533-9240-f0aa04deb54f"
+
+
+def test_deployed_head_check_sends_explicit_preflight_user_agent(monkeypatch):
+    observed = {}
+
+    class _Response:
+        def __enter__(self):
+            return io.BytesIO(b'{"commit_sha_short":"abc12345"}')
+
+        def __exit__(self, *_args):
+            return False
+
+    def _urlopen(request, timeout):
+        observed["user_agent"] = request.get_header("User-agent")
+        observed["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr("scripts.arm_native_capture_canary.urllib.request.urlopen", _urlopen)
+
+    result = confirm_deployed_head("https://example.test/api/health", "abc12345")
+
+    assert result["observed_sha"] == "abc12345"
+    assert observed == {"user_agent": HEALTH_CHECK_USER_AGENT, "timeout": 20}
 
 
 def test_atomic_arm_places_founder_in_both_allowlists_and_disables_other_diagnostics():
