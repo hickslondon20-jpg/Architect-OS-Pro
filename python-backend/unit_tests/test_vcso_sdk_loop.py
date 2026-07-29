@@ -2237,10 +2237,84 @@ def test_sdk_stream_capture_records_agent_result_and_result_termination(monkeypa
     assert "must never enter diagnostics" not in serialized
 
 
+def test_sdk_stream_capture_drops_token_deltas_but_keeps_agent_tool_start(monkeypatch):
+    diagnostics = []
+
+    async def fake_query(**_kwargs):
+        yield StreamEvent(
+            uuid="delta-1",
+            session_id="session-filter",
+            event={
+                "type": "content_block_delta",
+                "delta": {"type": "text_delta", "text": "private token"},
+            },
+        )
+        yield StreamEvent(
+            uuid="agent-start",
+            session_id="session-filter",
+            event={
+                "type": "content_block_start",
+                "content_block": {
+                    "type": "tool_use",
+                    "name": "Agent",
+                    "id": "agent-task-from-stream",
+                },
+            },
+        )
+        yield UserMessage(
+            content=[
+                ToolResultBlock(
+                    tool_use_id="agent-task-from-stream",
+                    content="private agent result",
+                    is_error=False,
+                )
+            ],
+            tool_use_result={"status": "completed"},
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-filter",
+            result="private result",
+        )
+
+    generator, _lifecycle = _model_driven_turn(
+        monkeypatch,
+        fake_query=fake_query,
+        stream_diagnostic_events=diagnostics,
+    )
+    with pytest.raises(RuntimeError, match="before required workers completed"):
+        _consume(generator)
+
+    stream_events = [
+        event
+        for event in diagnostics
+        if event["event"] == "sdk_stream_message"
+        and event["object_type"] == "StreamEvent"
+    ]
+    assert [event["status"] for event in stream_events] == ["content_block_start"]
+    assert any(
+        event["event"] == "agent_tool_result"
+        and event["tool_use_id"] == "agent-task-from-stream"
+        for event in diagnostics
+    )
+    assert "private token" not in json.dumps(diagnostics)
+    assert "private agent result" not in json.dumps(diagnostics)
+
+
 def test_sdk_stream_capture_distinguishes_failed_subagent_stop_from_missing_hook(monkeypatch):
     diagnostics = []
 
     async def fake_query(*, options, **_kwargs):
+        for index in range(250):
+            yield StreamEvent(
+                uuid=f"message-delta-{index}",
+                session_id="session-hook-budget",
+                event={"type": "message_delta", "delta": {"stop_reason": None}},
+            )
         subagent_stop = options.hooks["SubagentStop"][0].hooks[0]
         await subagent_stop(
             {
@@ -2268,6 +2342,10 @@ def test_sdk_stream_capture_distinguishes_failed_subagent_stop_from_missing_hook
     ]
     assert [event["phase"] for event in stop_events] == ["start", "exception"]
     assert stop_events[-1]["error_type"] == "RuntimeError"
+    truncation = next(
+        event for event in diagnostics if event["event"] == "sdk_stream_capture_truncated"
+    )
+    assert truncation["dropped_count"] == 10
     terminal = next(
         event for event in diagnostics if event["event"] == "sdk_iteration_terminated"
     )

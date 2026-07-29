@@ -72,6 +72,14 @@ SDK_TOOL_PREFIX = f"mcp__{SDK_TOOL_SERVER_NAME}__"
 SDK_STREAM_DIAGNOSTIC_EVENT_LIMIT = 320
 SDK_STREAM_DIAGNOSTIC_NONCRITICAL_LIMIT = 240
 SDK_STREAM_DIAGNOSTIC_TEXT_LIMIT = 200
+SDK_STREAM_DIAGNOSTIC_EVENT_TYPES = frozenset(
+    {
+        "message_start",
+        "message_stop",
+        "message_delta",
+        "content_block_start",
+    }
+)
 NARRATION_OPEN = "<narration>"
 NARRATION_CLOSE = "</narration>"
 P4_NATIVE_SUBAGENT_KEYS = (
@@ -1740,6 +1748,7 @@ async def _run_sdk_turn(
                 agent_tool_use_ids.add(str(tool_use_id))
             record_stream_diagnostic(
                 "hook_invocation",
+                critical=True,
                 hook_event=hook_event,
                 hook_name=hook_name,
                 phase="start",
@@ -1771,6 +1780,7 @@ async def _run_sdk_turn(
                 status = str(result.get("decision") or "returned")
             record_stream_diagnostic(
                 "hook_invocation",
+                critical=True,
                 hook_event=hook_event,
                 hook_name=hook_name,
                 phase="return",
@@ -3216,6 +3226,10 @@ async def _run_sdk_turn(
         """Record one SDK-yielded object without retaining any of its content."""
 
         nonlocal sdk_message_arrival_index, sdk_result_message_seen
+        if isinstance(message, StreamEvent):
+            event_type = str((message.event or {}).get("type") or "")
+            if event_type not in SDK_STREAM_DIAGNOSTIC_EVENT_TYPES:
+                return
         sdk_message_arrival_index += 1
         object_type = type(message).__name__
         parent_tool_use_id = str(getattr(message, "parent_tool_use_id", "") or "")
