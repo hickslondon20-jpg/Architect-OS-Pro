@@ -51,6 +51,10 @@ from claude_agent_sdk import (  # noqa: E402
     tool,
 )
 from claude_agent_sdk.types import AgentDefinition, HookMatcher  # noqa: E402
+from services.vcso_sdk_config import (  # noqa: E402
+    DISALLOWED_SDK_BUILTINS,
+    GRANULAR_NATIVE_AGENT_MAX_TURNS,
+)
 
 
 load_dotenv(Path(__file__).parents[1] / ".env")
@@ -106,6 +110,27 @@ def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _agent_response_text(agent_posts: list[dict[str, Any]]) -> str:
+    """Extract only returned Agent content, excluding prompts and lead narration."""
+    text_parts: list[str] = []
+    for event in agent_posts:
+        response = event.get("response")
+        if isinstance(response, str):
+            try:
+                response = json.loads(response)
+            except json.JSONDecodeError:
+                response = None
+        if not isinstance(response, dict):
+            continue
+        content = response.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if isinstance(block, dict) and isinstance(block.get("text"), str):
+                text_parts.append(block["text"])
+    return "\n".join(text_parts)
+
+
 def _runtime_versions() -> dict[str, str]:
     try:
         sdk_version = importlib.metadata.version("claude-agent-sdk")
@@ -151,12 +176,12 @@ def _event_summary(result: dict[str, Any]) -> dict[str, Any]:
     start_gap_ms = None
     if len(starts) >= 2:
         start_gap_ms = round(starts[1]["elapsed_ms"] - starts[0]["elapsed_ms"], 3)
-    serialized_agent_results = json.dumps(agent_posts, ensure_ascii=False, default=str)
     serialized_lead_results = json.dumps(lead_posts, ensure_ascii=False, default=str)
     assistant_text = "\n".join(result["assistant_text"])
+    agent_response_text = _agent_response_text(agent_posts)
     expected_agent_sentinels = result["expected_agent_sentinels"]
     agent_content_returned = {
-        sentinel: sentinel in serialized_agent_results or sentinel in assistant_text
+        sentinel: sentinel in agent_response_text
         for sentinel in expected_agent_sentinels
     }
     lead_content_returned = (
@@ -200,6 +225,8 @@ def _event_summary(result: dict[str, Any]) -> dict[str, Any]:
         "subagent_start_gap_ms": start_gap_ms,
         "agent_post_tool_count": len(agent_posts),
         "agent_content_returned": agent_content_returned,
+        "agent_response_text": agent_response_text,
+        "agent_max_turns": result["agent_max_turns"],
         "lead_post_tool_count": len(lead_posts),
         "lead_content_returned": lead_content_returned,
         "assistant_agent_turns": assistant_agent_turns,
@@ -213,7 +240,12 @@ def _event_summary(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def run_arm(*, label: str) -> dict[str, Any]:
+async def run_arm(
+    *,
+    label: str,
+    agent_max_turns: int = GRANULAR_NATIVE_AGENT_MAX_TURNS,
+    turn_cap_override: bool = False,
+) -> dict[str, Any]:
     if label not in ARM_PROMPTS:
         raise ValueError(f"Unknown probe arm: {label}")
 
@@ -392,8 +424,9 @@ async def run_arm(*, label: str) -> dict[str, Any]:
             f"{ALPHA_SENTINEL} tool text to the lead and stop."
         ),
         tools=[ALPHA_TOOL],
+        disallowedTools=list(DISALLOWED_SDK_BUILTINS),
         model="haiku",
-        maxTurns=3,
+        maxTurns=agent_max_turns,
         background=definition_background,
         permissionMode="dontAsk",
         mcpServers=[SERVER],
@@ -405,8 +438,9 @@ async def run_arm(*, label: str) -> dict[str, Any]:
             f"{BETA_SENTINEL} tool text to the lead and stop."
         ),
         tools=[BETA_TOOL],
+        disallowedTools=list(DISALLOWED_SDK_BUILTINS),
         model="haiku",
-        maxTurns=3,
+        maxTurns=agent_max_turns,
         background=definition_background,
         permissionMode="dontAsk",
         mcpServers=[SERVER],
@@ -476,6 +510,30 @@ async def run_arm(*, label: str) -> dict[str, Any]:
             "label": label,
             "prompt": ARM_PROMPTS[label],
             "definition_background": definition_background,
+            "agent_max_turns": agent_max_turns,
+            "compiled_surface_comparison": {
+                "production_granular_max_turns": GRANULAR_NATIVE_AGENT_MAX_TURNS,
+                "turn_cap_override_explicit": turn_cap_override,
+                "field_provenance": {
+                    "description": "synthetic probe worker",
+                    "prompt": "synthetic deterministic one-tool contract",
+                    "tools": "synthetic in-process sentinel tool",
+                    "disallowedTools": "matches production compiler constant",
+                    "model": "synthetic haiku route",
+                    "maxTurns": (
+                        "explicit diagnostic override"
+                        if turn_cap_override
+                        else "matches production granular floor"
+                    ),
+                    "permissionMode": "matches production dontAsk",
+                    "mcpServers": "synthetic in-process probe server",
+                    "background": (
+                        "explicit false diagnostic arm"
+                        if definition_background is False
+                        else "matches production unset value"
+                    ),
+                },
+            },
             "runtime_versions": _runtime_versions(),
             "config_dir": config_dir,
             "expected_agent_sentinels": expected_agent_sentinels,
@@ -556,8 +614,22 @@ async def run_arm(*, label: str) -> dict[str, Any]:
         return result
 
 
-async def main(labels: list[str], output: Path | None) -> None:
-    results = [await run_arm(label=label) for label in labels]
+async def main(
+    labels: list[str],
+    output: Path | None,
+    agent_max_turns: int,
+    turn_cap_override: bool,
+) -> None:
+    if not turn_cap_override:
+        assert agent_max_turns == GRANULAR_NATIVE_AGENT_MAX_TURNS
+    results = [
+        await run_arm(
+            label=label,
+            agent_max_turns=agent_max_turns,
+            turn_cap_override=turn_cap_override,
+        )
+        for label in labels
+    ]
     payload = json.dumps(results, indent=2, ensure_ascii=False, default=str)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -585,9 +657,32 @@ def _parse_args() -> argparse.Namespace:
         help="Run only this arm. Repeat to run multiple arms. Defaults to all arms.",
     )
     parser.add_argument("--output", type=Path, help="Optional JSON evidence file.")
+    parser.add_argument(
+        "--agent-max-turns",
+        type=int,
+        default=None,
+        help=(
+            "Explicit diagnostic override for both probe workers. "
+            f"Default: production granular floor ({GRANULAR_NATIVE_AGENT_MAX_TURNS})."
+        ),
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    anyio.run(main, args.arm or list(ARM_PROMPTS), args.output)
+    turn_cap_override = args.agent_max_turns is not None
+    agent_max_turns = (
+        args.agent_max_turns
+        if turn_cap_override
+        else GRANULAR_NATIVE_AGENT_MAX_TURNS
+    )
+    if agent_max_turns < 1:
+        raise SystemExit("--agent-max-turns must be at least 1")
+    anyio.run(
+        main,
+        args.arm or list(ARM_PROMPTS),
+        args.output,
+        agent_max_turns,
+        turn_cap_override,
+    )
