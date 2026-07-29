@@ -1,0 +1,86 @@
+{
+  "probe": "production_sdk_turn_return",
+  "started_at": "2026-07-29T16:06:51.165638+00:00",
+  "runtime": {
+    "claude_agent_sdk_version": "0.2.118",
+    "claude_code_cli_version": "2.1.209 (Claude Code)",
+    "claude_code_cli_source": "bundled"
+  },
+  "model": "claude-sonnet-4-6",
+  "pid": 13052,
+  "arms": [
+    {
+      "arm": {
+        "label": "prompt_production_scale",
+        "driver": "threaded",
+        "tool_latency_seconds": 2.0,
+        "hook_network_delay_seconds": 0.0,
+        "prompt_scale": "production"
+      },
+      "status": "exception",
+      "wall_clock_ms": 1960.2,
+      "subagent_start_count": 0,
+      "subagent_stop_count": 0,
+      "subagent_starts": [],
+      "subagent_stops": [],
+      "subagent_stop_after_start_ms": {},
+      "agent_result_count": 0,
+      "agent_results": [],
+      "iteration_termination": {
+        "sequence": 1,
+        "event": "sdk_iteration_terminated",
+        "elapsed_ms": 1888.0,
+        "termination": "exception",
+        "error_type": "CLINotFoundError",
+        "size_chars": 93,
+        "probe_elapsed_ms": 1949.1
+      },
+      "result_returned": false,
+      "answer_chars": 0,
+      "session_id_present": false,
+      "sse_event_counts": {
+        "heartbeat": 1,
+        "todos_updated": 1
+      },
+      "lifecycle_events": [
+        {
+          "sequence": 1,
+          "event": "runtime_manifest",
+          "decision": "native_granular",
+          "reason_code": "none",
+          "probe_elapsed_ms": 110.3
+        },
+        {
+          "event": "stream_keepalive",
+          "stage": "first",
+          "idle_seconds": 1.0,
+          "probe_elapsed_ms": 1113.6
+        },
+        {
+          "event": "stream_keepalive",
+          "stage": "total",
+          "count": 1,
+          "probe_elapsed_ms": 1959.5
+        }
+      ],
+      "stream_diagnostic_events": [
+        {
+          "sequence": 1,
+          "event": "sdk_iteration_terminated",
+          "elapsed_ms": 1888.0,
+          "termination": "exception",
+          "error_type": "CLINotFoundError",
+          "size_chars": 93,
+          "probe_elapsed_ms": 1949.1
+        }
+      ],
+      "stub_tools": [],
+      "hook_network_writes": [],
+      "exception": {
+        "type": "CLINotFoundError",
+        "message": "Claude Code not found at: C:\\Python314\\Lib\\site-packages\\claude_agent_sdk\\_bundled\\claude.exe"
+      }
+    }
+  ],
+  "finished_at": "2026-07-29T16:06:56.476056+00:00"
+}

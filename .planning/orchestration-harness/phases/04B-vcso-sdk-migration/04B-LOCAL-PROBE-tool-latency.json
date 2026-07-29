@@ -1,0 +1,2048 @@
+{
+  "probe": "production_sdk_turn_return",
+  "started_at": "2026-07-29T15:58:49.574001+00:00",
+  "runtime": {
+    "claude_agent_sdk_version": "0.2.118",
+    "claude_code_cli_version": "2.1.209 (Claude Code)",
+    "claude_code_cli_source": "bundled"
+  },
+  "model": "claude-sonnet-4-6",
+  "pid": 21440,
+  "arms": [
+    {
+      "arm": {
+        "label": "tool_latency_slow_threaded",
+        "driver": "threaded",
+        "tool_latency_seconds": 2.0,
+        "hook_network_delay_seconds": 0.0,
+        "prompt_scale": "small"
+      },
+      "status": "completed",
+      "wall_clock_ms": 59192.8,
+      "subagent_start_count": 2,
+      "subagent_stop_count": 2,
+      "subagent_starts": [
+        {
+          "sequence": 4,
+          "event": "subagent_start",
+          "tool_use_id": "95076fa8-6ee5-44f3-ab82-cf08b8c52314",
+          "capability_key": "structured_data_agent",
+          "agent_type": "structured_data_agent",
+          "child_run_id": "75768797-5bab-44a3-b411-935dddc1ad7e",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 22922.8
+        },
+        {
+          "sequence": 7,
+          "event": "subagent_start",
+          "tool_use_id": "ad7b9498-e83a-4fd8-867a-cddfb84f712f",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "child_run_id": "7985ec75-c9a0-4938-a46c-1b2818c550b3",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 24507.8
+        }
+      ],
+      "subagent_stops": [
+        {
+          "sequence": 24,
+          "event": "subagent_stop",
+          "tool_use_id": "0d45d668-afa2-4db6-9cc4-9d53aac48f51",
+          "capability_key": "structured_data_agent",
+          "agent_type": "structured_data_agent",
+          "child_run_id": "75768797-5bab-44a3-b411-935dddc1ad7e",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 48055.0
+        },
+        {
+          "sequence": 25,
+          "event": "subagent_stop",
+          "tool_use_id": "3cce3f82-31b8-4951-9a79-7fc32b4c7409",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "child_run_id": "7985ec75-c9a0-4938-a46c-1b2818c550b3",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 49181.9
+        }
+      ],
+      "subagent_stop_after_start_ms": {
+        "structured_data_agent": 25132.2,
+        "per_user_wiki": 24674.1
+      },
+      "agent_result_count": 2,
+      "agent_results": [
+        {
+          "sequence": 105,
+          "event": "agent_tool_result",
+          "elapsed_ms": 48136.6,
+          "object_type": "UserMessage",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "status": "completed",
+          "size_chars": 6903,
+          "is_agent_result": true,
+          "is_error": false,
+          "probe_elapsed_ms": 48167.6
+        },
+        {
+          "sequence": 114,
+          "event": "agent_tool_result",
+          "elapsed_ms": 49320.8,
+          "object_type": "UserMessage",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "status": "completed",
+          "size_chars": 5243,
+          "is_agent_result": true,
+          "is_error": false,
+          "probe_elapsed_ms": 49351.7
+        }
+      ],
+      "iteration_termination": {
+        "sequence": 125,
+        "event": "sdk_iteration_terminated",
+        "elapsed_ms": 59117.0,
+        "termination": "result_message",
+        "probe_elapsed_ms": 59147.9
+      },
+      "result_returned": true,
+      "answer_chars": 1307,
+      "session_id_present": true,
+      "sse_event_counts": {
+        "heartbeat": 53,
+        "step": 2,
+        "todos_updated": 6,
+        "token": 23,
+        "tool_call": 2,
+        "tool_result": 9
+      },
+      "lifecycle_events": [
+        {
+          "sequence": 1,
+          "event": "runtime_manifest",
+          "decision": "native_granular",
+          "reason_code": "none",
+          "probe_elapsed_ms": 35.5
+        },
+        {
+          "event": "stream_keepalive",
+          "stage": "first",
+          "idle_seconds": 1.0,
+          "probe_elapsed_ms": 1051.9
+        },
+        {
+          "sequence": 2,
+          "event": "delegation_input_rewrite",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "capability_key": "structured_data_agent",
+          "decision": "force_foreground",
+          "input_state": "present",
+          "probe_elapsed_ms": 22189.6
+        },
+        {
+          "sequence": 3,
+          "event": "task_pre_tool_use",
+          "tool_name": "Task",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "capability_key": "structured_data_agent",
+          "decision": "allow",
+          "reason_code": "approved_bounded_contract",
+          "agent_id_present": false,
+          "probe_elapsed_ms": 22192.2
+        },
+        {
+          "sequence": 4,
+          "event": "subagent_start",
+          "tool_use_id": "95076fa8-6ee5-44f3-ab82-cf08b8c52314",
+          "capability_key": "structured_data_agent",
+          "agent_type": "structured_data_agent",
+          "child_run_id": "75768797-5bab-44a3-b411-935dddc1ad7e",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 22922.8
+        },
+        {
+          "sequence": 5,
+          "event": "delegation_input_rewrite",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "capability_key": "per_user_wiki",
+          "decision": "force_foreground",
+          "input_state": "present",
+          "probe_elapsed_ms": 24465.6
+        },
+        {
+          "sequence": 6,
+          "event": "task_pre_tool_use",
+          "tool_name": "Task",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "capability_key": "per_user_wiki",
+          "decision": "allow",
+          "reason_code": "approved_bounded_contract",
+          "agent_id_present": false,
+          "probe_elapsed_ms": 24465.9
+        },
+        {
+          "sequence": 7,
+          "event": "subagent_start",
+          "tool_use_id": "ad7b9498-e83a-4fd8-867a-cddfb84f712f",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "child_run_id": "7985ec75-c9a0-4938-a46c-1b2818c550b3",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 24507.8
+        },
+        {
+          "sequence": 8,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "capability_key": "structured_data_agent",
+          "agent_type": "structured_data_agent",
+          "decision": "allow",
+          "reason_code": "list_founder_datasets is within the compiled structured_data_agent delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 26405.0
+        },
+        {
+          "sequence": 9,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 26406.8
+        },
+        {
+          "sequence": 10,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "capability_key": "structured_data_agent",
+          "agent_type": "structured_data_agent",
+          "decision": "allow",
+          "reason_code": "get_dataset_periods is within the compiled structured_data_agent delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27017.2
+        },
+        {
+          "sequence": 11,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 27018.4
+        },
+        {
+          "sequence": 12,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "decision": "allow",
+          "reason_code": "wiki_search is within the compiled per_user_wiki delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27063.5
+        },
+        {
+          "sequence": 13,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 27064.2
+        },
+        {
+          "sequence": 14,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "decision": "allow",
+          "reason_code": "wiki_search is within the compiled per_user_wiki delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27079.7
+        },
+        {
+          "sequence": 15,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 27080.8
+        },
+        {
+          "sequence": 16,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "decision": "allow",
+          "reason_code": "wiki_list is within the compiled per_user_wiki delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 31859.5
+        },
+        {
+          "sequence": 17,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 31860.2
+        },
+        {
+          "sequence": 18,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "capability_key": "structured_data_agent",
+          "agent_type": "structured_data_agent",
+          "decision": "allow",
+          "reason_code": "run_structured_query is within the compiled structured_data_agent delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 33396.5
+        },
+        {
+          "sequence": 19,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 33400.1
+        },
+        {
+          "sequence": 20,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "decision": "allow",
+          "reason_code": "wiki_get_page is within the compiled per_user_wiki delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 36476.6
+        },
+        {
+          "sequence": 21,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 36477.2
+        },
+        {
+          "sequence": 22,
+          "event": "native_access_gate",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "decision": "allow",
+          "reason_code": "wiki_get_page is within the compiled per_user_wiki delegation grant.",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 37001.2
+        },
+        {
+          "sequence": 23,
+          "event": "compute_gate",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "decision": "allow",
+          "reason_code": "Compute gate does not apply to this tool.",
+          "probe_elapsed_ms": 37001.9
+        },
+        {
+          "sequence": 24,
+          "event": "subagent_stop",
+          "tool_use_id": "0d45d668-afa2-4db6-9cc4-9d53aac48f51",
+          "capability_key": "structured_data_agent",
+          "agent_type": "structured_data_agent",
+          "child_run_id": "75768797-5bab-44a3-b411-935dddc1ad7e",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 48055.0
+        },
+        {
+          "sequence": 25,
+          "event": "subagent_stop",
+          "tool_use_id": "3cce3f82-31b8-4951-9a79-7fc32b4c7409",
+          "capability_key": "per_user_wiki",
+          "agent_type": "per_user_wiki",
+          "child_run_id": "7985ec75-c9a0-4938-a46c-1b2818c550b3",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 49181.9
+        },
+        {
+          "sequence": 26,
+          "event": "composer_integrity_gate",
+          "decision": "not_required",
+          "probe_elapsed_ms": 59179.9
+        },
+        {
+          "event": "stream_keepalive",
+          "stage": "total",
+          "count": 40,
+          "probe_elapsed_ms": 59192.3
+        }
+      ],
+      "stream_diagnostic_events": [
+        {
+          "sequence": 1,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 15786.1,
+          "object_type": "SystemMessage",
+          "arrival_index": 1,
+          "probe_elapsed_ms": 15817.0
+        },
+        {
+          "sequence": 2,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 15787.0,
+          "object_type": "SystemMessage",
+          "arrival_index": 2,
+          "probe_elapsed_ms": 15817.9
+        },
+        {
+          "sequence": 3,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 17097.9,
+          "object_type": "StreamEvent",
+          "status": "message_start",
+          "arrival_index": 3,
+          "probe_elapsed_ms": 17128.8
+        },
+        {
+          "sequence": 4,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 17100.9,
+          "object_type": "StreamEvent",
+          "status": "content_block_start",
+          "arrival_index": 4,
+          "probe_elapsed_ms": 17131.8
+        },
+        {
+          "sequence": 5,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 18452.8,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdFdR7zG2scvBaifneX",
+          "arrival_index": 5,
+          "text_chars": 188,
+          "tool_call_count": 0,
+          "tool_result_count": 0,
+          "has_text": true,
+          "tool_calls_only": false,
+          "content_block_types": [
+            "TextBlock"
+          ],
+          "tool_call_names": [],
+          "probe_elapsed_ms": 18483.8
+        },
+        {
+          "sequence": 6,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 18454.5,
+          "object_type": "StreamEvent",
+          "status": "content_block_start",
+          "arrival_index": 6,
+          "probe_elapsed_ms": 18485.4
+        },
+        {
+          "sequence": 7,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 22103.6,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdFdR7zG2scvBaifneX",
+          "arrival_index": 7,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "Agent"
+          ],
+          "probe_elapsed_ms": 22134.5
+        },
+        {
+          "sequence": 8,
+          "event": "hook_invocation",
+          "elapsed_ms": 22158.6,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_task_use",
+          "phase": "start",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "agent_id_present": false,
+          "probe_elapsed_ms": 22189.5
+        },
+        {
+          "sequence": 9,
+          "event": "hook_invocation",
+          "elapsed_ms": 22161.5,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_task_use",
+          "phase": "return",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "status": "allow",
+          "size_chars": 1051,
+          "agent_id_present": false,
+          "probe_elapsed_ms": 22192.4
+        },
+        {
+          "sequence": 10,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 22404.9,
+          "object_type": "StreamEvent",
+          "status": "content_block_start",
+          "arrival_index": 8,
+          "probe_elapsed_ms": 22435.7
+        },
+        {
+          "sequence": 11,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 22499.8,
+          "object_type": "TaskStartedMessage",
+          "arrival_index": 9,
+          "probe_elapsed_ms": 22530.8
+        },
+        {
+          "sequence": 12,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 22505.4,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "arrival_index": 10,
+          "tool_result_count": 0,
+          "content_block_types": [
+            "TextBlock"
+          ],
+          "probe_elapsed_ms": 22536.2
+        },
+        {
+          "sequence": 13,
+          "event": "hook_invocation",
+          "elapsed_ms": 22891.0,
+          "hook_event": "SubagentStart",
+          "hook_name": "subagent_start_hook",
+          "phase": "start",
+          "tool_use_id": "95076fa8-6ee5-44f3-ab82-cf08b8c52314",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 22921.8
+        },
+        {
+          "sequence": 14,
+          "event": "hook_invocation",
+          "elapsed_ms": 22892.2,
+          "hook_event": "SubagentStart",
+          "hook_name": "subagent_start_hook",
+          "phase": "return",
+          "tool_use_id": "95076fa8-6ee5-44f3-ab82-cf08b8c52314",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 22923.1
+        },
+        {
+          "sequence": 15,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 22926.6,
+          "object_type": "SystemMessage",
+          "arrival_index": 11,
+          "probe_elapsed_ms": 22957.5
+        },
+        {
+          "sequence": 16,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 24428.7,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdFdR7zG2scvBaifneX",
+          "arrival_index": 12,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "Agent"
+          ],
+          "probe_elapsed_ms": 24459.6
+        },
+        {
+          "sequence": 17,
+          "event": "hook_invocation",
+          "elapsed_ms": 24434.7,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_task_use",
+          "phase": "start",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "agent_id_present": false,
+          "probe_elapsed_ms": 24465.5
+        },
+        {
+          "sequence": 18,
+          "event": "hook_invocation",
+          "elapsed_ms": 24435.2,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_task_use",
+          "phase": "return",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "status": "allow",
+          "size_chars": 1051,
+          "agent_id_present": false,
+          "probe_elapsed_ms": 24466.1
+        },
+        {
+          "sequence": 19,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 24471.0,
+          "object_type": "TaskStartedMessage",
+          "arrival_index": 13,
+          "probe_elapsed_ms": 24501.8
+        },
+        {
+          "sequence": 20,
+          "event": "hook_invocation",
+          "elapsed_ms": 24476.7,
+          "hook_event": "SubagentStart",
+          "hook_name": "subagent_start_hook",
+          "phase": "start",
+          "tool_use_id": "ad7b9498-e83a-4fd8-867a-cddfb84f712f",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 24507.5
+        },
+        {
+          "sequence": 21,
+          "event": "hook_invocation",
+          "elapsed_ms": 24477.1,
+          "hook_event": "SubagentStart",
+          "hook_name": "subagent_start_hook",
+          "phase": "return",
+          "tool_use_id": "ad7b9498-e83a-4fd8-867a-cddfb84f712f",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 24508.0
+        },
+        {
+          "sequence": 22,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 24478.6,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 14,
+          "tool_result_count": 0,
+          "content_block_types": [
+            "TextBlock"
+          ],
+          "probe_elapsed_ms": 24509.5
+        },
+        {
+          "sequence": 23,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 24523.7,
+          "object_type": "SystemMessage",
+          "arrival_index": 15,
+          "probe_elapsed_ms": 24554.5
+        },
+        {
+          "sequence": 24,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 24589.9,
+          "object_type": "StreamEvent",
+          "status": "message_delta",
+          "arrival_index": 16,
+          "probe_elapsed_ms": 24620.9
+        },
+        {
+          "sequence": 25,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 24600.6,
+          "object_type": "StreamEvent",
+          "status": "message_stop",
+          "arrival_index": 17,
+          "probe_elapsed_ms": 24631.5
+        },
+        {
+          "sequence": 26,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 26366.8,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 18,
+          "probe_elapsed_ms": 26397.7
+        },
+        {
+          "sequence": 27,
+          "event": "hook_invocation",
+          "elapsed_ms": 26373.2,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 26404.7
+        },
+        {
+          "sequence": 28,
+          "event": "hook_invocation",
+          "elapsed_ms": 26374.2,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 26405.1
+        },
+        {
+          "sequence": 29,
+          "event": "hook_invocation",
+          "elapsed_ms": 26375.8,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 26406.7
+        },
+        {
+          "sequence": 30,
+          "event": "hook_invocation",
+          "elapsed_ms": 26376.0,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 26406.9
+        },
+        {
+          "sequence": 31,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 26377.5,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdG9zPoG779AGyUMuaA",
+          "parent_tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "arrival_index": 19,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__list_founder_datasets"
+          ],
+          "probe_elapsed_ms": 26408.3
+        },
+        {
+          "sequence": 32,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 26972.1,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 20,
+          "probe_elapsed_ms": 27003.0
+        },
+        {
+          "sequence": 33,
+          "event": "hook_invocation",
+          "elapsed_ms": 26986.2,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27017.1
+        },
+        {
+          "sequence": 34,
+          "event": "hook_invocation",
+          "elapsed_ms": 26986.5,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27017.4
+        },
+        {
+          "sequence": 35,
+          "event": "hook_invocation",
+          "elapsed_ms": 26987.4,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27018.3
+        },
+        {
+          "sequence": 36,
+          "event": "hook_invocation",
+          "elapsed_ms": 26987.6,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27018.5
+        },
+        {
+          "sequence": 37,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 26988.8,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdG9zPoG779AGyUMuaA",
+          "parent_tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "arrival_index": 21,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__get_dataset_periods"
+          ],
+          "probe_elapsed_ms": 27019.7
+        },
+        {
+          "sequence": 38,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 27020.0,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 22,
+          "probe_elapsed_ms": 27050.9
+        },
+        {
+          "sequence": 39,
+          "event": "hook_invocation",
+          "elapsed_ms": 27032.5,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27063.3
+        },
+        {
+          "sequence": 40,
+          "event": "hook_invocation",
+          "elapsed_ms": 27032.8,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27063.6
+        },
+        {
+          "sequence": 41,
+          "event": "hook_invocation",
+          "elapsed_ms": 27033.3,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27064.2
+        },
+        {
+          "sequence": 42,
+          "event": "hook_invocation",
+          "elapsed_ms": 27033.5,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27064.3
+        },
+        {
+          "sequence": 43,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 27034.5,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdGFbyrq265Xqcqccj3",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 23,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__wiki_search"
+          ],
+          "probe_elapsed_ms": 27065.4
+        },
+        {
+          "sequence": 44,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 27044.7,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 24,
+          "probe_elapsed_ms": 27075.6
+        },
+        {
+          "sequence": 45,
+          "event": "hook_invocation",
+          "elapsed_ms": 27048.7,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27079.6
+        },
+        {
+          "sequence": 46,
+          "event": "hook_invocation",
+          "elapsed_ms": 27048.9,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27079.8
+        },
+        {
+          "sequence": 47,
+          "event": "hook_invocation",
+          "elapsed_ms": 27049.8,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27080.6
+        },
+        {
+          "sequence": 48,
+          "event": "hook_invocation",
+          "elapsed_ms": 27050.0,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 27080.9
+        },
+        {
+          "sequence": 49,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 27051.1,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdGFbyrq265Xqcqccj3",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 25,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__wiki_search"
+          ],
+          "probe_elapsed_ms": 27082.0
+        },
+        {
+          "sequence": 50,
+          "event": "hook_invocation",
+          "elapsed_ms": 28471.3,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 28502.2
+        },
+        {
+          "sequence": 51,
+          "event": "hook_invocation",
+          "elapsed_ms": 28477.7,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__list_founder_datasets",
+          "tool_use_id": "toolu_01FJoa1ZMSvMghJSk3Gb7dEf",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 28508.6
+        },
+        {
+          "sequence": 52,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 28509.9,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "arrival_index": 26,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 28540.9
+        },
+        {
+          "sequence": 53,
+          "event": "hook_invocation",
+          "elapsed_ms": 29332.7,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 29363.6
+        },
+        {
+          "sequence": 54,
+          "event": "hook_invocation",
+          "elapsed_ms": 29335.1,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_013rr6pP86TcJKEaFGFxbB5d",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 29365.9
+        },
+        {
+          "sequence": 55,
+          "event": "hook_invocation",
+          "elapsed_ms": 29340.4,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 29371.3
+        },
+        {
+          "sequence": 56,
+          "event": "hook_invocation",
+          "elapsed_ms": 29346.2,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__get_dataset_periods",
+          "tool_use_id": "toolu_01XPrK48HbR2XMg5BiMLqGQd",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 29377.1
+        },
+        {
+          "sequence": 57,
+          "event": "hook_invocation",
+          "elapsed_ms": 29347.4,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 29378.3
+        },
+        {
+          "sequence": 58,
+          "event": "hook_invocation",
+          "elapsed_ms": 29349.6,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_search",
+          "tool_use_id": "toolu_01CpyfuTaRcAK7dwzNah7pTq",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 29380.4
+        },
+        {
+          "sequence": 59,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 29386.7,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "arrival_index": 27,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 29417.6
+        },
+        {
+          "sequence": 60,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 29394.9,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 28,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 29425.7
+        },
+        {
+          "sequence": 61,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 29412.8,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 29,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 29443.7
+        },
+        {
+          "sequence": 62,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 31821.4,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 30,
+          "probe_elapsed_ms": 31852.3
+        },
+        {
+          "sequence": 63,
+          "event": "hook_invocation",
+          "elapsed_ms": 31828.6,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 31859.5
+        },
+        {
+          "sequence": 64,
+          "event": "hook_invocation",
+          "elapsed_ms": 31828.8,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 31859.6
+        },
+        {
+          "sequence": 65,
+          "event": "hook_invocation",
+          "elapsed_ms": 31829.3,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 31860.2
+        },
+        {
+          "sequence": 66,
+          "event": "hook_invocation",
+          "elapsed_ms": 31829.4,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 31860.3
+        },
+        {
+          "sequence": 67,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 31830.5,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdGdsC4rHJmVXBJ8ijH",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 31,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__wiki_list"
+          ],
+          "probe_elapsed_ms": 31861.4
+        },
+        {
+          "sequence": 68,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 33355.7,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 32,
+          "probe_elapsed_ms": 33386.6
+        },
+        {
+          "sequence": 69,
+          "event": "hook_invocation",
+          "elapsed_ms": 33365.5,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 33396.4
+        },
+        {
+          "sequence": 70,
+          "event": "hook_invocation",
+          "elapsed_ms": 33365.8,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 33396.6
+        },
+        {
+          "sequence": 71,
+          "event": "hook_invocation",
+          "elapsed_ms": 33369.1,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 33400.0
+        },
+        {
+          "sequence": 72,
+          "event": "hook_invocation",
+          "elapsed_ms": 33369.3,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 33400.2
+        },
+        {
+          "sequence": 73,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 33371.1,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdGcnhUYDU4YfP21heQ",
+          "parent_tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "arrival_index": 33,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__run_structured_query"
+          ],
+          "probe_elapsed_ms": 33402.0
+        },
+        {
+          "sequence": 74,
+          "event": "hook_invocation",
+          "elapsed_ms": 33902.4,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 33933.3
+        },
+        {
+          "sequence": 75,
+          "event": "hook_invocation",
+          "elapsed_ms": 33904.1,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_list",
+          "tool_use_id": "toolu_01BMi2bz5zcfBmsaKwNHLmmN",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 33935.0
+        },
+        {
+          "sequence": 76,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 33916.7,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 34,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 33947.6
+        },
+        {
+          "sequence": 77,
+          "event": "hook_invocation",
+          "elapsed_ms": 35505.7,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 35536.6
+        },
+        {
+          "sequence": 78,
+          "event": "hook_invocation",
+          "elapsed_ms": 35510.4,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__run_structured_query",
+          "tool_use_id": "toolu_01B6MGwv6RqrUEv2t8APfwv2",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 35541.3
+        },
+        {
+          "sequence": 79,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 35549.5,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "arrival_index": 35,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 35580.4
+        },
+        {
+          "sequence": 80,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 36438.6,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 36,
+          "probe_elapsed_ms": 36469.5
+        },
+        {
+          "sequence": 81,
+          "event": "hook_invocation",
+          "elapsed_ms": 36445.6,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 36476.5
+        },
+        {
+          "sequence": 82,
+          "event": "hook_invocation",
+          "elapsed_ms": 36445.8,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 36476.7
+        },
+        {
+          "sequence": 83,
+          "event": "hook_invocation",
+          "elapsed_ms": 36446.3,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 36477.2
+        },
+        {
+          "sequence": 84,
+          "event": "hook_invocation",
+          "elapsed_ms": 36446.4,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 36477.3
+        },
+        {
+          "sequence": 85,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 36447.7,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdGxLh3GfQUdBezM76k",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 37,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__wiki_get_page"
+          ],
+          "probe_elapsed_ms": 36478.6
+        },
+        {
+          "sequence": 86,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 36963.8,
+          "object_type": "TaskProgressMessage",
+          "arrival_index": 38,
+          "probe_elapsed_ms": 36994.7
+        },
+        {
+          "sequence": 87,
+          "event": "hook_invocation",
+          "elapsed_ms": 36970.3,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 37001.1
+        },
+        {
+          "sequence": 88,
+          "event": "hook_invocation",
+          "elapsed_ms": 36970.4,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_native_access_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 37001.3
+        },
+        {
+          "sequence": 89,
+          "event": "hook_invocation",
+          "elapsed_ms": 36971.0,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 37001.8
+        },
+        {
+          "sequence": 90,
+          "event": "hook_invocation",
+          "elapsed_ms": 36971.1,
+          "hook_event": "PreToolUse",
+          "hook_name": "pre_compute_gate",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 37001.9
+        },
+        {
+          "sequence": 91,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 36971.7,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdGxLh3GfQUdBezM76k",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 39,
+          "text_chars": 0,
+          "tool_call_count": 1,
+          "tool_result_count": 0,
+          "has_text": false,
+          "tool_calls_only": true,
+          "content_block_types": [
+            "ToolUseBlock"
+          ],
+          "tool_call_names": [
+            "mcp__architectos__wiki_get_page"
+          ],
+          "probe_elapsed_ms": 37002.6
+        },
+        {
+          "sequence": 92,
+          "event": "hook_invocation",
+          "elapsed_ms": 38563.2,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 38594.1
+        },
+        {
+          "sequence": 93,
+          "event": "hook_invocation",
+          "elapsed_ms": 38566.2,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01KW735qff6apjPFMCoCfsVc",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 38597.0
+        },
+        {
+          "sequence": 94,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 38663.1,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 40,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 38694.0
+        },
+        {
+          "sequence": 95,
+          "event": "hook_invocation",
+          "elapsed_ms": 39063.8,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 39094.7
+        },
+        {
+          "sequence": 96,
+          "event": "hook_invocation",
+          "elapsed_ms": 39066.4,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "mcp__architectos__wiki_get_page",
+          "tool_use_id": "toolu_01K5Vr8EWy9gJXtP7odZnYAj",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 39097.2
+        },
+        {
+          "sequence": 97,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 39101.0,
+          "object_type": "UserMessage",
+          "parent_tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "arrival_index": 41,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 39131.8
+        },
+        {
+          "sequence": 98,
+          "event": "hook_invocation",
+          "elapsed_ms": 48023.4,
+          "hook_event": "SubagentStop",
+          "hook_name": "subagent_stop_hook",
+          "phase": "start",
+          "tool_use_id": "0d45d668-afa2-4db6-9cc4-9d53aac48f51",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 48054.4
+        },
+        {
+          "sequence": 99,
+          "event": "hook_invocation",
+          "elapsed_ms": 48024.3,
+          "hook_event": "SubagentStop",
+          "hook_name": "subagent_stop_hook",
+          "phase": "return",
+          "tool_use_id": "0d45d668-afa2-4db6-9cc4-9d53aac48f51",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 48055.2
+        },
+        {
+          "sequence": 100,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 48070.5,
+          "object_type": "TaskUpdatedMessage",
+          "arrival_index": 42,
+          "probe_elapsed_ms": 48101.4
+        },
+        {
+          "sequence": 101,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 48071.7,
+          "object_type": "TaskNotificationMessage",
+          "arrival_index": 43,
+          "probe_elapsed_ms": 48102.5
+        },
+        {
+          "sequence": 102,
+          "event": "hook_invocation",
+          "elapsed_ms": 48085.6,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "agent_id_present": false,
+          "probe_elapsed_ms": 48116.4
+        },
+        {
+          "sequence": 103,
+          "event": "hook_invocation",
+          "elapsed_ms": 48088.0,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": false,
+          "probe_elapsed_ms": 48118.9
+        },
+        {
+          "sequence": 104,
+          "event": "agent_tool_hook_result",
+          "elapsed_ms": 48088.2,
+          "hook_event": "PostToolUse",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "status": "completed",
+          "size_chars": 4178,
+          "is_agent_result": true,
+          "is_error": false,
+          "probe_elapsed_ms": 48119.1
+        },
+        {
+          "sequence": 105,
+          "event": "agent_tool_result",
+          "elapsed_ms": 48136.6,
+          "object_type": "UserMessage",
+          "tool_use_id": "toolu_01VkgaDEeRT2m7i2rLjqTcsF",
+          "status": "completed",
+          "size_chars": 6903,
+          "is_agent_result": true,
+          "is_error": false,
+          "probe_elapsed_ms": 48167.6
+        },
+        {
+          "sequence": 106,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 48136.8,
+          "object_type": "UserMessage",
+          "arrival_index": 44,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 48167.6
+        },
+        {
+          "sequence": 107,
+          "event": "hook_invocation",
+          "elapsed_ms": 49150.6,
+          "hook_event": "SubagentStop",
+          "hook_name": "subagent_stop_hook",
+          "phase": "start",
+          "tool_use_id": "3cce3f82-31b8-4951-9a79-7fc32b4c7409",
+          "agent_id_present": true,
+          "probe_elapsed_ms": 49181.5
+        },
+        {
+          "sequence": 108,
+          "event": "hook_invocation",
+          "elapsed_ms": 49151.1,
+          "hook_event": "SubagentStop",
+          "hook_name": "subagent_stop_hook",
+          "phase": "return",
+          "tool_use_id": "3cce3f82-31b8-4951-9a79-7fc32b4c7409",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": true,
+          "probe_elapsed_ms": 49182.0
+        },
+        {
+          "sequence": 109,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 49203.0,
+          "object_type": "TaskUpdatedMessage",
+          "arrival_index": 45,
+          "probe_elapsed_ms": 49233.8
+        },
+        {
+          "sequence": 110,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 49203.9,
+          "object_type": "TaskNotificationMessage",
+          "arrival_index": 46,
+          "probe_elapsed_ms": 49234.8
+        },
+        {
+          "sequence": 111,
+          "event": "hook_invocation",
+          "elapsed_ms": 49213.4,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "start",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "agent_id_present": false,
+          "probe_elapsed_ms": 49244.3
+        },
+        {
+          "sequence": 112,
+          "event": "hook_invocation",
+          "elapsed_ms": 49216.1,
+          "hook_event": "PostToolUse",
+          "hook_name": "post_tool_use",
+          "phase": "return",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": false,
+          "probe_elapsed_ms": 49247.2
+        },
+        {
+          "sequence": 113,
+          "event": "agent_tool_hook_result",
+          "elapsed_ms": 49216.7,
+          "hook_event": "PostToolUse",
+          "tool_name": "Agent",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "status": "completed",
+          "size_chars": 3346,
+          "is_agent_result": true,
+          "is_error": false,
+          "probe_elapsed_ms": 49247.5
+        },
+        {
+          "sequence": 114,
+          "event": "agent_tool_result",
+          "elapsed_ms": 49320.8,
+          "object_type": "UserMessage",
+          "tool_use_id": "toolu_01CnunJgt6M9WndBYJ1VPi9F",
+          "status": "completed",
+          "size_chars": 5243,
+          "is_agent_result": true,
+          "is_error": false,
+          "probe_elapsed_ms": 49351.7
+        },
+        {
+          "sequence": 115,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 49320.9,
+          "object_type": "UserMessage",
+          "arrival_index": 47,
+          "tool_result_count": 1,
+          "content_block_types": [
+            "ToolResultBlock"
+          ],
+          "probe_elapsed_ms": 49351.8
+        },
+        {
+          "sequence": 116,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 49328.9,
+          "object_type": "SystemMessage",
+          "arrival_index": 48,
+          "probe_elapsed_ms": 49359.8
+        },
+        {
+          "sequence": 117,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 50474.3,
+          "object_type": "StreamEvent",
+          "status": "message_start",
+          "arrival_index": 49,
+          "probe_elapsed_ms": 50506.1
+        },
+        {
+          "sequence": 118,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 50476.6,
+          "object_type": "StreamEvent",
+          "status": "content_block_start",
+          "arrival_index": 50,
+          "probe_elapsed_ms": 50507.5
+        },
+        {
+          "sequence": 119,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 57845.0,
+          "object_type": "AssistantMessage",
+          "message_id": "msg_011CdWdJ5vsVR3BkNTAdyi7t",
+          "arrival_index": 51,
+          "text_chars": 1307,
+          "tool_call_count": 0,
+          "tool_result_count": 0,
+          "has_text": true,
+          "tool_calls_only": false,
+          "content_block_types": [
+            "TextBlock"
+          ],
+          "tool_call_names": [],
+          "probe_elapsed_ms": 57875.9
+        },
+        {
+          "sequence": 120,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 57848.2,
+          "object_type": "StreamEvent",
+          "status": "message_delta",
+          "arrival_index": 52,
+          "probe_elapsed_ms": 57879.0
+        },
+        {
+          "sequence": 121,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 57848.7,
+          "object_type": "StreamEvent",
+          "status": "message_stop",
+          "arrival_index": 53,
+          "probe_elapsed_ms": 57879.6
+        },
+        {
+          "sequence": 122,
+          "event": "hook_invocation",
+          "elapsed_ms": 57861.2,
+          "hook_event": "Stop",
+          "hook_name": "stop_hook",
+          "phase": "start",
+          "tool_use_id": "de871969-7d7c-4e2f-b3d1-9a58150941cd",
+          "agent_id_present": false,
+          "probe_elapsed_ms": 57892.1
+        },
+        {
+          "sequence": 123,
+          "event": "hook_invocation",
+          "elapsed_ms": 57863.1,
+          "hook_event": "Stop",
+          "hook_name": "stop_hook",
+          "phase": "return",
+          "tool_use_id": "de871969-7d7c-4e2f-b3d1-9a58150941cd",
+          "status": "returned",
+          "size_chars": 2,
+          "agent_id_present": false,
+          "probe_elapsed_ms": 57894.0
+        },
+        {
+          "sequence": 124,
+          "event": "sdk_stream_message",
+          "elapsed_ms": 57884.1,
+          "object_type": "ResultMessage",
+          "message_id": "9cb9e6f3-edc8-49b4-b730-8879fe9c96a7",
+          "status": "success",
+          "arrival_index": 54,
+          "size_chars": 1307,
+          "is_error": false,
+          "probe_elapsed_ms": 57915.0
+        },
+        {
+          "sequence": 125,
+          "event": "sdk_iteration_terminated",
+          "elapsed_ms": 59117.0,
+          "termination": "result_message",
+          "probe_elapsed_ms": 59147.9
+        }
+      ],
+      "stub_tools": [
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 26465.2,
+          "tool_name": "list_founder_datasets"
+        },
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 27133.1,
+          "tool_name": "get_dataset_periods"
+        },
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 27153.1,
+          "tool_name": "wiki_search"
+        },
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 27162.4,
+          "tool_name": "wiki_search"
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 28465.5,
+          "tool_name": "list_founder_datasets",
+          "elapsed_ms": 2000.3
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 29163.7,
+          "tool_name": "wiki_search",
+          "elapsed_ms": 2010.5
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 29166.0,
+          "tool_name": "get_dataset_periods",
+          "elapsed_ms": 2032.9
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 29172.7,
+          "tool_name": "wiki_search",
+          "elapsed_ms": 2010.3
+        },
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 31891.8,
+          "tool_name": "wiki_list"
+        },
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 33442.9,
+          "tool_name": "run_structured_query"
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 33898.5,
+          "tool_name": "wiki_list",
+          "elapsed_ms": 2006.7
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 35443.4,
+          "tool_name": "run_structured_query",
+          "elapsed_ms": 2000.5
+        },
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 36511.5,
+          "tool_name": "wiki_get_page"
+        },
+        {
+          "event": "stub_tool_start",
+          "probe_elapsed_ms": 37048.3,
+          "tool_name": "wiki_get_page"
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 38512.5,
+          "tool_name": "wiki_get_page",
+          "elapsed_ms": 2001.0
+        },
+        {
+          "event": "stub_tool_return",
+          "probe_elapsed_ms": 39049.0,
+          "tool_name": "wiki_get_page",
+          "elapsed_ms": 2000.6
+        }
+      ],
+      "hook_network_writes": [],
+      "exception": null
+    }
+  ],
+  "finished_at": "2026-07-29T15:59:50.356270+00:00"
+}

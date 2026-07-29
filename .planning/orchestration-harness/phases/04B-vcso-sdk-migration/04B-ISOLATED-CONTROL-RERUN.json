@@ -1,0 +1,265 @@
+[
+  {
+    "label": "one_hook_rewrite",
+    "prompt": "Delegate exactly once to alpha_probe_agent. In the Agent input, explicitly request run_in_background=true. The runtime hook will normalize it. Do not call beta. Wait for the Agent result, then quote ALPHA_IN_PROCESS_RESULT_RETURNED exactly and finish.",
+    "definition_background": null,
+    "runtime_versions": {
+      "claude_agent_sdk_version": "0.2.118",
+      "claude_code_cli_version": "2.1.209 (Claude Code)",
+      "claude_code_cli_source": "bundled"
+    },
+    "config_dir": "C:\\Users\\Hicks\\AppData\\Local\\Temp\\claude-native-one_hook_rewrite-ye98wxj8",
+    "expected_agent_sentinels": [
+      "ALPHA_IN_PROCESS_RESULT_RETURNED"
+    ],
+    "expected_subagent_stops": 1,
+    "assistant_turns": [
+      {
+        "assistant_turn": 1,
+        "message_id": "msg_011CdWcvTjgbCaZbH3fTTri8",
+        "uuid": "608fd9e0-e613-4d48-9bad-4f09603a6407",
+        "stop_reason": null,
+        "parent_tool_use_id": null,
+        "tool_uses": [],
+        "text": [
+          "I'll delegate to the alpha_probe_agent now with `run_in_background: true` as requested."
+        ]
+      },
+      {
+        "assistant_turn": 2,
+        "message_id": "msg_011CdWcvTjgbCaZbH3fTTri8",
+        "uuid": "5d7b8def-bc8d-44ee-9014-05454d601ee3",
+        "stop_reason": null,
+        "parent_tool_use_id": null,
+        "tool_uses": [
+          {
+            "name": "Agent",
+            "input": {
+              "description": "Alpha probe sentinel retrieval",
+              "subagent_type": "alpha_probe_agent",
+              "prompt": "Please call your mcp__return_probe__read_alpha_value tool with request \"retrieve alpha sentinel\" and return the result.",
+              "run_in_background": true
+            },
+            "id": "toolu_0199D9DsUj6mUXWteAFou3jd"
+          }
+        ],
+        "text": []
+      },
+      {
+        "assistant_turn": 3,
+        "message_id": "msg_011CdWcviDKgRkn3YE7KSaVE",
+        "uuid": "1f448ad7-b7f7-4de5-a8cd-a5e02ec5a1b6",
+        "stop_reason": null,
+        "parent_tool_use_id": "toolu_0199D9DsUj6mUXWteAFou3jd",
+        "tool_uses": [
+          {
+            "name": "mcp__return_probe__read_alpha_value",
+            "input": {
+              "request": "alpha"
+            },
+            "id": "toolu_019wCojbwFXZKeWYi11t4qoJ"
+          }
+        ],
+        "text": []
+      },
+      {
+        "assistant_turn": 4,
+        "message_id": "msg_011CdWcvtSUj456VZ56JSbHB",
+        "uuid": "7ffd3a9d-1e74-4c93-b616-5c3917941090",
+        "stop_reason": null,
+        "parent_tool_use_id": null,
+        "tool_uses": [],
+        "text": [
+          "The alpha_probe_agent has completed. Here is the exact quoted result:\n\n**`ALPHA_IN_PROCESS_RESULT_RETURNED`**"
+        ]
+      }
+    ],
+    "assistant_text": [
+      "I'll delegate to the alpha_probe_agent now with `run_in_background: true` as requested.",
+      "The alpha_probe_agent has completed. Here is the exact quoted result:\n\n**`ALPHA_IN_PROCESS_RESULT_RETURNED`**"
+    ],
+    "user_tool_results": [
+      {
+        "parent_tool_use_id": "toolu_0199D9DsUj6mUXWteAFou3jd",
+        "tool_results": [
+          {
+            "tool_use_id": "toolu_019wCojbwFXZKeWYi11t4qoJ",
+            "is_error": null,
+            "content": "[{\"type\": \"text\", \"text\": \"ALPHA_IN_PROCESS_RESULT_RETURNED: alpha completed in process.\"}]"
+          }
+        ],
+        "tool_use_result": "null"
+      },
+      {
+        "parent_tool_use_id": null,
+        "tool_results": [
+          {
+            "tool_use_id": "toolu_0199D9DsUj6mUXWteAFou3jd",
+            "is_error": null,
+            "content": "[{\"type\": \"text\", \"text\": \"ALPHA_IN_PROCESS_RESULT_RETURNED: alpha completed in process.\"}, {\"type\": \"text\", \"text\": \"agentId: ab60367446ef54ba2 (use SendMessage with to: 'ab60367446ef54ba2', summary: '<5-10 word recap>' to continue this agent)\\n<usage>subagent_tokens: 2160\\ntool_uses: 1\\nduration_ms: 2469</usage>\"}]"
+          }
+        ],
+        "tool_use_result": "{\"status\": \"completed\", \"prompt\": \"Please call your mcp__return_probe__read_alpha_value tool with request \\\"retrieve alpha sentinel\\\" and return the result.\", \"agentId\": \"ab60367446ef54ba2\", \"agentType\": \"alpha_probe_agent\", \"content\": [{\"type\": \"text\", \"text\": \"ALPHA_IN_PROCESS_RESULT_RETURNED: alpha completed in process.\"}], \"resolvedModel\": \"claude-haiku-4-5-20251001\", \"totalDurationMs\": 2469, \"totalTokens\": 2160, \"totalToolUseCount\": 1, \"usage\": {\"input_tokens\": 2138, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0, \"output_tokens\": 22, \"server_tool_use\": {\"web_search_requests\": 0, \"web_fetch_requests\": 0}, \"service_tier\": \"standard\", \"cache_creation\": {\"ephemeral_1h_input_tokens\": 0, \"ephemeral_5m_input_tokens\": 0}, \"inference_geo\": \"not_available\", \"iterations\": [{\"input_tokens\": 2138, \"output_tokens\": 22, \"cache_read_input_tokens\": 0, \"cache_creation_input_tokens\": 0, \"cache_creation\": {\"ephemeral_5m_input_tokens\": 0, \"ephemeral_1h_input_tokens\": 0}, \"type\": \"message\"}], \"speed\": \"standard\"}, \"toolStats\": {\"readCount\": 0, \"searchCount\": 0, \"bashCount\": 0, \"editFileCount\": 0, \"linesAdded\": 0, \"linesRemoved\": 0, \"otherToolCount\": 1}}"
+      }
+    ],
+    "partial_message_count": 23,
+    "events": [
+      {
+        "event": "delegation_input_rewrite",
+        "elapsed_ms": 16634.746,
+        "at": "2026-07-29T15:54:50.466376+00:00",
+        "tool": "Agent",
+        "tool_use_id": "toolu_0199D9DsUj6mUXWteAFou3jd",
+        "agent_id": null,
+        "agent_type": null,
+        "input_state": "true",
+        "original_input": "{\"description\": \"Alpha probe sentinel retrieval\", \"prompt\": \"Please call your mcp__return_probe__read_alpha_value tool with request \\\"retrieve alpha sentinel\\\" and return the result.\", \"subagent_type\": \"alpha_probe_agent\", \"run_in_background\": true}",
+        "updated_input": "{\"description\": \"Alpha probe sentinel retrieval\", \"prompt\": \"Please call your mcp__return_probe__read_alpha_value tool with request \\\"retrieve alpha sentinel\\\" and return the result.\", \"subagent_type\": \"alpha_probe_agent\", \"run_in_background\": false}"
+      },
+      {
+        "event": "SubagentStart",
+        "elapsed_ms": 16757.671,
+        "at": "2026-07-29T15:54:50.589251+00:00",
+        "tool_use_id": "f8d4c1aa-9073-49f2-8fb8-dc4910182242",
+        "agent_id": "ab60367446ef54ba2",
+        "agent_type": "alpha_probe_agent",
+        "stop_hook_active": null
+      },
+      {
+        "event": "native_access_gate",
+        "elapsed_ms": 17988.797,
+        "at": "2026-07-29T15:54:51.820390+00:00",
+        "tool": "mcp__return_probe__read_alpha_value",
+        "tool_use_id": "toolu_019wCojbwFXZKeWYi11t4qoJ",
+        "agent_id": "ab60367446ef54ba2",
+        "decision": "allow"
+      },
+      {
+        "event": "compute_gate",
+        "elapsed_ms": 17988.997,
+        "at": "2026-07-29T15:54:51.820558+00:00",
+        "tool": "mcp__return_probe__read_alpha_value",
+        "tool_use_id": "toolu_019wCojbwFXZKeWYi11t4qoJ",
+        "agent_id": "ab60367446ef54ba2",
+        "decision": "allow"
+      },
+      {
+        "event": "tool_handler",
+        "elapsed_ms": 18026.118,
+        "at": "2026-07-29T15:54:51.857754+00:00",
+        "tool": "read_alpha_value",
+        "args": {
+          "request": "alpha"
+        }
+      },
+      {
+        "event": "post_tool",
+        "elapsed_ms": 18312.878,
+        "at": "2026-07-29T15:54:52.144447+00:00",
+        "tool": "mcp__return_probe__read_alpha_value",
+        "tool_use_id": "toolu_019wCojbwFXZKeWYi11t4qoJ",
+        "agent_id": "ab60367446ef54ba2",
+        "agent_type": "alpha_probe_agent",
+        "input": "{\"request\": \"alpha\"}",
+        "response": "[{\"type\": \"text\", \"text\": \"ALPHA_IN_PROCESS_RESULT_RETURNED: alpha completed in process.\"}]"
+      },
+      {
+        "event": "SubagentStop",
+        "elapsed_ms": 19143.447,
+        "at": "2026-07-29T15:54:52.975019+00:00",
+        "tool_use_id": "6cf26c97-2389-4103-be9d-aa67b27c2323",
+        "agent_id": "ab60367446ef54ba2",
+        "agent_type": "alpha_probe_agent",
+        "stop_hook_active": false
+      },
+      {
+        "event": "post_tool",
+        "elapsed_ms": 19181.589,
+        "at": "2026-07-29T15:54:53.013165+00:00",
+        "tool": "Agent",
+        "tool_use_id": "toolu_0199D9DsUj6mUXWteAFou3jd",
+        "agent_id": null,
+        "agent_type": null,
+        "input": "{\"description\": \"Alpha probe sentinel retrieval\", \"prompt\": \"Please call your mcp__return_probe__read_alpha_value tool with request \\\"retrieve alpha sentinel\\\" and return the result.\", \"subagent_type\": \"alpha_probe_agent\", \"run_in_background\": false}",
+        "response": "{\"status\": \"completed\", \"prompt\": \"Please call your mcp__return_probe__read_alpha_value tool with request \\\"retrieve alpha sentinel\\\" and return the result.\", \"agentId\": \"ab60367446ef54ba2\", \"agentType\": \"alpha_probe_agent\", \"content\": [{\"type\": \"text\", \"text\": \"ALPHA_IN_PROCESS_RESULT_RETURNED: alpha completed in process.\"}], \"resolvedModel\": \"claude-haiku-4-5-20251001\", \"totalDurationMs\": 2469, \"totalTokens\": 2160, \"totalToolUseCount\": 1, \"usage\": {\"input_tokens\": 2138, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0, \"output_tokens\": 22, \"server_tool_use\": {\"web_search_requests\": 0, \"web_fetch_requests\": 0}, \"service_tier\": \"standard\", \"cache_creation\": {\"ephemeral_1h_input_tokens\": 0, \"ephemeral_5m_input_tokens\": 0}, \"inference_geo\": \"not_available\", \"iterations\": [{\"input_tokens\": 2138, \"output_tokens\": 22, \"cache_read_input_tokens\": 0, \"cache_creation_input_tokens\": 0, \"cache_creation\": {\"ephemeral_5m_input_tokens\": 0, \"ephemeral_1h_input_tokens\": 0}, \"type\": \"message\"}], \"speed\": \"standard\"}, \"toolStats\": {\"readCount\": 0, \"searchCount\": 0, \"bashCount\": 0, \"editFileCount\": 0, \"linesAdded\": 0, \"linesRemoved\": 0, \"otherToolCount\": 1}}"
+      },
+      {
+        "event": "Stop",
+        "elapsed_ms": 20843.672,
+        "at": "2026-07-29T15:54:54.675261+00:00",
+        "tool_use_id": "e6308ce2-512e-4cca-8adc-53bc0ba3e4a0",
+        "stop_hook_active": false
+      }
+    ],
+    "init_tools": [
+      "Task",
+      "mcp__return_probe__read_alpha_value",
+      "mcp__return_probe__read_beta_value",
+      "mcp__return_probe__read_lead_value"
+    ],
+    "init_agents": [
+      "claude",
+      "Explore",
+      "general-purpose",
+      "Plan",
+      "statusline-setup",
+      "alpha_probe_agent",
+      "beta_probe_agent"
+    ],
+    "cli_version": "2.1.209",
+    "result": {
+      "subtype": "success",
+      "is_error": false,
+      "num_turns": 2,
+      "total_cost_usd": 0.02250395,
+      "duration_ms": 8164,
+      "result": "The alpha_probe_agent has completed. Here is the exact quoted result:\n\n**`ALPHA_IN_PROCESS_RESULT_RETURNED`**"
+    },
+    "wall_clock_ms": 22816.122,
+    "summary": {
+      "status": "completed_in_band",
+      "subagent_start_count": 1,
+      "subagent_stop_count": 1,
+      "subagent_start_gap_ms": null,
+      "agent_post_tool_count": 1,
+      "agent_content_returned": {
+        "ALPHA_IN_PROCESS_RESULT_RETURNED": true
+      },
+      "lead_post_tool_count": 0,
+      "lead_content_returned": null,
+      "assistant_agent_turns": [
+        {
+          "assistant_turn": 2,
+          "message_id": "msg_011CdWcvTjgbCaZbH3fTTri8",
+          "uuid": "5d7b8def-bc8d-44ee-9014-05454d601ee3",
+          "agent_calls": [
+            {
+              "name": "Agent",
+              "input": {
+                "description": "Alpha probe sentinel retrieval",
+                "subagent_type": "alpha_probe_agent",
+                "prompt": "Please call your mcp__return_probe__read_alpha_value tool with request \"retrieve alpha sentinel\" and return the result.",
+                "run_in_background": true
+              },
+              "id": "toolu_0199D9DsUj6mUXWteAFou3jd"
+            }
+          ]
+        }
+      ],
+      "agent_call_message_ids": [
+        "msg_011CdWcvTjgbCaZbH3fTTri8"
+      ],
+      "agent_calls_share_one_message": false,
+      "wall_clock_ms": 22816.122,
+      "result": {
+        "subtype": "success",
+        "is_error": false,
+        "num_turns": 2,
+        "total_cost_usd": 0.02250395,
+        "duration_ms": 8164,
+        "result": "The alpha_probe_agent has completed. Here is the exact quoted result:\n\n**`ALPHA_IN_PROCESS_RESULT_RETURNED`**"
+      },
+      "exception": null
+    }
+  }
+]
