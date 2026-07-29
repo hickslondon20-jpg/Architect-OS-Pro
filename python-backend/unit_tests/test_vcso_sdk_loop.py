@@ -45,6 +45,7 @@ from services.vcso_sdk_loop import (
     persist_native_child_step,
     read_sdk_loop_settings,
     foreground_delegation_input,
+    sdk_runtime_versions,
     stream_vcso_sdk_turn,
 )
 
@@ -101,6 +102,14 @@ def test_sdk_error_sanitizer_preserves_type_and_redacts_credentials():
     assert "secret-token" not in details["error_message"]
     assert "sk-abcdefghijklmnop" not in details["error_message"]
     assert "eyJabc.def.ghi" not in details["error_message"]
+
+
+def test_sdk_runtime_versions_report_the_actual_package_and_cli_source():
+    versions = sdk_runtime_versions()
+
+    assert versions["claude_agent_sdk_version"]
+    assert versions["claude_code_cli_version"]
+    assert versions["claude_code_cli_source"] in {"bundled", "system"}
 
 
 def test_sdk_tool_executor_returns_bounded_real_exception_identity():

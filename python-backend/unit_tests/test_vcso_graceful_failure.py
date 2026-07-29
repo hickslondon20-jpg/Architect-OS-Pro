@@ -388,3 +388,66 @@ def test_completed_child_findings_skips_empty_summaries():
     assert _findings(
         [{"capability_key": "per_user_wiki", "status": "completed", "user_id": FOUNDER, "parent_run_id": "parent-1", "result_summary": "", "completed_at": "z"}]
     ) == []
+
+
+class _FailureUpdateClient:
+    def __init__(self):
+        self.payload = None
+        self.filters = {}
+
+    def table(self, name):
+        assert name == "agent_delegation_runs"
+        return self
+
+    def update(self, payload):
+        self.payload = payload
+        return self
+
+    def eq(self, key, value):
+        self.filters[key] = value
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=[self.payload])
+
+
+def test_failed_main_run_persists_native_activation_attribution_and_lifecycle():
+    client = _FailureUpdateClient()
+    service = VcsoChatService.__new__(VcsoChatService)
+    service.supabase = client
+    lifecycle = [
+        {
+            "sequence": 1,
+            "event": "runtime_manifest",
+            "decision": "native_granular",
+            "reason_code": "none",
+        }
+    ]
+    attribution = {
+        "sdk_phase": "04B-D",
+        "native_subagent_mode": True,
+        "available_subagents": ["structured_data_agent", "per_user_wiki"],
+        "claude_agent_sdk_version": "0.2.118",
+        "claude_code_cli_version": "2.1.209 (Claude Code)",
+        "claude_code_cli_source": "bundled",
+    }
+
+    service._fail_main_run(
+        "parent-1",
+        FOUNDER,
+        assistant_message_id="assistant-1",
+        terminal_status="failed",
+        error_message="bounded failure",
+        run_attribution=attribution,
+        sdk_lifecycle=lifecycle,
+    )
+
+    assert client.payload["structured_result"]["native_subagent_mode"] is True
+    assert client.payload["structured_result"]["sdk_phase"] == "04B-D"
+    assert client.payload["metadata"]["sdk_native_lifecycle"] == lifecycle
+    assert client.payload["metadata"]["available_subagents"] == [
+        "structured_data_agent",
+        "per_user_wiki",
+    ]
+    assert client.payload["metadata"]["claude_code_cli_version"] == "2.1.209 (Claude Code)"
+    assert client.filters == {"id": "parent-1", "user_id": FOUNDER}

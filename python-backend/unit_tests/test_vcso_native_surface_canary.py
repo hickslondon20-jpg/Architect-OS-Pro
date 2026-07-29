@@ -13,6 +13,14 @@ def _native_run(**overrides):
         "metadata": {
             "sdk_phase": "04B-D",
             "available_subagents": AGENTS,
+            "sdk_native_lifecycle": [
+                {
+                    "sequence": 1,
+                    "event": "runtime_manifest",
+                    "decision": "native_granular",
+                    "reason_code": "none",
+                }
+            ],
         },
         "structured_result": {
             "sdk_phase": "04B-D",
@@ -33,6 +41,21 @@ def test_native_surface_run_is_countable_only_with_all_three_markers():
     assert verdict["failures"] == []
 
 
+def test_failed_native_run_is_countable_from_activation_evidence_without_success_only_mode_field():
+    run = _native_run(
+        structured_result={
+            "sdk_phase": "04B-D",
+            "status": "failed",
+            "available_subagents": AGENTS,
+        }
+    )
+
+    verdict = evaluate_native_surface_countability(run=run)
+
+    assert verdict["countable"] is True
+    assert verdict["checks"]["runtime_manifest_native_granular"] is True
+
+
 def test_flat_deep_mode_run_is_void():
     verdict = evaluate_native_surface_countability(
         run=_native_run(
@@ -49,7 +72,7 @@ def test_flat_deep_mode_run_is_void():
     assert verdict["classification"] == "void"
     assert verdict["failures"] == [
         "phase_d_marker",
-        "native_subagent_mode",
+        "runtime_manifest_native_granular",
         "available_subagents",
     ]
 
@@ -68,3 +91,25 @@ def test_conflicting_persisted_markers_fail_closed():
     assert verdict["countable"] is False
     assert "phase_d_marker" in verdict["failures"]
     assert "available_subagents" in verdict["failures"]
+
+
+def test_missing_or_wrong_runtime_manifest_fails_closed():
+    missing = _native_run(
+        metadata={"sdk_phase": "04B-D", "available_subagents": AGENTS}
+    )
+    wrong = _native_run(
+        metadata={
+            "sdk_phase": "04B-D",
+            "available_subagents": AGENTS,
+            "sdk_native_lifecycle": [
+                {"event": "runtime_manifest", "decision": "app_owned"}
+            ],
+        }
+    )
+
+    assert evaluate_native_surface_countability(run=missing)["failures"] == [
+        "runtime_manifest_native_granular"
+    ]
+    assert evaluate_native_surface_countability(run=wrong)["failures"] == [
+        "runtime_manifest_native_granular"
+    ]

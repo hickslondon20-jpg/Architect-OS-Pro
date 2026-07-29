@@ -54,6 +54,7 @@ from services.vcso_sdk_loop import (
     native_fault_injection_mode,
     native_subagent_requirements,
     read_sdk_loop_settings,
+    sdk_runtime_versions,
     stream_vcso_sdk_turn,
 )
 from services.vcso_session_store import SupabaseVcsoSessionStore
@@ -694,13 +695,17 @@ class VcsoChatService:
             sdk_max_budget_usd = max(0.01, min(_safe_float(sdk_settings.get("max_budget_usd"), 0.25), 1.0))
             sdk_run_attribution = {
                 "sdk_phase": sdk_phase,
+                "native_subagent_mode": sdk_native_subagent_mode,
                 "native_subagent_scope": str(_sdk_settings.get("native_subagent_scope") or ""),
                 "delegation_selection": "model_choice" if native_model_choice else "fixed_required",
                 "available_subagents": list(native_required_agents),
                 "required_subagents": [] if native_model_choice else list(native_required_agents),
+                **sdk_runtime_versions(),
             }
             sdk_lifecycle_events: list[dict[str, Any]] = []
             sdk_lifecycle_lock = threading.Lock()
+            self._active_turn["run_attribution"] = dict(sdk_run_attribution)
+            self._active_turn["sdk_lifecycle_events"] = sdk_lifecycle_events
 
             def persist_sdk_lifecycle(event: dict[str, Any]) -> None:
                 if not sdk_native_subagent_mode:
@@ -1508,6 +1513,8 @@ class VcsoChatService:
                     terminal_status=terminal_status,
                     error_message=_safe_internal_error(exc),
                     partials=partials,
+                    run_attribution=dict(state.get("run_attribution") or {}),
+                    sdk_lifecycle=list(state.get("sdk_lifecycle_events") or []),
                 )
 
             if state.get("deep_mode"):
@@ -1607,10 +1614,12 @@ class VcsoChatService:
         terminal_status: str,
         error_message: str,
         partials: list[dict[str, str]] | None = None,
+        run_attribution: dict[str, Any] | None = None,
+        sdk_lifecycle: list[dict[str, Any]] | None = None,
     ) -> None:
         status = "cancelled" if terminal_status == "cancelled" else "failed"
-        self.supabase.table("agent_delegation_runs").update(
-            {
+        attribution = dict(run_attribution or {})
+        values: dict[str, Any] = {
                 "status": status,
                 "assistant_message_id": assistant_message_id,
                 "result_summary": _failed_turn_message(terminal_status, partials=partials)[:500],
@@ -1620,12 +1629,22 @@ class VcsoChatService:
                     "reasoning_visibility": "summary_only",
                     "partial_answer": bool(partials),
                     "completed_workers": [item["capability_key"] for item in (partials or [])],
+                    **attribution,
                 },
                 "error_message": error_message,
                 "completed_at": _now(),
                 "updated_at": _now(),
             }
-        ).eq("id", run_id).eq("user_id", user_id).execute()
+        if attribution or sdk_lifecycle:
+            values["metadata"] = {
+                "output_schema_version": "vcso_tool_loop_v1",
+                "reasoning_visibility": "summary_only",
+                "sdk_native_lifecycle": list(sdk_lifecycle or []),
+                **attribution,
+            }
+        self.supabase.table("agent_delegation_runs").update(values).eq("id", run_id).eq(
+            "user_id", user_id
+        ).execute()
 
     def _resolve_model(self) -> None:
         resolved = self.store.resolve_platform_model(

@@ -17,6 +17,18 @@ def _agent_list(value: Any) -> tuple[str, ...]:
     return tuple(str(item).strip() for item in value if str(item or "").strip())
 
 
+def _runtime_manifest_decisions(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    return tuple(
+        str(event.get("decision") or "").strip()
+        for event in value
+        if isinstance(event, dict)
+        and event.get("event") == "runtime_manifest"
+        and str(event.get("decision") or "").strip()
+    )
+
+
 def evaluate_native_surface_countability(*, run: dict[str, Any]) -> dict[str, Any]:
     """Return an auditable verdict; callers must treat every failed verdict as void."""
 
@@ -27,21 +39,24 @@ def evaluate_native_surface_countability(*, run: dict[str, Any]) -> dict[str, An
         for value in (metadata.get("sdk_phase"), structured_result.get("sdk_phase"))
         if str(value or "").strip()
     }
-    observed_native_modes = {
-        value
-        for container in (metadata, structured_result)
-        if "native_subagent_mode" in container
-        for value in (container.get("native_subagent_mode"),)
-    }
     observed_agent_lists = [
         _agent_list(container.get("available_subagents"))
         for container in (metadata, structured_result)
         if "available_subagents" in container
     ]
     available_subagents = observed_agent_lists[0] if observed_agent_lists else ()
+    observed_manifest_decisions = [
+        _runtime_manifest_decisions(container.get("sdk_native_lifecycle"))
+        for container in (metadata, structured_result)
+        if "sdk_native_lifecycle" in container
+    ]
     checks = {
         "phase_d_marker": observed_phases == {NATIVE_SURFACE_PHASE},
-        "native_subagent_mode": observed_native_modes == {True},
+        "runtime_manifest_native_granular": bool(observed_manifest_decisions)
+        and all(
+            decisions == ("native_granular",)
+            for decisions in observed_manifest_decisions
+        ),
         "available_subagents": bool(available_subagents)
         and all(agent_list == available_subagents for agent_list in observed_agent_lists),
     }
