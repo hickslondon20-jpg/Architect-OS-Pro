@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.metadata
 import json
 import logging
 import os
+from pathlib import Path
+import platform
 import queue
 import re
+import subprocess
 import threading
 from types import SimpleNamespace
 from collections import defaultdict, deque
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from decimal import Decimal
+from functools import lru_cache
 from typing import Any, AsyncIterator, Callable, Iterator
 from uuid import UUID
 
+import claude_agent_sdk
 from claude_agent_sdk import (
     AssistantMessage,
     HookMatcher,
@@ -53,6 +59,8 @@ logger = logging.getLogger(__name__)
 
 # Hook matchers key off the RUNTIME tool name the model emits, never the provision name.
 _DELEGATION_OR_MCP_MATCHER = rf"^({re.escape(DELEGATION_TOOL_RUNTIME_NAME)}|mcp__.*)$"
+_SDK_ERROR_TYPE_RE = re.compile(r'"error_type"\s*:\s*"([^"]+)"')
+_SDK_ERROR_MESSAGE_RE = re.compile(r'"error_message"\s*:\s*"([^"]*)"')
 
 VCSO_SDK_LOOP_FLAG = "vcso_sdk_loop"
 VCSO_SDK_CAPABILITY_KEY = "vcso_sdk_loop"
@@ -628,6 +636,87 @@ def compute_gate_decision(
         "execute_code requires data with provenance. Complete a successful cited read-only retrieval "
         "tool call in this turn, then compute from that retrieved evidence.",
     )
+
+
+def foreground_delegation_input(tool_input: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Force the runtime Agent call to return its result in-band.
+
+    Claude Code 2.1.209 treats an omitted ``run_in_background`` field as an
+    asynchronous launch. The app owns this execution invariant; prompt wording
+    and AgentDefinition defaults are not authorization or lifecycle controls.
+    """
+
+    if "run_in_background" not in tool_input:
+        input_state = "absent"
+    elif tool_input.get("run_in_background") is True:
+        input_state = "true"
+    else:
+        input_state = "present"
+    updated_input = dict(tool_input)
+    updated_input["run_in_background"] = False
+    return updated_input, input_state
+
+
+def _sanitized_sdk_error(error: Any) -> dict[str, str]:
+    """Return bounded exception identity without credentials or bearer material."""
+
+    if isinstance(error, BaseException):
+        error_type = type(error).__name__
+        message = str(error) or error_type
+    else:
+        raw = str(error or "SDK tool failure")
+        type_match = _SDK_ERROR_TYPE_RE.search(raw)
+        message_match = _SDK_ERROR_MESSAGE_RE.search(raw)
+        error_type = type_match.group(1) if type_match else "SdkToolFailure"
+        message = message_match.group(1) if message_match else raw
+    safe_type = re.sub(r"[^A-Za-z0-9_.-]", "", str(error_type))[:120] or "SdkToolFailure"
+    safe_message = re.sub(
+        r"(?i)bearer\s+[a-z0-9._~+/-]+=*",
+        "Bearer [redacted]",
+        str(message),
+    )
+    safe_message = re.sub(r"\bsk-[A-Za-z0-9_-]{12,}\b", "[redacted]", safe_message)
+    safe_message = re.sub(
+        r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b",
+        "[redacted]",
+        safe_message,
+    )
+    return {
+        "error_type": safe_type,
+        "error_message": safe_message[:500],
+    }
+
+
+@lru_cache(maxsize=1)
+def sdk_runtime_versions() -> dict[str, str]:
+    """Read the SDK package and the exact bundled CLI that the SDK will launch."""
+
+    try:
+        sdk_version = importlib.metadata.version("claude-agent-sdk")
+    except importlib.metadata.PackageNotFoundError:
+        sdk_version = str(getattr(claude_agent_sdk, "__version__", "unavailable"))
+    cli_name = "claude.exe" if platform.system() == "Windows" else "claude"
+    bundled_cli = Path(claude_agent_sdk.__file__).resolve().parent / "_bundled" / cli_name
+    cli_version = "unavailable"
+    cli_source = "bundled" if bundled_cli.is_file() else "system"
+    executable = str(bundled_cli) if bundled_cli.is_file() else "claude"
+    try:
+        completed = subprocess.run(
+            [executable, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=True,
+        )
+        raw_version = (completed.stdout or completed.stderr or "").strip()
+        cli_version = raw_version[:120] or "unavailable"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return {
+        "claude_agent_sdk_version": sdk_version[:80],
+        "claude_code_cli_version": cli_version,
+        "claude_code_cli_source": cli_source,
+    }
 
 
 def _native_base_system_prompt(system_prompt: str) -> str:
@@ -1480,6 +1569,9 @@ async def _run_sdk_turn(
             "reason_code",
             "child_run_id",
             "child_status",
+            "input_state",
+            "error_type",
+            "error_message",
             # `stage` carries the whole meaning of a worker_hop entry (received / completed / deduped /
             # fault_injected). Omitting it made canary 9-retry's dedupe readable only as an ABSENCE — a
             # worker_hop with a child_run_id and no child_status — and would have made canary 10's
@@ -1631,9 +1723,20 @@ async def _run_sdk_turn(
         _context: Any,
     ) -> dict[str, Any]:
         nonlocal delegation_count, task_denial_count
-        tool_input = input_data.get("tool_input") if isinstance(input_data.get("tool_input"), dict) else {}
+        raw_tool_input = (
+            input_data.get("tool_input") if isinstance(input_data.get("tool_input"), dict) else {}
+        )
+        tool_input, input_state = foreground_delegation_input(raw_tool_input)
         capability_key = str(tool_input.get("subagent_type") or "").strip()
         task_id = str(tool_use_id or "")
+        record_lifecycle(
+            "delegation_input_rewrite",
+            tool_name=DELEGATION_TOOL_RUNTIME_NAME,
+            tool_use_id=task_id,
+            capability_key=capability_key,
+            input_state=input_state,
+            decision="force_foreground",
+        )
         try:
             contract = _parse_task_contract(
                 tool_input.get("prompt"),
@@ -1690,6 +1793,7 @@ async def _run_sdk_turn(
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "allow",
                 "permissionDecisionReason": "Approved bounded Phase-D delegation contract.",
+                "updatedInput": tool_input,
             }
         }
 
@@ -1893,6 +1997,17 @@ async def _run_sdk_turn(
         input_data: dict[str, Any], tool_use_id: str | None, _context: Any
     ) -> dict[str, Any]:
         error = input_data.get("error")
+        sdk_tool_name = str(input_data.get("tool_name") or "tool")
+        queued_outcome = (
+            tool_outcomes[sdk_tool_name].popleft()
+            if tool_outcomes[sdk_tool_name] and tool_outcomes[sdk_tool_name][0].status == "failed"
+            else None
+        )
+        error_details = (
+            dict(queued_outcome.output_summary)
+            if queued_outcome is not None and queued_outcome.output_summary
+            else _sanitized_sdk_error(error)
+        )
         agent_id = str(input_data.get("agent_id") or "")
         if model_driven and agent_id:
             run_id = native_child_run_ids.get(agent_id)
@@ -1911,16 +2026,18 @@ async def _run_sdk_turn(
                 tool_use_id=str(tool_use_id or ""),
                 status="failed",
                 summary="The granular worker tool call failed safely.",
-                output_summary={"status": "failed"},
+                output_summary={"status": "failed", **error_details},
                 source_refs=[],
-                error_message=str(error or "SDK tool failure"),
+                error_message=error_details["error_message"],
             )
         record_lifecycle(
             "post_tool_use_failure",
-            tool_name=input_data.get("tool_name"),
+            tool_name=sdk_tool_name,
             tool_use_id=tool_use_id,
             agent_id_present=bool(input_data.get("agent_id")),
-            reason_code=type(error).__name__ if isinstance(error, BaseException) else "sdk_tool_failure",
+            reason_code=error_details["error_type"],
+            error_type=error_details["error_type"],
+            error_message=error_details["error_message"],
         )
         return {}
 
@@ -3210,10 +3327,32 @@ def _make_sdk_tool(
             safe_content = json.dumps(envelope.to_dict(), default=str)
             return {"content": [{"type": "text", "text": safe_content[:12000]}]}
         except Exception as exc:  # noqa: BLE001 - return a bounded tool error to the SDK loop
-            logger.warning("SDK registry tool %s failed: %s", definition.name, exc)
-            tool_outcomes[sdk_name].append(_ToolOutcome("failed", []))
+            error_details = _sanitized_sdk_error(exc)
+            logger.warning(
+                "SDK registry tool %s failed (%s): %s",
+                definition.name,
+                error_details["error_type"],
+                error_details["error_message"],
+            )
+            tool_outcomes[sdk_name].append(
+                _ToolOutcome(
+                    "failed",
+                    [],
+                    {"status": "failed", **error_details},
+                )
+            )
             return {
-                "content": [{"type": "text", "text": json.dumps({"error": "Tool failed safely."})}],
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "error": "Tool failed safely.",
+                                **error_details,
+                            }
+                        ),
+                    }
+                ],
                 "is_error": True,
             }
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict, deque
 import json
+import queue
 import sys
 import time
 from pathlib import Path
@@ -29,8 +31,10 @@ from services.vcso_sdk_loop import (
     _child_run_id_for_capability,
     _enforce_composer_integrity,
     _make_worker_progress_bridge,
+    _make_sdk_tool,
     _native_generalization_prompt,
     _native_synthesis_prompt,
+    _sanitized_sdk_error,
     _native_tool_output_summary,
     _successful_cited_compute_result,
     complete_native_child_run,
@@ -40,6 +44,7 @@ from services.vcso_sdk_loop import (
     native_subagent_requirements,
     persist_native_child_step,
     read_sdk_loop_settings,
+    foreground_delegation_input,
     stream_vcso_sdk_turn,
 )
 
@@ -68,6 +73,63 @@ def test_native_lifecycle_summary_carries_agent_result_evidence_semantics():
         "returned_count": 20,
         "finding_count": 2,
         "finding_types": ["dataset_row", "dataset_row_error"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("tool_input", "input_state"),
+    [
+        ({"prompt": "x"}, "absent"),
+        ({"prompt": "x", "run_in_background": False}, "present"),
+        ({"prompt": "x", "run_in_background": True}, "true"),
+    ],
+)
+def test_delegation_input_rewrite_always_forces_foreground(tool_input, input_state):
+    updated, observed = foreground_delegation_input(tool_input)
+
+    assert observed == input_state
+    assert updated["run_in_background"] is False
+    assert tool_input != updated or tool_input.get("run_in_background") is False
+
+
+def test_sdk_error_sanitizer_preserves_type_and_redacts_credentials():
+    details = _sanitized_sdk_error(
+        RuntimeError("Bearer secret-token sk-abcdefghijklmnop eyJabc.def.ghi")
+    )
+
+    assert details["error_type"] == "RuntimeError"
+    assert "secret-token" not in details["error_message"]
+    assert "sk-abcdefghijklmnop" not in details["error_message"]
+    assert "eyJabc.def.ghi" not in details["error_message"]
+
+
+def test_sdk_tool_executor_returns_bounded_real_exception_identity():
+    registry = ToolRegistry()
+    definition = registry.get("execute_code")
+    outcomes = defaultdict(deque)
+    sdk_tool = _make_sdk_tool(
+        definition=definition,
+        registry=registry,
+        tool_context=ToolExecutionContext(user_id="founder-1", thread_id="thread-1"),
+        events=queue.Queue(),
+        running_steps=defaultdict(deque),
+        tool_outcomes=outcomes,
+        source_refs=[],
+        timeout_seconds=1,
+        heartbeat_seconds=0.01,
+    )
+
+    result = asyncio.run(sdk_tool.handler({"code": "print(2 + 2)"}))
+    payload = json.loads(result["content"][0]["text"])
+
+    assert result["is_error"] is True
+    assert payload["error_type"] == "ToolRegistryError"
+    assert payload["error_message"] == "Sandbox service and thread_id are required for execute_code."
+    outcome = outcomes["mcp__architectos__execute_code"][0]
+    assert outcome.output_summary == {
+        "status": "failed",
+        "error_type": "ToolRegistryError",
+        "error_message": "Sandbox service and thread_id are required for execute_code.",
     }
 
 
@@ -1274,6 +1336,7 @@ def test_model_driven_lead_delegates_via_task_with_workers_hidden(monkeypatch):
             None,
         )
         assert decision["hookSpecificOutput"]["permissionDecision"] == "allow"
+        assert decision["hookSpecificOutput"]["updatedInput"]["run_in_background"] is False
 
         # 3. The worker tool fires from INSIDE the Task-spawned subagent (agent_id present) — the §4 probe.
         probe = options.hooks["PreToolUse"][1].hooks[0]
@@ -1424,6 +1487,18 @@ def test_native_model_driven_worker_uses_in_process_grants_and_lifecycle_hooks(m
             None,
             None,
         )
+        failure = options.hooks["PostToolUseFailure"][0].hooks[0]
+        await failure(
+            {
+                "tool_name": "mcp__architectos__execute_code",
+                "error": (
+                    'MCP error: {"error_type":"SandboxServiceError",'
+                    '"error_message":"No active sandbox service."}'
+                ),
+            },
+            "lead-compute-failure",
+            None,
+        )
         await post({"tool_name": "Agent"}, "task-1", None)
         assert await options.hooks["Stop"][0].hooks[0]({}, None, None) == {}
 
@@ -1465,6 +1540,16 @@ def test_native_model_driven_worker_uses_in_process_grants_and_lifecycle_hooks(m
     assert result.answer_text == "Cited recommendation."
     manifest = next(event for event in lifecycle_events if event["event"] == "runtime_manifest")
     assert manifest["decision"] == "native_granular"
+    rewrite = next(
+        event for event in lifecycle_events if event["event"] == "delegation_input_rewrite"
+    )
+    assert rewrite["input_state"] == "absent"
+    assert rewrite["tool_use_id"] == "task-1"
+    failure = next(
+        event for event in lifecycle_events if event["event"] == "post_tool_use_failure"
+    )
+    assert failure["error_type"] == "SandboxServiceError"
+    assert failure["error_message"] == "No active sandbox service."
     assert any(table == "agent_delegation_steps" for table, _operation, _payload in client.writes)
 
 
