@@ -231,7 +231,11 @@ def compile_founder_sdk_options(
             agent_mcp_servers = None
         agents[capability.capability_key] = AgentDefinition(
             description=capability.description or capability.label,
-            prompt=_capability_prompt(capability, handler_name=handler_name),
+            prompt=_capability_prompt(
+                capability,
+                handler_name=handler_name,
+                granular_native=granular_native,
+            ),
             tools=agent_tools,
             disallowedTools=list(DISALLOWED_SDK_BUILTINS),
             model=route["model_name"],
@@ -457,7 +461,12 @@ def _connected_sdk_servers(client: Any, *, user_id: str) -> list[str]:
     return names
 
 
-def _capability_prompt(capability: AgentCapability, *, handler_name: str | None = None) -> str:
+def _capability_prompt(
+    capability: AgentCapability,
+    *,
+    handler_name: str | None = None,
+    granular_native: bool = False,
+) -> str:
     prompt = (
         f"You are the bounded {capability.label} capability. {capability.description} "
         "Use only the granted founder-scoped tools, never delegate recursively, keep outputs compact, "
@@ -469,6 +478,13 @@ def _capability_prompt(capability: AgentCapability, *, handler_name: str | None 
             "call that tool exactly once with its objective, output_format, tools_sources, boundaries, "
             "and context_scope, then return only the compact cited handler result. Never expose the raw "
             "task contract or tool payload."
+        )
+    elif granular_native:
+        prompt += (
+            " A safely refused tool call does not erase earlier cited findings. Correct the request and "
+            "continue when possible. If correction does not succeed but usable cited findings remain, "
+            "return those findings honestly with the exact marker `PARTIAL_RESULT: true`, name the failed "
+            "tool, and never present the requested computation as completed."
         )
     return prompt
 

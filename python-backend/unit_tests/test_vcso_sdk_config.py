@@ -371,6 +371,10 @@ def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server
         "mcp__architectos__wiki_list",
     ]
     assert all(
+        "PARTIAL_RESULT: true" in agent.prompt
+        for agent in compiled.options.agents.values()
+    )
+    assert all(
         agent.mcpServers == ["architectos"]
         for agent in compiled.options.agents.values()
     )

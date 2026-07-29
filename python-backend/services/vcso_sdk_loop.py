@@ -111,6 +111,7 @@ COMPUTE_INTEGRITY_REFUSAL = (
     "calculation could not be completed with cited evidence. I can still identify the data needed "
     "for a sound calculation."
 )
+NATIVE_PARTIAL_RESULT_MARKER = "PARTIAL_RESULT: true"
 COMPUTE_REQUEST_SIGNALS = re.compile(
     r"\b(?:calculate|compute|derive|forecast|model|project|scenario|simulate)\b"
     r"|\bhow\s+much\s+(?:would|will|does|do)\b"
@@ -999,6 +1000,44 @@ def _successful_cited_compute_result(
     return False
 
 
+def _native_granular_worker_outcome(
+    *,
+    tool_failed: bool,
+    findings: list[dict[str, Any]],
+    citations: list[dict[str, Any]],
+) -> tuple[str, str, bool]:
+    """Separate SDK transport completion from an honest partial semantic result."""
+
+    usable_cited_finding = bool(citations) and any(
+        finding.get("status") == "completed"
+        and int(finding.get("source_count") or 0) > 0
+        for finding in findings
+        if isinstance(finding, dict)
+    )
+    if tool_failed and usable_cited_finding:
+        return "completed", "partial", True
+    if tool_failed:
+        return "failed", "failed", False
+    return "completed", "completed", False
+
+
+def _native_partial_failure_context(*, has_usable_citations: bool) -> dict[str, Any]:
+    if not has_usable_citations:
+        return {}
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUseFailure",
+            "additionalContext": (
+                "The refusal was safely enforced and earlier cited findings remain usable. "
+                "Correct the request and continue if possible. If no correction succeeds, return "
+                "the existing cited findings, name the failed tool and error type, and include the "
+                f"exact marker `{NATIVE_PARTIAL_RESULT_MARKER}`. A partial result must not claim "
+                "that a requested computation completed."
+            ),
+        }
+    }
+
+
 def _enforce_composer_integrity(
     answer_text: str,
     *,
@@ -1437,6 +1476,9 @@ def complete_native_child_run(
     result_summary: str,
     citations: list[dict[str, Any]],
     finding_summaries: list[dict[str, Any]],
+    semantic_status: str | None = None,
+    degraded: bool = False,
+    failure_summaries: list[dict[str, Any]] | None = None,
 ) -> None:
     """Complete the child row from in-band SDK lifecycle facts."""
 
@@ -1446,12 +1488,16 @@ def complete_native_child_run(
         for finding in finding_summaries
         if isinstance(finding.get("confidence"), (int, float))
     ]
-    needs_review = status != "completed" or any(
+    resolved_semantic_status = str(semantic_status or status)
+    partial = resolved_semantic_status == "partial"
+    needs_review = resolved_semantic_status != "completed" or any(
         finding.get("needs_review") is True for finding in finding_summaries
     )
     structured_result = {
         "schema_version": "agent_result_v1",
-        "status": status,
+        "status": resolved_semantic_status,
+        "partial": partial,
+        "degraded": bool(degraded),
         "result_summary": result_summary[:1000],
         "findings": list(finding_summaries),
         "citations": list(citations),
@@ -1459,6 +1505,11 @@ def complete_native_child_run(
         "needs_review": needs_review,
         "reasoning_visibility": "summary_only",
     }
+    if failure_summaries:
+        structured_result["degradation"] = {
+            "marker": NATIVE_PARTIAL_RESULT_MARKER if partial else None,
+            "failed_tool_calls": list(failure_summaries),
+        }
     (
         client.table("agent_delegation_runs")
         .update(
@@ -1559,6 +1610,8 @@ async def _run_sdk_turn(
     native_child_step_indexes: dict[str, int] = defaultdict(int)
     native_child_sources: dict[str, list[dict[str, Any]]] = defaultdict(list)
     native_child_findings: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    native_child_failures: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    native_child_failed_tools: dict[str, set[str]] = defaultdict(set)
     native_child_failed: set[str] = set()
     delegation_count = 0
     max_delegations = len(provisioned_agents)
@@ -2156,12 +2209,29 @@ async def _run_sdk_turn(
                 )
             citations = list(native_child_sources.get(agent_id) or ())
             step_count = native_child_step_indexes.get(agent_id, 0)
-            status = "failed" if agent_id in native_child_failed else "completed"
+            findings = list(native_child_findings.get(agent_id) or ())
+            unresolved_tools = native_child_failed_tools.get(agent_id) or set()
+            failures = [
+                failure
+                for failure in native_child_failures.get(agent_id, ())
+                if failure.get("tool_name") in unresolved_tools
+            ]
+            status, semantic_status, degraded = _native_granular_worker_outcome(
+                tool_failed=agent_id in native_child_failed,
+                findings=findings,
+                citations=citations,
+            )
             result_summary = (
                 f"{_subagent_title(capability_key)} completed {step_count} granular tool "
                 f"call(s) with {len(citations)} cited source reference(s)."
-                if status == "completed"
-                else f"{_subagent_title(capability_key)} stopped after a failed granular tool call."
+                if semantic_status == "completed"
+                else (
+                    f"{_subagent_title(capability_key)} completed partially with {len(citations)} cited "
+                    f"source reference(s); one or more optional tool calls failed safely. "
+                    f"{NATIVE_PARTIAL_RESULT_MARKER}"
+                    if semantic_status == "partial"
+                    else f"{_subagent_title(capability_key)} stopped after a failed granular tool call."
+                )
             )
             complete_native_child_run(
                 tool_context.store.client,
@@ -2170,7 +2240,10 @@ async def _run_sdk_turn(
                 status=status,
                 result_summary=result_summary,
                 citations=citations,
-                finding_summaries=list(native_child_findings.get(agent_id) or ()),
+                finding_summaries=findings,
+                semantic_status=semantic_status,
+                degraded=degraded,
+                failure_summaries=failures,
             )
             worker_results[capability_key] = SimpleNamespace(
                 run_id=run_id,
@@ -2178,21 +2251,31 @@ async def _run_sdk_turn(
                 result_summary=result_summary,
                 structured_result={
                     "schema_version": "agent_result_v1",
-                    "status": status,
-                    "findings": list(native_child_findings.get(agent_id) or ()),
+                    "status": semantic_status,
+                    "partial": semantic_status == "partial",
+                    "degraded": degraded,
+                    "degradation": {
+                        "marker": (
+                            NATIVE_PARTIAL_RESULT_MARKER
+                            if semantic_status == "partial"
+                            else None
+                        ),
+                        "failed_tool_calls": failures,
+                    },
+                    "findings": findings,
                     "citations": citations,
                     "confidence": min(
                         [
                             float(finding["confidence"])
-                            for finding in native_child_findings.get(agent_id, ())
+                            for finding in findings
                             if isinstance(finding.get("confidence"), (int, float))
                         ]
                         or [0.7]
                     ),
-                    "needs_review": status != "completed"
+                    "needs_review": semantic_status != "completed"
                     or any(
                         finding.get("needs_review") is True
-                        for finding in native_child_findings.get(agent_id, ())
+                        for finding in findings
                     ),
                     "reasoning_visibility": "summary_only",
                 },
@@ -2235,6 +2318,15 @@ async def _run_sdk_turn(
                 )
             native_child_step_indexes[agent_id] += 1
             native_child_failed.add(agent_id)
+            failed_registry_name = _registry_name(sdk_tool_name)
+            native_child_failed_tools[agent_id].add(failed_registry_name)
+            native_child_failures[agent_id].append(
+                {
+                    "tool_name": failed_registry_name,
+                    "error_type": error_details["error_type"],
+                    "error_message": error_details["error_message"],
+                }
+            )
             persist_native_child_step(
                 tool_context.store.client,
                 user_id=tool_context.user_id,
@@ -2257,7 +2349,11 @@ async def _run_sdk_turn(
             error_type=error_details["error_type"],
             error_message=error_details["error_message"],
         )
-        return {}
+        return _native_partial_failure_context(
+            has_usable_citations=bool(
+                model_driven and agent_id and native_child_sources.get(agent_id)
+            )
+        )
 
     async def post_tool_use(input_data: dict[str, Any], tool_use_id: str | None, _context: Any) -> dict[str, Any]:
         sdk_tool_name = str(input_data.get("tool_name") or "tool")
@@ -2293,6 +2389,17 @@ async def _run_sdk_turn(
                     )
                     worker_results[capability_key] = result
             status = "completed" if result is not None and result.status == "completed" else "failed"
+            structured_result = (
+                result.structured_result
+                if result is not None and isinstance(getattr(result, "structured_result", None), dict)
+                else {}
+            )
+            semantic_status = (
+                semantic_worker_status(status, structured_result)
+                if result is not None
+                else "failed"
+            )
+            partial = semantic_status == "partial"
             sources = task_sources.get(task_id, [])
             title = _subagent_title(capability_key)
             summary = (
@@ -2304,6 +2411,9 @@ async def _run_sdk_turn(
                 "run_id": getattr(result, "run_id", None),
                 "capability_key": capability_key,
                 "status": status,
+                "semantic_status": semantic_status,
+                "partial": partial,
+                "degraded": bool(structured_result.get("degraded")),
                 "result_summary": summary,
             }
             step = {
@@ -2388,8 +2498,13 @@ async def _run_sdk_turn(
                     **outcome.output_summary,
                 }
             )
-            if outcome.status == "failed":
+            if outcome.status == "completed":
+                native_child_failed_tools[agent_id].discard(registry_name)
+                if not native_child_failed_tools[agent_id]:
+                    native_child_failed.discard(agent_id)
+            elif outcome.status == "failed":
                 native_child_failed.add(agent_id)
+                native_child_failed_tools[agent_id].add(registry_name)
         if running_steps[sdk_tool_name]:
             running_steps[sdk_tool_name].popleft()
         step_type, title, summary = _curated_tool_copy(registry_name, running=False, failed=outcome.status == "failed")
@@ -3644,6 +3759,15 @@ async def _run_sdk_turn(
                 "run_id": result.run_id,
                 "capability_key": capability_key,
                 "status": result.status,
+                "semantic_status": semantic_worker_status(
+                    result.status,
+                    getattr(result, "structured_result", None),
+                ),
+                "partial": bool(
+                    getattr(result, "structured_result", {}).get("partial")
+                    if isinstance(getattr(result, "structured_result", None), dict)
+                    else False
+                ),
                 "result_summary": result.result_summary,
             }
             for capability_key, result in worker_results.items()
@@ -3923,7 +4047,8 @@ def _native_lead_prompt(required_agents: tuple[str, ...]) -> str:
         "exactly one JSON object with keys objective, output_format, tools_sources, boundaries, and "
         "context_scope. Boundaries must require founder isolation, citations, compact output, no raw "
         "payloads, no wiki writes, no recursion, and no external writes. Compose only after both worker "
-        "findings and a cited computation complete."
+        "findings and a cited computation complete. If a worker returns `PARTIAL_RESULT: true`, disclose "
+        "that degradation, use only its cited findings, and never treat it as satisfying cited compute."
         # EFFORT-SCALING, BOTH DIRECTIONS (SDK-M3 step C1). Scaling up is the failure everyone watches for;
         # scaling DOWN is the one that quietly makes the system expensive and slow. Both are stated as one
         # rule so neither reads as an afterthought, and the "already know the answer" clause is explicit

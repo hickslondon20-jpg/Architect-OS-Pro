@@ -29,12 +29,15 @@ from services.vcso_sdk_loop import (
     G_GATE_CANDIDATE_AGENTS,
     G_GATE_MODEL_CHOICE_SCOPE,
     NATIVE_SURFACE_REQUIRED_AGENTS,
+    NATIVE_PARTIAL_RESULT_MARKER,
     _assistant_worker_capability,
     _child_run_id_for_capability,
     _enforce_composer_integrity,
     _make_worker_progress_bridge,
     _make_sdk_tool,
     _native_generalization_prompt,
+    _native_granular_worker_outcome,
+    _native_partial_failure_context,
     _native_synthesis_prompt,
     _sanitized_sdk_error,
     _native_tool_output_summary,
@@ -279,6 +282,76 @@ def test_native_lifecycle_writers_create_steps_sources_and_complete_child():
     assert run_update["structured_result"]["confidence"] == 0.7
     assert run_update["structured_result"]["needs_review"] is True
     assert run_update["citations"] == sources
+
+
+def test_native_worker_with_cited_findings_and_failed_tool_completes_as_partial():
+    citations = [
+        {
+            "source_kind": "founder_dataset",
+            "source_id": "22222222-2222-2222-2222-222222222222",
+            "label": "Monthly P&L",
+        }
+    ]
+    findings = [
+        {
+            "finding_type": "granular_tool_result",
+            "tool_name": "get_dataset_periods",
+            "status": "completed",
+            "source_count": 1,
+        }
+    ]
+
+    assert _native_granular_worker_outcome(
+        tool_failed=True,
+        findings=findings,
+        citations=citations,
+    ) == ("completed", "partial", True)
+
+    client = _LifecycleWriteClient()
+    complete_native_child_run(
+        client,
+        user_id="founder-1",
+        run_id="child-run-1",
+        status="completed",
+        semantic_status="partial",
+        degraded=True,
+        result_summary=f"Structured worker completed partially. {NATIVE_PARTIAL_RESULT_MARKER}",
+        citations=citations,
+        finding_summaries=findings,
+        failure_summaries=[
+            {
+                "tool_name": "run_structured_query",
+                "error_type": "StructuredQueryError",
+                "error_message": "Approved surfaces: founder_dataset_rows.",
+            }
+        ],
+    )
+
+    update = client.writes[-1][2]
+    structured = update["structured_result"]
+    assert update["status"] == "completed"
+    assert structured["status"] == "partial"
+    assert structured["partial"] is True
+    assert structured["degraded"] is True
+    assert structured["needs_review"] is True
+    assert structured["degradation"]["marker"] == NATIVE_PARTIAL_RESULT_MARKER
+    assert structured["degradation"]["failed_tool_calls"][0]["tool_name"] == "run_structured_query"
+
+
+def test_native_worker_with_failed_tool_and_no_cited_findings_still_fails():
+    assert _native_granular_worker_outcome(
+        tool_failed=True,
+        findings=[],
+        citations=[],
+    ) == ("failed", "failed", False)
+
+
+def test_partial_failure_context_teaches_worker_to_return_marker_to_lead():
+    context = _native_partial_failure_context(has_usable_citations=True)
+
+    assert context["hookSpecificOutput"]["hookEventName"] == "PostToolUseFailure"
+    assert NATIVE_PARTIAL_RESULT_MARKER in context["hookSpecificOutput"]["additionalContext"]
+    assert _native_partial_failure_context(has_usable_citations=False) == {}
 
 
 def test_native_access_gate_allows_only_the_compiled_owner_grant():
@@ -598,6 +671,23 @@ def test_composer_integrity_refuses_degraded_compute():
     )
     assert answer == COMPUTE_INTEGRITY_REFUSAL
     assert decision == "refused_missing_compute"
+
+
+def test_partial_result_does_not_satisfy_compute_integrity_gate():
+    result = SimpleNamespace(
+        status="completed",
+        structured_result={
+            "status": "partial",
+            "partial": True,
+            "degraded": True,
+            "needs_review": True,
+        },
+        citations=[{"source_kind": "computation", "source_id": "partial-compute"}],
+    )
+
+    assert _successful_cited_compute_result(
+        worker_results={"sandbox_execution_agent": result}
+    ) is False
 
 
 def test_standard_sdk_turn_compiles_registry_tools_and_normalizes_lifecycle(monkeypatch):
@@ -1578,6 +1668,147 @@ def test_native_model_driven_worker_uses_in_process_grants_and_lifecycle_hooks(m
     assert failure["error_type"] == "SandboxServiceError"
     assert failure["error_message"] == "No active sandbox service."
     assert any(table == "agent_delegation_steps" for table, _operation, _payload in client.writes)
+
+
+def test_native_worker_with_cited_read_then_failed_tool_returns_partial_in_band(monkeypatch):
+    captured = _capture_sdk_tools(monkeypatch)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability("structured_data_agent")],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    client = _LifecycleWriteClient()
+
+    class NativeStore(_NativeStore):
+        def __init__(self):
+            self.client = client
+
+    registry = ToolRegistry()
+
+    def execute_tool(name, _context, _args):
+        if name == "get_dataset_periods":
+            return ToolResultEnvelope(
+                content={
+                    "structured_result": {
+                        "status": "completed",
+                        "row_count": 1,
+                        "truncated": False,
+                    }
+                },
+                sources=[
+                    ToolSourceRef(
+                        source_kind="founder_dataset",
+                        source_id="22222222-2222-2222-2222-222222222222",
+                        label="Monthly P&L",
+                    )
+                ],
+            )
+        if name == "run_structured_query":
+            raise RuntimeError("Query references an unapproved dataset surface.")
+        raise AssertionError(f"unexpected tool: {name}")
+
+    monkeypatch.setattr(registry, "execute", execute_tool)
+
+    async def fake_query(*, options, **_kwargs):
+        pre_task = options.hooks["PreToolUse"][0].hooks[0]
+        await pre_task(
+            {
+                "tool_name": "Agent",
+                "tool_input": {
+                    "subagent_type": "structured_data_agent",
+                    "prompt": _delegation_contract("Read the founder's cited structured dataset."),
+                },
+            },
+            "task-1",
+            None,
+        )
+        await options.hooks["SubagentStart"][0].hooks[0](
+            {"agent_id": "sub-1", "agent_type": "structured_data_agent"},
+            None,
+            None,
+        )
+        tools = {item.name: item for item in captured["tools"]}
+        read_result = await tools["get_dataset_periods"].handler({"dataset_id": "dataset-1"})
+        assert read_result.get("is_error") is not True
+        post = options.hooks["PostToolUse"][0].hooks[0]
+        await post(
+            {
+                "tool_name": "mcp__architectos__get_dataset_periods",
+                "agent_id": "sub-1",
+                "agent_type": "structured_data_agent",
+            },
+            "worker-read-1",
+            None,
+        )
+        failed_result = await tools["run_structured_query"].handler(
+            {"question": "Aggregate", "generated_sql": "select * from invented"}
+        )
+        assert failed_result["is_error"] is True
+        failure_context = await options.hooks["PostToolUseFailure"][0].hooks[0](
+            {
+                "tool_name": "mcp__architectos__run_structured_query",
+                "agent_id": "sub-1",
+                "agent_type": "structured_data_agent",
+                "error": RuntimeError(failed_result["content"][0]["text"]),
+            },
+            "worker-query-2",
+            None,
+        )
+        assert NATIVE_PARTIAL_RESULT_MARKER in str(failure_context)
+        await options.hooks["SubagentStop"][0].hooks[0](
+            {"agent_id": "sub-1", "agent_type": "structured_data_agent"},
+            None,
+            None,
+        )
+        await post({"tool_name": "Agent"}, "task-1", None)
+        assert await options.hooks["Stop"][0].hooks[0]({}, None, None) == {}
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-partial",
+            result="The structured worker returned partial cited findings.",
+        )
+
+    _events, result = _consume(
+        stream_vcso_sdk_turn(
+            prompt="Summarize the available structured data.",
+            system_prompt="System\n\nRules remain bounded.",
+            model="claude-sonnet-test",
+            api_key="test-key",
+            registry=registry,
+            tool_names=[],
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=NativeStore(),
+                thread_id="thread-1",
+                metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+            ),
+            trace_metadata={"run_id": "lead-run"},
+            native_subagent_required_agents=("structured_data_agent",),
+            native_subagent_scopes={
+                "structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}
+            },
+            native_model_driven=True,
+            query_impl=fake_query,
+        )
+    )
+
+    assert result.worker_runs[0]["status"] == "completed"
+    assert result.worker_runs[0]["semantic_status"] == "partial"
+    assert result.worker_runs[0]["partial"] is True
+    child_update = next(
+        payload
+        for table, operation, payload in client.writes
+        if table == "agent_delegation_runs"
+        and operation == "update"
+        and payload.get("structured_result", {}).get("status") == "partial"
+    )
+    assert child_update["status"] == "completed"
+    assert NATIVE_PARTIAL_RESULT_MARKER in child_update["result_summary"]
 
 
 @pytest.mark.skip(reason="Phase G runtime-shape migration is deferred; eligibility logic remains unchanged.")
