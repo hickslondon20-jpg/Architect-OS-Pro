@@ -13,6 +13,7 @@ import queue
 import re
 import subprocess
 import threading
+import time
 from types import SimpleNamespace
 from collections import defaultdict, deque
 from dataclasses import dataclass, field, replace
@@ -31,7 +32,7 @@ from claude_agent_sdk import (
     query,
     tool,
 )
-from claude_agent_sdk.types import StreamEvent
+from claude_agent_sdk.types import StreamEvent, ToolResultBlock, ToolUseBlock, UserMessage
 
 from services.agent_capabilities import AgentCapabilityRegistry
 from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
@@ -68,6 +69,9 @@ SDK_STANDARD_SCHEMA_VERSION = "vcso_sdk_standard_v1"
 SDK_NATIVE_SUBAGENT_SCHEMA_VERSION = "vcso_sdk_native_subagents_v1"
 SDK_TOOL_SERVER_NAME = "architectos"
 SDK_TOOL_PREFIX = f"mcp__{SDK_TOOL_SERVER_NAME}__"
+SDK_STREAM_DIAGNOSTIC_EVENT_LIMIT = 320
+SDK_STREAM_DIAGNOSTIC_NONCRITICAL_LIMIT = 240
+SDK_STREAM_DIAGNOSTIC_TEXT_LIMIT = 200
 NARRATION_OPEN = "<narration>"
 NARRATION_CLOSE = "</narration>"
 P4_NATIVE_SUBAGENT_KEYS = (
@@ -502,6 +506,21 @@ def cross_worker_probe_enabled(settings: dict[str, Any] | None, user_id: str | N
     return bool(user_id) and str(user_id) in diagnostic_user_ids
 
 
+def sdk_stream_capture_enabled(settings: dict[str, Any] | None, user_id: str | None) -> bool:
+    """Whether bounded raw SDK stream diagnostics may exist for this founder.
+
+    This is deliberately a second, dark diagnostic gate rather than a consequence of enabling the
+    native path. Both the explicit switch and the existing diagnostic founder allowlist must match.
+    Missing settings, an empty allowlist, or a different founder all fail closed.
+    """
+
+    settings = settings or {}
+    if not bool(settings.get("diagnostic_sdk_stream_capture_enabled")):
+        return False
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    return bool(user_id) and str(user_id) in diagnostic_user_ids
+
+
 FAULT_INJECTION_MODES: tuple[str, ...] = ("before_start", "after_completion")
 
 
@@ -749,6 +768,7 @@ def stream_vcso_sdk_turn(
     native_subagent_required_agents: tuple[str, ...] = (),
     native_subagent_scopes: dict[str, dict[str, Any]] | None = None,
     native_lifecycle_sink: LifecycleSink | None = None,
+    native_stream_diagnostic_sink: LifecycleSink | None = None,
     native_model_driven: bool = False,
     native_model_choice: bool = False,
     native_fault_injection: tuple[str, ...] = (),
@@ -791,6 +811,7 @@ def stream_vcso_sdk_turn(
                         native_subagent_required_agents=native_subagent_required_agents,
                         native_subagent_scopes=native_subagent_scopes or {},
                         native_lifecycle_sink=native_lifecycle_sink,
+                        native_stream_diagnostic_sink=native_stream_diagnostic_sink,
                         native_model_driven=native_model_driven,
                         native_model_choice=native_model_choice,
                         native_fault_injection=native_fault_injection,
@@ -1471,6 +1492,7 @@ async def _run_sdk_turn(
     native_subagent_required_agents: tuple[str, ...],
     native_subagent_scopes: dict[str, dict[str, Any]],
     native_lifecycle_sink: LifecycleSink | None,
+    native_stream_diagnostic_sink: LifecycleSink | None,
     native_model_driven: bool = False,
     native_model_choice: bool = False,
     native_fault_injection: tuple[str, ...] = (),
@@ -1548,6 +1570,13 @@ async def _run_sdk_turn(
     gave_up_early = False
     deferred_ask_user: dict[str, str] | None = None
     resumed_ask_user_consumed = False
+    stream_diagnostic_started_at = time.monotonic()
+    stream_diagnostic_sequence = 0
+    stream_diagnostic_noncritical_emitted = 0
+    stream_diagnostic_critical_emitted = 0
+    stream_diagnostic_dropped = 0
+    stream_diagnostic_lock = threading.Lock()
+    agent_tool_use_ids: set[str] = set()
 
     def record_lifecycle(event: str, **details: Any) -> None:
         """Persist bounded lifecycle facts without prompts, tool inputs, or model output."""
@@ -1592,6 +1621,185 @@ async def _run_sdk_turn(
             native_lifecycle_sink(safe)
         except Exception as exc:  # noqa: BLE001 - diagnostics must never affect the turn
             logger.warning("SDK lifecycle persistence failed open: %s", exc)
+
+    def _bounded_size(value: Any) -> int:
+        """Measure a value without retaining it in the diagnostic record."""
+
+        try:
+            return len(json.dumps(value, ensure_ascii=True, default=str))
+        except Exception:
+            return len(str(value))
+
+    def record_stream_diagnostic(event: str, *, critical: bool = False, **details: Any) -> None:
+        """Emit one ordered, sanitized SDK diagnostic fact.
+
+        The sink receives no prompts, message text, tool inputs, tool outputs, or reasoning. A hard event
+        ceiling bounds the run metadata. Terminal and hook-failure facts are allowed through the ceiling
+        so truncation can never hide how iteration ended.
+        """
+
+        nonlocal stream_diagnostic_sequence
+        nonlocal stream_diagnostic_noncritical_emitted, stream_diagnostic_critical_emitted
+        nonlocal stream_diagnostic_dropped
+        if not model_driven or native_stream_diagnostic_sink is None:
+            return
+        with stream_diagnostic_lock:
+            stream_diagnostic_sequence += 1
+            sequence = stream_diagnostic_sequence
+            terminal_fact = event in {
+                "sdk_iteration_terminated",
+                "sdk_stream_capture_truncated",
+            }
+            critical_limit = (
+                SDK_STREAM_DIAGNOSTIC_EVENT_LIMIT
+                - SDK_STREAM_DIAGNOSTIC_NONCRITICAL_LIMIT
+                - 2
+            )
+            if (
+                not critical
+                and stream_diagnostic_noncritical_emitted
+                >= SDK_STREAM_DIAGNOSTIC_NONCRITICAL_LIMIT
+            ):
+                stream_diagnostic_dropped += 1
+                return
+            if critical and not terminal_fact and stream_diagnostic_critical_emitted >= critical_limit:
+                stream_diagnostic_dropped += 1
+                return
+            if critical:
+                stream_diagnostic_critical_emitted += 1
+            else:
+                stream_diagnostic_noncritical_emitted += 1
+            safe: dict[str, Any] = {
+                "sequence": sequence,
+                "event": str(event)[:80],
+                "elapsed_ms": round((time.monotonic() - stream_diagnostic_started_at) * 1000, 1),
+            }
+            for key in (
+                "object_type",
+                "message_id",
+                "parent_tool_use_id",
+                "hook_event",
+                "hook_name",
+                "phase",
+                "tool_name",
+                "tool_use_id",
+                "status",
+                "termination",
+                "error_type",
+            ):
+                value = details.get(key)
+                if value not in (None, ""):
+                    safe[key] = str(value)[:SDK_STREAM_DIAGNOSTIC_TEXT_LIMIT]
+            for key in (
+                "arrival_index",
+                "size_chars",
+                "text_chars",
+                "tool_call_count",
+                "tool_result_count",
+                "dropped_count",
+            ):
+                value = details.get(key)
+                if value is not None:
+                    try:
+                        safe[key] = int(value)
+                    except (TypeError, ValueError):
+                        continue
+            for key in (
+                "has_text",
+                "tool_calls_only",
+                "is_agent_result",
+                "is_error",
+                "agent_id_present",
+            ):
+                if key in details:
+                    safe[key] = bool(details[key])
+            for key in ("content_block_types", "tool_call_names", "agent_result_statuses"):
+                values = details.get(key)
+                if isinstance(values, (list, tuple)):
+                    safe[key] = [str(value)[:80] for value in values[:12]]
+        try:
+            native_stream_diagnostic_sink(safe)
+        except Exception as exc:  # noqa: BLE001 - diagnostics must never affect the turn
+            logger.warning("SDK stream diagnostic persistence failed open: %s", exc)
+
+    def instrument_hook(hook_event: str, hook: Callable[..., Any]) -> Callable[..., Any]:
+        """Wrap an SDK hook with content-free arrival, return, and failure markers."""
+
+        if not model_driven or native_stream_diagnostic_sink is None:
+            return hook
+        hook_name = getattr(hook, "__name__", type(hook).__name__)
+
+        async def observed_hook(
+            input_data: dict[str, Any],
+            tool_use_id: str | None,
+            context: Any,
+        ) -> dict[str, Any]:
+            tool_name = str(input_data.get("tool_name") or "")
+            agent_id_present = bool(input_data.get("agent_id"))
+            if tool_name == DELEGATION_TOOL_RUNTIME_NAME and tool_use_id:
+                agent_tool_use_ids.add(str(tool_use_id))
+            record_stream_diagnostic(
+                "hook_invocation",
+                hook_event=hook_event,
+                hook_name=hook_name,
+                phase="start",
+                tool_name=tool_name,
+                tool_use_id=tool_use_id,
+                agent_id_present=agent_id_present,
+            )
+            try:
+                result = await hook(input_data, tool_use_id, context)
+            except BaseException as exc:  # noqa: BLE001 - record and preserve the real hook failure
+                record_stream_diagnostic(
+                    "hook_invocation",
+                    critical=True,
+                    hook_event=hook_event,
+                    hook_name=hook_name,
+                    phase="exception",
+                    tool_name=tool_name,
+                    tool_use_id=tool_use_id,
+                    error_type=type(exc).__name__,
+                    size_chars=min(len(str(exc)), SDK_STREAM_DIAGNOSTIC_TEXT_LIMIT),
+                    agent_id_present=agent_id_present,
+                )
+                raise
+            hook_output = result.get("hookSpecificOutput") if isinstance(result, dict) else None
+            status = ""
+            if isinstance(hook_output, dict):
+                status = str(hook_output.get("permissionDecision") or "")
+            if not status and isinstance(result, dict):
+                status = str(result.get("decision") or "returned")
+            record_stream_diagnostic(
+                "hook_invocation",
+                hook_event=hook_event,
+                hook_name=hook_name,
+                phase="return",
+                tool_name=tool_name,
+                tool_use_id=tool_use_id,
+                status=status or "returned",
+                size_chars=_bounded_size(result),
+                agent_id_present=agent_id_present,
+            )
+            if tool_name == DELEGATION_TOOL_RUNTIME_NAME and hook_event in {
+                "PostToolUse",
+                "PostToolUseFailure",
+            }:
+                tool_response = input_data.get("tool_response")
+                failure = input_data.get("error")
+                record_stream_diagnostic(
+                    "agent_tool_hook_result",
+                    critical=hook_event == "PostToolUseFailure",
+                    hook_event=hook_event,
+                    tool_name=tool_name,
+                    tool_use_id=tool_use_id,
+                    status="failed" if hook_event == "PostToolUseFailure" else "completed",
+                    size_chars=_bounded_size(failure if failure is not None else tool_response),
+                    is_error=hook_event == "PostToolUseFailure",
+                    is_agent_result=True,
+                )
+            return result
+
+        return observed_hook
 
     def emit_plan_update() -> None:
         if not native_mode:
@@ -2686,18 +2894,29 @@ async def _run_sdk_turn(
     # must reason the decomposition and delegate via Task.
     native_subagent_tools: dict[str, Any] = {}
     hooks: dict[str, Any] = {
-        "PostToolUse": [HookMatcher(matcher=r"^mcp__.*$", hooks=[post_tool_use])],
-        "PostToolUseFailure": [
-            HookMatcher(matcher=_DELEGATION_OR_MCP_MATCHER, hooks=[post_tool_failure])
+        "PostToolUse": [
+            HookMatcher(
+                matcher=r"^mcp__.*$",
+                hooks=[instrument_hook("PostToolUse", post_tool_use)],
+            )
         ],
-        "Stop": [HookMatcher(hooks=[stop_hook])],
-        "PreCompact": [HookMatcher(hooks=[pre_compact_hook])],
+        "PostToolUseFailure": [
+            HookMatcher(
+                matcher=_DELEGATION_OR_MCP_MATCHER,
+                hooks=[instrument_hook("PostToolUseFailure", post_tool_failure)],
+            )
+        ],
+        "Stop": [HookMatcher(hooks=[instrument_hook("Stop", stop_hook)])],
+        "PreCompact": [HookMatcher(hooks=[instrument_hook("PreCompact", pre_compact_hook)])],
     }
     if model_driven and False:  # Retained dark until Step 3 removes the external worker transport.
         # The completion bridge + subagent-step trace live in post_tool_use's delegation branch, so the
         # PostToolUse matcher must also match the delegation tool (the `^mcp__.*$` default never would).
         hooks["PostToolUse"] = [
-            HookMatcher(matcher=_DELEGATION_OR_MCP_MATCHER, hooks=[post_tool_use])
+            HookMatcher(
+                matcher=_DELEGATION_OR_MCP_MATCHER,
+                hooks=[instrument_hook("PostToolUse", post_tool_use)],
+            )
         ]
 
         base_url = os.environ.get("VCSO_WORKER_MCP_BASE_URL") or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}"
@@ -2787,22 +3006,41 @@ async def _run_sdk_turn(
             finally:
                 TURN_REGISTRY.unregister(probe_token)
         hooks["PreToolUse"] = [
-            HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
-            HookMatcher(matcher=r"^mcp__.*$", hooks=[pre_tool_probe]),
+            HookMatcher(
+                matcher=DELEGATION_TOOL_RUNTIME_NAME,
+                hooks=[instrument_hook("PreToolUse", pre_task_use)],
+            ),
+            HookMatcher(
+                matcher=r"^mcp__.*$",
+                hooks=[instrument_hook("PreToolUse", pre_tool_probe)],
+            ),
         ]
     if model_driven:
         hooks["PostToolUse"] = [
-            HookMatcher(matcher=_DELEGATION_OR_MCP_MATCHER, hooks=[post_tool_use])
+            HookMatcher(
+                matcher=_DELEGATION_OR_MCP_MATCHER,
+                hooks=[instrument_hook("PostToolUse", post_tool_use)],
+            )
         ]
         hooks["PreToolUse"] = [
-            HookMatcher(matcher=DELEGATION_TOOL_RUNTIME_NAME, hooks=[pre_task_use]),
+            HookMatcher(
+                matcher=DELEGATION_TOOL_RUNTIME_NAME,
+                hooks=[instrument_hook("PreToolUse", pre_task_use)],
+            ),
             HookMatcher(
                 matcher=r"^mcp__.*$",
-                hooks=[pre_native_access_gate, pre_compute_gate],
+                hooks=[
+                    instrument_hook("PreToolUse", pre_native_access_gate),
+                    instrument_hook("PreToolUse", pre_compute_gate),
+                ],
             ),
         ]
-        hooks["SubagentStart"] = [HookMatcher(hooks=[subagent_start_hook])]
-        hooks["SubagentStop"] = [HookMatcher(hooks=[subagent_stop_hook])]
+        hooks["SubagentStart"] = [
+            HookMatcher(hooks=[instrument_hook("SubagentStart", subagent_start_hook)])
+        ]
+        hooks["SubagentStop"] = [
+            HookMatcher(hooks=[instrument_hook("SubagentStop", subagent_stop_hook)])
+        ]
     if enable_ask_user_pause:
         async def pause_or_resume_ask_user(
             input_data: dict[str, Any],
@@ -2837,7 +3075,7 @@ async def _run_sdk_turn(
         hooks["PreToolUse"] = [
             HookMatcher(
                 matcher=f"{SDK_TOOL_PREFIX}ask_user",
-                hooks=[pause_or_resume_ask_user],
+                hooks=[instrument_hook("PreToolUse", pause_or_resume_ask_user)],
             ),
             *(hooks.get("PreToolUse") or []),
         ]
@@ -2950,6 +3188,8 @@ async def _run_sdk_turn(
     final_result_text: str | None = None
     result_deferred_tool_use: Any | None = None
     diagnostics_drained = False
+    sdk_message_arrival_index = 0
+    sdk_result_message_seen = False
 
     def _drain_model_driven_diagnostics() -> None:
         """Record the out-of-process worker endpoint's diagnostics, then release every per-turn token.
@@ -2972,87 +3212,204 @@ async def _run_sdk_turn(
             TURN_REGISTRY.unregister(token)
         model_driven_tokens.clear()
 
-    try:
-        async for message in query_impl(prompt=prompt, options=options):
-            if isinstance(message, StreamEvent):
-                if message.parent_tool_use_id:
-                    # Child text/tool payloads stay inside the native subagent context. Curated handler
-                    # progress is emitted separately through sub_agent_step events.
+    def _record_sdk_message(message: Any) -> None:
+        """Record one SDK-yielded object without retaining any of its content."""
+
+        nonlocal sdk_message_arrival_index, sdk_result_message_seen
+        sdk_message_arrival_index += 1
+        object_type = type(message).__name__
+        parent_tool_use_id = str(getattr(message, "parent_tool_use_id", "") or "")
+        details: dict[str, Any] = {
+            "arrival_index": sdk_message_arrival_index,
+            "object_type": object_type,
+            "parent_tool_use_id": parent_tool_use_id,
+        }
+        if isinstance(message, AssistantMessage):
+            blocks = list(message.content or [])
+            block_types = [type(block).__name__ for block in blocks]
+            text_chars = sum(
+                len(str(getattr(block, "text", "") or ""))
+                for block in blocks
+                if type(block).__name__ == "TextBlock"
+            )
+            tool_calls = [block for block in blocks if isinstance(block, ToolUseBlock)]
+            tool_results = [block for block in blocks if isinstance(block, ToolResultBlock)]
+            for block in tool_calls:
+                if str(block.name or "") == DELEGATION_TOOL_RUNTIME_NAME:
+                    agent_tool_use_ids.add(str(block.id))
+            for block in tool_results:
+                tool_use_id = str(block.tool_use_id or "")
+                if tool_use_id in agent_tool_use_ids:
+                    record_stream_diagnostic(
+                        "agent_tool_result",
+                        critical=True,
+                        object_type=object_type,
+                        parent_tool_use_id=parent_tool_use_id,
+                        tool_use_id=tool_use_id,
+                        status="failed" if block.is_error else "completed",
+                        size_chars=_bounded_size(block.content),
+                        is_agent_result=True,
+                        is_error=bool(block.is_error),
+                    )
+            details.update(
+                {
+                    "message_id": str(message.message_id or ""),
+                    "has_text": text_chars > 0,
+                    "text_chars": text_chars,
+                    "tool_calls_only": bool(tool_calls) and text_chars == 0,
+                    "tool_call_count": len(tool_calls),
+                    "tool_result_count": len(tool_results),
+                    "tool_call_names": [str(block.name or "") for block in tool_calls],
+                    "content_block_types": block_types,
+                }
+            )
+        elif isinstance(message, UserMessage):
+            blocks = list(message.content) if isinstance(message.content, list) else []
+            tool_results = [block for block in blocks if isinstance(block, ToolResultBlock)]
+            details.update(
+                {
+                    "tool_result_count": len(tool_results),
+                    "content_block_types": [type(block).__name__ for block in blocks],
+                }
+            )
+            for block in tool_results:
+                tool_use_id = str(block.tool_use_id or "")
+                if tool_use_id not in agent_tool_use_ids:
                     continue
-                event = message.event
-                if event.get("type") == "content_block_start":
-                    block = event.get("content_block") or {}
-                    if block.get("type") == "tool_use":
-                        if native_mode and str(block.get("name") or "") == DELEGATION_TOOL_RUNTIME_NAME:
-                            continue
-                        emit_tool_start(
-                            str(block.get("name") or "tool"),
-                            str(block.get("id") or block.get("name") or "tool"),
-                        )
-                elif event.get("type") == "content_block_delta":
-                    delta = event.get("delta") or {}
-                    if delta.get("type") == "text_delta":
-                        text = str(delta.get("text") or "")
-                        if text:
-                            for channel, visible_text, segment_id in text_normalizer.feed(text):
-                                if channel == "answer":
-                                    answer_parts.append(visible_text)
-                                elif segment_id is not None:
-                                    narration_by_segment[segment_id] = (
-                                        narration_by_segment.get(segment_id, "") + visible_text
-                                    )
-                                token_data: dict[str, Any] = {
-                                    "text": visible_text,
-                                    "channel": channel,
-                                    "sdkMode": True,
-                                }
-                                if segment_id is not None:
-                                    token_data["segmentId"] = segment_id
-                                # A compute-sensitive answer is buffered until the deterministic final
-                                # seam can verify a successful, cited compute result. Narration and every
-                                # non-compute turn keep their existing real-time stream.
-                                if not (
-                                    (compute_integrity_required or enable_ask_user_pause)
-                                    and channel == "answer"
-                                ):
-                                    events.put({"event": "token", "data": token_data})
-            elif isinstance(message, ResultMessage):
-                session_id = message.session_id
-                final_result_text = message.result
-                result_deferred_tool_use = message.deferred_tool_use
-                usage = message.usage or {}
-                input_tokens = _usage_input_total(usage)
-                output_tokens = _usage_int(usage, "output_tokens", "outputTokens")
-                if message.total_cost_usd is not None:
-                    total_cost_usd = Decimal(str(message.total_cost_usd))
-                if usage_sink is not None:
-                    try:
-                        usage_sink(
-                            VcsoSdkUsage(
-                                input_tokens=input_tokens,
-                                output_tokens=output_tokens,
-                                total_cost_usd=total_cost_usd,
-                                session_id=session_id,
-                            )
-                        )
-                        usage_recorded = True
-                    except Exception as exc:  # noqa: BLE001 - metering failure must not erase the founder answer
-                        logger.warning("SDK ResultMessage usage sink failed open: %s", exc)
-            elif isinstance(message, AssistantMessage) and native_mode and message.parent_tool_use_id:
-                usage = message.usage or {}
-                child_usage_records.append(
-                    {
-                        "task_id": str(message.parent_tool_use_id),
-                        "capability_key": _assistant_worker_capability(
-                        message,
-                        task_capabilities=task_capabilities,
-                        allowed_capabilities=provisioned_agents,
-                        ),
-                        "model": str(message.model or ""),
-                        "input_tokens": _usage_input_total(usage),
-                        "output_tokens": _usage_int(usage, "output_tokens", "outputTokens"),
-                    }
+                tool_use_result = (
+                    message.tool_use_result if isinstance(message.tool_use_result, dict) else {}
                 )
+                status = str(tool_use_result.get("status") or "")
+                if not status:
+                    status = "failed" if block.is_error else "completed"
+                record_stream_diagnostic(
+                    "agent_tool_result",
+                    critical=True,
+                    object_type=object_type,
+                    parent_tool_use_id=parent_tool_use_id,
+                    tool_use_id=tool_use_id,
+                    status=status,
+                    size_chars=_bounded_size(block.content) + _bounded_size(tool_use_result),
+                    is_agent_result=True,
+                    is_error=bool(block.is_error),
+                )
+        elif isinstance(message, ResultMessage):
+            sdk_result_message_seen = True
+            details.update(
+                {
+                    "message_id": str(getattr(message, "uuid", "") or ""),
+                    "status": str(message.subtype or ""),
+                    "is_error": bool(message.is_error),
+                    "size_chars": len(str(message.result or "")),
+                }
+            )
+        elif isinstance(message, StreamEvent):
+            event = message.event or {}
+            details["status"] = str(event.get("type") or "")
+            if event.get("type") == "content_block_start":
+                block = event.get("content_block") or {}
+                if str(block.get("name") or "") == DELEGATION_TOOL_RUNTIME_NAME:
+                    agent_tool_use_ids.add(str(block.get("id") or ""))
+        record_stream_diagnostic("sdk_stream_message", **details)
+
+    try:
+        try:
+            async for message in query_impl(prompt=prompt, options=options):
+                _record_sdk_message(message)
+                if isinstance(message, StreamEvent):
+                    if message.parent_tool_use_id:
+                        # Child text/tool payloads stay inside the native subagent context. Curated handler
+                        # progress is emitted separately through sub_agent_step events.
+                        continue
+                    event = message.event
+                    if event.get("type") == "content_block_start":
+                        block = event.get("content_block") or {}
+                        if block.get("type") == "tool_use":
+                            if native_mode and str(block.get("name") or "") == DELEGATION_TOOL_RUNTIME_NAME:
+                                continue
+                            emit_tool_start(
+                                str(block.get("name") or "tool"),
+                                str(block.get("id") or block.get("name") or "tool"),
+                            )
+                    elif event.get("type") == "content_block_delta":
+                        delta = event.get("delta") or {}
+                        if delta.get("type") == "text_delta":
+                            text = str(delta.get("text") or "")
+                            if text:
+                                for channel, visible_text, segment_id in text_normalizer.feed(text):
+                                    if channel == "answer":
+                                        answer_parts.append(visible_text)
+                                    elif segment_id is not None:
+                                        narration_by_segment[segment_id] = (
+                                            narration_by_segment.get(segment_id, "") + visible_text
+                                        )
+                                    token_data: dict[str, Any] = {
+                                        "text": visible_text,
+                                        "channel": channel,
+                                        "sdkMode": True,
+                                    }
+                                    if segment_id is not None:
+                                        token_data["segmentId"] = segment_id
+                                    # A compute-sensitive answer is buffered until the deterministic final
+                                    # seam can verify a successful, cited compute result. Narration and every
+                                    # non-compute turn keep their existing real-time stream.
+                                    if not (
+                                        (compute_integrity_required or enable_ask_user_pause)
+                                        and channel == "answer"
+                                    ):
+                                        events.put({"event": "token", "data": token_data})
+                elif isinstance(message, ResultMessage):
+                    session_id = message.session_id
+                    final_result_text = message.result
+                    result_deferred_tool_use = message.deferred_tool_use
+                    usage = message.usage or {}
+                    input_tokens = _usage_input_total(usage)
+                    output_tokens = _usage_int(usage, "output_tokens", "outputTokens")
+                    if message.total_cost_usd is not None:
+                        total_cost_usd = Decimal(str(message.total_cost_usd))
+                    if usage_sink is not None:
+                        try:
+                            usage_sink(
+                                VcsoSdkUsage(
+                                    input_tokens=input_tokens,
+                                    output_tokens=output_tokens,
+                                    total_cost_usd=total_cost_usd,
+                                    session_id=session_id,
+                                )
+                            )
+                            usage_recorded = True
+                        except Exception as exc:  # noqa: BLE001 - metering failure must not erase the founder answer
+                            logger.warning("SDK ResultMessage usage sink failed open: %s", exc)
+                elif isinstance(message, AssistantMessage) and native_mode and message.parent_tool_use_id:
+                    usage = message.usage or {}
+                    child_usage_records.append(
+                        {
+                            "task_id": str(message.parent_tool_use_id),
+                            "capability_key": _assistant_worker_capability(
+                            message,
+                            task_capabilities=task_capabilities,
+                            allowed_capabilities=provisioned_agents,
+                            ),
+                            "model": str(message.model or ""),
+                            "input_tokens": _usage_input_total(usage),
+                            "output_tokens": _usage_int(usage, "output_tokens", "outputTokens"),
+                        }
+                    )
+        except BaseException as exc:  # noqa: BLE001 - preserve the SDK iterator's real failure
+            record_stream_diagnostic(
+                "sdk_iteration_terminated",
+                critical=True,
+                termination="exception",
+                error_type=type(exc).__name__,
+                size_chars=min(len(str(exc)), SDK_STREAM_DIAGNOSTIC_TEXT_LIMIT),
+            )
+            raise
+        else:
+            record_stream_diagnostic(
+                "sdk_iteration_terminated",
+                critical=True,
+                termination="result_message" if sdk_result_message_seen else "exhaustion",
+            )
 
         for channel, visible_text, segment_id in text_normalizer.finish():
             if channel == "answer":
@@ -3068,6 +3425,12 @@ async def _run_sdk_turn(
             ):
                 events.put({"event": "token", "data": token_data})
     finally:
+        if stream_diagnostic_dropped:
+            record_stream_diagnostic(
+                "sdk_stream_capture_truncated",
+                critical=True,
+                dropped_count=stream_diagnostic_dropped,
+            )
         # DIAGNOSTICS SURVIVE FAILURE (SDK-M3 step A4). The worker_hop drain used to run only after a
         # clean query; a turn that raised — max_turns, a required-worker block, a client disconnect —
         # skipped it and lost the worker-level evidence on precisely the turns that most needed

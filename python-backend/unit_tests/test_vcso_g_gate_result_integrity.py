@@ -75,12 +75,19 @@ def test_complete_main_run_persists_exact_g_gate_parent_attribution():
 
 def test_sdk_completion_caller_passes_attribution_and_lifecycle_to_run_metadata():
     source = inspect.getsource(VcsoChatService._stream_chat_impl)
-    planner_branch = source.split("if planner_result is not None:", 1)[1].split("sdk_settings =", 1)[0]
+    planner_branch = source.split("if planner_result is not None:", 1)[1].split(
+        "\n        sdk_mode =",
+        1,
+    )[0]
     sdk_branch = source.split("if sdk_mode:", 1)[1]
 
     assert "sdk_run_attribution =" not in planner_branch
     assert "sdk_run_attribution =" in sdk_branch
     assert "run_metadata={" in sdk_branch
     assert '"sdk_native_lifecycle": final_sdk_lifecycle' in sdk_branch
-    lifecycle_writer = sdk_branch.split("def persist_sdk_lifecycle", 1)[1].split("def record_sdk_usage", 1)[0]
-    assert "**sdk_run_attribution" in lifecycle_writer
+    assert '"sdk_raw_stream_capture": final_sdk_stream_capture' in sdk_branch
+    diagnostic_writer = sdk_branch.split("def persist_sdk_diagnostic_snapshot", 1)[1].split(
+        "def record_sdk_usage",
+        1,
+    )[0]
+    assert "**sdk_run_attribution" in diagnostic_writer

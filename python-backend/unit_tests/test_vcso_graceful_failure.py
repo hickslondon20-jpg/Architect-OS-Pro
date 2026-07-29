@@ -411,7 +411,7 @@ class _FailureUpdateClient:
         return SimpleNamespace(data=[self.payload])
 
 
-def test_failed_main_run_persists_native_activation_attribution_and_lifecycle():
+def test_failed_main_run_persists_native_activation_lifecycle_and_stream_capture():
     client = _FailureUpdateClient()
     service = VcsoChatService.__new__(VcsoChatService)
     service.supabase = client
@@ -431,6 +431,15 @@ def test_failed_main_run_persists_native_activation_attribution_and_lifecycle():
         "claude_code_cli_version": "2.1.209 (Claude Code)",
         "claude_code_cli_source": "bundled",
     }
+    stream_capture = [
+        {
+            "sequence": 1,
+            "event": "sdk_iteration_terminated",
+            "elapsed_ms": 123.4,
+            "termination": "exception",
+            "error_type": "RuntimeError",
+        }
+    ]
 
     service._fail_main_run(
         "parent-1",
@@ -440,11 +449,13 @@ def test_failed_main_run_persists_native_activation_attribution_and_lifecycle():
         error_message="bounded failure",
         run_attribution=attribution,
         sdk_lifecycle=lifecycle,
+        sdk_stream_capture=stream_capture,
     )
 
     assert client.payload["structured_result"]["native_subagent_mode"] is True
     assert client.payload["structured_result"]["sdk_phase"] == "04B-D"
     assert client.payload["metadata"]["sdk_native_lifecycle"] == lifecycle
+    assert client.payload["metadata"]["sdk_raw_stream_capture"] == stream_capture
     assert client.payload["metadata"]["available_subagents"] == [
         "structured_data_agent",
         "per_user_wiki",

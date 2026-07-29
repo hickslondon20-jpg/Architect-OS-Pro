@@ -54,6 +54,7 @@ from services.vcso_sdk_loop import (
     native_fault_injection_mode,
     native_subagent_requirements,
     read_sdk_loop_settings,
+    sdk_stream_capture_enabled,
     sdk_runtime_versions,
     stream_vcso_sdk_turn,
 )
@@ -460,6 +461,9 @@ class VcsoChatService:
             native_model_driven
             and str(_sdk_settings.get("native_subagent_scope") or "") == G_GATE_MODEL_CHOICE_SCOPE
         )
+        native_stream_capture = (
+            sdk_stream_capture_enabled(_sdk_settings, user_id) if native_model_driven else False
+        )
         sdk_phase = (
             "04B-G-GATE"
             if native_model_choice
@@ -700,12 +704,38 @@ class VcsoChatService:
                 "delegation_selection": "model_choice" if native_model_choice else "fixed_required",
                 "available_subagents": list(native_required_agents),
                 "required_subagents": [] if native_model_choice else list(native_required_agents),
+                "sdk_stream_capture_enabled": native_stream_capture,
                 **sdk_runtime_versions(),
             }
             sdk_lifecycle_events: list[dict[str, Any]] = []
+            sdk_stream_capture_events: list[dict[str, Any]] = []
             sdk_lifecycle_lock = threading.Lock()
             self._active_turn["run_attribution"] = dict(sdk_run_attribution)
             self._active_turn["sdk_lifecycle_events"] = sdk_lifecycle_events
+            self._active_turn["sdk_stream_capture_events"] = sdk_stream_capture_events
+
+            def persist_sdk_diagnostic_snapshot(
+                lifecycle_snapshot: list[dict[str, Any]],
+                stream_snapshot: list[dict[str, Any]],
+            ) -> None:
+                metadata = {
+                    "output_schema_version": "vcso_tool_loop_v1",
+                    "reasoning_visibility": "summary_only",
+                    "deep_mode": sdk_deep_mode,
+                    "sdk_native_lifecycle": lifecycle_snapshot,
+                    **sdk_run_attribution,
+                }
+                if native_stream_capture:
+                    metadata["sdk_raw_stream_capture"] = stream_snapshot
+                try:
+                    self.supabase.table("agent_delegation_runs").update(
+                        {
+                            "metadata": metadata,
+                            "updated_at": _now(),
+                        }
+                    ).eq("id", run_id).eq("user_id", user_id).execute()
+                except Exception as exc:  # noqa: BLE001 - diagnostics must remain fail-open
+                    logger.warning("SDK diagnostic snapshot persistence failed open: %s", exc)
 
             def persist_sdk_lifecycle(event: dict[str, Any]) -> None:
                 if not sdk_native_subagent_mode:
@@ -713,22 +743,25 @@ class VcsoChatService:
                 with sdk_lifecycle_lock:
                     sdk_lifecycle_events.append(dict(event))
                     del sdk_lifecycle_events[:-60]
-                    snapshot = list(sdk_lifecycle_events)
-                try:
-                    self.supabase.table("agent_delegation_runs").update(
-                        {
-                            "metadata": {
-                                "output_schema_version": "vcso_tool_loop_v1",
-                                "reasoning_visibility": "summary_only",
-                                "deep_mode": sdk_deep_mode,
-                                "sdk_native_lifecycle": snapshot,
-                                **sdk_run_attribution,
-                            },
-                            "updated_at": _now(),
-                        }
-                    ).eq("id", run_id).eq("user_id", user_id).execute()
-                except Exception as exc:  # noqa: BLE001 - diagnostics must remain fail-open
-                    logger.warning("SDK lifecycle snapshot persistence failed open: %s", exc)
+                    lifecycle_snapshot = list(sdk_lifecycle_events)
+                    stream_snapshot = list(sdk_stream_capture_events)
+                persist_sdk_diagnostic_snapshot(lifecycle_snapshot, stream_snapshot)
+
+            def persist_sdk_stream_capture(event: dict[str, Any]) -> None:
+                if not native_stream_capture:
+                    return
+                with sdk_lifecycle_lock:
+                    sdk_stream_capture_events.append(dict(event))
+                    del sdk_stream_capture_events[:-340]
+                    lifecycle_snapshot = list(sdk_lifecycle_events)
+                    stream_snapshot = list(sdk_stream_capture_events)
+                # Persist all hook/terminal/result facts immediately. Partial stream messages are
+                # checkpointed every 20 arrivals to keep the diagnostic from materially perturbing
+                # the runtime it is observing; the final or failure-path write persists the full list.
+                event_name = str(event.get("event") or "")
+                arrival_index = int(event.get("arrival_index") or 0)
+                if event_name != "sdk_stream_message" or arrival_index % 20 == 0:
+                    persist_sdk_diagnostic_snapshot(lifecycle_snapshot, stream_snapshot)
 
             def record_sdk_usage(usage: VcsoSdkUsage) -> None:
                 log_ai_usage_event(
@@ -826,6 +859,9 @@ class VcsoChatService:
                     else {}
                 ),
                 native_lifecycle_sink=persist_sdk_lifecycle if sdk_native_subagent_mode else None,
+                native_stream_diagnostic_sink=(
+                    persist_sdk_stream_capture if native_stream_capture else None
+                ),
                 native_model_driven=native_model_driven,
                 native_model_choice=native_model_choice,
                 native_fault_injection=native_fault_injection,
@@ -881,6 +917,7 @@ class VcsoChatService:
                 )
                 with sdk_lifecycle_lock:
                     paused_sdk_lifecycle = list(sdk_lifecycle_events)
+                    paused_sdk_stream_capture = list(sdk_stream_capture_events)
                 self.supabase.table("agent_delegation_runs").update(
                     {
                         "metadata": {
@@ -891,6 +928,11 @@ class VcsoChatService:
                             "sdk_waiting_for_user": True,
                             "sdk_native_lifecycle": paused_sdk_lifecycle,
                             **sdk_run_attribution,
+                            **(
+                                {"sdk_raw_stream_capture": paused_sdk_stream_capture}
+                                if native_stream_capture
+                                else {}
+                            ),
                         },
                         "updated_at": _now(),
                     }
@@ -940,6 +982,7 @@ class VcsoChatService:
             self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 2)
             with sdk_lifecycle_lock:
                 final_sdk_lifecycle = list(sdk_lifecycle_events)
+                final_sdk_stream_capture = list(sdk_stream_capture_events)
             self._complete_main_run(
                 run_id,
                 user_id,
@@ -971,6 +1014,11 @@ class VcsoChatService:
                     "deep_mode": sdk_deep_mode,
                     "sdk_native_lifecycle": final_sdk_lifecycle,
                     **sdk_run_attribution,
+                    **(
+                        {"sdk_raw_stream_capture": final_sdk_stream_capture}
+                        if native_stream_capture
+                        else {}
+                    ),
                 },
             )
             self._active_turn["run_completed"] = True
@@ -1515,6 +1563,7 @@ class VcsoChatService:
                     partials=partials,
                     run_attribution=dict(state.get("run_attribution") or {}),
                     sdk_lifecycle=list(state.get("sdk_lifecycle_events") or []),
+                    sdk_stream_capture=list(state.get("sdk_stream_capture_events") or []),
                 )
 
             if state.get("deep_mode"):
@@ -1616,6 +1665,7 @@ class VcsoChatService:
         partials: list[dict[str, str]] | None = None,
         run_attribution: dict[str, Any] | None = None,
         sdk_lifecycle: list[dict[str, Any]] | None = None,
+        sdk_stream_capture: list[dict[str, Any]] | None = None,
     ) -> None:
         status = "cancelled" if terminal_status == "cancelled" else "failed"
         attribution = dict(run_attribution or {})
@@ -1635,12 +1685,17 @@ class VcsoChatService:
                 "completed_at": _now(),
                 "updated_at": _now(),
             }
-        if attribution or sdk_lifecycle:
+        if attribution or sdk_lifecycle or sdk_stream_capture:
             values["metadata"] = {
                 "output_schema_version": "vcso_tool_loop_v1",
                 "reasoning_visibility": "summary_only",
                 "sdk_native_lifecycle": list(sdk_lifecycle or []),
                 **attribution,
+                **(
+                    {"sdk_raw_stream_capture": list(sdk_stream_capture)}
+                    if sdk_stream_capture
+                    else {}
+                ),
             }
         self.supabase.table("agent_delegation_runs").update(values).eq("id", run_id).eq(
             "user_id", user_id

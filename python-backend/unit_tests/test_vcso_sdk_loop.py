@@ -15,7 +15,9 @@ from claude_agent_sdk.types import (
     DeferredToolUse,
     ResultMessage,
     StreamEvent,
+    ToolResultBlock,
     ToolUseBlock,
+    UserMessage,
 )
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
@@ -44,6 +46,7 @@ from services.vcso_sdk_loop import (
     native_subagent_requirements,
     persist_native_child_step,
     read_sdk_loop_settings,
+    sdk_stream_capture_enabled,
     foreground_delegation_input,
     sdk_runtime_versions,
     stream_vcso_sdk_turn,
@@ -91,6 +94,21 @@ def test_delegation_input_rewrite_always_forces_foreground(tool_input, input_sta
     assert observed == input_state
     assert updated["run_in_background"] is False
     assert tool_input != updated or tool_input.get("run_in_background") is False
+
+
+def test_sdk_stream_capture_requires_explicit_switch_and_allowlisted_founder():
+    armed = {
+        "diagnostic_sdk_stream_capture_enabled": True,
+        "diagnostic_user_ids": ["founder-1"],
+    }
+
+    assert sdk_stream_capture_enabled(armed, "founder-1") is True
+    assert sdk_stream_capture_enabled(armed, "founder-2") is False
+    assert sdk_stream_capture_enabled(
+        {**armed, "diagnostic_sdk_stream_capture_enabled": False},
+        "founder-1",
+    ) is False
+    assert sdk_stream_capture_enabled({}, "founder-1") is False
 
 
 def test_sdk_error_sanitizer_preserves_type_and_redacts_credentials():
@@ -2089,7 +2107,14 @@ def _worker_tokens(options):
     }
 
 
-def _model_driven_turn(monkeypatch, *, fake_query, required=("structured_data_agent",), store=None):
+def _model_driven_turn(
+    monkeypatch,
+    *,
+    fake_query,
+    required=("structured_data_agent",),
+    store=None,
+    stream_diagnostic_events=None,
+):
     """Run one model-driven turn against a stubbed SDK query. Shared by the SDK-M3 tests below."""
 
     _capture_sdk_tools(monkeypatch)
@@ -2118,6 +2143,9 @@ def _model_driven_turn(monkeypatch, *, fake_query, required=("structured_data_ag
         native_subagent_required_agents=required,
         native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
         native_lifecycle_sink=lifecycle_events.append,
+        native_stream_diagnostic_sink=(
+            stream_diagnostic_events.append if stream_diagnostic_events is not None else None
+        ),
         native_model_driven=True,
         query_impl=fake_query,
     )
@@ -2134,6 +2162,154 @@ def _delegation_contract(objective):
             "context_scope": {},
         }
     )
+
+
+def test_sdk_stream_capture_records_agent_result_and_result_termination(monkeypatch):
+    diagnostics = []
+
+    async def fake_query(**_kwargs):
+        yield AssistantMessage(
+            content=[
+                ToolUseBlock(
+                    id="agent-task-1",
+                    name="Agent",
+                    input={"prompt": "must never enter diagnostics"},
+                )
+            ],
+            model="claude-sonnet-test",
+            message_id="assistant-1",
+        )
+        yield UserMessage(
+            content=[
+                ToolResultBlock(
+                    tool_use_id="agent-task-1",
+                    content="private worker content must never enter diagnostics",
+                    is_error=False,
+                )
+            ],
+            parent_tool_use_id=None,
+            tool_use_result={"status": "completed", "payload": "private"},
+        )
+        yield ResultMessage(
+            subtype="success",
+            duration_ms=1,
+            duration_api_ms=1,
+            is_error=False,
+            num_turns=1,
+            session_id="session-stream-capture",
+            result="private lead result must never enter diagnostics",
+        )
+
+    generator, _lifecycle = _model_driven_turn(
+        monkeypatch,
+        fake_query=fake_query,
+        stream_diagnostic_events=diagnostics,
+    )
+    with pytest.raises(RuntimeError, match="before required workers completed"):
+        _consume(generator)
+
+    message_events = [
+        event for event in diagnostics if event["event"] == "sdk_stream_message"
+    ]
+    assert [event["object_type"] for event in message_events] == [
+        "AssistantMessage",
+        "UserMessage",
+        "ResultMessage",
+    ]
+    assistant = message_events[0]
+    assert assistant["message_id"] == "assistant-1"
+    assert assistant["has_text"] is False
+    assert assistant["tool_calls_only"] is True
+    assert assistant["tool_call_names"] == ["Agent"]
+    agent_result = next(
+        event for event in diagnostics if event["event"] == "agent_tool_result"
+    )
+    assert agent_result["tool_use_id"] == "agent-task-1"
+    assert agent_result["status"] == "completed"
+    assert agent_result["is_agent_result"] is True
+    terminal = next(
+        event for event in diagnostics if event["event"] == "sdk_iteration_terminated"
+    )
+    assert terminal["termination"] == "result_message"
+    serialized = json.dumps(diagnostics)
+    assert "private worker content" not in serialized
+    assert "private lead result" not in serialized
+    assert "must never enter diagnostics" not in serialized
+
+
+def test_sdk_stream_capture_distinguishes_failed_subagent_stop_from_missing_hook(monkeypatch):
+    diagnostics = []
+
+    async def fake_query(*, options, **_kwargs):
+        subagent_stop = options.hooks["SubagentStop"][0].hooks[0]
+        await subagent_stop(
+            {
+                "agent_id": "agent-without-child-row",
+                "agent_type": "structured_data_agent",
+            },
+            "agent-task-1",
+            None,
+        )
+        if False:
+            yield None
+
+    generator, _lifecycle = _model_driven_turn(
+        monkeypatch,
+        fake_query=fake_query,
+        stream_diagnostic_events=diagnostics,
+    )
+    with pytest.raises(RuntimeError, match="evidence gap"):
+        _consume(generator)
+
+    stop_events = [
+        event
+        for event in diagnostics
+        if event.get("hook_event") == "SubagentStop"
+    ]
+    assert [event["phase"] for event in stop_events] == ["start", "exception"]
+    assert stop_events[-1]["error_type"] == "RuntimeError"
+    terminal = next(
+        event for event in diagnostics if event["event"] == "sdk_iteration_terminated"
+    )
+    assert terminal["termination"] == "exception"
+    assert terminal["error_type"] == "RuntimeError"
+
+
+def test_sdk_stream_capture_records_agent_post_tool_use_failure(monkeypatch):
+    diagnostics = []
+
+    async def fake_query(*, options, **_kwargs):
+        post_failure = options.hooks["PostToolUseFailure"][0].hooks[0]
+        await post_failure(
+            {
+                "tool_name": "Agent",
+                "error": RuntimeError("private exception detail"),
+            },
+            "agent-task-failed",
+            None,
+        )
+        if False:
+            yield None
+
+    generator, _lifecycle = _model_driven_turn(
+        monkeypatch,
+        fake_query=fake_query,
+        stream_diagnostic_events=diagnostics,
+    )
+    with pytest.raises(RuntimeError, match="before required workers completed"):
+        _consume(generator)
+
+    failure = next(
+        event for event in diagnostics if event["event"] == "agent_tool_hook_result"
+    )
+    assert failure["hook_event"] == "PostToolUseFailure"
+    assert failure["status"] == "failed"
+    assert failure["is_error"] is True
+    terminal = next(
+        event for event in diagnostics if event["event"] == "sdk_iteration_terminated"
+    )
+    assert terminal["termination"] == "exhaustion"
+    assert "private exception detail" not in json.dumps(diagnostics)
 
 
 def test_cheap_give_up_stops_blocking_a_lead_that_will_not_delegate(monkeypatch):
