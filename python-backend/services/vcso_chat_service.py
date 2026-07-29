@@ -196,12 +196,11 @@ class VcsoChatService:
         self._resolve_model()
         thread = self._load_or_create_thread(user_id, payload)
         thread_id = str(thread["id"])
-        pending_sdk_resume = bool(
-            thread.get("agent_status") == "waiting_for_user"
-            and thread.get("active_sdk_session_id")
-            and thread.get("sdk_pending_tool_use_id")
-        )
-        deep_mode = bool(payload.deep_mode or pending_sdk_resume)
+        # Step 1.5: keep the Phase E session/resume machinery dormant but intact.
+        # Neither a stale pending pointer nor a legacy request may route around the
+        # native worker surface while its delegation reliability is under test.
+        pending_sdk_resume = False
+        deep_mode = False
         sdk_flag = self._sdk_loop_settings(user_id)
         sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
         forced_sdk_fail_open = _sdk_force_fail_open(sdk_settings, user_id)
@@ -442,7 +441,7 @@ class VcsoChatService:
                 settings=sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {},
                 user_id=user_id,
             )
-            if bool(sdk_flag.get("enabled")) and not deep_mode and not is_deep_resume
+            if bool(sdk_flag.get("enabled"))
             else ()
         )
         sdk_native_subagent_mode = bool(native_required_agents)

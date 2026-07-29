@@ -47,7 +47,6 @@ export interface Ws5AssembledContextMeta {
 export interface SendUserMessageOptions {
   linkedFolder?: string | null;
   projectId?: string | null;
-  deepMode?: boolean;
   forkSessionId?: string | null;
   onUserMessage?: (message: Message) => void;
   onToken?: (text: string, meta: { channel: 'answer' | 'narration'; sdkMode: boolean }) => void;
@@ -784,7 +783,6 @@ export const sendUserMessage = async (
       text,
       linkedFolder: options.linkedFolder ?? null,
       projectId: options.projectId ?? null,
-      deepMode: options.deepMode ?? false,
       forkSessionId: options.forkSessionId ?? null,
     }),
   });

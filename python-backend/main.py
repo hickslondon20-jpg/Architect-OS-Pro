@@ -1272,7 +1272,9 @@ def stream_vcso_chat(
                 text=payload.text,
                 linked_folder=payload.linkedFolder,
                 project_id=payload.projectId,
-                deep_mode=payload.deepMode,
+                # Step 1.5: Deep Mode remains implemented but is intentionally unreachable
+                # while the native worker surface is proved.
+                deep_mode=False,
                 fork_session_id=payload.forkSessionId,
             )
             # DARK, FOUNDER-ONLY stream rehearsals (04B-D2 Gate 2). Both inert unless the `vcso_sdk_loop`

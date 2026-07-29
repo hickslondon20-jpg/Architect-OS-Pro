@@ -7,6 +7,10 @@ const workspacePath = path.resolve(
   process.cwd(),
   'pages/ProSuite/virtual-cso/VirtualCSOWorkspace.tsx',
 );
+const composerPath = path.resolve(
+  process.cwd(),
+  'components/pro-suite/virtual-cso/Composer.tsx',
+);
 
 const composerAttributes = (): string[][] => {
   const source = fs.readFileSync(workspacePath, 'utf8');
@@ -37,14 +41,19 @@ const composerAttributes = (): string[][] => {
   return results;
 };
 
-describe('VirtualCSOWorkspace Deep Mode composer wiring', () => {
-  it('keeps Deep Mode controlled in both new-chat and established-thread states', () => {
+describe('VirtualCSOWorkspace Composer routing controls', () => {
+  it('exposes no Deep Mode control in either Composer branch', () => {
     const composers = composerAttributes();
+    const workspaceSource = fs.readFileSync(workspacePath, 'utf8');
+    const composerSource = fs.readFileSync(composerPath, 'utf8');
 
     expect(composers).toHaveLength(2);
     for (const attributes of composers) {
-      expect(attributes).toContain('deepMode');
-      expect(attributes).toContain('onDeepModeChange');
+      expect(attributes).not.toContain('deepMode');
+      expect(attributes).not.toContain('onDeepModeChange');
     }
+    expect(workspaceSource).not.toContain('setDeepMode');
+    expect(composerSource).not.toContain('Deep Mode');
+    expect(composerSource).not.toContain('onDeepModeChange');
   });
 });
