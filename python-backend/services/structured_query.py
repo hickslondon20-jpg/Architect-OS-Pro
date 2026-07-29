@@ -203,7 +203,10 @@ def validate_structured_sql(sql: str, *, max_rows: int = 25) -> dict[str, Any]:
 
     surface = match.group("surface").lower()
     if surface not in APPROVED_SURFACES:
-        raise StructuredQueryError("Query references an unapproved dataset surface.")
+        approved = ", ".join(sorted(APPROVED_SURFACES))
+        raise StructuredQueryError(
+            f"Query references an unapproved dataset surface. Approved surfaces: {approved}."
+        )
 
     columns = _parse_columns(match.group("columns"), surface=surface)
     limit = min(int(match.group("limit") or max_rows), max(1, max_rows))

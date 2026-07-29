@@ -760,6 +760,8 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             name="run_structured_query",
             description=(
                 "Run a validated, read-only, row-capped SQL query against approved founder dataset surfaces. "
+                "Use it for aggregation across many rows, or when rows returned by a bounded dataset read do "
+                "not already answer the question; do not repeat a complete, untruncated bounded read. "
                 "Authoritative for the returned structured figures and current state. Not authoritative for "
                 "interpretation, and never permits model-supplied founder identity or write operations."
             ),

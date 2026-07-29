@@ -6,7 +6,12 @@ from typing import Any
 
 import pytest
 
-from services.structured_query import StructuredQueryError, StructuredQueryResult
+from services.structured_query import (
+    APPROVED_SURFACES,
+    StructuredQueryError,
+    StructuredQueryResult,
+    validate_structured_sql,
+)
 from services.tool_registry import ToolExecutionContext, ToolRegistry
 
 
@@ -248,3 +253,19 @@ def test_run_structured_query_does_not_invoke_service_for_invalid_sql(
             _context(client),
             {"question": "Delete it", "generated_sql": "delete from founder_dataset_rows"},
         )
+
+
+def test_structured_query_surface_refusal_names_the_approved_surfaces() -> None:
+    with pytest.raises(StructuredQueryError) as exc_info:
+        validate_structured_sql("select * from invented_financial_surface limit 5")
+
+    message = str(exc_info.value)
+    assert "unapproved dataset surface" in message
+    assert all(surface in message for surface in APPROVED_SURFACES)
+
+
+def test_run_structured_query_description_limits_when_it_is_appropriate() -> None:
+    definition = ToolRegistry().get("run_structured_query")
+
+    assert "aggregation across many rows" in definition.description
+    assert "complete, untruncated bounded read" in definition.description
