@@ -24,6 +24,7 @@ from services.vcso_sdk_loop import (
     COMPUTE_INTEGRITY_REFUSAL,
     G_GATE_CANDIDATE_AGENTS,
     G_GATE_MODEL_CHOICE_SCOPE,
+    NATIVE_SURFACE_REQUIRED_AGENTS,
     _assistant_worker_capability,
     _child_run_id_for_capability,
     _enforce_composer_integrity,
@@ -808,6 +809,33 @@ def test_native_subagent_effort_scaling_is_limited_to_the_p4_thin_slice():
     ) == required
 
 
+def test_native_surface_eligibility_is_flag_plus_founder_allowlist_only():
+    armed = {
+        "native_model_driven_enabled": True,
+        "diagnostic_user_ids": ["founder-1"],
+        "native_subagent_scope": "p4_thin_slice_only",
+    }
+
+    assert native_subagent_requirements(
+        message="Give me a concise hello.",
+        intent={"move_type": "lookup", "depth": "shallow"},
+        user_id="founder-1",
+        settings=armed,
+    ) == NATIVE_SURFACE_REQUIRED_AGENTS
+    assert native_subagent_requirements(
+        message="Give me a concise hello.",
+        intent={"move_type": "lookup", "depth": "shallow"},
+        user_id="founder-other",
+        settings=armed,
+    ) == ()
+    assert native_subagent_requirements(
+        message="Give me a concise hello.",
+        intent={"move_type": "lookup", "depth": "shallow"},
+        user_id="founder-1",
+        settings={**armed, "native_model_driven_enabled": False},
+    ) == ()
+
+
 def test_g_gate_model_choice_scope_is_exact_and_founder_scoped():
     armed = {
         "native_subagent_scope": G_GATE_MODEL_CHOICE_SCOPE,
@@ -838,7 +866,7 @@ def test_g_gate_model_choice_scope_is_exact_and_founder_scoped():
         intent={"move_type": "reflect_and_steer", "depth": "standard"},
         user_id="founder-1",
         settings={**armed, "native_subagent_scope": "p4_thin_slice_only"},
-    ) == ()
+    ) == NATIVE_SURFACE_REQUIRED_AGENTS
 
 
 def test_g_gate_prompt_requires_smallest_sufficient_worker_set():

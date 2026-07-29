@@ -342,9 +342,11 @@ def native_subagent_requirements(
 ) -> tuple[str, ...]:
     """Return the founder-scoped native worker surface.
 
-    The original P4 path remains pinned to its exact app gate. The Phase-G generalization surface is
-    separately dark-gated and returns only the bounded candidate pool; the loop decides whether those
-    candidates are mandatory or model-selected from the explicit selection mode passed by the caller.
+    The original P4 path remains pinned to its exact app gate. The Step 1.5 native surface is admitted
+    only by its dark sub-flag plus founder allowlist, without keyword or intent eligibility. The Phase-G
+    generalization surface is separately dark-gated and returns only the bounded candidate pool; the
+    loop decides whether those candidates are mandatory or model-selected from the explicit selection
+    mode passed by the caller.
     """
 
     intent = intent or {}
@@ -358,6 +360,12 @@ def native_subagent_requirements(
         ):
             return G_GATE_CANDIDATE_AGENTS
         return ()
+    if (
+        bool(settings.get("native_model_driven_enabled"))
+        and bool(user_id)
+        and str(user_id) in diagnostic_user_ids
+    ):
+        return NATIVE_SURFACE_REQUIRED_AGENTS
     if str(intent.get("move_type") or intent.get("intent") or "") != "strategic_synthesis":
         return ()
     if str(intent.get("depth") or "") != "deep":
@@ -372,12 +380,6 @@ def native_subagent_requirements(
         and diagnostic_worker in P4_THIN_SLICE_REQUIRED_AGENTS
     ):
         return (diagnostic_worker,)
-    if (
-        bool(settings.get("native_model_driven_enabled"))
-        and bool(user_id)
-        and str(user_id) in diagnostic_user_ids
-    ):
-        return NATIVE_SURFACE_REQUIRED_AGENTS
     return P4_THIN_SLICE_REQUIRED_AGENTS
 
 
