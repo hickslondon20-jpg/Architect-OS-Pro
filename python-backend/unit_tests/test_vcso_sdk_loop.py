@@ -30,6 +30,7 @@ from services.vcso_sdk_loop import (
     _make_worker_progress_bridge,
     _native_generalization_prompt,
     _native_synthesis_prompt,
+    _native_tool_output_summary,
     _successful_cited_compute_result,
     complete_native_child_run,
     compute_gate_decision,
@@ -40,6 +41,33 @@ from services.vcso_sdk_loop import (
     read_sdk_loop_settings,
     stream_vcso_sdk_turn,
 )
+
+
+def test_native_lifecycle_summary_carries_agent_result_evidence_semantics():
+    summary = _native_tool_output_summary(
+        {
+            "result_summary": "Reviewed bounded periods.",
+            "structured_result": {
+                "schema_version": "agent_result_v1",
+                "summary": "Reviewed bounded periods.",
+                "findings": [{"type": "dataset_row"}, {"type": "dataset_row_error"}],
+                "confidence": 0.7,
+                "needs_review": True,
+                "truncated": True,
+                "returned_count": 20,
+            },
+        }
+    )
+
+    assert summary == {
+        "summary": "Reviewed bounded periods.",
+        "needs_review": True,
+        "confidence": 0.7,
+        "truncated": True,
+        "returned_count": 20,
+        "finding_count": 2,
+        "finding_types": ["dataset_row", "dataset_row_error"],
+    }
 
 
 class _LifecycleWriteQuery:
@@ -132,7 +160,14 @@ def test_native_lifecycle_writers_create_steps_sources_and_complete_child():
         status="completed",
         result_summary="Structured Data Analyst completed 1 granular tool call.",
         citations=sources,
-        finding_summaries=[{"finding_type": "granular_tool_result", "truncated": False}],
+        finding_summaries=[
+            {
+                "finding_type": "granular_tool_result",
+                "truncated": False,
+                "confidence": 0.7,
+                "needs_review": True,
+            }
+        ],
     )
 
     assert run_id == "child-run-1"
@@ -150,7 +185,9 @@ def test_native_lifecycle_writers_create_steps_sources_and_complete_child():
         if table == "agent_delegation_runs" and operation == "update"
     )
     assert run_update["status"] == "completed"
-    assert run_update["structured_result"]["version"] == "agent_result_v1"
+    assert run_update["structured_result"]["schema_version"] == "agent_result_v1"
+    assert run_update["structured_result"]["confidence"] == 0.7
+    assert run_update["structured_result"]["needs_review"] is True
     assert run_update["citations"] == sources
 
 

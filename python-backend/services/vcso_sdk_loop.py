@@ -1176,7 +1176,7 @@ def _native_source_uuid(value: Any) -> str | None:
 def _native_tool_output_summary(content: dict[str, Any]) -> dict[str, Any]:
     """Keep evidence-shape facts while excluding raw rows, markdown, SQL, and code."""
 
-    result = content.get("agent_result_v1") if isinstance(content, dict) else None
+    result = content.get("structured_result") if isinstance(content, dict) else None
     candidate = result if isinstance(result, dict) else content
     summary: dict[str, Any] = {}
     for key in (
@@ -1321,13 +1321,22 @@ def complete_native_child_run(
     """Complete the child row from in-band SDK lifecycle facts."""
 
     now = _native_lifecycle_now()
+    confidence_values = [
+        float(finding["confidence"])
+        for finding in finding_summaries
+        if isinstance(finding.get("confidence"), (int, float))
+    ]
+    needs_review = status != "completed" or any(
+        finding.get("needs_review") is True for finding in finding_summaries
+    )
     structured_result = {
-        "version": "agent_result_v1",
+        "schema_version": "agent_result_v1",
         "status": status,
         "result_summary": result_summary[:1000],
         "findings": list(finding_summaries),
         "citations": list(citations),
-        "needs_review": status != "completed",
+        "confidence": min(confidence_values) if confidence_values else 0.7,
+        "needs_review": needs_review,
         "reasoning_visibility": "summary_only",
     }
     (
@@ -1844,11 +1853,23 @@ async def _run_sdk_turn(
                 status=status,
                 result_summary=result_summary,
                 structured_result={
-                    "version": "agent_result_v1",
+                    "schema_version": "agent_result_v1",
                     "status": status,
                     "findings": list(native_child_findings.get(agent_id) or ()),
                     "citations": citations,
-                    "needs_review": status != "completed",
+                    "confidence": min(
+                        [
+                            float(finding["confidence"])
+                            for finding in native_child_findings.get(agent_id, ())
+                            if isinstance(finding.get("confidence"), (int, float))
+                        ]
+                        or [0.7]
+                    ),
+                    "needs_review": status != "completed"
+                    or any(
+                        finding.get("needs_review") is True
+                        for finding in native_child_findings.get(agent_id, ())
+                    ),
                     "reasoning_visibility": "summary_only",
                 },
                 citations=citations,
