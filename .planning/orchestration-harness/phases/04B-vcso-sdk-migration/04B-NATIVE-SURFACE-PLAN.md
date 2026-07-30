@@ -423,12 +423,22 @@ findings 1 and 2; finding 3 is scheduled before the negative tests, not before t
 | `unit_tests/test_vcso_sdk_config.py:347–348` | `12` / `0.5` | A **test fixture** — the only place those numbers exist together |
 
 **Why it matters, with evidence.** The one successful native granular run (parent
-`f0d57def-ac61-4c93-8b3d-43aae03355f5`, 2026-07-29 18:11 UTC) spent **$0.1486 on the lead alone**
-(`ai_usage_log`: 28,910 in / 1,449 out, `claude-sonnet-4-6`) against a **$0.25** cap — and that run
-carried **no compute step**, because the structured worker returned `partial`/`degraded`. A true PASS adds
-an `execute_code` turn and composes over more evidence, so **the first genuine pass is likely the most
-expensive run yet.** A budget or turn stop mid-delegation produces a failure shape that is difficult to
-separate from a real mechanism failure in the evidence — exactly the ambiguity the probe exists to remove.
+`f0d57def-ac61-4c93-8b3d-43aae03355f5`, 2026-07-29 18:11 UTC) recorded **$0.1486** against a **$0.25**
+cap — **59% of the cap consumed by a run that carried no compute step at all**, because the structured
+worker returned `partial`/`degraded`. A true PASS adds an `execute_code` call and composes over more
+evidence, so **the first genuine pass is likely the most expensive run yet.** A budget or turn stop
+mid-delegation produces a failure shape that is difficult to separate from a real mechanism failure in the
+evidence — exactly the ambiguity the probe exists to remove.
+
+> **CORRECTION 2026-07-30.** An earlier revision of this paragraph described that $0.1486 as spent "on the
+> lead alone." **That was wrong.** Verified in code: the `vcso_sdk_loop` usage row carries
+> `ResultMessage.total_cost_usd` copied unchanged (`vcso_sdk_loop.py:3497–3508`) and written straight to
+> `ai_usage_log.cost_usd` (`vcso_chat_service.py:766`) — the SDK's **whole-query total, lead plus every
+> SDK-native subagent.** Child rows carry tokens with `total_cost_usd=None` **deliberately**
+> (`vcso_sdk_loop.py:3644`), so that subagent spend is not double-counted. Worker tokens must therefore
+> **not** be priced and added to the parent figure. The caps decision is unaffected — 59% of the cap
+> against a run missing its most expensive step still justifies the raise — but the margin is less
+> alarming than the original wording implied, and the corrected basis is what the record should carry.
 
 **Ruling (London, 2026-07-29): raise to `max_turns: 12` / `max_budget_usd: 0.50` in Step 0, before Run 1.**
 Hold **$0.50, not the $1.00 ceiling** — budget exhaustion must stay informative. If runs land at
@@ -518,6 +528,31 @@ because it is load-bearing and was, until now, written down nowhere:
 **Single replica is not incidental — it is the `TURN_REGISTRY` single-process constraint holding by
 configuration rather than by code.** Anything that raises replicas before Step 3 breaks worker token
 lookup. Treat this row as a lock until Step 3 removes its cause.
+
+### 5B.5 Cost attribution — what is recoverable, and one criterion that overclaims (2026-07-30)
+
+Established by code trace during Step 1A, at zero spend. **Record this before scoring any counted run**,
+because it defines what "budget consumption" can honestly mean in the per-run report.
+
+| Figure | Recoverable? | From where |
+|---|---|---|
+| **Per-run total SDK spend** (lead + all SDK-native subagents) | **Yes** | `ai_usage_log.cost_usd` on the `vcso_sdk_loop` row — `ResultMessage.total_cost_usd` copied unchanged (`vcso_sdk_loop.py:3497–3508` → `vcso_chat_service.py:766`) |
+| Per-child **tokens** and model | **Yes** | Child `ai_usage_log` rows, from `AssistantMessage.usage` keyed by `parent_tool_use_id` |
+| Per-child **cost** | **No — by design** | Written as `total_cost_usd=None` (`vcso_sdk_loop.py:3644`) so subagent spend is not double-counted inside the parent total |
+| Per-model / cache-category breakdown | **No** | SDK 0.2.118 exposes `model_usage`; it is never persisted |
+| Model calls made **outside** the SDK query (intent read, working-state) | **Not in the SDK total** | Separate `ai_usage_log` rows, all with null cost |
+
+**Two consequences.**
+
+1. **The `max_budget_usd` cap is measurable on the same number the SDK enforces against.** The persisted
+   `vcso_sdk_loop` cost *is* `ResultMessage.total_cost_usd`. A capacity finding ("this run cost $0.47 of
+   its $0.50") is therefore evidenced, not asserted. **Never price worker tokens and add them to that
+   figure — they are already inside it.**
+2. **Acceptance criterion 5's phrase "per-child cost attribution holds" overclaims and must be restated.**
+   What holds is per-child **token and model** attribution. Per-child cost is deliberately null. The
+   design is correct; the wording is not. Restate it in the completion doc rather than quietly scoring it
+   as met — and note that model-**tier** claims (Sonnet composes, Haiku workers gather) remain fully
+   provable from the `model` column, so rubric #3's substance is unaffected.
 
 ---
 
