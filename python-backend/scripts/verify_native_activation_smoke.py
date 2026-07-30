@@ -1,7 +1,9 @@
-"""Verify that a cheap throwaway turn actually activated the 04B-D capture path.
+"""Superseded post-hoc evaluator for a completed 04B-D capture turn.
 
-Run this against the throwaway turn's parent run id before submitting the real
-anchor. A non-zero exit means the anchor must not be spent.
+Use ``verify_native_activation_compile.py`` before any model turn. The former
+activation smoke costs a full two-worker delegation and verifies activation only
+after that spend. This evaluator remains available for existing post-hoc evidence
+and its tests; it is no longer part of the activation preflight sequence.
 """
 
 from __future__ import annotations
