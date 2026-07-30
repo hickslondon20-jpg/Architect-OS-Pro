@@ -554,6 +554,71 @@ because it defines what "budget consumption" can honestly mean in the per-run re
    as met — and note that model-**tier** claims (Sonnet composes, Haiku workers gather) remain fully
    provable from the `model` column, so rubric #3's substance is unaffected.
 
+### 5B.6 Canary Run 1 — FAIL on scoring, but the mechanism passed and the anchor hit a data floor (2026-07-30)
+
+**Run 1 (parent `c2f7afc2-cba5-4338-bec3-e650c64afdf6`, 07:10:32–07:11:47 UTC) scores FAIL. The count stays
+at 0/5.** It was countable (`sdk_phase=04B-D`, `native_subagent_mode=true`, both subagents available) and
+the FAIL is correct: the lead produced a **Mode B answer** — top-two/top-five concentration ratios, margin
+percentages, and the directional claim that concentration "keeps rising" — with **no `execute_code` step
+and no cited multi-period computation.** Per §5.2 that is a failure, not a pass.
+
+**Every mechanism-level criterion passed.** Delegation was unprompted, `structured_data_agent` then
+`per_user_wiki`, both Task contracts allowed first attempt. **Zero hook refusals. Zero direct handler
+executions.** Correct tiers — lead `claude-sonnet-4-6`, both children `claude-haiku-4-5`. 46 citations
+persisted. Both children completed; the structured worker returned `partial` after
+`run_structured_query` failed on an unapproved surface, which is now correct behaviour. Whole-query spend
+$0.1464247 — **29.3% of the $0.50 cap**, no turn or budget exhaustion. **The `stop_hook` was never
+invoked and therefore never blocked**: the lead chose delegation on its own and the required-worker
+scaffolding was inert. That is the strongest rubric #1 reading this probe was designed to produce.
+
+**The failure was a judgment failure with no legitimate exit.** The lead's own words, verbatim:
+
+> The structured-data worker returned a `PARTIAL_RESULT` — client-level concentration ratios couldn't be
+> derived from the dataset (it's a single-period summary P&L only, no client-level rows). I'll disclose
+> that gap and work from the cited wiki evidence, which is rich enough to give you a grounded answer.
+
+It diagnosed the gap correctly and then reasoned itself into asserting the unsupported figures anyway.
+**This is precisely the missing third ending.** §5 of the target architecture specifies STEER — deliver
+what is known, name the gap, name what would close it — and it is **not built until Phase G**. The lead
+had two endings available, ANSWER or fail the turn, and took the only completing path it had.
+
+**The data floor, verified directly.** The canary founder (`cd490873…`) owns **exactly one dataset and
+exactly one row**: `SEED — Q2 2026 P&L Dataset`, a single period 2026-06-01 → 2026-06-30. The only other
+dataset in the table, `MA01 Task2 Smoke Dataset`, belongs to a **different tenant** and is correctly
+invisible to this founder — founder isolation working as designed.
+
+**One row. One period. No client-level rows.** The anchor asks for concentration
+and margin movement across 90 days. The `PASS — delegated and computed` class was therefore **structurally
+unreachable**, not merely difficult, and `PASS — delegated and honestly declined` requires a behaviour
+scheduled for Phase G. **Runs 2–5 under these conditions would have re-observed a diagnosed gap at roughly
+$0.15 and 75 seconds each.**
+
+This was foreseeable from the roadmap's own text and is recorded so the sequencing lesson is not lost:
+§7 Step 5 already stated the anchor "becomes a real numeric test" only once Phase F supplies data, and D5
+already diagnosed the G-gate failure as "an empty series with a composer filling the vacuum." **Run 1
+reproduces that failure exactly on the new architecture** — which is itself a valuable positive result:
+the fabrication is not an artifact of the retired engine, and no engine change will fix it.
+
+**A note on why the anchor stopped working when the scaffolding came off.** The anchor was pinned in the
+Canary 8 era, when the required-worker set *forced* three children including the sandbox. Compute happened
+because the application compelled it. Now that the lead genuinely chooses and the data cannot support the
+computation, it reasons its way to a Mode B answer. **The anchor's validity partly depended on the
+scaffolding whose removal it was meant to test.**
+
+**Ruling (London, 2026-07-30): seed a dataset that can actually support the anchor — multi-period *and*
+client-level — then run N=5 on the pinned anchor byte-for-byte, unchanged.** The anchor is not re-pinned;
+the evidence base under it is repaired. This front-loads a Phase F precondition the roadmap already
+requires.
+
+**Two incidental findings from Run 1:**
+
+1. **The Defect 8 recovery path held, unprompted.** An operator-side command-runner timeout killed the
+   client at ~14 s while the backend ran to completion and persisted the answer and all evidence. A real
+   disconnect, recovered, observed — obtained for free.
+2. **Harness-side observation was lost with that client.** Event sequence, `done` receipt, and wall-clock
+   had to be reconstructed from rows. **Before any further run, give the harness a runner timeout well
+   above the turn's wall-clock** (Run 1 took 75 s server-side; allow minutes).
+
 ---
 
 ## 6. Acceptance criteria
