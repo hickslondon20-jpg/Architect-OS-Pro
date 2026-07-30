@@ -7,6 +7,11 @@ intentional: granular-native agents derive their names and grants from
 below. The SDK tools created here preserve the live registry names, descriptions, and schemas but have
 inert handlers because this preflight compiles the surface and never executes a tool.
 
+This preflight passes ``hooks={}``, so a green verdict proves the compiled tool, agent, permission,
+turn, and budget surface only. It does not prove that the model-driven runtime registered the access
+hook or compute gate; either governance hook could be absent from the shipping path while this
+compile-only preflight still reports ``activated: true``.
+
 The script never writes ``platform_ai_settings`` and never mints TURN_REGISTRY tokens.
 """
 
