@@ -18,9 +18,134 @@ from scripts.arm_native_capture_canary import (
     confirm_deployed_head,
 )
 from scripts.verify_native_activation_smoke import evaluate_activation_smoke
+from scripts.verify_native_activation_compile import (
+    compile_activation_surface,
+    compiled_activation_snapshot,
+    evaluate_activation_compile,
+)
+from services.tool_registry import ToolRegistry
+from services.vcso_sdk_config import (
+    GRANULAR_NATIVE_AGENT_MAX_TURNS,
+    MODE_B_LEAD_TOOL_NAMES,
+    NATIVE_GRANULAR_AGENT_TOOL_GRANTS,
+    SDK_INTERNAL_SERVER,
+)
+from services.vcso_sdk_loop import NATIVE_SURFACE_REQUIRED_AGENTS
 
 
 FOUNDER_ID = "cd490873-99aa-4533-9240-f0aa04deb54f"
+
+
+class _Query:
+    def __init__(self, rows):
+        self.rows = list(rows)
+
+    def select(self, *_args):
+        return self
+
+    def eq(self, key, value):
+        self.rows = [row for row in self.rows if row.get(key) == value]
+        return self
+
+    def in_(self, key, values):
+        self.rows = [row for row in self.rows if row.get(key) in values]
+        return self
+
+    def order(self, key):
+        self.rows.sort(key=lambda row: str(row.get(key) or ""))
+        return self
+
+    def execute(self):
+        return type("Response", (), {"data": self.rows})()
+
+
+class _Client:
+    def __init__(self, tables):
+        self.tables = tables
+
+    def table(self, name):
+        return _Query(self.tables.get(name, []))
+
+
+class _Store:
+    def __init__(self, client):
+        self.client = client
+
+    def resolve_platform_model(self, *, setting_key, fallback_model_name, fallback_provider):
+        return {"provider": fallback_provider, "model_name": fallback_model_name}
+
+
+def _capability(key):
+    return {
+        "id": key,
+        "capability_key": key,
+        "label": key.replace("_", " ").title(),
+        "description": f"Bounded {key}.",
+        "status": "experimental",
+        "allowed_surfaces": ["virtual_cso"],
+        "allowed_tools": [],
+        "allowed_source_kinds": [],
+        "model_setting_key": key,
+        "routing_tier": "worker",
+        "output_schema": {"version": "agent_result_v1"},
+        "default_config": {"max_rounds": 1},
+        "can_spawn_agents": False,
+    }
+
+
+def _armed_compile_substrate():
+    all_tools = {
+        *MODE_B_LEAD_TOOL_NAMES,
+        *(name for grants in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.values() for name in grants),
+    }
+    client = _Client(
+        {
+            "tool_registry": [
+                {"slug": name, "enabled": True, "is_code_registered": True}
+                for name in all_tools
+            ],
+            "agent_capabilities": [
+                _capability(key) for key in NATIVE_GRANULAR_AGENT_TOOL_GRANTS
+            ],
+            "mcp_connections": [],
+        }
+    )
+    store = _Store(client)
+    return store, ToolRegistry(store=store)
+
+
+def _passing_compile_snapshot():
+    grants = {
+        key: list(value) for key, value in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.items()
+    }
+    return {
+        "lead_tool_names": list(MODE_B_LEAD_TOOL_NAMES),
+        "lead_tools": ["Task"],
+        "lead_allowed_tools": [
+            "Task",
+            *[
+                f"mcp__{SDK_INTERNAL_SERVER}__{name}"
+                for names in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.values()
+                for name in names
+            ],
+        ],
+        "lead_disallowed_tools": ["Bash"],
+        "agent_keys": sorted(NATIVE_GRANULAR_AGENT_TOOL_GRANTS),
+        "agent_tool_grants": grants,
+        "agent_tools": {
+            key: [f"mcp__{SDK_INTERNAL_SERVER}__{name}" for name in names]
+            for key, names in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.items()
+        },
+        "agent_mcp_servers": {
+            key: [SDK_INTERNAL_SERVER] for key in NATIVE_GRANULAR_AGENT_TOOL_GRANTS
+        },
+        "agent_max_turns": {
+            key: GRANULAR_NATIVE_AGENT_MAX_TURNS
+            for key in NATIVE_GRANULAR_AGENT_TOOL_GRANTS
+        },
+        "max_turns": 12,
+        "max_budget_usd": 0.50,
+    }
 
 
 def test_deployed_head_check_sends_explicit_preflight_user_agent(monkeypatch):
@@ -87,6 +212,119 @@ def test_disarm_clears_both_allowlists_and_every_diagnostic_switch():
     assert dark["native_model_driven_enabled"] is False
     assert dark["diagnostic_sdk_stream_capture_enabled"] is False
     assert all(dark[key] is False for key in DIAGNOSTIC_FALSE_KEYS)
+
+
+def test_compile_assertion_passes_on_armed_shaped_settings():
+    verdict = evaluate_activation_compile(
+        loop_enabled=True,
+        requirements=NATIVE_SURFACE_REQUIRED_AGENTS,
+        capture_enabled=True,
+        compiled_snapshot=_passing_compile_snapshot(),
+    )
+
+    assert verdict["activated"] is True
+    assert all(verdict["checks"].values())
+
+
+def _mutate_loop_disabled(state):
+    state["loop_enabled"] = False
+
+
+def _mutate_requirements(state):
+    state["requirements"] = ()
+
+
+def _mutate_capture_disabled(state):
+    state["capture_enabled"] = False
+
+
+def _mutate_lead_catalog(state):
+    state["compiled_snapshot"]["lead_tool_names"].remove("execute_code")
+
+
+def _mutate_task_runtime_split(state):
+    state["compiled_snapshot"]["lead_disallowed_tools"].append("Agent")
+
+
+def _mutate_external_worker_transport(state):
+    key = next(iter(NATIVE_GRANULAR_AGENT_TOOL_GRANTS))
+    state["compiled_snapshot"]["agent_mcp_servers"][key] = ["vcso_workers"]
+    state["compiled_snapshot"]["agent_tools"][key] = ["mcp__vcso_workers__run_worker"]
+
+
+def _mutate_turn_floor(state):
+    key = next(iter(NATIVE_GRANULAR_AGENT_TOOL_GRANTS))
+    state["compiled_snapshot"]["agent_max_turns"][key] = GRANULAR_NATIVE_AGENT_MAX_TURNS - 1
+
+
+def _mutate_parent_preapproval(state):
+    missing = next(
+        name for names in NATIVE_GRANULAR_AGENT_TOOL_GRANTS.values() for name in names
+    )
+    state["compiled_snapshot"]["lead_allowed_tools"].remove(
+        f"mcp__{SDK_INTERNAL_SERVER}__{missing}"
+    )
+
+
+def _mutate_budget(state):
+    state["compiled_snapshot"]["max_budget_usd"] = 0.25
+
+
+@pytest.mark.parametrize(
+    ("expected_failure", "mutation"),
+    [
+        ("A_loop_enabled_for_founder", _mutate_loop_disabled),
+        ("B_non_anchor_requires_exact_native_agents", _mutate_requirements),
+        ("C_stream_capture_enabled", _mutate_capture_disabled),
+        ("D_mode_b_lead_catalog_exact", _mutate_lead_catalog),
+        ("E_task_provisioned_and_runtime_not_blocked", _mutate_task_runtime_split),
+        ("F_granular_agents_grants_and_in_process_server_exact", _mutate_external_worker_transport),
+        ("G_parent_and_agent_turn_floors", _mutate_turn_floor),
+        ("H_granular_tools_parent_preapproved", _mutate_parent_preapproval),
+        ("I_half_dollar_budget", _mutate_budget),
+    ],
+)
+def test_compile_assertion_fails_closed_on_each_individual_mutation(
+    expected_failure, mutation
+):
+    state = {
+        "loop_enabled": True,
+        "requirements": NATIVE_SURFACE_REQUIRED_AGENTS,
+        "capture_enabled": True,
+        "compiled_snapshot": _passing_compile_snapshot(),
+    }
+    mutation(state)
+
+    verdict = evaluate_activation_compile(**state)
+
+    assert verdict["activated"] is False
+    assert verdict["failures"] == [expected_failure]
+
+
+def test_empty_model_driven_worker_urls_compile_equivalent_to_supplied_urls():
+    store, registry = _armed_compile_substrate()
+    settings = {"max_turns": 12, "max_budget_usd": 0.50}
+    empty_urls = compile_activation_surface(
+        store=store,
+        registry=registry,
+        founder_id=FOUNDER_ID,
+        settings=settings,
+        model_driven_worker_server_urls={},
+    )
+    supplied_urls = compile_activation_surface(
+        store=store,
+        registry=registry,
+        founder_id=FOUNDER_ID,
+        settings=settings,
+        model_driven_worker_server_urls={
+            key: f"https://workers.invalid/{key}"
+            for key in NATIVE_GRANULAR_AGENT_TOOL_GRANTS
+        },
+    )
+
+    assert compiled_activation_snapshot(empty_urls) == compiled_activation_snapshot(
+        supplied_urls
+    )
 
 
 def test_activation_smoke_requires_exact_phase_workers_and_nonempty_capture():
