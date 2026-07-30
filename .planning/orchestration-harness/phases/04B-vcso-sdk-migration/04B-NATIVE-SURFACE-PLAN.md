@@ -619,6 +619,198 @@ requires.
    had to be reconstructed from rows. **Before any further run, give the harness a runner timeout well
    above the turn's wall-clock** (Run 1 took 75 s server-side; allow minutes).
 
+### 5B.7 Scoring amendment — computation without a cited compute result (2026-07-30)
+
+Surfaced during the Step 2 design review, before any seed was written. **Nothing in the architecture
+structurally requires `execute_code`.** The lead holds `get_dataset_periods` on its Mode B surface; the
+compute gate governs *whether* `execute_code` may run, not whether it *must*; and the composer-integrity
+gate reads `not_required` on this anchor's phrasing. Twenty small integers are trivially summable by the
+lead in the answer text. **No dataset design can close this** — more volume collides with the 20-row
+default limit — so it is a scoring question, settled here rather than after a run.
+
+**Ruling (London, 2026-07-30): it remains a FAIL, recorded as a named sub-class.**
+
+> **FAIL — computed without cited compute.** The lead delegated, workers retrieved, the figures are
+> numerically correct and cited to their rows, but the arithmetic was performed in the answer text with no
+> `execute_code` call and therefore no cited compute result.
+
+**Why FAIL:** authority rule #3 (§6) states that a computed figure is never asserted without a compute
+result and its citation. In-head arithmetic is unverifiable, and unverifiable arithmetic is the exact
+fabrication surface this probe exists to close.
+
+**Why a named sub-class rather than a plain FAIL:** the evidence must never conflate "did not delegate"
+with "delegated, retrieved correctly, and computed without provenance." Those are opposite findings about
+the mechanism — the second means everything under test worked and only the derivation contract is
+missing. **Score it, record it distinctly, and decide whether to relax the bar after observing it at least
+once — not by anticipating it.**
+
+**Do not fix this by editing the lead prompt or the gates mid-probe.** That moves a variable inside the
+measurement. If it occurs, it is a Phase G input alongside reflect-and-steer and the composer-integrity
+classifier gap.
+
+### 5B.8 Dataset-grain provenance is invisible to the model (2026-07-30)
+
+Found during Step 2B verification, before any seed was written, by an execution agent refusing to
+proceed against an unsatisfiable instruction rather than working around it.
+
+**Neither structured-data tool selects `founder_datasets.provenance`.**
+`_execute_list_founder_datasets` (`tool_registry.py:1274–1275`) and `_execute_get_dataset_periods`
+(`:1327–1334`) both select `id, user_id, source_document_id, dataset_name, dataset_type, status,
+summary, confidence, metadata` — no `provenance`. Row-grain provenance **is** selected from
+`founder_dataset_rows` (`:1353`) and does reach the model.
+
+**Two consequences.**
+
+1. **Operationally, for the seed:** anything the model must know about a dataset's origin has to ride in
+   `dataset_name`, `summary`, or `metadata`, which are all selected — and `metadata` is passed through
+   explicitly into the emitted finding (`:1293`). Dataset-level `provenance` is still worth writing for
+   direct-table auditability, but it **cannot be verified through the tool path and must not be relied on
+   as the model-visible disclosure.**
+2. **As a standing gap:** at dataset grain the model can see *what* a dataset is but not *where it came
+   from*. `_dataset_source()` builds the founder-visible citation from this same select, so a dataset
+   citation cannot carry dataset provenance either. That is a real, if narrow, softness in the
+   cited-provenance lock. **It matters more in Phase F**, where connector-sourced datasets arrive and
+   "where did this figure come from" becomes a per-source question rather than a per-row one.
+
+**Do not fix it during the probe** — adding a column to a tool's select changes the model's visible
+surface mid-measurement. Carry it into Phase F alongside the connector work.
+
+### 5B.9 Filename-to-roadmap map — the kickoff documents are numbered by execution order, not roadmap step
+
+The execution kickoff documents in this folder were numbered in the order agents were dispatched. That
+collides with the roadmap step numbering in `04B-TARGET-ARCHITECTURE-AND-ROADMAP.md` §7 and has already
+caused confusion. **Everything dispatched so far sits inside roadmap Step 2 ("Prove it once").**
+
+| Kickoff document | Roadmap position | State |
+|---|---|---|
+| `04B-STEP-0-CAPS-AND-PREFLIGHT-KICKOFF.md` | Step 2 prerequisite — canary caps + deterministic preflight | Done (v0.6.145–149) |
+| `04B-STEP-1-TURN-HARNESS-AND-RUN-1-KICKOFF.md` | Step 2 — turn harness, then anchor Run 1 | Harness done (v0.6.150–151); Run 1 FAIL, see §5B.6 |
+| `04B-STEP-2-ANCHOR-DATASET-SEED-KICKOFF.md` | Step 2 prerequisite — repair the evidence base under the anchor | Done (v0.6.152–155) |
+
+**Roadmap Step 2 remains open at 0/5.** Its §5.1 local CLI experiment is already satisfied by the
+isolated harness probe run during the delegation-return investigation. What is outstanding: the five
+consecutive anchor passes, the granular cross-worker isolation probe and the two negative tests watched
+executing, the single watched UI turn for the nested-surface render proof, and
+`04B-NATIVE-SURFACE-COMPLETION.md` with a re-grade against `04B-VISION-AND-INTENT.md` §4.
+
+**Convention from here:** name kickoff documents by roadmap step, not dispatch order.
+
+### 5B.10 Anchor Run 2 — FAIL, and the compute gate is hollow (2026-07-30)
+
+**Run 2 (parent `585485e6-f402-49c4-9918-2c899bbc077d`, 08:42:10–08:45:28 UTC, 197.7 s) scores FAIL. The
+count stays at 0/5.** Countable: `sdk_phase=04B-D`, `native_subagent_mode=true`, both subagents available.
+Deployed head `68a14478`, confirmed cache-busted and passed to `--expected-sha`.
+
+**The mechanism passed again, and went further than Run 1.** Delegation unprompted, `structured_data_agent`
+then `per_user_wiki`, both `Task` gates `allow`. **Zero hook refusals. Zero direct handler executions.
+`stop_hook` never blocked.** Correct tiers. 52 source refs. **Dataset selection was correct** — the
+structured worker listed both datasets and read the new 20-row client-level dataset **twice**, each time
+returning 20 rows with `truncated=false`, ignoring the stale single-row dataset. **`execute_code` ran and
+completed** (`exit_code=0`, pod `sandbox-python-1a408db1`). Spend **$0.2304 — 46% of the $0.50 cap**, which
+**would have exceeded the retired $0.25 cap**: the Step 0 caps raise was load-bearing, not precautionary.
+
+**Four distinct derivation and composition defects, all traced to persisted evidence.** The full code and
+stdout are in `agent_delegation_steps.source_refs[].verbatim` on step 20 — note that `input_summary` and
+`output_summary` on that row are both empty `{}`, so the compute is auditable but **not where a reader
+would first look.**
+
+**1. The compute gate is satisfied but hollow — `execute_code` did not consume the retrieved data.**
+The sandbox ran on hand-transcribed constants:
+
+```python
+total_q2 = 117_000  # April+May+June from structured data
+vantage  =  31_000
+harborline = 26_400
+```
+
+Vantage (31,000) and Harborline (26,400) are correct. **The denominator is not:** April+May+June is
+**130,000**, not 117,000. Top-two share printed as **49.1%** against a true **44.2%**, and that wrong
+figure reached the founder-visible answer verbatim. §4.7 requires *a prior successful retrieval* before
+compute; **nothing requires the computation to operate on what was retrieved.** The sandbox therefore
+degrades into a calculator over model-transcribed numbers, and transcription is exactly the fabrication
+surface this architecture exists to remove. **This defect was invisible until data existed worth computing
+over** — Run 1 could not have surfaced it.
+
+**2. The authority rule was not ignored — it was reasoned around.** From the persisted code:
+
+> `# Top 2 = ~40% MRR (wiki figure, authoritative for retainer-level data)`
+
+The model invented a carve-out — wiki authoritative for *retainer* figures, records authoritative for
+*realized revenue* — and then **blended tiers into a single derived claim**: `32_000 × 0.711 = 22,752`
+(a Tier-3 retainer times a Tier-1 margin), minus `8,325` net profit, producing the answer's central risk
+statement of a **"$14K monthly deficit … one renewal conversation away from a real crisis."** The rule is
+encoded as prose in tool descriptions (D11) and **is not enforced anywhere at composition.**
+
+**3. The record-versus-wiki discrepancy was never surfaced.** The answer states "~41% of your $145K MRR"
+and record-derived figures in adjacent sentences without noting that $145K and $45K are incompatible.
+Authority rule #2 explicitly asks for the discrepancy to be surfaced. It was not.
+
+**4. Unverified wiki figures asserted as fact.** `# Runway: 3.6 months cash on hand (wiki)` appears as a
+code comment and reaches the answer as a stated fact supporting the crisis framing.
+
+**What was correct:** the margin analysis is record-based and exact — April 74.0%, June 71.1%, "290 basis
+points," matching the seeded figures to the decimal.
+
+**Incidental defect — narration bleed.** The persisted assistant message begins *"Both workers returned
+clean, cited findings. Now deriving the key concentration and margin figures before composing the
+answer."* immediately concatenated to the answer with no separator (`…composing the answer.Here is the
+full read`). Narration is supposed to be confined to `<narration>` markers and excluded from the final
+answer. Record for the C2 surface; do not fix mid-probe.
+
+**The pattern across two runs is consistent and now fully named: mechanism perfect, derivation and
+composition wrong.** Four defects — compute-data binding, authority enforcement at composition, the
+integrity gate not arming on advisory phrasing, and the missing STEER ending. **Three are already Phase G
+scope; the first is new.** Runs 3–5 would spend roughly $0.70 to re-observe defects already traced to
+code.
+
+### 5B.11 RULING — Step 2 closed on mechanism evidence; N=5 retired as the deletion gate (2026-07-30)
+
+**Ruling (London, 2026-07-30).** The N=5 anchor count is **retired as constructed**. Roadmap Step 2 closes
+on the question it was written to answer, and the composition defects move to where the plan already puts
+them.
+
+**What is banked.** §1 of this plan states Step 2's question: *"whether the lead delegates reliably when
+its direct calls are refused by a hook rather than hidden by a transport."* **Answered yes, on two
+independent live runs** (§5B.6, §5B.10), on a repaired evidence base, with: delegation unprompted and
+correctly ordered both times; **zero hook refusals**; **zero direct handler executions**; the `stop_hook`
+never blocking; correct model tiers; correct dataset selection under a genuine two-dataset choice; child
+runs, steps, source refs and per-child token attribution persisting; and `execute_code` executing
+successfully in-process. **The in-process hook-enforced surface works. The transport's reason for existing
+is gone.**
+
+**What is explicitly NOT claimed.** Derivation and composition quality are **not** proven — they failed
+both times. A future reader must not read "Step 2 closed" as "the Virtual CSO answers correctly." It does
+not yet.
+
+**Gate change, stated plainly because it overrides a founder decision on record.** D13 in
+`04B-TARGET-ARCHITECTURE-AND-ROADMAP.md` makes the Step 3 deletion *"contingent on N=5 passing."* **That
+contingency is replaced by: contingent on the mechanism being proven, which it now is.** The rationale D13
+itself gives — that Path A "protects nothing a founder can reach," since every flag is dark and production
+runs the pre-migration loop — is unchanged and is what makes this safe.
+
+**One defect moves INTO Step 3 rather than to Phase G.** The compute-data binding gap (§5B.10 defect 1) is
+not a deferred capability; it is a flaw in the compute gate authored in Step 1 and retained in the
+shipping surface. `execute_code` must be bound to the values actually retrieved in the turn, not merely
+preceded by a retrieval. Step 3 already touches code; this closes the gap before anything is deleted.
+
+**Three defects carried to Phase G**, joining reflect-and-steer: authority enforcement at composition
+(currently prose in tool descriptions only); the composer-integrity classifier keying off question
+phrasing rather than answer content; and unverified Tier-3 figures asserted as fact.
+
+**SEQUENCING REFINEMENT — the negative tests run BEFORE the deletion, not after.** This is not
+negotiable and it changes the order the roadmap implies. §10 of the target architecture records that
+founder isolation moved *"from an explicit token check to an implicit code boundary — stronger in
+mechanism but weaker in evidence,"* and that the two negative tests *"are how that evidence gets
+rebuilt. Do not skip them."* **The Step 3 deletion removes `TURN_REGISTRY` and the token machinery —
+which is the mechanism currently carrying that evidence.** Deleting it while its replacement has never
+been *observed* refusing would destroy the old evidence and the ability to rebuild it in one move.
+Therefore: build and run both isolation probes on the granular surface first, then delete.
+
+**Step 2 items still owed and NOT waived by this ruling:** the granular cross-worker isolation probe and
+the founder-isolation probe, both **watched executing**; the single watched UI turn for the nested-surface
+render proof (which can ride on the same armed session); and `04B-NATIVE-SURFACE-COMPLETION.md` with a
+re-grade against `04B-VISION-AND-INTENT.md` §4.
+
 ---
 
 ## 6. Acceptance criteria
