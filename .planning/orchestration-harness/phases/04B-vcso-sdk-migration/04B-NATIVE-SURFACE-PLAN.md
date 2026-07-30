@@ -476,6 +476,49 @@ the tool layer**, not inferred from answer text. **Not a blocker for the five ru
 5/5 and the negative tests. Do not delete or repoint the existing probe — it stays with the transport
 until Step 3.
 
+### 5B.4 Step 0 outcome, and two deployment facts found on the way (2026-07-29)
+
+**Step 0 is complete.** Commits v0.6.145–v0.6.149, deployed head `c6740ec5` confirmed cache-busted
+(`observed_sha=c6740ec59d4be8ea0826e7d6693ca8bd58b1206b`), all flags read back dark, zero live model spend,
+zero new `agent_delegation_runs` and zero new `ai_usage_log` rows. Six unique files changed: two planning
+documents, three scripts, one unit-test file. No service, route, or `src/` file was touched, so **no
+founder-facing runtime behaviour differs between `c75ea99d` and `c6740ec5`.**
+
+**Deploy confirmation is a bounded poll, not a single read.** Two head confirmations were reported as
+failures before the cause was found; both had landed *inside the build window*. Railway build timing
+observed on this deploy: scheduled 23:27:29, image produced 23:29:41, image push completed 23:29:57 —
+roughly two and a half minutes. **Poll the cache-busted health URL every 20 s to a 5-minute deadline.**
+Only a timeout is a finding. A single immediate read that returns the previous SHA is expected behaviour,
+and treating it as a fault costs an investigation cycle — it cost one here.
+
+If it *does* time out, the first question is whether the head commit touched anything under
+`/python-backend`. That is the Railway root directory, and there are **no watch paths configured**, so any
+push touching it builds — including `scripts/` and `unit_tests/`, which is what happened here. A
+`.planning/`-only commit sits outside the root directory and may legitimately never trigger a build.
+(An earlier orchestration hypothesis — that watch paths were skipping script-and-doc commits, and that the
+head check should therefore compare against the last *runtime* commit — is **disproved** by the recorded
+configuration. Do not reinstate it.)
+
+**The deployment configuration is unversioned dashboard state — same landmine class as
+`MCP_TOOL_TIMEOUT`.** There is no `railway.json`, `nixpacks.toml`, `Dockerfile`, or CI workflow in the
+repository, so none of the following is under version control or reviewable in a diff. Recorded here
+because it is load-bearing and was, until now, written down nowhere:
+
+| Setting | Value |
+|---|---|
+| Repository / branch | `hickslondon20-jpg/Architect-OS-Pro` / `main` |
+| Root directory | `/python-backend` |
+| Watch paths | none configured |
+| Builder | Railpack v0.35.0, Python 3.13.14 |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| Region / replicas | `us-west2` / 1 |
+| Restart policy | on failure, max 10 retries |
+
+**Single replica is not incidental — it is the `TURN_REGISTRY` single-process constraint holding by
+configuration rather than by code.** Anything that raises replicas before Step 3 breaks worker token
+lookup. Treat this row as a lock until Step 3 removes its cause.
+
 ---
 
 ## 6. Acceptance criteria
