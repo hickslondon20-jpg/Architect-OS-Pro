@@ -43,10 +43,25 @@ DIAGNOSTIC_FALSE_KEYS = (
     "diagnostic_stream_disconnect_enabled",
     "diagnostic_stream_drop_done_enabled",
     "diagnostic_cross_worker_probe_enabled",
+    "diagnostic_granular_cross_worker_probe_enabled",
+    "diagnostic_founder_isolation_probe_enabled",
+)
+DIAGNOSTIC_CLEAR_KEYS = (
+    "diagnostic_founder_isolation_dataset_id",
+    "diagnostic_founder_isolation_owned_dataset_id",
+    "diagnostic_founder_isolation_random_dataset_id",
 )
 
 
-def build_armed_settings(current: dict[str, Any], founder_id: str) -> dict[str, Any]:
+def build_armed_settings(
+    current: dict[str, Any],
+    founder_id: str,
+    *,
+    granular_cross_worker_probe: bool = False,
+    foreign_dataset_id: str | None = None,
+    owned_dataset_id: str | None = None,
+    random_dataset_id: str | None = None,
+) -> dict[str, Any]:
     settings = dict(current)
     settings.update(
         {
@@ -63,6 +78,14 @@ def build_armed_settings(current: dict[str, Any], founder_id: str) -> dict[str, 
         }
     )
     settings.update({key: False for key in DIAGNOSTIC_FALSE_KEYS})
+    settings.update({key: "" for key in DIAGNOSTIC_CLEAR_KEYS})
+    if granular_cross_worker_probe:
+        settings["diagnostic_granular_cross_worker_probe_enabled"] = True
+    if foreign_dataset_id:
+        settings["diagnostic_founder_isolation_probe_enabled"] = True
+        settings["diagnostic_founder_isolation_dataset_id"] = foreign_dataset_id
+        settings["diagnostic_founder_isolation_owned_dataset_id"] = owned_dataset_id or ""
+        settings["diagnostic_founder_isolation_random_dataset_id"] = random_dataset_id or ""
     return settings
 
 
@@ -80,6 +103,7 @@ def build_dark_settings(current: dict[str, Any]) -> dict[str, Any]:
         }
     )
     settings.update({key: False for key in DIAGNOSTIC_FALSE_KEYS})
+    settings.update({key: "" for key in DIAGNOSTIC_CLEAR_KEYS})
     return settings
 
 
@@ -120,7 +144,13 @@ def assert_armed_state(row: dict[str, Any], founder_id: str) -> None:
         failures.append("native_subagent_scope")
     if not bool(settings.get("diagnostic_sdk_stream_capture_enabled")):
         failures.append("diagnostic_sdk_stream_capture_enabled")
-    for key in DIAGNOSTIC_FALSE_KEYS:
+    for key in (
+        "diagnostic_single_worker_enabled",
+        "diagnostic_fault_injection_enabled",
+        "diagnostic_stream_disconnect_enabled",
+        "diagnostic_stream_drop_done_enabled",
+        "diagnostic_cross_worker_probe_enabled",
+    ):
         if bool(settings.get(key)):
             failures.append(key)
     if int(settings.get("max_turns") or 0) != 12:
@@ -218,6 +248,11 @@ def sanitized_state(row: dict[str, Any]) -> dict[str, Any]:
         "diagnostic_stream_disconnect_enabled",
         "diagnostic_stream_drop_done_enabled",
         "diagnostic_cross_worker_probe_enabled",
+        "diagnostic_granular_cross_worker_probe_enabled",
+        "diagnostic_founder_isolation_probe_enabled",
+        "diagnostic_founder_isolation_dataset_id",
+        "diagnostic_founder_isolation_owned_dataset_id",
+        "diagnostic_founder_isolation_random_dataset_id",
         "max_turns",
         "max_budget_usd",
     )
@@ -240,6 +275,10 @@ def main() -> None:
     arm.add_argument("--expected-sha", required=True)
     arm.add_argument("--health-url", default=DEFAULT_HEALTH_URL)
     arm.add_argument("--confirm", required=True)
+    arm.add_argument("--granular-cross-worker-probe", action="store_true")
+    arm.add_argument("--foreign-dataset-id")
+    arm.add_argument("--owned-dataset-id")
+    arm.add_argument("--random-dataset-id")
 
     disarm = subparsers.add_parser("disarm")
     disarm.add_argument("--confirm", required=True)
@@ -259,7 +298,14 @@ def main() -> None:
         updated = write_flag(
             client,
             is_enabled=True,
-            settings=build_armed_settings(current.get("settings") or {}, args.founder_id),
+            settings=build_armed_settings(
+                current.get("settings") or {},
+                args.founder_id,
+                granular_cross_worker_probe=bool(args.granular_cross_worker_probe),
+                foreign_dataset_id=args.foreign_dataset_id,
+                owned_dataset_id=args.owned_dataset_id,
+                random_dataset_id=args.random_dataset_id,
+            ),
         )
         assert_armed_state(updated, args.founder_id)
         print(json.dumps({"health": health, "state": sanitized_state(updated)}, indent=2))

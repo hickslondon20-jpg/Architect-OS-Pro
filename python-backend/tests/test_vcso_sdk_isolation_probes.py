@@ -4,6 +4,7 @@ from services.tool_registry import ToolExecutionContext, ToolRegistry
 from services.vcso_sdk_loop import (
     SDK_TOOL_PREFIX,
     founder_isolation_probe_dataset_id,
+    founder_isolation_probe_dataset_ids,
     founder_isolation_probe_decision,
     granular_cross_worker_probe_decision,
     granular_cross_worker_probe_enabled,
@@ -157,6 +158,20 @@ def test_founder_isolation_probe_gate_requires_flag_allowlist_and_dataset_id():
         )
         == "foreign-dataset"
     )
+    assert founder_isolation_probe_dataset_ids(
+        {
+            "diagnostic_founder_isolation_probe_enabled": True,
+            "diagnostic_user_ids": ["founder-a"],
+            "diagnostic_founder_isolation_dataset_id": "foreign-dataset",
+            "diagnostic_founder_isolation_owned_dataset_id": "owned-dataset",
+            "diagnostic_founder_isolation_random_dataset_id": "random-dataset",
+        },
+        "founder-a",
+    ) == {
+        "foreign": "foreign-dataset",
+        "owned_positive_control": "owned-dataset",
+        "random_negative_control": "random-dataset",
+    }
 
 
 def test_granular_cross_worker_probe_refuses_sibling_tool_and_allows_owned_tool():

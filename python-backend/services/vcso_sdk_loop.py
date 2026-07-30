@@ -549,6 +549,25 @@ def founder_isolation_probe_dataset_id(
     return dataset_id or None
 
 
+def founder_isolation_probe_dataset_ids(
+    settings: dict[str, Any] | None, user_id: str | None
+) -> dict[str, str]:
+    """Return labeled dataset ids for the founder-isolation probe controls."""
+
+    foreign_id = founder_isolation_probe_dataset_id(settings, user_id)
+    if not foreign_id:
+        return {}
+    settings = settings or {}
+    dataset_ids = {"foreign": foreign_id}
+    owned_id = str(settings.get("diagnostic_founder_isolation_owned_dataset_id") or "").strip()
+    random_id = str(settings.get("diagnostic_founder_isolation_random_dataset_id") or "").strip()
+    if owned_id:
+        dataset_ids["owned_positive_control"] = owned_id
+    if random_id:
+        dataset_ids["random_negative_control"] = random_id
+    return dataset_ids
+
+
 def sdk_stream_capture_enabled(settings: dict[str, Any] | None, user_id: str | None) -> bool:
     """Whether bounded raw SDK stream diagnostics may exist for this founder.
 
@@ -859,6 +878,7 @@ def stream_vcso_sdk_turn(
     native_cross_worker_probe: bool = False,
     native_granular_cross_worker_probe: bool = False,
     native_founder_isolation_probe_dataset_id: str | None = None,
+    native_founder_isolation_probe_dataset_ids: dict[str, str] | None = None,
     founder_question: str | None = None,
     session_store: Any | None = None,
     resume_session_id: str | None = None,
@@ -1738,6 +1758,8 @@ async def _run_sdk_turn(
             "input_state",
             "error_type",
             "error_message",
+            "probe_label",
+            "dataset_id",
             # `stage` carries the whole meaning of a worker_hop entry (received / completed / deduped /
             # fault_injected). Omitting it made canary 9-retry's dedupe readable only as an ABSENCE — a
             # worker_hop with a child_run_id and no child_status — and would have made canary 10's
@@ -3382,23 +3404,29 @@ async def _run_sdk_turn(
                     probe_agent,
                     probe_tool,
                 )
+        founder_probe_dataset_ids = dict(native_founder_isolation_probe_dataset_ids or {})
         if native_founder_isolation_probe_dataset_id:
+            founder_probe_dataset_ids.setdefault("foreign", native_founder_isolation_probe_dataset_id)
+        for probe_label, probe_dataset_id in founder_probe_dataset_ids.items():
             decision, reason = founder_isolation_probe_decision(
                 registry=registry,
                 tool_context=tool_context,
-                dataset_id=native_founder_isolation_probe_dataset_id,
+                dataset_id=probe_dataset_id,
             )
             record_lifecycle(
                 "founder_isolation_probe",
                 tool_name=f"{SDK_TOOL_PREFIX}get_dataset_periods",
                 capability_key="structured_data_agent",
                 decision=decision,
-                reason_code=reason,
+                probe_label=probe_label,
+                dataset_id=probe_dataset_id,
+                reason_code=f"{probe_label}:{reason}"[:200],
             )
             if decision == "LEAKED":
                 logger.error(
-                    "vcso_sdk founder-isolation probe leaked for dataset_id=%s",
-                    native_founder_isolation_probe_dataset_id,
+                    "vcso_sdk founder-isolation probe leaked for label=%s dataset_id=%s",
+                    probe_label,
+                    probe_dataset_id,
                 )
     else:
         runtime_manifest = {
