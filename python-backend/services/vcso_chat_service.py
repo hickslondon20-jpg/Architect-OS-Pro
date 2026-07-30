@@ -50,6 +50,8 @@ from services.vcso_sdk_loop import (
     VCSO_SDK_CAPABILITY_KEY,
     VcsoSdkUsage,
     cross_worker_probe_enabled,
+    founder_isolation_probe_dataset_id,
+    granular_cross_worker_probe_enabled,
     native_fault_injection_capabilities,
     native_fault_injection_mode,
     native_subagent_requirements,
@@ -492,6 +494,16 @@ class VcsoChatService:
         native_cross_worker_probe = (
             cross_worker_probe_enabled(_sdk_settings, user_id) if native_model_driven else False
         )
+        native_granular_cross_worker_probe = (
+            granular_cross_worker_probe_enabled(_sdk_settings, user_id)
+            if native_model_driven
+            else False
+        )
+        native_founder_isolation_probe_dataset_id = (
+            founder_isolation_probe_dataset_id(_sdk_settings, user_id)
+            if native_model_driven
+            else None
+        )
         planner_flag = self._planner_settings(user_id)
         planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
         planner_path_selected = (
@@ -867,6 +879,8 @@ class VcsoChatService:
                 native_fault_injection=native_fault_injection,
                 native_fault_injection_mode_key=native_fault_mode,
                 native_cross_worker_probe=native_cross_worker_probe,
+                native_granular_cross_worker_probe=native_granular_cross_worker_probe,
+                native_founder_isolation_probe_dataset_id=native_founder_isolation_probe_dataset_id,
                 founder_question=payload.text,
                 session_store=sdk_session_store,
                 resume_session_id=sdk_resume_session_id or None,

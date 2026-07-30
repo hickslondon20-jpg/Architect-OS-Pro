@@ -35,7 +35,12 @@ from claude_agent_sdk import (
 from claude_agent_sdk.types import StreamEvent, ToolResultBlock, ToolUseBlock, UserMessage
 
 from services.agent_capabilities import AgentCapabilityRegistry
-from services.tool_registry import ToolDefinition, ToolExecutionContext, ToolRegistry
+from services.tool_registry import (
+    ToolDefinition,
+    ToolExecutionContext,
+    ToolRegistry,
+    ToolRegistryError,
+)
 from services.vcso_sdk_config import (
     DELEGATION_TOOL_NAMES,
     DELEGATION_TOOL_PROVISION_NAME,
@@ -515,6 +520,35 @@ def cross_worker_probe_enabled(settings: dict[str, Any] | None, user_id: str | N
     return bool(user_id) and str(user_id) in diagnostic_user_ids
 
 
+def granular_cross_worker_probe_enabled(settings: dict[str, Any] | None, user_id: str | None) -> bool:
+    """Whether to fire the granular-surface cross-worker isolation probe.
+
+    This is the replacement evidence for the retiring TURN_REGISTRY token probe. It is gated by a distinct
+    explicit flag plus the existing founder diagnostic allowlist, and defaults inert.
+    """
+
+    settings = settings or {}
+    if not bool(settings.get("diagnostic_granular_cross_worker_probe_enabled")):
+        return False
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    return bool(user_id) and str(user_id) in diagnostic_user_ids
+
+
+def founder_isolation_probe_dataset_id(
+    settings: dict[str, Any] | None, user_id: str | None
+) -> str | None:
+    """Return the configured foreign dataset id for the founder-isolation probe, or None when dark."""
+
+    settings = settings or {}
+    if not bool(settings.get("diagnostic_founder_isolation_probe_enabled")):
+        return None
+    diagnostic_user_ids = {str(value) for value in settings.get("diagnostic_user_ids") or []}
+    if not user_id or str(user_id) not in diagnostic_user_ids:
+        return None
+    dataset_id = str(settings.get("diagnostic_founder_isolation_dataset_id") or "").strip()
+    return dataset_id or None
+
+
 def sdk_stream_capture_enabled(settings: dict[str, Any] | None, user_id: str | None) -> bool:
     """Whether bounded raw SDK stream diagnostics may exist for this founder.
 
@@ -647,6 +681,46 @@ def native_tool_access_decision(
         f"{registry_name} performs founder-data work inside an approved {owner_text} delegation. "
         f"Delegate with Task to {owner_text}; the lead may not call this tool directly.",
     )
+
+
+def granular_cross_worker_probe_decision(
+    *,
+    agent_type: str,
+    sibling_tool_name: str,
+    lead_tool_names: set[str],
+    agent_tool_grants: dict[str, set[str]],
+) -> tuple[str, str]:
+    """Exercise the granular native access hook boundary without asking the model to misbehave."""
+
+    allowed, reason = native_tool_access_decision(
+        tool_name=sibling_tool_name,
+        agent_id_present=True,
+        agent_type=agent_type,
+        lead_tool_names=lead_tool_names,
+        agent_tool_grants=agent_tool_grants,
+    )
+    return ("allowed" if allowed else "refused", reason)
+
+
+def founder_isolation_probe_decision(
+    *,
+    registry: ToolRegistry,
+    tool_context: ToolExecutionContext,
+    dataset_id: str,
+) -> tuple[str, str]:
+    """Exercise the founder-bound structured-data tool path against a configured dataset id."""
+
+    try:
+        registry.execute(
+            "get_dataset_periods",
+            tool_context,
+            {"dataset_id": dataset_id, "limit": 1},
+        )
+    except ToolRegistryError as exc:
+        return ("refused", str(exc))
+    except Exception as exc:  # noqa: BLE001 - surface the exact bounded failure mode in lifecycle evidence
+        return (f"error:{type(exc).__name__}", str(exc))
+    return ("LEAKED", "get_dataset_periods returned rows for the probe dataset under this founder context.")
 
 
 def compute_gate_decision(
@@ -783,6 +857,8 @@ def stream_vcso_sdk_turn(
     native_fault_injection: tuple[str, ...] = (),
     native_fault_injection_mode_key: str = "before_start",
     native_cross_worker_probe: bool = False,
+    native_granular_cross_worker_probe: bool = False,
+    native_founder_isolation_probe_dataset_id: str | None = None,
     founder_question: str | None = None,
     session_store: Any | None = None,
     resume_session_id: str | None = None,
@@ -3281,6 +3357,49 @@ async def _run_sdk_turn(
                 + ", ".join(runtime_manifest["violations"])
             )
         record_lifecycle("runtime_manifest", decision="native_granular", reason_code="none")
+        if native_granular_cross_worker_probe:
+            probe_agent = "structured_data_agent"
+            probe_tool = f"{SDK_TOOL_PREFIX}wiki_search"
+            decision, reason = granular_cross_worker_probe_decision(
+                agent_type=probe_agent,
+                sibling_tool_name=probe_tool,
+                lead_tool_names=compiled_lead_tool_names,
+                agent_tool_grants=compiled_agent_tool_grants,
+            )
+            lifecycle_decision = "LEAKED" if decision == "allowed" else decision
+            record_lifecycle(
+                "granular_cross_worker_probe",
+                tool_name=probe_tool,
+                capability_key=probe_agent,
+                agent_id_present=True,
+                agent_type=probe_agent,
+                decision=lifecycle_decision,
+                reason_code=reason,
+            )
+            if lifecycle_decision == "LEAKED":
+                logger.error(
+                    "vcso_sdk granular cross-worker probe leaked: %s was allowed to call %s",
+                    probe_agent,
+                    probe_tool,
+                )
+        if native_founder_isolation_probe_dataset_id:
+            decision, reason = founder_isolation_probe_decision(
+                registry=registry,
+                tool_context=tool_context,
+                dataset_id=native_founder_isolation_probe_dataset_id,
+            )
+            record_lifecycle(
+                "founder_isolation_probe",
+                tool_name=f"{SDK_TOOL_PREFIX}get_dataset_periods",
+                capability_key="structured_data_agent",
+                decision=decision,
+                reason_code=reason,
+            )
+            if decision == "LEAKED":
+                logger.error(
+                    "vcso_sdk founder-isolation probe leaked for dataset_id=%s",
+                    native_founder_isolation_probe_dataset_id,
+                )
     else:
         runtime_manifest = {
             "delegation_model": "app_owned",
