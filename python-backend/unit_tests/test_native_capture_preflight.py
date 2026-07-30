@@ -54,6 +54,8 @@ def test_atomic_arm_places_founder_in_both_allowlists_and_disables_other_diagnos
     assert armed["test_user_ids"] == [FOUNDER_ID]
     assert armed["diagnostic_user_ids"] == [FOUNDER_ID]
     assert armed["diagnostic_sdk_stream_capture_enabled"] is True
+    assert armed["max_turns"] == 12
+    assert armed["max_budget_usd"] == 0.50
     assert armed["unrelated"] == "preserved"
     assert all(armed[key] is False for key in DIAGNOSTIC_FALSE_KEYS)
 
@@ -66,7 +68,16 @@ def test_arm_readback_rejects_the_two_allowlist_trap():
         assert_armed_state({"is_enabled": True, "settings": armed}, FOUNDER_ID)
 
 
-def test_disarm_clears_both_allowlists_and_capture_switch():
+def test_arm_readback_rejects_old_six_turn_quarter_dollar_caps():
+    armed = build_armed_settings({}, FOUNDER_ID)
+    armed["max_turns"] = 6
+    armed["max_budget_usd"] = 0.25
+
+    with pytest.raises(RuntimeError, match=r"max_budget_usd, max_turns"):
+        assert_armed_state({"is_enabled": True, "settings": armed}, FOUNDER_ID)
+
+
+def test_disarm_clears_both_allowlists_and_every_diagnostic_switch():
     dark = build_dark_settings(build_armed_settings({}, FOUNDER_ID))
     row = {"is_enabled": False, "settings": dark}
 
@@ -75,6 +86,7 @@ def test_disarm_clears_both_allowlists_and_capture_switch():
     assert dark["diagnostic_user_ids"] == []
     assert dark["native_model_driven_enabled"] is False
     assert dark["diagnostic_sdk_stream_capture_enabled"] is False
+    assert all(dark[key] is False for key in DIAGNOSTIC_FALSE_KEYS)
 
 
 def test_activation_smoke_requires_exact_phase_workers_and_nonempty_capture():

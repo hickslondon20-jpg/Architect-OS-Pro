@@ -57,8 +57,9 @@ def build_armed_settings(current: dict[str, Any], founder_id: str) -> dict[str, 
             "native_subagent_scope": "",
             "diagnostic_sdk_stream_capture_enabled": True,
             "diagnostic_single_worker": "",
-            "max_turns": 6,
-            "max_budget_usd": 0.25,
+            # 12 is the hardcoded production ceiling; raising it is a founder decision.
+            "max_turns": 12,
+            "max_budget_usd": 0.50,
         }
     )
     settings.update({key: False for key in DIAGNOSTIC_FALSE_KEYS})
@@ -122,9 +123,9 @@ def assert_armed_state(row: dict[str, Any], founder_id: str) -> None:
     for key in DIAGNOSTIC_FALSE_KEYS:
         if bool(settings.get(key)):
             failures.append(key)
-    if int(settings.get("max_turns") or 0) != 6:
+    if int(settings.get("max_turns") or 0) != 12:
         failures.append("max_turns")
-    if float(settings.get("max_budget_usd") or 0) != 0.25:
+    if float(settings.get("max_budget_usd") or 0) != 0.50:
         failures.append("max_budget_usd")
     if failures:
         raise RuntimeError("atomic arming readback failed: " + ", ".join(sorted(set(failures))))
