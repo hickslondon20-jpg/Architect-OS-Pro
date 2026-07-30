@@ -3,11 +3,13 @@ import pytest
 from services.tool_registry import ToolExecutionContext, ToolRegistry
 from services.vcso_sdk_loop import (
     SDK_TOOL_PREFIX,
+    VcsoSdkTurnResult,
     founder_isolation_probe_dataset_id,
     founder_isolation_probe_dataset_ids,
     founder_isolation_probe_decision,
     granular_cross_worker_probe_decision,
     granular_cross_worker_probe_enabled,
+    stream_vcso_sdk_turn,
 )
 
 
@@ -224,3 +226,60 @@ def test_founder_isolation_probe_exercises_tool_layer(dataset_id, expected_decis
         assert "current founder" in reason
     else:
         assert "returned rows" in reason
+
+
+def test_stream_wrapper_forwards_isolation_probe_controls(monkeypatch):
+    captured = {}
+
+    async def fake_run_sdk_turn(**kwargs):
+        captured.update(kwargs)
+        return VcsoSdkTurnResult(
+            answer_text="ok",
+            input_tokens=None,
+            output_tokens=None,
+            total_cost_usd=None,
+            session_id=None,
+        )
+
+    monkeypatch.setattr("services.vcso_sdk_loop._run_sdk_turn", fake_run_sdk_turn)
+
+    events = stream_vcso_sdk_turn(
+        prompt="hello",
+        system_prompt="system",
+        model="claude-test",
+        api_key="test-key",
+        registry=object(),
+        tool_names=[],
+        tool_context=object(),
+        trace_metadata={},
+        initial_sources=[],
+        step_index_offset=0,
+        max_turns=12,
+        max_budget_usd=0.5,
+        tool_timeout_seconds=1,
+        heartbeat_seconds=0.01,
+        usage_sink=None,
+        native_subagent_required_agents=("structured_data_agent", "per_user_wiki"),
+        native_subagent_scopes={},
+        native_lifecycle_sink=None,
+        native_stream_diagnostic_sink=None,
+        native_model_driven=True,
+        native_granular_cross_worker_probe=True,
+        native_founder_isolation_probe_dataset_ids={
+            "foreign": "foreign-dataset",
+            "owned_positive_control": "owned-dataset",
+            "random_negative_control": "random-dataset",
+        },
+    )
+    while True:
+        try:
+            next(events)
+        except StopIteration:
+            break
+
+    assert captured["native_granular_cross_worker_probe"] is True
+    assert captured["native_founder_isolation_probe_dataset_ids"] == {
+        "foreign": "foreign-dataset",
+        "owned_positive_control": "owned-dataset",
+        "random_negative_control": "random-dataset",
+    }

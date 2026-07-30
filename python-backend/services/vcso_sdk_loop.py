@@ -675,6 +675,8 @@ def native_tool_access_decision(
 ) -> tuple[bool, str]:
     """Authorize founder-data tools by caller identity, not by SDK pre-approval."""
 
+    # Keep this as the single authorization decision for both the live PreToolUse hook and the deterministic
+    # granular isolation probe. Future callers must reuse this function, not reimplement its grant logic.
     registry_name = _registry_name(tool_name)
     owners = sorted(
         capability
@@ -922,6 +924,13 @@ def stream_vcso_sdk_turn(
                         native_fault_injection=native_fault_injection,
                         native_fault_injection_mode_key=native_fault_injection_mode_key,
                         native_cross_worker_probe=native_cross_worker_probe,
+                        native_granular_cross_worker_probe=native_granular_cross_worker_probe,
+                        native_founder_isolation_probe_dataset_id=(
+                            native_founder_isolation_probe_dataset_id
+                        ),
+                        native_founder_isolation_probe_dataset_ids=(
+                            native_founder_isolation_probe_dataset_ids
+                        ),
                         founder_question=founder_question,
                         session_store=session_store,
                         resume_session_id=resume_session_id,
