@@ -1,6 +1,9 @@
+import inspect
+
 import pytest
 
 from services.tool_registry import ToolExecutionContext, ToolRegistry
+import services.vcso_sdk_loop as vcso_sdk_loop
 from services.vcso_sdk_loop import (
     SDK_TOOL_PREFIX,
     VcsoSdkTurnResult,
@@ -283,3 +286,15 @@ def test_stream_wrapper_forwards_isolation_probe_controls(monkeypatch):
         "owned_positive_control": "owned-dataset",
         "random_negative_control": "random-dataset",
     }
+
+
+def test_inner_sdk_turn_accepts_chat_service_probe_keywords():
+    signature = inspect.signature(vcso_sdk_loop._run_sdk_turn)
+    accepted = set(signature.parameters)
+
+    assert {
+        "native_cross_worker_probe",
+        "native_granular_cross_worker_probe",
+        "native_founder_isolation_probe_dataset_id",
+        "native_founder_isolation_probe_dataset_ids",
+    }.issubset(accepted)
