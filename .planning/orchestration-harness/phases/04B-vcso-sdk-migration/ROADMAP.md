@@ -200,6 +200,54 @@ testing, **not** the operational M4 close. Nothing widens past the dark founder 
 - **Native legible UX** — previously folded into Phase G's gate; now **built explicitly in Phase C2**
   (streaming surface redesign) and only *verified* in G.
 
+## OPEN FOR FOUNDER ALIGNMENT — agentic pattern evaluation (added 2026-07-29)
+
+**Status: parked, not scheduled, must not be lost.** This is a founder-flagged item to *discuss and align
+on*, not a decision already made. It has a home here rather than only in a handoff document precisely so it
+survives session boundaries.
+
+**The question.** Beyond the orchestrator-worker shape 04B is proving, are additional agentic patterns —
+reflection, evaluator-optimizer, plan-and-execute, hierarchical delegation, and others catalogued in the
+reference material the founder supplied — worth composing onto this substrate, for Virtual CSO and/or for
+Domain Agents?
+
+**The clarification that frames it.** The SDK ships **one execution loop**, plus the `Workflow` tool as a
+second orchestration mechanism for very large agent counts. Agentic *architectures* are not installed —
+they are **composed** from the SDK's primitives: subagents, hooks, sessions, permissions, structured
+output, skills, and background execution. Nearly every pattern in a catalogue is expressible from those.
+
+**The test any candidate pattern must pass.** *What specific failure does it fix that a cheaper mechanism
+does not?* Every pattern costs latency, tokens, new failure modes, and evidence surface. This migration's
+own record is the argument: every complexity added without a named failure behind it — the external worker
+transport, Deep Mode, the keyword eligibility gate — became a liability that cost cycles to remove.
+
+**The strategic caution.** Reasoning topology has not been the constraint on answer quality. The binding
+constraints have been evidence quality (one seed P&L row), freshness (stale wiki figures versus live
+records), and honest handling of gaps. **More reasoning over insufficient evidence produces more elaborate
+wrong answers** — the fabrication mode with extra steps. Phase F, not a new architecture, is the answer to
+that.
+
+**Leading candidates when it is taken up:**
+
+- **Evaluator-optimizer** (critique → revise → re-check). Today's guardrails are pass/fail validators, not
+  critique-and-revise. For an output-oriented deliverable this is the difference between "not wrong" and
+  "good." Most relevant to Domain Agents.
+- **Plan-and-execute with an authored, editable plan.** `agent_todos` exists and currently renders
+  delegation; multi-step artifact production wants a plan the agent authors and revises.
+- **Reflection** — already specified as reflect-and-steer (Phase G). Recognise it as a named pattern so it
+  is built deliberately.
+
+**Standing constraint to revisit deliberately, not by accident:** the harness locks forbid recursive
+sub-agents. The SDK supports nesting. If Domain Agents need a specialist to delegate further, that lock
+requires an explicit founder decision.
+
+**Founder position (2026-07-29):** most likely suited to Domain Agents, **but not ruled out for Virtual CSO
+chat.** Hold until 04B's substrate is proven — N=5 passed and Phase F supplying real data — then align.
+
+**Inputs when taken up:** the founder-supplied agentic-architectures catalogue; `Agent-SDK-Setup/` (28
+documents, already read once — the loop, subagents, sessions, hooks, permissions, structured output,
+skills, `Workflow`); the pattern vocabulary section in `04B-TARGET-ARCHITECTURE-AND-ROADMAP.md`.
+
 ## Progress tracker
 
 | Phase | Status | Completed |

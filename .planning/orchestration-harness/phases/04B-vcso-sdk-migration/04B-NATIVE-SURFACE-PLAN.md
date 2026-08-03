@@ -497,9 +497,17 @@ founder-facing runtime behaviour differs between `c75ea99d` and `c6740ec5`.**
 **Deploy confirmation is a bounded poll, not a single read.** Two head confirmations were reported as
 failures before the cause was found; both had landed *inside the build window*. Railway build timing
 observed on this deploy: scheduled 23:27:29, image produced 23:29:41, image push completed 23:29:57 —
-roughly two and a half minutes. **Poll the cache-busted health URL every 20 s to a 5-minute deadline.**
-Only a timeout is a finding. A single immediate read that returns the previous SHA is expected behaviour,
-and treating it as a fault costs an investigation cycle — it cost one here.
+roughly two and a half minutes **from schedule**, with webhook delivery, queueing and activation on top.
+**Poll the cache-busted health URL every 20 s to a 10-minute deadline.** Only a timeout is a finding. A
+single immediate read that returns the previous SHA is expected behaviour, and treating it as a fault
+costs an investigation cycle — it cost one here.
+
+> **AMENDED 2026-07-30 after a second occurrence.** The deadline was originally 5 minutes. A poll of
+> 4 m 42 s expired on a commit whose immediate predecessor had built successfully minutes earlier, which
+> means the window was simply too short. **On timeout, do not re-poll blindly and do not conclude a
+> failure — read the Railway deploy list first.** That single read-only check distinguishes queued,
+> building, failed, and built-but-not-yet-activated, and it is the difference between waiting another
+> minute and opening an investigation.
 
 If it *does* time out, the first question is whether the head commit touched anything under
 `/python-backend`. That is the Railway root directory, and there are **no watch paths configured**, so any
