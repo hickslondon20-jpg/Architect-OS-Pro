@@ -737,6 +737,7 @@ def founder_isolation_probe_decision(
     registry: ToolRegistry,
     tool_context: ToolExecutionContext,
     dataset_id: str,
+    probe_label: str = "foreign",
 ) -> tuple[str, str]:
     """Exercise the founder-bound structured-data tool path against a configured dataset id."""
 
@@ -750,7 +751,12 @@ def founder_isolation_probe_decision(
         return ("refused", str(exc))
     except Exception as exc:  # noqa: BLE001 - surface the exact bounded failure mode in lifecycle evidence
         return (f"error:{type(exc).__name__}", str(exc))
-    return ("LEAKED", "get_dataset_periods returned rows for the probe dataset under this founder context.")
+    if probe_label == "owned_positive_control":
+        return (
+            "owned_positive_control_returned_rows",
+            "get_dataset_periods returned rows for a dataset owned by this founder context.",
+        )
+    return ("LEAKED", "get_dataset_periods returned rows for a non-owned probe dataset under this founder context.")
 
 
 def compute_gate_decision(
@@ -3505,6 +3511,7 @@ async def _run_sdk_turn(
                 registry=registry,
                 tool_context=tool_context,
                 dataset_id=probe_dataset_id,
+                probe_label=probe_label,
             )
             record_lifecycle(
                 "founder_isolation_probe",

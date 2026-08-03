@@ -141,6 +141,10 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - 2026-07-30 — Fourth near-false-green: probe wiring passed unit tests and `compileall` while the live path
   was broken by a keyword mismatch. A signature-reachability test now exists. **Code-verified is not
   observed.**
+- 2026-08-03 — Step 3 relabels future owned positive-control probe returns as
+  `owned_positive_control_returned_rows`; historical run `8a51ce24-f417-4709-b060-2803a743422d` remains
+  unmodified pending London's decision on whether to annotate persisted evidence or leave the correction
+  in this findings log only.
 
 ---
 

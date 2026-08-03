@@ -204,13 +204,14 @@ def test_granular_cross_worker_probe_refuses_sibling_tool_and_allows_owned_tool(
 
 
 @pytest.mark.parametrize(
-    ("dataset_id", "expected_decision"),
+    ("dataset_id", "probe_label", "expected_decision"),
     [
-        ("foreign-dataset", "refused"),
-        ("owned-dataset", "LEAKED"),
+        ("foreign-dataset", "foreign", "refused"),
+        ("owned-dataset", "owned_positive_control", "owned_positive_control_returned_rows"),
+        ("owned-dataset", "foreign", "LEAKED"),
     ],
 )
-def test_founder_isolation_probe_exercises_tool_layer(dataset_id, expected_decision):
+def test_founder_isolation_probe_exercises_tool_layer(dataset_id, probe_label, expected_decision):
     registry = ToolRegistry(supabase_client=object())
     context = ToolExecutionContext(
         user_id="founder-a",
@@ -222,6 +223,7 @@ def test_founder_isolation_probe_exercises_tool_layer(dataset_id, expected_decis
         registry=registry,
         tool_context=context,
         dataset_id=dataset_id,
+        probe_label=probe_label,
     )
 
     assert decision == expected_decision
