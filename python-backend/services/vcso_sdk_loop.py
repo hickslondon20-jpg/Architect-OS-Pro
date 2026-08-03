@@ -276,6 +276,15 @@ class _ToolOutcome:
     status: str
     sources: list[dict[str, Any]]
     output_summary: dict[str, Any] = field(default_factory=dict)
+    content_text: str = ""
+
+
+@dataclass(frozen=True)
+class _RetrievalBinding:
+    tool_use_id: str
+    tool_name: str
+    source_tokens: set[str]
+    numeric_tokens: set[str]
 
 
 @dataclass
@@ -747,17 +756,82 @@ def founder_isolation_probe_decision(
 def compute_gate_decision(
     *,
     tool_name: str,
-    successful_retrieval_tool_use_ids: set[str],
+    tool_input: Any | None = None,
+    successful_retrievals: dict[str, _RetrievalBinding] | None = None,
 ) -> tuple[bool, str]:
     if _registry_name(tool_name) != "execute_code":
         return True, "Compute gate does not apply to this tool."
-    if successful_retrieval_tool_use_ids:
-        retrieval_ids = ", ".join(sorted(successful_retrieval_tool_use_ids))
-        return True, f"A cited read-only retrieval completed successfully in this turn: {retrieval_ids}."
-    return (
-        False,
-        "execute_code requires data with provenance. Complete a successful cited read-only retrieval "
-        "tool call in this turn, then compute from that retrieved evidence.",
+    retrievals = successful_retrievals or {}
+    if not retrievals:
+        return (
+            False,
+            "execute_code requires data with provenance. Complete a successful cited read-only retrieval "
+            "tool call in this turn, then compute from that retrieved evidence.",
+        )
+    input_text = _compute_binding_text(tool_input)
+    input_tokens = _binding_text_tokens(input_text)
+    source_tokens = set().union(*(binding.source_tokens for binding in retrievals.values()))
+    if source_tokens and not (input_tokens & source_tokens):
+        retrieval_ids = ", ".join(sorted(retrievals))
+        return (
+            False,
+            "execute_code must compute from the cited retrieval output, not from typed context. Include "
+            f"the retrieved rows or their source identifiers from {retrieval_ids} in the code input.",
+        )
+    retrieved_numbers = set().union(*(binding.numeric_tokens for binding in retrievals.values()))
+    asserted_numbers = sorted(_material_numeric_tokens(input_text) - retrieved_numbers)
+    if asserted_numbers:
+        sample = ", ".join(asserted_numbers[:5])
+        return (
+            False,
+            "execute_code includes material numeric constants not present in this turn's cited retrieval "
+            f"output ({sample}). Re-read or paste the cited retrieved values, then compute only from them.",
+        )
+    retrieval_ids = ", ".join(sorted(retrievals))
+    return True, f"execute_code input is bound to cited retrieval output from this turn: {retrieval_ids}."
+
+
+def _compute_binding_text(value: Any) -> str:
+    try:
+        return json.dumps(value, sort_keys=True, default=str)
+    except TypeError:
+        return str(value or "")
+
+
+def _binding_text_tokens(text: str) -> set[str]:
+    return {
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9_.:-]{5,}", text or "")
+    }
+
+
+def _material_numeric_tokens(text: str) -> set[str]:
+    tokens: set[str] = set()
+    for match in re.finditer(r"(?<![A-Za-z0-9])\$?-?\d[\d,_]*(?:\.\d+)?%?", text or ""):
+        raw = match.group(0).strip("$%").replace(",", "").replace("_", "")
+        try:
+            value = abs(float(raw))
+        except ValueError:
+            continue
+        if value >= 1000:
+            tokens.add(raw.rstrip("0").rstrip(".") if "." in raw else raw)
+    return tokens
+
+
+def _retrieval_binding(
+    *,
+    tool_use_id: str,
+    tool_name: str,
+    sources: list[dict[str, Any]],
+    content_text: str,
+) -> _RetrievalBinding:
+    source_text = json.dumps(sources, sort_keys=True, default=str)
+    combined = f"{source_text}\n{content_text}"
+    return _RetrievalBinding(
+        tool_use_id=tool_use_id,
+        tool_name=tool_name,
+        source_tokens=_binding_text_tokens(source_text),
+        numeric_tokens=_material_numeric_tokens(combined),
     )
 
 
@@ -1700,7 +1774,7 @@ async def _run_sdk_turn(
     worker_results: dict[str, Any] = {}
     child_usage_records: list[dict[str, Any]] = []
     completed_agents: set[str] = set()
-    successful_retrieval_tool_use_ids: set[str] = set()
+    successful_retrievals: dict[str, _RetrievalBinding] = {}
     successful_compute_sources: list[dict[str, Any]] = []
     compiled_lead_tool_names: set[str] = set()
     compiled_agent_tool_grants: dict[str, set[str]] = {}
@@ -2232,7 +2306,8 @@ async def _run_sdk_turn(
         tool_name = str(input_data.get("tool_name") or "")
         allowed, reason = compute_gate_decision(
             tool_name=tool_name,
-            successful_retrieval_tool_use_ids=successful_retrieval_tool_use_ids,
+            tool_input=input_data.get("tool_input"),
+            successful_retrievals=successful_retrievals,
         )
         record_lifecycle(
             "compute_gate",
@@ -2562,7 +2637,13 @@ async def _run_sdk_turn(
             and getattr(definition, "persistence_semantics", "read_only") == "read_only"
             and bool(getattr(definition, "citation", None))
         ):
-            successful_retrieval_tool_use_ids.add(str(tool_use_id or sdk_tool_name))
+            retrieval_id = str(tool_use_id or sdk_tool_name)
+            successful_retrievals[retrieval_id] = _retrieval_binding(
+                tool_use_id=retrieval_id,
+                tool_name=registry_name,
+                sources=outcome.sources,
+                content_text=outcome.content_text,
+            )
         if (
             outcome.status == "completed"
             and registry_name == "execute_code"
@@ -3977,14 +4058,15 @@ def _make_sdk_tool(
                         raise TimeoutError(f"{definition.name} exceeded the configured VCSO tool deadline.")
             sources = [source.to_dict() for source in envelope.sources]
             source_refs.extend(sources)
+            safe_content = json.dumps(envelope.to_dict(), default=str)
             tool_outcomes[sdk_name].append(
                 _ToolOutcome(
                     "completed",
                     sources,
                     _native_tool_output_summary(envelope.content),
+                    safe_content[:12000],
                 )
             )
-            safe_content = json.dumps(envelope.to_dict(), default=str)
             return {"content": [{"type": "text", "text": safe_content[:12000]}]}
         except Exception as exc:  # noqa: BLE001 - return a bounded tool error to the SDK loop
             error_details = _sanitized_sdk_error(exc)

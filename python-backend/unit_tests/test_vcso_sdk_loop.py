@@ -39,6 +39,7 @@ from services.vcso_sdk_loop import (
     _native_granular_worker_outcome,
     _native_partial_failure_context,
     _native_synthesis_prompt,
+    _RetrievalBinding,
     _sanitized_sdk_error,
     _native_tool_output_summary,
     _successful_cited_compute_result,
@@ -415,15 +416,39 @@ def test_native_access_gate_refuses_lead_worker_work_and_allows_mode_b():
 def test_compute_gate_requires_a_prior_successful_cited_retrieval():
     denied, refusal = compute_gate_decision(
         tool_name="mcp__architectos__execute_code",
-        successful_retrieval_tool_use_ids=set(),
+        successful_retrievals={},
+    )
+    unbound, unbound_reason = compute_gate_decision(
+        tool_name="mcp__architectos__execute_code",
+        tool_input={"code": "rows_source = 'dataset-alpha'\ntotal_q2 = 117_000\nprint(total_q2)"},
+        successful_retrievals={
+            "read-tool-use-1": _RetrievalBinding(
+                tool_use_id="read-tool-use-1",
+                tool_name="get_dataset_periods",
+                source_tokens={"dataset-alpha"},
+                numeric_tokens={"130000"},
+            )
+        },
     )
     allowed, reason = compute_gate_decision(
         tool_name="mcp__architectos__execute_code",
-        successful_retrieval_tool_use_ids={"read-tool-use-1"},
+        tool_input={
+            "code": "rows_source = 'dataset-alpha'\nvalues = [130_000]\nprint(sum(values))"
+        },
+        successful_retrievals={
+            "read-tool-use-1": _RetrievalBinding(
+                tool_use_id="read-tool-use-1",
+                tool_name="get_dataset_periods",
+                source_tokens={"dataset-alpha"},
+                numeric_tokens={"130000"},
+            )
+        },
     )
 
     assert denied is False
     assert "successful cited read-only retrieval" in refusal
+    assert unbound is False
+    assert "117000" in unbound_reason
     assert allowed is True
     assert "read-tool-use-1" in reason
 
