@@ -183,3 +183,4 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - **Do not edit the harness-root `ROADMAP.md`** — that is the separately founder-gated Phase G cutover.
 
 - 2026-08-03 - Step 3 Unit 3 removed the retired external worker MCP transport, vcso_planner, token/worker-hop probes, handler-backed compile surface, and out-of-band completion bridge from the backend code/tests. The native granular path remains via Task + in-process architectos registry tools; no production flags were armed during this deletion unit.
+- 2026-08-03 - Step 3 Unit 4 pins native activation to bundled Claude Code CLI `2.1.209 (Claude Code)`. The guard is checked by the compile preflight and fails closed only when native model-driven activation is attempted; dark/standard SDK traffic is unaffected.

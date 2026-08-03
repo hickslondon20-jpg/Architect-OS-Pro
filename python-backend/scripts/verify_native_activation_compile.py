@@ -44,6 +44,7 @@ from services.vcso_sdk_loop import (
     native_subagent_requirements,
     read_sdk_loop_settings,
     sdk_stream_capture_enabled,
+    sdk_runtime_pin_status,
 )
 from services.vector_store import VectorStore
 
@@ -224,6 +225,12 @@ def run_preflight(founder_id: str) -> dict[str, Any]:
         capture_enabled=capture_enabled,
         compiled_snapshot=compiled_activation_snapshot(compiled),
     )
+    runtime_pin = sdk_runtime_pin_status()
+    verdict["runtime_pin"] = runtime_pin
+    verdict["checks"]["J_claude_code_cli_version_pinned"] = runtime_pin["ok"]
+    if not runtime_pin["ok"]:
+        verdict["activated"] = False
+        verdict["failures"].append("J_claude_code_cli_version_pinned")
     verdict["non_anchor_message"] = NON_ANCHOR_MESSAGE
     return verdict
 

@@ -61,6 +61,7 @@ VCSO_SDK_LOOP_FLAG = "vcso_sdk_loop"
 VCSO_SDK_CAPABILITY_KEY = "vcso_sdk_loop"
 SDK_STANDARD_SCHEMA_VERSION = "vcso_sdk_standard_v1"
 SDK_NATIVE_SUBAGENT_SCHEMA_VERSION = "vcso_sdk_native_subagents_v1"
+EXPECTED_CLAUDE_CODE_CLI_VERSION = "2.1.209 (Claude Code)"
 SDK_TOOL_SERVER_NAME = "architectos"
 SDK_TOOL_PREFIX = f"mcp__{SDK_TOOL_SERVER_NAME}__"
 SDK_STREAM_DIAGNOSTIC_EVENT_LIMIT = 320
@@ -899,6 +900,22 @@ def sdk_runtime_versions() -> dict[str, str]:
         "claude_agent_sdk_version": sdk_version[:80],
         "claude_code_cli_version": cli_version,
         "claude_code_cli_source": cli_source,
+    }
+
+
+def sdk_runtime_pin_status() -> dict[str, Any]:
+    """Fail-closed native activation guard for the SDK CLI runtime."""
+
+    versions = sdk_runtime_versions()
+    observed = str(versions.get("claude_code_cli_version") or "")
+    source = str(versions.get("claude_code_cli_source") or "")
+    ok = observed == EXPECTED_CLAUDE_CODE_CLI_VERSION and source == "bundled"
+    reason = "matched" if ok else "claude_code_cli_pin_mismatch"
+    return {
+        **versions,
+        "expected_claude_code_cli_version": EXPECTED_CLAUDE_CODE_CLI_VERSION,
+        "ok": ok,
+        "reason": reason,
     }
 
 
@@ -2690,6 +2707,21 @@ async def _run_sdk_turn(
             ),
             *(hooks.get("PreToolUse") or []),
         ]
+    if model_driven:
+        runtime_pin = sdk_runtime_pin_status()
+        if not runtime_pin["ok"]:
+            record_lifecycle(
+                "sdk_runtime_pin",
+                decision="fail_closed",
+                reason_code=runtime_pin["reason"],
+            )
+            raise RuntimeError(
+                "Native SDK runtime pin mismatch: expected Claude Code CLI "
+                f"{EXPECTED_CLAUDE_CODE_CLI_VERSION}, observed "
+                f"{runtime_pin.get('claude_code_cli_version') or 'unavailable'} "
+                f"from {runtime_pin.get('claude_code_cli_source') or 'unknown'}."
+            )
+
     native_prompt = (
         (
             _native_generalization_prompt(provisioned_agents)

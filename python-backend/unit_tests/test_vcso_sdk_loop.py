@@ -26,6 +26,7 @@ from services.agent_capabilities import AgentCapability
 from services.tool_registry import ToolExecutionContext, ToolRegistry, ToolResultEnvelope, ToolSourceRef
 from services.vcso_sdk_loop import (
     COMPUTE_INTEGRITY_REFUSAL,
+    EXPECTED_CLAUDE_CODE_CLI_VERSION,
     G_GATE_CANDIDATE_AGENTS,
     G_GATE_MODEL_CHOICE_SCOPE,
     NATIVE_SURFACE_REQUIRED_AGENTS,
@@ -52,6 +53,7 @@ from services.vcso_sdk_loop import (
     sdk_stream_capture_enabled,
     foreground_delegation_input,
     sdk_runtime_versions,
+    sdk_runtime_pin_status,
     stream_vcso_sdk_turn,
 )
 
@@ -131,6 +133,15 @@ def test_sdk_runtime_versions_report_the_actual_package_and_cli_source():
     assert versions["claude_agent_sdk_version"]
     assert versions["claude_code_cli_version"]
     assert versions["claude_code_cli_source"] in {"bundled", "system"}
+
+
+def test_sdk_runtime_pin_matches_the_bundled_cli():
+    status = sdk_runtime_pin_status()
+
+    assert status["expected_claude_code_cli_version"] == EXPECTED_CLAUDE_CODE_CLI_VERSION
+    assert status["claude_code_cli_source"] == "bundled"
+    assert status["claude_code_cli_version"] == EXPECTED_CLAUDE_CODE_CLI_VERSION
+    assert status["ok"] is True
 
 
 def test_sdk_tool_executor_returns_bounded_real_exception_identity():
