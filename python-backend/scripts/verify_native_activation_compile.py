@@ -1,10 +1,9 @@
 """Deterministic, read-only activation preflight for the 04B native surface.
 
 This script reads the live settings, tool catalog, capability rows, and model routes, then exercises
-``compile_founder_sdk_options`` without submitting a model turn. ``native_subagent_tools={}`` is
-intentional: granular-native agents derive their names and grants from
-``NATIVE_GRANULAR_AGENT_TOOL_GRANTS``; handler tools affect MCP server contents, not the assertions
-below. The SDK tools created here preserve the live registry names, descriptions, and schemas but have
+``compile_founder_sdk_options`` without submitting a model turn. Granular-native agents derive their
+names and grants from ``NATIVE_GRANULAR_AGENT_TOOL_GRANTS``. The SDK tools created here preserve the
+live registry names, descriptions, and schemas but have
 inert handlers because this preflight compiles the surface and never executes a tool.
 
 This preflight passes ``hooks={}``, so a green verdict proves the compiled tool, agent, permission,
@@ -12,7 +11,7 @@ turn, and budget surface only. It does not prove that the model-driven runtime r
 hook or compute gate; either governance hook could be absent from the shipping path while this
 compile-only preflight still reports ``activated: true``.
 
-The script never writes ``platform_ai_settings`` and never mints TURN_REGISTRY tokens.
+The script never writes ``platform_ai_settings`` and never submits a model turn.
 """
 
 from __future__ import annotations
@@ -77,7 +76,6 @@ def compile_activation_surface(
     registry: ToolRegistry,
     founder_id: str,
     settings: dict[str, Any],
-    model_driven_worker_server_urls: dict[str, str] | None = None,
 ) -> CompiledFounderSdkOptions:
     """Run the shipping compiler with the granular-native activation arguments."""
 
@@ -96,9 +94,7 @@ def compile_activation_surface(
         max_turns=int(settings.get("max_turns") or 0),
         max_budget_usd=float(settings.get("max_budget_usd") or 0),
         enable_native_subagents=True,
-        native_subagent_tools={},
         native_agent_tool_grants=NATIVE_GRANULAR_AGENT_TOOL_GRANTS,
-        model_driven_worker_server_urls=model_driven_worker_server_urls or {},
         session_store=None,
         resume_session_id=None,
         fork_session=False,
@@ -221,7 +217,6 @@ def run_preflight(founder_id: str) -> dict[str, Any]:
         registry=registry,
         founder_id=founder_id,
         settings=live_settings,
-        model_driven_worker_server_urls={},
     )
     verdict = evaluate_activation_compile(
         loop_enabled=bool(loop_state.get("enabled")),

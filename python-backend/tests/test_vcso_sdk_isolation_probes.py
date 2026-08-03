@@ -295,7 +295,6 @@ def test_inner_sdk_turn_accepts_chat_service_probe_keywords():
     accepted = set(signature.parameters)
 
     assert {
-        "native_cross_worker_probe",
         "native_granular_cross_worker_probe",
         "native_founder_isolation_probe_dataset_id",
         "native_founder_isolation_probe_dataset_ids",

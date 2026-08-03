@@ -301,32 +301,6 @@ def test_compile_assertion_fails_closed_on_each_individual_mutation(
     assert verdict["failures"] == [expected_failure]
 
 
-def test_empty_model_driven_worker_urls_compile_equivalent_to_supplied_urls():
-    store, registry = _armed_compile_substrate()
-    settings = {"max_turns": 12, "max_budget_usd": 0.50}
-    empty_urls = compile_activation_surface(
-        store=store,
-        registry=registry,
-        founder_id=FOUNDER_ID,
-        settings=settings,
-        model_driven_worker_server_urls={},
-    )
-    supplied_urls = compile_activation_surface(
-        store=store,
-        registry=registry,
-        founder_id=FOUNDER_ID,
-        settings=settings,
-        model_driven_worker_server_urls={
-            key: f"https://workers.invalid/{key}"
-            for key in NATIVE_GRANULAR_AGENT_TOOL_GRANTS
-        },
-    )
-
-    assert compiled_activation_snapshot(empty_urls) == compiled_activation_snapshot(
-        supplied_urls
-    )
-
-
 def test_activation_smoke_requires_exact_phase_workers_and_nonempty_capture():
     run = {
         "id": "run-1",
@@ -373,3 +347,4 @@ def test_activation_smoke_fails_closed(mutation):
     mutation(run)
 
     assert evaluate_activation_smoke(run)["activated"] is False
+

@@ -42,7 +42,6 @@ DIAGNOSTIC_FALSE_KEYS = (
     "diagnostic_fault_injection_enabled",
     "diagnostic_stream_disconnect_enabled",
     "diagnostic_stream_drop_done_enabled",
-    "diagnostic_cross_worker_probe_enabled",
     "diagnostic_granular_cross_worker_probe_enabled",
     "diagnostic_founder_isolation_probe_enabled",
 )
@@ -149,7 +148,6 @@ def assert_armed_state(row: dict[str, Any], founder_id: str) -> None:
         "diagnostic_fault_injection_enabled",
         "diagnostic_stream_disconnect_enabled",
         "diagnostic_stream_drop_done_enabled",
-        "diagnostic_cross_worker_probe_enabled",
     ):
         if bool(settings.get(key)):
             failures.append(key)
@@ -247,7 +245,6 @@ def sanitized_state(row: dict[str, Any]) -> dict[str, Any]:
         "diagnostic_fault_injection_enabled",
         "diagnostic_stream_disconnect_enabled",
         "diagnostic_stream_drop_done_enabled",
-        "diagnostic_cross_worker_probe_enabled",
         "diagnostic_granular_cross_worker_probe_enabled",
         "diagnostic_founder_isolation_probe_enabled",
         "diagnostic_founder_isolation_dataset_id",

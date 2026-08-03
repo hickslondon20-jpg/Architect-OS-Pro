@@ -42,14 +42,12 @@ from services.vcso_intent_read import (
 )
 from services.vcso_working_state import WorkingStateService, assemble, normalize_working_state
 from services.vcso_source_router import SourceRouter, TIER_LABELS
-from services.vcso_planner import PLANNER_FLAG, VcsoPlanner, planner_entry_allowed
 from services.vcso_sdk_loop import (
     G_GATE_MODEL_CHOICE_SCOPE,
     SDK_NATIVE_SUBAGENT_SCHEMA_VERSION,
     SDK_STANDARD_SCHEMA_VERSION,
     VCSO_SDK_CAPABILITY_KEY,
     VcsoSdkUsage,
-    cross_worker_probe_enabled,
     founder_isolation_probe_dataset_ids,
     granular_cross_worker_probe_enabled,
     native_fault_injection_capabilities,
@@ -225,7 +223,7 @@ class VcsoChatService:
             and thread.get("sdk_pending_tool_use_id")
         )
         # Authority boundary: SDK Deep Mode never reads the legacy JSON resume payload.
-        # That payload remains byte-for-byte available to the dark fallback / Path A only.
+        # The dormant JSON resume payload remains isolated from SDK session resume.
         resume_state = _deep_resume_state(thread) if deep_mode and not sdk_deep_mode else None
         is_deep_resume = bool(resume_state and thread.get("agent_status") == "waiting_for_user")
         if deep_mode:
@@ -449,9 +447,8 @@ class VcsoChatService:
             else ()
         )
         sdk_native_subagent_mode = bool(native_required_agents)
-        # Phase D2 (SDK-M2): model-driven delegation is gated behind the dark sub-flag
+        # Native granular delegation is gated behind the dark sub-flag
         # `native_model_driven_enabled` AND founder-scoped via the existing `diagnostic_user_ids` allowlist.
-        # Default off ⇒ the native path stays Path A (deterministic app-owned delegation).
         _sdk_settings = sdk_flag.get("settings") if isinstance(sdk_flag.get("settings"), dict) else {}
         _md_user_ids = {str(value) for value in (_sdk_settings.get("diagnostic_user_ids") or [])}
         native_model_driven = (
@@ -489,11 +486,6 @@ class VcsoChatService:
         native_fault_mode = (
             native_fault_injection_mode(_sdk_settings) if native_fault_injection else "before_start"
         )
-        # Defect-7 guard observation: dark, founder-only, model-driven only. Fires one cross-worker call
-        # server-side so the scope refusal is watched executing. Inert on every real turn.
-        native_cross_worker_probe = (
-            cross_worker_probe_enabled(_sdk_settings, user_id) if native_model_driven else False
-        )
         native_granular_cross_worker_probe = (
             granular_cross_worker_probe_enabled(_sdk_settings, user_id)
             if native_model_driven
@@ -504,176 +496,10 @@ class VcsoChatService:
             if native_model_driven
             else {}
         )
-        planner_flag = self._planner_settings(user_id)
-        planner_threshold = _safe_float(planner_flag.get("settings", {}).get("confidence_threshold"), 0.8)
-        planner_path_selected = (
-            not deep_mode
-            and
-            not sdk_native_subagent_mode
-            and bool(planner_flag.get("enabled"))
-            and planner_entry_allowed(turn_intent, planner_threshold)
-        )
-        planner_result = None
-        if planner_path_selected:
-            planner_future = _TOOL_EXECUTOR.submit(
-                self._run_planner_or_none,
-                planner_flag=planner_flag,
-                turn_intent=turn_intent,
-                user_id=user_id,
-                thread_id=thread_id,
-                user_message_id=str(user_message["id"]),
-                parent_run_id=run_id,
-                message=payload.text,
-                working_state=thread.get("working_state"),
-            )
-            planner_elapsed = 0.0
-            planner_heartbeat_elapsed = 0.0
-            while True:
-                try:
-                    planner_result = planner_future.result(timeout=0.5)
-                    break
-                except concurrent.futures.TimeoutError:
-                    planner_elapsed += 0.5
-                    planner_heartbeat_elapsed += 0.5
-                    if planner_heartbeat_elapsed >= TOOL_HEARTBEAT_SECONDS:
-                        planner_heartbeat_elapsed = 0.0
-                        yield {
-                            "event": "heartbeat",
-                            "data": {
-                                "stepIndex": len(initial_trace_steps) + 1,
-                                "tool": "vcso_planner",
-                                "elapsedSeconds": planner_elapsed,
-                            },
-                        }
-
-        if planner_result is not None:
-            planner_steps: list[dict[str, Any]] = []
-            step_offset = len(initial_trace_steps)
-            for raw_step in planner_result.trace_steps:
-                step = {**raw_step, "stepIndex": int(raw_step.get("stepIndex") or 0) + step_offset + 1}
-                planner_steps.append(step)
-                try:
-                    output_summary = json.loads(step.get("output") or "{}")
-                except (TypeError, json.JSONDecodeError):
-                    output_summary = {}
-                self._create_step(
-                    run_id,
-                    user_id,
-                    step["stepIndex"],
-                    step_type=str(step.get("stepType") or "tool_call"),
-                    title=str(step.get("title") or "Planner step"),
-                    summary=str(step.get("summary") or "Planner step complete."),
-                    input_summary=step.get("input") if isinstance(step.get("input"), dict) else {},
-                    output_summary=output_summary,
-                    source_refs=step.get("sourceRefs") if isinstance(step.get("sourceRefs"), list) else [],
-                    tool_name=step.get("tool"),
-                    status="completed" if step.get("status") != "failed" else "failed",
-                )
-            trace_steps = [*initial_trace_steps, *planner_steps]
-            self._active_turn["trace_steps"] = trace_steps
-            self._active_turn["ready_emitted"] = True
-            yield {
-                "event": "ready",
-                "data": {
-                    "threadId": thread_id,
-                    "userMessage": _message_payload(user_message),
-                    "route": _route_payload(context["route"]),
-                    "assembledContext": {
-                        "skillIndexCount": len(context["skill_index"]),
-                        "selectedPackSlugs": [skill.get("slug") for skill in context["route"]["selected"]],
-                        "loadedIpPageCount": len(context["invoked_ip_pages"]),
-                        "founderIndexCount": len(context["founder_index"]),
-                        "loadedFounderPageTitles": [page.get("page_title") for page in context["founder_pages"]],
-                        "requiredPlatformContext": context["route"]["required"],
-                        "allowDraftIp": context["allow_draft_ip"],
-                        **_assembly_ready_payload(context),
-                        "plannerMode": True,
-                        "plannerComposeEstimatedTokens": planner_result.estimated_compose_tokens,
-                    },
-                    "agentSteps": trace_steps,
-                    "deepMode": deep_mode,
-                    "agentStatus": "complete",
-                },
-            }
-            # The planner is still the hand-rolled Phase-4 path and remains disabled.
-            # Do not counterfeit token streaming for its already-complete answer.
-            yield {"event": "token", "data": {"text": planner_result.answer_text}}
-            assistant_message = self._insert_message(
-                thread_id,
-                user_id,
-                "assistant",
-                planner_result.answer_text,
-                token_count=planner_result.compose_output_tokens,
-                deep_mode=deep_mode,
-                citations=planner_result.citations,
-            )
-            self._active_turn["assistant_message"] = assistant_message
-            self._update_thread_count(thread_id, user_id, int(thread.get("message_count") or 0) + 2)
-            self._complete_main_run(
-                run_id,
-                user_id,
-                assistant_message["id"],
-                planner_result.answer_text,
-                planner_result.citations,
-                result_schema_version="vcso_planner_v1",
-                metadata={
-                    "planner_budget": planner_result.budget,
-                    "worker_run_ids": [finding.run_id for finding in planner_result.findings],
-                    "compose_estimated_tokens": planner_result.estimated_compose_tokens,
-                },
-            )
-            self._active_turn["run_completed"] = True
-            self._after_turn_working_state(
-                user_id=user_id,
-                thread_id=thread_id,
-                current_state=thread.get("working_state"),
-                user_text=payload.text,
-                assistant_text=planner_result.answer_text,
-            )
-            result_step = _result_trace_step(
-                step_index=len(trace_steps) + 1,
-                answer_chars=len(planner_result.answer_text),
-                tool_step_count=len(planner_result.findings),
-            )
-            self._create_step(
-                run_id,
-                user_id,
-                result_step["stepIndex"],
-                step_type="result",
-                title=result_step["title"],
-                summary=result_step["summary"],
-                output_summary=json.loads(result_step["output"]),
-            )
-            trace_steps.append(result_step)
-            fresh_thread = self._get_thread(thread_id, user_id)
-            yield {
-                "event": "context",
-                "data": _context_signal(planner_result.compose_input_tokens, self.context_window),
-            }
-            self._active_turn["completed"] = True
-            yield {
-                "event": "done",
-                "data": {
-                    "chat": _chat_payload(fresh_thread),
-                    "assistantMessage": {**_message_payload(assistant_message), "agentSteps": trace_steps},
-                    "artifactId": None,
-                    "sources": planner_result.citations,
-                    "sourcePages": source_pages,
-                    "usage": {
-                        "inputTokens": planner_result.compose_input_tokens,
-                        "outputTokens": planner_result.compose_output_tokens,
-                    },
-                    "deepMode": deep_mode,
-                    "agentStatus": "complete",
-                    "plannerMode": True,
-                },
-            }
-            return
 
         sdk_mode = (
             bool(sdk_flag.get("enabled"))
             and not is_deep_resume
-            and not planner_path_selected
             and not forced_sdk_fail_open
         )
         if forced_sdk_fail_open:
@@ -878,7 +704,6 @@ class VcsoChatService:
                 native_model_choice=native_model_choice,
                 native_fault_injection=native_fault_injection,
                 native_fault_injection_mode_key=native_fault_mode,
-                native_cross_worker_probe=native_cross_worker_probe,
                 native_granular_cross_worker_probe=native_granular_cross_worker_probe,
                 native_founder_isolation_probe_dataset_ids=native_founder_isolation_probe_dataset_ids,
                 founder_question=payload.text,
@@ -2059,30 +1884,6 @@ class VcsoChatService:
         )
         return {"enabled": enabled, "settings": settings}
 
-    def _planner_settings(self, user_id: str | None = None) -> dict[str, Any]:
-        """Read the Phase 4 flag fail-closed; an absent/unreadable row means off."""
-
-        try:
-            rows = (
-                self.supabase.table("platform_ai_settings")
-                .select("is_enabled,settings")
-                .eq("setting_key", PLANNER_FLAG)
-                .limit(1)
-                .execute()
-                .data
-                or []
-            )
-        except Exception as exc:
-            logger.warning("planner flag read failed; leaving the flat VCSO path active: %s", exc)
-            return {"enabled": False, "settings": {}}
-        if not rows:
-            return {"enabled": False, "settings": {}}
-        settings = rows[0].get("settings") or {}
-        test_user_ids = {str(value) for value in settings.get("test_user_ids") or []}
-        enabled = bool(rows[0].get("is_enabled")) and (
-            bool(settings.get("enabled_for_all")) or (bool(user_id) and str(user_id) in test_user_ids)
-        )
-        return {"enabled": enabled, "settings": settings}
 
     def _sdk_loop_settings(self, user_id: str | None = None) -> dict[str, Any]:
         """Read the 04B SDK flag fail-closed; absent or unreadable means off."""
@@ -2121,42 +1922,6 @@ class VcsoChatService:
             },
         }
 
-    def _run_planner_or_none(
-        self,
-        *,
-        planner_flag: dict[str, Any],
-        turn_intent: dict[str, Any] | None,
-        user_id: str,
-        thread_id: str,
-        user_message_id: str,
-        parent_run_id: str,
-        message: str,
-        working_state: Any,
-    ) -> Any | None:
-        """Invoke the distinct planner only through the locked gate; fail open."""
-
-        settings = planner_flag.get("settings") if isinstance(planner_flag.get("settings"), dict) else {}
-        try:
-            threshold = float(settings.get("confidence_threshold", 0.8))
-        except (TypeError, ValueError):
-            threshold = 0.8
-        if not planner_flag.get("enabled") or not planner_entry_allowed(turn_intent, threshold):
-            return None
-        try:
-            return VcsoPlanner(store=self.store, anthropic_client=self.anthropic_client).run(
-                user_id=user_id,
-                thread_id=thread_id,
-                user_message_id=user_message_id,
-                parent_run_id=parent_run_id,
-                message=message,
-                working_state=working_state,
-                intent=turn_intent or {},
-                settings=settings,
-            )
-        except Exception as exc:
-            # Any planner failure drops into the unchanged Phase 3/flat loop.
-            logger.warning("planner failed open; continuing on the flat VCSO path: %s", exc)
-            return None
 
     def _load_turn_source_components(
         self,

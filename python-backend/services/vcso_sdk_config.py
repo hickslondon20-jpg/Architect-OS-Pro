@@ -33,17 +33,11 @@ NATIVE_GRANULAR_AGENT_TOOL_GRANTS: dict[str, tuple[str, ...]] = {
         "wiki_list",
     ),
 }
-# `default_config.max_rounds` limits SubAgentOrchestrator passes on Path A; SDK
-# `maxTurns` limits model turns in a tool-calling loop. They are not interchangeable.
+# SDK `maxTurns` limits model turns in a tool-calling loop.
 # Granular workers need up to three discovery/read calls plus composition, with
 # room for one recovery call: structured list -> periods -> optional query -> compose,
 # or wiki list -> search -> page -> compose.
 GRANULAR_NATIVE_AGENT_MAX_TURNS = 6
-# Phase D2 (SDK-M2): the external (loopback HTTP) worker MCP server name. Must match the FastMCP `name`
-# in services/vcso_worker_mcp_server.py. In model-driven mode the worker handlers are exposed from this
-# EXTERNAL server, referenced inline per-agent and kept OUT of top-level mcp_servers, so the lead cannot
-# see or call run_<agent> — it must delegate via Task (04B-D2-FINDINGS.md §2-§3).
-MODEL_DRIVEN_WORKER_SERVER = "vcso_workers"
 # The SDK's delegation built-in has TWO names, and conflating them cost the first canary (Stage H):
 #   * PROVISION name ("Task") — what `ClaudeAgentOptions.tools` / `allowed_tools` must contain.
 #     `tools` decides which built-ins EXIST (`tools=[]` disables all of them); `allowed_tools` only
@@ -54,8 +48,8 @@ MODEL_DRIVEN_WORKER_SERVER = "vcso_workers"
 # experiment in 04B-D2-M2-FINISH-LOG.md. Re-verify both if the SDK is upgraded.
 DELEGATION_TOOL_PROVISION_NAME = "Task"
 DELEGATION_TOOL_RUNTIME_NAME = "Agent"
-# BOTH names must be exempted from `disallowed_tools` in model-driven mode. DISALLOWED_SDK_BUILTINS below
-# blocks both (correctly, for Path A and the flat loop, which must never spawn agents). Exempting only the
+# BOTH names must be exempted from `disallowed_tools` in native granular mode.
+# The flat loop keeps both blocked because it must never spawn agents.
 # provision name leaves the RUNTIME name blocked, so the lead is handed a delegation tool it is forbidden
 # to call and stalls to max_turns — reproduced locally as probe variant E, fixed as variant F.
 DELEGATION_TOOL_NAMES = frozenset({DELEGATION_TOOL_PROVISION_NAME, DELEGATION_TOOL_RUNTIME_NAME})
@@ -81,7 +75,6 @@ class CompiledFounderSdkOptions:
     lead_tool_names: list[str] = field(default_factory=list)
     agent_tool_grants: dict[str, list[str]] = field(default_factory=dict)
     agent_model_routes: dict[str, dict[str, str]] = field(default_factory=dict)
-    agent_handler_tools: dict[str, str] = field(default_factory=dict)
     connector_names: list[str] = field(default_factory=list)
     excluded_tool_names: list[str] = field(default_factory=list)
 
@@ -100,9 +93,7 @@ def compile_founder_sdk_options(
     max_turns: int,
     max_budget_usd: float,
     enable_native_subagents: bool = False,
-    native_subagent_tools: dict[str, Any] | None = None,
     native_agent_tool_grants: dict[str, tuple[str, ...] | list[str]] | None = None,
-    model_driven_worker_server_urls: dict[str, str] | None = None,
     session_store: Any | None = None,
     resume_session_id: str | None = None,
     fork_session: bool = False,
@@ -115,19 +106,8 @@ def compile_founder_sdk_options(
     """
 
     client = getattr(store, "client", None)
-    native_subagent_tools = native_subagent_tools or {}
     native_agent_tool_grants = native_agent_tool_grants or {}
     granular_native = bool(enable_native_subagents and native_agent_tool_grants)
-    # Model-driven delegation (D2): when worker-server URLs are supplied, expose each worker handler from
-    # the EXTERNAL per-agent server instead of the in-process session server. Path-A/Fix-C behavior is
-    # byte-identical when this is None/empty.
-    #
-    # SDK-M3 (Defect 7): this is a MAPPING capability_key -> url, not one shared url. Each URL carries that
-    # capability's OWN turn token, so a worker subagent that reaches for a sibling's tool is refused by the
-    # existing scope check in `run_worker_capability`. A single shared URL is what made every worker's token
-    # permit all three capabilities.
-    model_driven_worker_server_urls = model_driven_worker_server_urls or {}
-    model_driven = bool(model_driven_worker_server_urls)
     enabled_catalog = _enabled_catalog_names(client) if client is not None else None
     connected_servers = _connected_sdk_servers(client, user_id=user_id) if client is not None else []
     selected, excluded = _select_definitions(
@@ -146,7 +126,6 @@ def compile_founder_sdk_options(
             )
             excluded.extend(name for name in native_excluded if name not in excluded)
         else:
-            # Path A / legacy handler-backed surface: the lead composes or delegates through handlers only.
             selected = []
 
     capabilities = (
@@ -159,11 +138,7 @@ def compile_founder_sdk_options(
         else []
     )
     if enable_native_subagents:
-        selected_agent_keys = (
-            set(native_agent_tool_grants)
-            if granular_native
-            else set(native_subagent_tools)
-        )
+        selected_agent_keys = set(native_agent_tool_grants)
         capabilities = [
             capability
             for capability in capabilities
@@ -172,13 +147,6 @@ def compile_founder_sdk_options(
     agents: dict[str, AgentDefinition] = {}
     agent_tool_grants: dict[str, list[str]] = {}
     agent_model_routes: dict[str, dict[str, str]] = {}
-    agent_handler_tools: dict[str, str] = {}
-    # Model-driven only: the exact per-agent worker handler tool names (mcp__vcso_workers__run_<agent>).
-    # These MUST be pre-approved on the lead's `allowed_tools` — under permission_mode="dontAsk" a subagent
-    # MCP tool absent from the PARENT allowed_tools is silently denied (ListTools 200 but zero CallToolRequest
-    # ever reaches the worker server), which was the v0.6.74 production defect. This list is the single source
-    # for both the per-agent AgentDefinition.tools and the lead pre-approval below, so the two cannot drift.
-    model_driven_worker_tools: list[str] = []
     selectable_names = (
         _grantable_names(
             registry,
@@ -191,39 +159,13 @@ def compile_founder_sdk_options(
     for capability in capabilities:
         configured_grants = (
             list(native_agent_tool_grants.get(capability.capability_key) or [])
-            if granular_native
+            if enable_native_subagents
             else list(capability.allowed_tools)
         )
         grant_names = [name for name in configured_grants if name in selectable_names]
         sdk_grants = [_sdk_tool_name(registry.get(name)) for name in grant_names]
         route = resolve_capability_model(store, capability=capability, fallback_model=main_model)
-        handler_tool = None if granular_native else native_subagent_tools.get(capability.capability_key)
-        handler_name = _native_handler_name(capability.capability_key) if handler_tool is not None else None
-        if handler_name and model_driven:
-            # External per-agent worker server: the worker handler is scoped to this agent (not the lead's
-            # availability list), but the handler tool name is still pre-approved on the lead so the SDK does
-            # not silently deny the subagent's call under dontAsk.
-            agent_tools = [f"mcp__{MODEL_DRIVEN_WORKER_SERVER}__{handler_name}"]
-            model_driven_worker_tools.extend(agent_tools)
-            # This agent's OWN token-bearing URL (Defect 7). Missing means the caller minted tokens for a
-            # different agent set than it is compiling — fail here rather than silently handing this worker
-            # a surface it cannot call, or worse, someone else's token.
-            worker_url = model_driven_worker_server_urls.get(capability.capability_key)
-            if not worker_url:
-                raise ValueError(
-                    "Model-driven compile is missing a per-capability worker server URL for "
-                    f"{capability.capability_key}; refusing to build an unscoped worker surface."
-                )
-            # The worker tool-call timeout is delivered via the `MCP_TOOL_TIMEOUT` env var (Railway),
-            # NOT a per-server config key: the deployed CLI rejects an unknown `timeout` key on the http
-            # server config, which stranded the lead with no valid delegation target (see 04B-D2 findings).
-            agent_mcp_servers: list[Any] | None = [
-                {MODEL_DRIVEN_WORKER_SERVER: {"type": "http", "url": worker_url}}
-            ]
-        elif handler_name:
-            agent_tools = [f"mcp__{SDK_INTERNAL_SERVER}__{handler_name}"]
-            agent_mcp_servers = [SDK_INTERNAL_SERVER]
-        elif granular_native:
+        if granular_native:
             agent_tools = sdk_grants
             agent_mcp_servers = [SDK_INTERNAL_SERVER]
         else:
@@ -233,43 +175,29 @@ def compile_founder_sdk_options(
             description=capability.description or capability.label,
             prompt=_capability_prompt(
                 capability,
-                handler_name=handler_name,
                 granular_native=granular_native,
             ),
             tools=agent_tools,
             disallowedTools=list(DISALLOWED_SDK_BUILTINS),
             model=route["model_name"],
-            # Handler-backed agents need a call-and-return floor. Granular agents use
-            # the separate SDK turn budget above; Path A keeps its database round cap.
             maxTurns=(
                 GRANULAR_NATIVE_AGENT_MAX_TURNS
                 if granular_native
-                else (
-                    max(2, _capability_max_turns(capability))
-                    if handler_name
-                    else _capability_max_turns(capability)
-                )
+                else _capability_max_turns(capability)
             ),
             permissionMode="dontAsk",
-            # The in-process server is registered once at session level for SDK transport, while
-            # the agent definition explicitly declares the only MCP server its worker may use. In
-            # model-driven mode this is an EXTERNAL per-agent server (kept out of top-level mcp_servers).
+            # The in-process server is registered once at session level for SDK transport.
+            # Each agent definition declares the only MCP server its worker may use.
             mcpServers=agent_mcp_servers,
         )
         agent_tool_grants[capability.capability_key] = grant_names
         agent_model_routes[capability.capability_key] = route
-        if handler_name:
-            agent_handler_tools[capability.capability_key] = handler_name
 
     definition_by_name = {definition.name: definition for definition in selected}
     for definition in registry.definitions() if hasattr(registry, "definitions") else []:
         definition_by_name.setdefault(definition.name, definition)
     used_names: list[str] = [definition.name for definition in selected]
     for capability_key, grant_names in agent_tool_grants.items():
-        # A native handler is the worker's complete implementation surface. Its underlying
-        # registry grants remain audit metadata but must not be registered as session MCP tools.
-        if capability_key in agent_handler_tools:
-            continue
         used_names.extend(name for name in grant_names if name not in used_names)
     grouped_tools: dict[str, list[Any]] = {SDK_INTERNAL_SERVER: []}
     connected_set = set(connected_servers)
@@ -282,11 +210,6 @@ def compile_founder_sdk_options(
         if server_name != SDK_INTERNAL_SERVER and server_name not in connected_set:
             continue
         grouped_tools.setdefault(server_name, []).append(sdk_tool)
-    if not model_driven or granular_native:
-        # In-process worker tools attach to the session server only for the Path-A/Fix-C surface. Model-
-        # driven scoping exposes workers via the external per-agent server instead (D2), so they are never
-        # added to any top-level server — keeping run_<agent> out of the lead's tool schema.
-        grouped_tools[SDK_INTERNAL_SERVER].extend(native_subagent_tools.values())
     mcp_servers = {
         server_name: create_sdk_mcp_server(name=server_name, version="1.0.0", tools=server_tools)
         for server_name, server_tools in grouped_tools.items()
@@ -300,11 +223,6 @@ def compile_founder_sdk_options(
     main_allowed_tools = [_sdk_tool_name(definition) for definition in selected]
     if enable_native_subagents:
         main_allowed_tools.append(DELEGATION_TOOL_PROVISION_NAME)
-    if model_driven:
-        # Pre-approve each provisioned worker handler so the subagent's MCP call is permitted (not silently
-        # denied) under dontAsk. Isolation is preserved on the exposure surface: the worker server stays out
-        # of top-level mcp_servers and the handler names stay out of the lead's `tools` availability list.
-        main_allowed_tools.extend(model_driven_worker_tools)
     if granular_native:
         for grant_names in agent_tool_grants.values():
             for name in grant_names:
@@ -314,10 +232,8 @@ def compile_founder_sdk_options(
                     # list, decides whether the lead or a particular subagent may execute it.
                     main_allowed_tools.append(sdk_name)
     options = ClaudeAgentOptions(
-        # `tools` PROVISIONS built-in tools. Path A stays `[]` (compose-only: it deliberately wants no
-        # tools at all). Model-driven MUST provision the delegation built-in here — putting it only in
-        # `allowed_tools` permits a tool that does not exist, which is what left the Stage H lead with an
-        # empty tool schema, hallucinating delegations in prose until it hit max_turns.
+        # `tools` provisions built-in tools; native granular mode must provision
+        # delegation here, not only in `allowed_tools`.
         tools=[DELEGATION_TOOL_PROVISION_NAME] if enable_native_subagents else [],
         allowed_tools=main_allowed_tools,
         disallowed_tools=main_disallowed_tools,
@@ -346,7 +262,6 @@ def compile_founder_sdk_options(
         lead_tool_names=[definition.name for definition in selected],
         agent_tool_grants=agent_tool_grants,
         agent_model_routes=agent_model_routes,
-        agent_handler_tools=agent_handler_tools,
         connector_names=compiled_connectors,
         excluded_tool_names=excluded,
     )

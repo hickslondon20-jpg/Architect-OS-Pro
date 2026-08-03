@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import sys
-from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -95,7 +93,7 @@ def _capability(key, tools, *, routing_tier=None):
     }
 
 
-def _compile_for(user_id, *, connection_user_id=None, native_subagents=False, model_driven_urls=None):
+def _compile_for(user_id, *, connection_user_id=None, native_subagents=False):
     tables = {
         "tool_registry": [
             {"slug": "wiki_search", "enabled": True, "is_code_registered": True},
@@ -155,15 +153,6 @@ def _compile_for(user_id, *, connection_user_id=None, native_subagents=False, mo
         max_turns=6,
         max_budget_usd=0.25,
         enable_native_subagents=native_subagents,
-        native_subagent_tools=(
-            {
-                "wiki_agent": {"name": "run_wiki_agent"},
-                "sandbox_agent": {"name": "run_sandbox_agent"},
-            }
-            if native_subagents
-            else None
-        ),
-        model_driven_worker_server_urls=model_driven_urls,
     )
 
 
@@ -199,106 +188,6 @@ def test_compiler_scopes_connectors_grants_and_tier_models_per_founder(monkeypat
     assert locked.agent_tool_grants["wiki_agent"] == ["wiki_search"]
     assert other_founder.connector_names == []
     assert other_founder.options.allowed_tools == ["mcp__architectos__wiki_search"]
-
-
-def test_compiler_enables_task_only_for_lead_and_keeps_worker_recursion_blocked(monkeypatch):
-    monkeypatch.setattr(
-        "services.vcso_sdk_config.create_sdk_mcp_server",
-        lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
-    )
-    compiled = _compile_for("founder-12", native_subagents=True)
-
-    assert compiled.options.allowed_tools == ["Task"]
-    assert "Task" not in compiled.options.disallowed_tools
-    assert compiled.tool_names == []
-    assert compiled.connector_names == []
-    assert set(compiled.options.mcp_servers) == {"architectos"}
-    assert {tool["name"] for tool in compiled.options.mcp_servers["architectos"]["tools"]} == {
-        "run_sandbox_agent",
-        "run_wiki_agent",
-    }
-    assert compiled.agent_handler_tools == {
-        "sandbox_agent": "run_sandbox_agent",
-        "wiki_agent": "run_wiki_agent",
-    }
-    assert compiled.options.agents["sandbox_agent"].tools == [
-        "mcp__architectos__run_sandbox_agent"
-    ]
-    assert compiled.options.agents["sandbox_agent"].mcpServers == ["architectos"]
-    assert compiled.options.agents["sandbox_agent"].permissionMode == "dontAsk"
-    serialized_agents = json.loads(
-        json.dumps(
-            {
-                name: {key: value for key, value in asdict(agent).items() if value is not None}
-                for name, agent in compiled.options.agents.items()
-            }
-        )
-    )
-    assert serialized_agents["sandbox_agent"]["mcpServers"] == ["architectos"]
-    assert "Task" in compiled.options.agents["sandbox_agent"].disallowedTools
-    assert "Agent" in compiled.options.agents["sandbox_agent"].disallowedTools
-    assert compiled.options.agents["sandbox_agent"].model == "claude-haiku-test"
-
-
-def test_model_driven_scopes_workers_to_external_server_and_hides_them_from_lead(monkeypatch):
-    # D2: worker handlers move OFF the in-process session server onto an EXTERNAL per-agent server and are
-    # kept out of the lead's `tools` availability list, so the lead must delegate via Task. But each handler
-    # tool name IS pre-approved on the lead's allowed_tools — under permission_mode="dontAsk" a subagent MCP
-    # tool absent from the PARENT allowed_tools is silently denied (the v0.6.74 production defect).
-    monkeypatch.setattr(
-        "services.vcso_sdk_config.create_sdk_mcp_server",
-        lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
-    )
-    # SDK-M3 (Defect 7): one URL PER CAPABILITY, each carrying that worker's own token.
-    urls = {
-        "wiki_agent": "http://127.0.0.1:8000/internal/mcp/workers/?t=TOKEN_WIKI",
-        "sandbox_agent": "http://127.0.0.1:8000/internal/mcp/workers/?t=TOKEN_SANDBOX",
-    }
-    compiled = _compile_for("founder-12", native_subagents=True, model_driven_urls=urls)
-
-    # Lead pre-approves Task AND every provisioned worker handler tool (required under dontAsk). The handler
-    # names must NOT be provisioned into the lead's `tools` availability list (isolation is on the exposure
-    # surface, checked below).
-    assert compiled.options.allowed_tools[0] == "Task"
-    assert set(compiled.options.allowed_tools[1:]) == {
-        "mcp__vcso_workers__run_wiki_agent",
-        "mcp__vcso_workers__run_sandbox_agent",
-    }
-    assert compiled.options.tools == ["Task"]
-
-    # The external worker server is NOT registered top-level (invisible to the lead), and no top-level
-    # server exposes a run_<agent> tool.
-    assert "vcso_workers" not in compiled.options.mcp_servers
-    for server in compiled.options.mcp_servers.values():
-        for tool in server.get("tools", []):
-            assert not str(tool.get("name", "")).startswith("run_")
-
-    # Each worker agent scopes ONLY the external server, inline, and points its single tool at it.
-    for key, handler in (("sandbox_agent", "run_sandbox_agent"), ("wiki_agent", "run_wiki_agent")):
-        agent = compiled.options.agents[key]
-        assert agent.tools == [f"mcp__vcso_workers__{handler}"]
-        assert agent.mcpServers == [{"vcso_workers": {"type": "http", "url": urls[key]}}]
-
-    # Defect 7: the two workers must NOT share a URL — a shared URL is a shared token, and a shared token
-    # permits every capability of the turn to every worker subagent.
-    scoped_urls = [
-        agent.mcpServers[0]["vcso_workers"]["url"] for agent in compiled.options.agents.values()
-    ]
-    assert len(set(scoped_urls)) == len(scoped_urls)
-
-    # The inline external config must JSON-serialize (unlike the in-process McpSdkServerConfig instance),
-    # which is exactly why the SDK can deliver it per-agent in the initialize request.
-    serialized = json.loads(
-        json.dumps(
-            {
-                name: {key: value for key, value in asdict(agent).items() if value is not None}
-                for name, agent in compiled.options.agents.items()
-            }
-        )
-    )
-    assert serialized["sandbox_agent"]["mcpServers"] == [
-        {"vcso_workers": {"type": "http", "url": urls["sandbox_agent"]}}
-    ]
 
 
 def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server(monkeypatch):
@@ -385,8 +274,6 @@ def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server
     }
     assert set(compiled.options.mcp_servers) == {"architectos"}
     assert {tool["name"] for tool in compiled.options.mcp_servers["architectos"]["tools"]} == all_tools
-    assert compiled.agent_handler_tools == {}
-
 
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():
     calls = []
@@ -470,3 +357,4 @@ def test_mcp_descriptions_are_aci_curated_and_money_tools_are_blocked():
     assert "founder confirmation" in discovered.description
     assert discovered.persistence_semantics == "privileged"
     assert discovered.moves_money is True
+

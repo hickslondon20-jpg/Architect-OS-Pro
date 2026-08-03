@@ -215,7 +215,7 @@ def test_disconnect_injection_is_inert_on_empty_settings():
 
 from services.vcso_sdk_loop import (  # noqa: E402
     STREAM_DROP_DONE_EVENTS,
-    cross_worker_probe_enabled,
+    granular_cross_worker_probe_enabled,
     stream_drop_done_injection,
 )
 
@@ -248,16 +248,16 @@ def test_drop_done_event_set_withholds_answer_and_terminal_but_not_keepalive():
 
 
 def test_cross_worker_probe_gate_on_for_the_enrolled_founder():
-    assert cross_worker_probe_enabled(
-        {"diagnostic_cross_worker_probe_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
+    assert granular_cross_worker_probe_enabled(
+        {"diagnostic_granular_cross_worker_probe_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
     ) is True
 
 
 def test_cross_worker_probe_gate_inert_when_disabled_or_off_allowlist():
-    assert cross_worker_probe_enabled(
-        {"diagnostic_cross_worker_probe_enabled": False, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
+    assert granular_cross_worker_probe_enabled(
+        {"diagnostic_granular_cross_worker_probe_enabled": False, "diagnostic_user_ids": [_FOUNDER]}, _FOUNDER
     ) is False
-    assert cross_worker_probe_enabled(
-        {"diagnostic_cross_worker_probe_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, "someone-else"
+    assert granular_cross_worker_probe_enabled(
+        {"diagnostic_granular_cross_worker_probe_enabled": True, "diagnostic_user_ids": [_FOUNDER]}, "someone-else"
     ) is False
-    assert cross_worker_probe_enabled(None, _FOUNDER) is False
+    assert granular_cross_worker_probe_enabled(None, _FOUNDER) is False

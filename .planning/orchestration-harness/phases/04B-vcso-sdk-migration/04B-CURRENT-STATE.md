@@ -181,3 +181,5 @@ New findings go here, dated, one line each. **Do not open new amendment sections
   per-agent `timeout` config key; `max_rounds` and SDK `maxTurns` are different concepts and must never be
   re-collapsed.
 - **Do not edit the harness-root `ROADMAP.md`** — that is the separately founder-gated Phase G cutover.
+
+- 2026-08-03 - Step 3 Unit 3 removed the retired external worker MCP transport, vcso_planner, token/worker-hop probes, handler-backed compile surface, and out-of-band completion bridge from the backend code/tests. The native granular path remains via Task + in-process architectos registry tools; no production flags were armed during this deletion unit.
