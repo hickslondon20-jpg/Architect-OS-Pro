@@ -184,3 +184,69 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 
 - 2026-08-03 - Step 3 Unit 3 removed the retired external worker MCP transport, vcso_planner, token/worker-hop probes, handler-backed compile surface, and out-of-band completion bridge from the backend code/tests. The native granular path remains via Task + in-process architectos registry tools; no production flags were armed during this deletion unit.
 - 2026-08-03 - Step 3 Unit 4 pins native activation to bundled Claude Code CLI `2.1.209 (Claude Code)`. The guard is checked by the compile preflight and fails closed only when native model-driven activation is attempted; dark/standard SDK traffic is unaffected.
+- 2026-08-09 - Deploy of `421560d1` was reported as a head mismatch during Unit 4 and was propagation timing, not a fault. Railway shows the deploy succeeded; health now returns `421560d1`. Third occurrence. A head mismatch immediately after a push is not evidence of a broken deploy; read the Railway deploy list before concluding anything.
+- 2026-08-09 - Compute-gate binding inspects material numeric constants >= 1000 only (`_material_numeric_tokens`, `vcso_sdk_loop.py:803`). Typed figures below that threshold are unchecked. Deliberate - small integers are usually legitimate literals - but it is a real coverage limit.
+- 2026-08-09 - The CLI pin treats `unavailable` as a mismatch and fails closed. If the container's subprocess call to the bundled CLI fails for an environmental reason, native activation blocks. Check `sdk_runtime_pin_status()` before diagnosing any confusing native failure.
+
+---
+
+## Step 3 Unit 5 deletion smoke report - 2026-08-09
+
+Version checkpoint: `v0.6.166`, local commit `a865b7d3` before the live smoke.
+
+Pre-arm proof:
+
+- Zero-canary reload proof passed 3/3 via `python-backend/scripts/verify_phase_e_reload.py --user-id cd490873-99aa-4533-9240-f0aa04deb54f`.
+  Proof threads: `26ed90ce-ece4-4d60-ac6c-c25450a2ff62`, `a90718f0-33b6-42ce-bc9a-2a0bb3600db4`, `99bffc47-f86b-4a9d-8730-e3b48b3da328`.
+- Compile preflight check `J_claude_code_cli_version_pinned` passed. Observed bundled CLI: `2.1.209 (Claude Code)`. Overall activation verdict was false only because the flag was dark before arming (`A_loop_enabled_for_founder`, `B_non_anchor_requires_exact_native_agents`, and `C_stream_capture_enabled` were false).
+- Cache-busted health confirmed deployed backend SHA `421560d1ba07083fed96f57bb7e8be888fbe3764`.
+- Pre-arm flag readback was fully dark: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`, `native_model_driven_enabled=false`, `diagnostic_sdk_stream_capture_enabled=false`, probe flags false/empty, caps 12 turns / $0.50.
+
+Live run:
+
+- Explicit arming authorization received in-thread from London: "Please proceed".
+- Armed plain only with `python-backend/scripts/arm_native_capture_canary.py arm --founder-id cd490873-99aa-4533-9240-f0aa04deb54f --expected-sha 421560d1ba07083fed96f57bb7e8be888fbe3764 --confirm ARM-ONE-CAPTURE-CANARY`. No probe flags were passed.
+- Submitted one pinned-anchor turn with `python-backend/scripts/submit_vcso_canary_turn.py --prompt-mode anchor`.
+- Parent run id: `5f03966b-25ee-4ad5-9804-da7604b849c0`.
+- Thread id: `9f4eaad6-acad-4628-97a7-b06445ae74a3`.
+- User message id: `e403917c-366e-4fc4-a7bc-c9da017ac53a`.
+- Assistant message id: `60c3ba85-7482-41da-9480-6de7eae50d14`.
+- SSE result: `done_received=true`; answer bytes `5907`; answer tokens `4693`; wall clock `126.116` seconds.
+- Parent run row status: `completed`; `error_message=null`; started `2026-08-09T19:18:19.764912+00:00`; completed `2026-08-09T19:20:14.38362+00:00`.
+- Native activation recorded `runtime_manifest`: `{"event":"runtime_manifest","decision":"native_granular","sequence":1,"reason_code":"none"}`.
+- SDK versions on persisted result: Claude Code CLI `2.1.209 (Claude Code)`, CLI source `bundled`, Claude Agent SDK `0.2.118`.
+- Child runs persisted:
+  - `b5cf1351-eace-4cfb-b30f-a733c2c5cd4a`, `structured_data_agent`, `status=completed`, `partial=true`, 5 persisted steps, summary: "Structured data worker completed partially with 25 cited source reference(s); one or more optional tool calls failed safely. PARTIAL_RESULT: true".
+  - `c62e03c5-8239-4650-a093-4d15d9e7580f`, `per_user_wiki`, `status=completed`, `partial=false`, 6 persisted steps, summary: "Strategic context worker completed 6 granular tool call(s) with 22 cited source reference(s)."
+- Parent trace persisted 15 steps. Parent step titles: Intent and depth read; Sources selected; Context prepared; Structured data worker; List Founder Datasets; Strategic context worker; Get Dataset Periods; Get Dataset Periods; Wiki Search; Wiki Search; Wiki Search; Wiki Get Page; Wiki Get Page; Wiki Get Page; Answer prepared.
+- Overall persisted `source_count=49`.
+
+Compute-gate acceptance evidence:
+
+- Lifecycle event count: 42 against the 60-event cap. No truncation observed; `runtime_manifest` remains the first lifecycle event and the last lifecycle event is `{"count":3,"event":"stream_keepalive","stage":"total"}`.
+- The live path evaluated and denied `execute_code` three times. Quoted lifecycle entries:
+  - `{"event":"compute_gate","decision":"deny","sequence":35,"tool_name":"mcp__architectos__execute_code","reason_code":"execute_code includes material numeric constants not present in this turn's cited retrieval output (10660, 12100, 12683, 41000, 44000). Re-read or paste the cited retrieved values, then compute only f","tool_use_id":"toolu_01D46Kg3n4UhduTzJLJMv1Qg"}`
+  - `{"event":"compute_gate","decision":"deny","sequence":37,"tool_name":"mcp__architectos__execute_code","reason_code":"execute_code includes material numeric constants not present in this turn's cited retrieval output (41000, 44000). Re-read or paste the cited retrieved values, then compute only from them.","tool_use_id":"toolu_01EMhkWHXkUmHFWhuVDBNHjY"}`
+  - `{"event":"compute_gate","decision":"deny","sequence":39,"tool_name":"mcp__architectos__execute_code","reason_code":"execute_code includes material numeric constants not present in this turn's cited retrieval output (41000, 44000). Re-read or paste the cited retrieved values, then compute only from them.","tool_use_id":"toolu_01MH6sri4kALvMmBtFFX9pGN"}`
+
+Answer behavior:
+
+- The answer did not fail outright. It disclosed the refusal and continued from cited figures. Opening persisted text: "The compute worker is rejecting constants that were in fact returned by the structured data agent this turn. I'll disclose that limitation and work strictly from the cited figures the workers returned - stating the math explicitly in my answer without an uncited derivation."
+- This is recorded as Phase F/G composition input, not a Unit 5 regression.
+
+Spend:
+
+- `ai_usage_log` rows for the thread: 14.
+- Recorded cost with non-null `cost_usd`: `$0.22334094999999998`, from the main `vcso_sdk_loop` row only (`input_tokens=71287`, `output_tokens=4693`, model `claude-sonnet-4-6`).
+- Subagent and utility rows persisted token counts but no `cost_usd`; therefore the non-null cost total is not the whole-query cost if those rows are priced elsewhere.
+
+Post-run flag readback:
+
+- Disarmed immediately with `python-backend/scripts/arm_native_capture_canary.py disarm --confirm RE-DARKEN-04B`, then ran `read`.
+- Final readback: `is_enabled=false`, `test_user_ids=[]`, `diagnostic_user_ids=[]`, `native_model_driven_enabled=false`, `diagnostic_sdk_stream_capture_enabled=false`, `diagnostic_single_worker_enabled=false`, `diagnostic_fault_injection_enabled=false`, `diagnostic_stream_disconnect_enabled=false`, `diagnostic_stream_drop_done_enabled=false`, `diagnostic_granular_cross_worker_probe_enabled=false`, `diagnostic_founder_isolation_probe_enabled=false`, diagnostic dataset ids empty, `max_turns=12`, `max_budget_usd=0.5`.
+
+Not done:
+
+- I did not pass any probe flags or re-run isolation/cross-worker probes.
+- I did not loosen the compute gate, build a STEER ending, change answer composition, raise caps, change Railway replica configuration, or remove `MCP_TOOL_TIMEOUT`.
+- I did not obtain a separate human UI render observation for this run. The operator harness produced a named run and persisted trace evidence, but it is not itself a London visual confirmation of the nested plan panel and SOURCES rail.
