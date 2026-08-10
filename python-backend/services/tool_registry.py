@@ -2000,10 +2000,26 @@ def _execute_deep_task(context: ToolExecutionContext, tool_input: dict[str, Any]
     return _execute_delegate_to_sub_agent(context, delegated)
 
 
-def _execute_ask_user_marker(_context: ToolExecutionContext, tool_input: dict[str, Any]) -> ToolResultEnvelope:
+def _execute_ask_user_marker(context: ToolExecutionContext, tool_input: dict[str, Any]) -> ToolResultEnvelope:
     question = str(tool_input.get("question") or "").strip()
     if not question:
         raise ToolRegistryError("question is required.")
+    pending_answer = str(context.metadata.get("pending_ask_user_answer") or "").strip()
+    if pending_answer:
+        return ToolResultEnvelope(
+            content={
+                "status": "answered",
+                "question": question[:1000],
+                "answer": pending_answer[:4000],
+            },
+            sources=[
+                ToolSourceRef(
+                    source_kind="human_input",
+                    source_id=None,
+                    label="Founder clarification",
+                )
+            ],
+        )
     return ToolResultEnvelope(
         content={"status": "waiting_for_user", "question": question[:1000]},
         sources=[ToolSourceRef(source_kind="human_input", source_id=None, label="Founder clarification needed")],

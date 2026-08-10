@@ -1970,9 +1970,31 @@ def test_ask_user_preference_retrieval_signal_ignores_structured_data_reads():
     ]
 
 
-def test_deep_resume_allows_only_persisted_question_replay_and_emits_final_answer(monkeypatch):
+def test_ask_user_marker_returns_founder_answer_on_resume():
+    registry = ToolRegistry()
+    result = registry.execute(
+        "ask_user",
+        ToolExecutionContext(
+            user_id="founder-1",
+            metadata={
+                "pending_ask_user_tool_use_id": "tool-question-1",
+                "pending_ask_user_answer": "Prioritize healthcare.",
+            },
+        ),
+        {"question": "Which market should I prioritize?"},
+    )
+
+    assert result.content == {
+        "status": "answered",
+        "question": "Which market should I prioritize?",
+        "answer": "Prioritize healthcare.",
+    }
+
+
+def test_deep_resume_resolves_persisted_question_with_founder_answer(monkeypatch):
     captured: dict[str, object] = {}
     session_store = object()
+    tool_context = ToolExecutionContext(user_id="founder-1")
 
     async def fake_query(*, prompt, options):
         captured["options"] = options
@@ -2014,12 +2036,13 @@ def test_deep_resume_allows_only_persisted_question_replay_and_emits_final_answe
             api_key="test-key",
             registry=_Registry(),
             tool_names=[],
-            tool_context=ToolExecutionContext(user_id="founder-1"),
+            tool_context=tool_context,
             trace_metadata={"run_id": "run-resume"},
             query_impl=fake_query,
             session_store=session_store,
             resume_session_id="11111111-1111-1111-1111-111111111111",
             pending_ask_user_tool_use_id="tool-question-1",
+            pending_ask_user_answer="Prioritize healthcare.",
             enable_ask_user_pause=True,
         )
     )
@@ -2027,6 +2050,8 @@ def test_deep_resume_allows_only_persisted_question_replay_and_emits_final_answe
     options = captured["options"]
     assert options.resume == "11111111-1111-1111-1111-111111111111"
     assert options.fork_session is False
+    assert tool_context.metadata["pending_ask_user_tool_use_id"] == "tool-question-1"
+    assert tool_context.metadata["pending_ask_user_answer"] == "Prioritize healthcare."
     assert [event["data"]["text"] for event in events if event["event"] == "token"] == [
         "Healthcare is now the priority."
     ]

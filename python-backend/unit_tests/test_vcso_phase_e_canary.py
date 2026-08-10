@@ -110,6 +110,37 @@ def test_completed_resume_requires_pending_state_to_be_cleared():
         thread=thread,
         transcript=[{"type": "assistant"}],
         stage="resume",
+        pending_question="Approval word?",
+        resumed_answer="Approved. Continue with the recommendation.",
     )
 
     assert verdict["countable"] is True
+
+
+def test_completed_resume_rejects_answer_that_restates_pending_question():
+    run = _paused_run(
+        status="completed",
+        metadata={"deep_mode": False, "sdk_session_mode": True, "sdk_phase": "04B-E"},
+        structured_result={
+            "sdk_phase": "04B-E",
+            "sdk_session_id": SESSION_ID,
+        },
+    )
+    thread = _paused_thread(
+        agent_status="complete",
+        sdk_pending_tool_use_id=None,
+        sdk_pending_question=None,
+        sdk_pending_run_id=None,
+    )
+
+    verdict = evaluate_phase_e_countability(
+        run=run,
+        thread=thread,
+        transcript=[{"type": "assistant"}],
+        stage="resume",
+        pending_question="Approval word?",
+        resumed_answer="I still need your answer: Approval word?",
+    )
+
+    assert verdict["countable"] is False
+    assert "resumed_answer_does_not_restate_pending_question" in verdict["failures"]

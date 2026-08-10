@@ -963,6 +963,7 @@ def stream_vcso_sdk_turn(
     resume_session_id: str | None = None,
     fork_session: bool = False,
     pending_ask_user_tool_use_id: str | None = None,
+    pending_ask_user_answer: str | None = None,
     enable_ask_user_pause: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """Bridge the SDK async lifecycle into the synchronous, existing VCSO SSE contract."""
@@ -1012,6 +1013,7 @@ def stream_vcso_sdk_turn(
                         resume_session_id=resume_session_id,
                         fork_session=fork_session,
                         pending_ask_user_tool_use_id=pending_ask_user_tool_use_id,
+                        pending_ask_user_answer=pending_ask_user_answer,
                         enable_ask_user_pause=enable_ask_user_pause,
                     )
                 )
@@ -1551,6 +1553,7 @@ async def _run_sdk_turn(
     resume_session_id: str | None = None,
     fork_session: bool = False,
     pending_ask_user_tool_use_id: str | None = None,
+    pending_ask_user_answer: str | None = None,
     enable_ask_user_pause: bool = False,
 ) -> VcsoSdkTurnResult:
     source_refs: list[dict[str, Any]] = list(initial_sources)
@@ -1917,6 +1920,9 @@ async def _run_sdk_turn(
 
     definitions = _selected_definitions(registry, tool_names)
     tool_context.metadata["enforce_persistence_guardrail"] = True
+    if pending_ask_user_tool_use_id and pending_ask_user_answer:
+        tool_context.metadata["pending_ask_user_tool_use_id"] = str(pending_ask_user_tool_use_id)
+        tool_context.metadata["pending_ask_user_answer"] = str(pending_ask_user_answer)
     if model_driven:
         # execute_code is an approved part of this dark native surface. Its authorization is the
         # structural compute gate below, not a founder-facing confirmation prompt.

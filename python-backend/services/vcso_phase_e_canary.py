@@ -34,6 +34,8 @@ def evaluate_phase_e_countability(
     thread: dict[str, Any],
     transcript: list[dict[str, Any]] | None,
     stage: CanaryStage,
+    pending_question: str | None = None,
+    resumed_answer: str | None = None,
 ) -> dict[str, Any]:
     """Return an auditable verdict; callers must not count a failed verdict."""
 
@@ -69,6 +71,8 @@ def evaluate_phase_e_countability(
             }
         )
     else:
+        normalized_question = str(pending_question or "").strip().lower()
+        normalized_answer = str(resumed_answer or "").strip().lower()
         checks.update(
             {
                 "run_completed": run.get("status") == "completed",
@@ -77,6 +81,13 @@ def evaluate_phase_e_countability(
                 "pending_tool_cleared": not thread.get("sdk_pending_tool_use_id"),
                 "pending_question_cleared": not thread.get("sdk_pending_question"),
                 "pending_run_cleared": not thread.get("sdk_pending_run_id"),
+                "resume_pending_question_observed": bool(normalized_question),
+                "resumed_answer_present": bool(normalized_answer),
+                "resumed_answer_does_not_restate_pending_question": (
+                    bool(normalized_answer)
+                    and bool(normalized_question)
+                    and normalized_question not in normalized_answer
+                ),
             }
         )
     failures = [name for name, passed in checks.items() if not passed]

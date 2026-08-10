@@ -39,6 +39,46 @@ def _single(response: Any, label: str) -> dict[str, Any]:
     raise RuntimeError(f"{label} did not return exactly one row")
 
 
+def _rows(response: Any) -> list[dict[str, Any]]:
+    data = getattr(response, "data", None)
+    return [row for row in data if isinstance(row, dict)] if isinstance(data, list) else []
+
+
+def _latest_assistant_message(client: Any, *, user_id: str, thread_id: str) -> str:
+    rows = _rows(
+        client.table("vcso_chat_messages")
+        .select("role,content,created_at")
+        .eq("thread_id", thread_id)
+        .eq("user_id", user_id)
+        .eq("role", "assistant")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not rows:
+        return ""
+    return str(rows[0].get("content") or "")
+
+
+def _pending_question_from_steps(client: Any, *, user_id: str, run_id: str) -> str:
+    rows = _rows(
+        client.table("agent_delegation_steps")
+        .select("output_summary,summary,created_at")
+        .eq("run_id", run_id)
+        .eq("user_id", user_id)
+        .eq("tool_name", "ask_user")
+        .order("created_at", desc=False)
+        .limit(1)
+        .execute()
+    )
+    if not rows:
+        return ""
+    summary = rows[0].get("output_summary")
+    if isinstance(summary, dict):
+        return str(summary.get("question") or "").strip()
+    return str(rows[0].get("summary") or "").strip()
+
+
 async def verify(*, user_id: str, run_id: str, stage: str) -> dict[str, Any]:
     settings = get_settings()
     if not settings.supabase_url or not settings.supabase_service_role_key:
@@ -113,11 +153,26 @@ async def verify(*, user_id: str, run_id: str, stage: str) -> dict[str, Any]:
             )
             if transcript:
                 break
+    pending_question = ""
+    resumed_answer = ""
+    if stage == "resume":
+        pending_question = _pending_question_from_steps(
+            client,
+            user_id=user_id,
+            run_id=run_id,
+        )
+        resumed_answer = _latest_assistant_message(
+            client,
+            user_id=user_id,
+            thread_id=str(thread.get("id") or ""),
+        )
     verdict = evaluate_phase_e_countability(
         run=run,
         thread=thread,
         transcript=transcript,
         stage=stage,  # type: ignore[arg-type]
+        pending_question=pending_question,
+        resumed_answer=resumed_answer,
     )
     print(json.dumps(verdict, indent=2))
     return verdict

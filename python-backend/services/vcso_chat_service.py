@@ -658,7 +658,14 @@ class VcsoChatService:
             sdk_result = yield from stream_vcso_sdk_turn(
                 # A resumed or forked SDK session already owns prior conversation context.
                 # Re-injecting vcso_chat_messages here would create a second transcript authority.
-                prompt=payload.text if sdk_resume_session_id else context["prompt"],
+                prompt=(
+                    "The founder has answered the pending ask_user request. Resolve that pending "
+                    "tool call with the supplied tool result and continue from the SDK session."
+                    if is_sdk_session_resume
+                    else payload.text
+                    if sdk_resume_session_id
+                    else context["prompt"]
+                ),
                 system_prompt=(
                     VCSO_TOOL_LOOP_SYSTEM_PROMPT
                 ),
@@ -726,6 +733,7 @@ class VcsoChatService:
                     if is_sdk_session_resume
                     else None
                 ),
+                pending_ask_user_answer=payload.text if is_sdk_session_resume else None,
                 enable_ask_user_pause=sdk_session_mode,
             )
             self._persist_sdk_trace_steps(run_id, user_id, sdk_result.tool_steps)
