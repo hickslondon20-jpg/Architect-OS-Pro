@@ -217,6 +217,11 @@ New findings go here, dated, one line each. **Do not open new amendment sections
   an in-memory store where "durably flushed" has no meaning. This is precisely the gap that was recorded as
   still-open when the spike was accepted as local-only. The open item was real and it cost `$0.14` to
   close. **An adapter spiked against a fake backing store proves the protocol, never the persistence.**
+- 2026-08-10 - **Step 5 provenance check narrowed defect 7.** `get_dataset_periods` already selected
+  row-level `provenance`, and `run_structured_query` could already select it for row reads; the missing
+  dataset-grain surface was `list_founder_datasets`, while aggregate reads need input provenance
+  (`dataset_ids`, period range, source row count, group columns, aggregate functions) because grouping
+  destroys row-level provenance.
 
 ---
 
