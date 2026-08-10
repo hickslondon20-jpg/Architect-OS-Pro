@@ -558,7 +558,19 @@ class _Registry:
     def __init__(self, *, delay: float = 0.0):
         self.delay = delay
         self.calls = []
-        self._definitions = {name: self._Definition(name) for name in ("wiki_search", "wiki_get_page")}
+        self._definitions = {
+            name: self._Definition(name)
+            for name in (
+                "ask_user",
+                "execute_code",
+                "get_dataset_periods",
+                "list_founder_datasets",
+                "run_structured_query",
+                "wiki_get_page",
+                "wiki_list",
+                "wiki_search",
+            )
+        }
 
     def get(self, name: str):
         return self._definitions[name]
@@ -1779,6 +1791,7 @@ def test_give_up_budget_resets_when_a_worker_actually_completes(monkeypatch):
 
 def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(monkeypatch):
     captured: dict[str, object] = {}
+    lifecycle_events: list[dict[str, object]] = []
     session_store = object()
 
     async def fake_query(*, options, **_kwargs):
@@ -1821,6 +1834,46 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
         )
 
     monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        "services.vcso_sdk_loop.sdk_runtime_pin_status",
+        lambda: {"ok": True},
+    )
+    monkeypatch.setattr(
+        "services.vcso_sdk_loop.build_native_model_driven_manifest",
+        lambda _compiled, **_kwargs: {"violations": []},
+    )
+    native_capabilities = [
+        AgentCapability(
+            capability_key="structured_data_agent",
+            label="Structured Data Agent",
+            description="Read bounded structured founder data.",
+            status="experimental",
+            allowed_surfaces=["virtual_cso"],
+            allowed_tools=[
+                "list_founder_datasets",
+                "get_dataset_periods",
+                "run_structured_query",
+            ],
+            default_config={"max_rounds": 2},
+        ),
+        AgentCapability(
+            capability_key="per_user_wiki",
+            label="Per User Wiki",
+            description="Read founder wiki context.",
+            status="experimental",
+            allowed_surfaces=["virtual_cso"],
+            allowed_tools=["wiki_search", "wiki_get_page", "wiki_list"],
+            default_config={"max_rounds": 2},
+        ),
+    ]
+    monkeypatch.setattr(
+        "services.agent_capabilities.AgentCapabilityRegistry.list_active",
+        lambda _self: native_capabilities,
+    )
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: native_capabilities,
+    )
     events, result = _consume(
         stream_vcso_sdk_turn(
             prompt="Start the deep task.",
@@ -1829,9 +1882,20 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
             api_key="test-key",
             registry=_Registry(),
             tool_names=[],
-            tool_context=ToolExecutionContext(user_id="founder-1"),
+            tool_context=ToolExecutionContext(
+                user_id="founder-1",
+                store=SimpleNamespace(
+                    resolve_platform_model=lambda **kwargs: {
+                        "provider": kwargs["fallback_provider"],
+                        "model_name": kwargs["fallback_model_name"],
+                    }
+                ),
+            ),
             trace_metadata={"run_id": "run-pause"},
             query_impl=fake_query,
+            native_subagent_required_agents=NATIVE_SURFACE_REQUIRED_AGENTS,
+            native_lifecycle_sink=lifecycle_events.append,
+            native_model_driven=True,
             session_store=session_store,
             enable_ask_user_pause=True,
         )
@@ -1857,6 +1921,27 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
         "missing_reason_code": False,
         "retrieved_context_summary_present": False,
         "observation": "retrieval_not_attempted_before_pause",
+    }
+    classification_events = [
+        event
+        for event in lifecycle_events
+        if event.get("event") == "ask_user_classification"
+    ]
+    assert len(classification_events) == 1
+    assert classification_events[0] | {"sequence": 0} == {
+        "sequence": 0,
+        "event": "ask_user_classification",
+        "decision": "pause",
+        "reason_code": "founder_priority",
+        "retrieval_attempted": False,
+        "preference_retrieval_attempted": False,
+        "model_claimed_retrieval_attempted": True,
+        "single_question": True,
+        "observed_retrieval_count": 0,
+        "preference_retrieval_count": 0,
+        "question_count": 1,
+        "observed_retrievals": [],
+        "preference_retrievals": [],
     }
 
 

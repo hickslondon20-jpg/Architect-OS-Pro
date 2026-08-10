@@ -1659,12 +1659,39 @@ async def _run_sdk_turn(
             value = details.get(key)
             if value not in (None, ""):
                 safe[key] = str(value)[:200]
-        if "agent_id_present" in details:
-            safe["agent_id_present"] = bool(details["agent_id_present"])
-        if "same_objective" in details:
-            safe["same_objective"] = bool(details["same_objective"])
-        if "delegated" in details:
-            safe["delegated"] = bool(details["delegated"])
+        for key in (
+            "agent_id_present",
+            "delegated",
+            "model_claimed_retrieval_attempted",
+            "preference_retrieval_attempted",
+            "retrieval_attempted",
+            "same_objective",
+            "single_question",
+        ):
+            if key in details:
+                safe[key] = bool(details[key])
+        for key in (
+            "observed_retrieval_count",
+            "preference_retrieval_count",
+            "question_count",
+        ):
+            if key in details:
+                try:
+                    safe[key] = max(0, min(int(details[key]), 100))
+                except (TypeError, ValueError):
+                    safe[key] = 0
+        for key in ("observed_retrievals", "preference_retrievals"):
+            value = details.get(key)
+            if isinstance(value, list):
+                safe[key] = [
+                    {
+                        "tool_name": str(item.get("tool_name") or "")[:120],
+                        "tool_use_id": str(item.get("tool_use_id") or "")[:120],
+                    }
+                    for item in value[:20]
+                    if isinstance(item, dict)
+                    and (item.get("tool_name") or item.get("tool_use_id"))
+                ]
         try:
             native_lifecycle_sink(safe)
         except Exception as exc:  # noqa: BLE001 - diagnostics must never affect the turn
@@ -2722,9 +2749,12 @@ async def _run_sdk_turn(
                 decision="pause",
                 reason_code=supplied_reason,
                 retrieval_attempted=retrieval_attempted,
+                preference_retrieval_attempted=retrieval_attempted,
                 preference_retrieval_count=len(preference_retrievals),
                 observed_retrieval_count=len(observed_retrievals),
                 model_claimed_retrieval_attempted=bool(tool_input.get("retrieval_attempted")),
+                observed_retrievals=observed_retrievals,
+                preference_retrievals=preference_retrievals,
                 single_question=question_count <= 1,
                 question_count=question_count,
             )

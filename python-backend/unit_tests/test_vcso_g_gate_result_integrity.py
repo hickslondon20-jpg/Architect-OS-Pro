@@ -91,3 +91,38 @@ def test_sdk_completion_caller_passes_attribution_and_lifecycle_to_run_metadata(
         1,
     )[0]
     assert "**sdk_run_attribution" in diagnostic_writer
+
+
+def test_fail_main_run_preserves_ask_user_classification_metadata():
+    client = _Client()
+    service = VcsoChatService.__new__(VcsoChatService)
+    service.supabase = client
+    classification = {
+        "classification": "pause",
+        "reason_code": "founder_priority",
+        "retrieval_attempted": False,
+        "preference_retrieval_attempted": False,
+        "model_claimed_retrieval_attempted": True,
+        "observed_retrieval_count": 0,
+        "preference_retrieval_count": 0,
+        "single_question": True,
+        "question_count": 1,
+    }
+
+    service._fail_main_run(
+        "parent-run-1",
+        "user-1",
+        assistant_message_id="assistant-1",
+        terminal_status="failed",
+        error_message="SDK session path refused to wait because its session was not durably flushed.",
+        run_attribution={"sdk_phase": "04B-E", "sdk_session_mode": True},
+        sdk_lifecycle=[{"event": "ask_user_classification", "reason_code": "founder_priority"}],
+        sdk_ask_user_classification=classification,
+    )
+
+    metadata = client.updates[-1]["metadata"]
+    assert metadata["sdk_phase"] == "04B-E"
+    assert metadata["sdk_ask_user_classification"] == classification
+    assert metadata["sdk_native_lifecycle"] == [
+        {"event": "ask_user_classification", "reason_code": "founder_priority"}
+    ]

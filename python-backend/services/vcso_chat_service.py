@@ -730,10 +730,35 @@ class VcsoChatService:
             )
             self._persist_sdk_trace_steps(run_id, user_id, sdk_result.tool_steps)
             if sdk_result.deferred_tool_use_id:
+                self._active_turn["sdk_ask_user_classification"] = dict(
+                    sdk_result.deferred_classification or {}
+                )
                 if (
                     sdk_session_store is None
                     or not sdk_session_store.confirmed_persisted(sdk_result.session_id)
                 ):
+                    with sdk_lifecycle_lock:
+                        failed_pause_lifecycle = list(sdk_lifecycle_events)
+                        failed_pause_stream_capture = list(sdk_stream_capture_events)
+                    failed_pause_metadata = {
+                        "output_schema_version": "vcso_tool_loop_v1",
+                        "reasoning_visibility": "summary_only",
+                        "deep_mode": False,
+                        "sdk_session_mode": sdk_session_mode,
+                        "sdk_session_id": sdk_result.session_id,
+                        "sdk_waiting_for_user": False,
+                        "sdk_ask_user_classification": sdk_result.deferred_classification,
+                        "sdk_native_lifecycle": failed_pause_lifecycle,
+                        **sdk_run_attribution,
+                    }
+                    if native_stream_capture:
+                        failed_pause_metadata["sdk_raw_stream_capture"] = failed_pause_stream_capture
+                    self.supabase.table("agent_delegation_runs").update(
+                        {
+                            "metadata": failed_pause_metadata,
+                            "updated_at": _now(),
+                        }
+                    ).eq("id", run_id).eq("user_id", user_id).execute()
                     raise RuntimeError(
                         "SDK session path refused to wait because its session was not durably flushed."
                     )
@@ -1418,6 +1443,11 @@ class VcsoChatService:
                     run_attribution=dict(state.get("run_attribution") or {}),
                     sdk_lifecycle=list(state.get("sdk_lifecycle_events") or []),
                     sdk_stream_capture=list(state.get("sdk_stream_capture_events") or []),
+                    sdk_ask_user_classification=(
+                        dict(state.get("sdk_ask_user_classification") or {})
+                        if state.get("sdk_ask_user_classification")
+                        else None
+                    ),
                 )
 
             if state.get("deep_mode"):
@@ -1520,6 +1550,7 @@ class VcsoChatService:
         run_attribution: dict[str, Any] | None = None,
         sdk_lifecycle: list[dict[str, Any]] | None = None,
         sdk_stream_capture: list[dict[str, Any]] | None = None,
+        sdk_ask_user_classification: dict[str, Any] | None = None,
     ) -> None:
         status = "cancelled" if terminal_status == "cancelled" else "failed"
         attribution = dict(run_attribution or {})
@@ -1551,6 +1582,10 @@ class VcsoChatService:
                     else {}
                 ),
             }
+            if sdk_ask_user_classification:
+                values["metadata"]["sdk_ask_user_classification"] = dict(
+                    sdk_ask_user_classification
+                )
         self.supabase.table("agent_delegation_runs").update(values).eq("id", run_id).eq(
             "user_id", user_id
         ).execute()

@@ -189,6 +189,21 @@ New findings go here, dated, one line each. **Do not open new amendment sections
   classification accepted `tool_input["retrieval_attempted"]` from the model as an alternative to observed
   retrieval. Same trust pattern as defect 10. Model-supplied fields may be *recorded* for comparison
   against observed facts; they may never *satisfy* a check.
+- 2026-08-09 — **Sixth near-false-green, and a new species again: instrumentation silently dropped at the
+  persistence boundary.** `record_lifecycle` (`vcso_sdk_loop.py:1641–1667`) copies only a fixed key
+  allowlist. Every field added by `v0.6.168`/`v0.6.169` — `retrieval_attempted`,
+  `preference_retrieval_count`, `observed_retrieval_count`, `single_question`, `question_count`,
+  `model_claimed_retrieval_attempted` — is **not in that allowlist and is discarded**. Only `decision` and
+  `reason_code` survived, by coincidence of already being allowlisted. Nine unit tests passed because they
+  assert on the in-memory classification dict, not on what is persisted. **When adding a field to a
+  diagnostic record, verify it survives the sink, not just the function that builds it.**
+- 2026-08-09 — The rich `sdk_ask_user_classification` payload is written **only on the successful pause
+  path** (`vcso_chat_service.py:781`). A run that reaches PAUSE and then fails persists nothing, so the
+  most diagnostically valuable runs are the least observable. Write it on the failure path too.
+- 2026-08-09 — **The Guardrail 1 spike could not have caught the durable-flush refusal**, because it used
+  an in-memory store where "durably flushed" has no meaning. This is precisely the gap that was recorded as
+  still-open when the spike was accepted as local-only. The open item was real and it cost `$0.14` to
+  close. **An adapter spiked against a fake backing store proves the protocol, never the persistence.**
 
 ---
 
@@ -248,6 +263,7 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - 2026-08-09 - Compute-gate binding inspects material numeric constants >= 1000 only (`_material_numeric_tokens`, `vcso_sdk_loop.py:803`). Typed figures below that threshold are unchecked. Deliberate - small integers are usually legitimate literals - but it is a real coverage limit.
 - 2026-08-09 - The CLI pin treats `unavailable` as a mismatch and fails closed. If the container's subprocess call to the bundled CLI fails for an environmental reason, native activation blocks. Check `sdk_runtime_pin_status()` before diagnosing any confusing native failure.
 - 2026-08-09 - Step 4 Guardrail 1 spike was local, not a deployed-backend run: direct SDK `0.2.118` plus bundled Claude Code CLI `2.1.209`, ephemeral config dir, and an in-memory session store. It proves the pinned CLI accepts `resume=` and `fork_session=true`; it does **not** prove `SupabaseVcsoSessionStore` through the real RPC path or behavior inside the Railway container. That composition remains open for the Step 4 pause/reload/resume gate.
+- 2026-08-09 - Step 4 `v0.6.170` Unit 1 fixes the pause observability fault found by the first armed run. Lifecycle persistence now carries the bounded ask_user classification fields (`retrieval_attempted`, preference-specific counts, model-claim comparison, single-question check, and sanitized retrieval tool names/tool-use ids), and failed pause attempts preserve `sdk_ask_user_classification` on the final run metadata.
 
 ---
 
