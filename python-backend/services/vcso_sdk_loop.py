@@ -2833,6 +2833,7 @@ async def _run_sdk_turn(
         session_store=session_store,
         resume_session_id=resume_session_id,
         fork_session=fork_session,
+        enable_ask_user_pause=enable_ask_user_pause,
     )
     options = compiled.options
     compiled_lead_tool_names.update(compiled.lead_tool_names)

@@ -98,6 +98,7 @@ def compile_founder_sdk_options(
     session_store: Any | None = None,
     resume_session_id: str | None = None,
     fork_session: bool = False,
+    enable_ask_user_pause: bool = False,
 ) -> CompiledFounderSdkOptions:
     """Compile one founder's callable tools, bounded agents, models, and MCP servers.
 
@@ -253,7 +254,7 @@ def compile_founder_sdk_options(
         env={"ANTHROPIC_API_KEY": api_key},
         thinking={"type": "disabled"},
         session_store=session_store,
-        session_store_flush="batched",
+        session_store_flush="eager" if enable_ask_user_pause else "batched",
         resume=resume_session_id,
         fork_session=bool(fork_session),
     )

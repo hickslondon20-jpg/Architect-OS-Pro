@@ -275,6 +275,32 @@ def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server
     assert set(compiled.options.mcp_servers) == {"architectos"}
     assert {tool["name"] for tool in compiled.options.mcp_servers["architectos"]["tools"]} == all_tools
 
+
+def test_ask_user_pause_uses_eager_session_flush_without_global_change(monkeypatch):
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.create_sdk_mcp_server",
+        lambda *, name, version, tools: {"type": "sdk", "name": name, "version": version, "tools": tools},
+    )
+    base = _compile_for("founder-1")
+    paused = compile_founder_sdk_options(
+        store=None,
+        user_id="founder-1",
+        registry=ToolRegistry(store=None),
+        requested_tool_names=[],
+        sdk_tools_by_name={},
+        system_prompt="VCSO",
+        main_model="claude-sonnet-test",
+        api_key="test-key",
+        hooks={},
+        max_turns=6,
+        max_budget_usd=0.25,
+        session_store=object(),
+        enable_ask_user_pause=True,
+    )
+
+    assert base.options.session_store_flush == "batched"
+    assert paused.options.session_store_flush == "eager"
+
 def test_persistence_guardrail_forced_write_quarantine_and_money_block():
     calls = []
     registry = ToolRegistry()

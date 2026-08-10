@@ -1903,7 +1903,7 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
 
     options = captured["options"]
     assert options.session_store is session_store
-    assert options.session_store_flush == "batched"
+    assert options.session_store_flush == "eager"
     assert not [event for event in events if event["event"] == "token"]
     assert result.answer_text == ""
     assert result.deferred_tool_use_id == "tool-question-1"
