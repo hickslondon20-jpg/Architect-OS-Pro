@@ -13,6 +13,35 @@ G-gate:** the financial-series store F delivers (§D) is exactly what lets the G
 numeric test. **The big one** — most external dependencies (OAuth, Vault, QuickBooks), most net-new (the
 financial-series store + real sandbox compute).
 
+## UNIT F0 ADDED 2026-08-09 — approve aggregate query shapes, FIRST, ahead of the connector
+
+**Source: live evidence, Step 3 smoke, run `5f03966b`. This reorders F's internals; the E → F → G-gate
+sequencing above is unchanged.**
+
+`run_structured_query` refused twice inside `structured_data_agent` with `"Query shape is not approved for
+structured dataset reads."` (child run `b5cf1351`, steps 4 and 5). **Because aggregate totals cannot be
+retrieved, the model derives them by hand** — and hand-derived subtotals are then correctly refused by the
+Step 3 compute gate, after which the model computes in prose and publishes uncited figures. That whole
+chain starts here.
+
+Orchestrator verification confirmed the model's arithmetic was right (April revenue 41,000; May 44,000;
+April delivery cost 10,660; May 12,100 — all exact sums of retrieved rows). **The problem is not accuracy.
+It is that a correct aggregate arrives with no provenance because no tool produced it.**
+
+**F0 deliverable:** `validate_structured_sql` approves a bounded set of aggregate shapes (`SUM`, `COUNT`,
+`AVG`, `GROUP BY` over period and client dimensions) for founder-scoped structured reads, so a period total
+returns **as tool output carrying its citation and dataset-grain provenance**. Founder scoping stays bound
+at tool construction and is never model-supplied.
+
+**Why first:** it is the cheapest intervention that dissolves the derivation pressure at source, it is
+required before the anchor can ever be answered correctly, and every downstream connector read in this
+phase will hit the same validator. Building the connector first means building on the broken shape.
+
+**Pairs with defect 7** (dataset-grain provenance invisible to the model) — same tool, same change, do them
+together.
+
+---
+
 ## Current state (verified 2026-07-23)
 - **D2 done** (`v0.6.114`); flags dark; Path A retained. **Sandbox is a working smoke** — the founder P&L
   dataset (`founder_dataset_tables.pnl_monthly`) has **one** seed row (June 2026). No financial *series*

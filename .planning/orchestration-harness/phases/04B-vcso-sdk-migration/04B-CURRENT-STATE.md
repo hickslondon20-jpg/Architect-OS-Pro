@@ -1,6 +1,6 @@
 # 04B — Current State
 
-**Last updated:** 2026-07-30 · **This is the single entry point.** A new orchestration agent reads this
+**Last updated:** 2026-08-09 · **This is the single entry point.** A new orchestration agent reads this
 file first and nothing else until it has. Everything else in this folder is either a decision record, a
 completed phase artifact, or archive.
 
@@ -31,9 +31,15 @@ different engine.
 **Nothing is live. Every flag is dark. Production Virtual CSO still runs the pre-migration loop**, and
 that untouched loop is the real safety net. This has been true for the entire migration.
 
-**Roadmap Step 2 is closed.** The engine works: the lead delegates on its own, refuses to cheat, and the
-safety boundaries hold under observed test. **The answers are not yet right** — the system fetches correct
-data and then composes using stale or mistyped figures. Engine proven, judgment not.
+**Roadmap Steps 2 and 3 are closed.** The engine works: the lead delegates on its own, refuses to cheat,
+and the safety boundaries hold under observed test. The old plumbing is gone — 6,590 lines of external
+worker transport, planner, and token machinery deleted against a proven path, with a clean smoke.
+
+**The answers are still not right, and Step 3 sharpened our understanding of why.** The system fetches
+correct data and then composes from figures that never passed through an auditable computation. Step 3's
+compute gate closed the *sandbox* path to that; the model responded by doing the arithmetic in prose and
+publishing it uncited. **Engine proven. Judgment not. And the gate on judgment is bypassable.** See §5
+and defects 10–11.
 
 ---
 
@@ -44,10 +50,10 @@ data and then composes using stale or mistyped figures. Engine proven, judgment 
 | 1 | Author the in-process worker surface | **Done** |
 | 1.5 | Remove the Deep Mode and keyword-eligibility tripwires | **Done** |
 | **2** | **Prove the lead delegates reliably; two mandatory isolation tests** | **CLOSED on mechanism evidence.** See §4 and §5 |
-| **3** | **Compute-data binding fix, `LEAKED` relabel, delete the old plumbing, pin the CLI version** | **NEXT.** Founder-approved to proceed (§9) |
-| 4 | Phase E — `ask_user` and sessions on the single path | Not started |
-| 5 | Phase F — QuickBooks connector, real financial series, freshness/authority inside the retrieval tools | Not started. **This fixes more of the wrong-answer problem than any reasoning change** |
-| 6 | Phase G — reflect-and-steer, authority enforced at composition, varied-question rubric, then cutover | Not started |
+| **3** | **Compute-data binding fix, `LEAKED` relabel, delete the old plumbing, pin the CLI version** | **CLOSED 2026-08-09.** Deletion clean, smoke passed. See `04B-STEP-3-COMPLETION.md` |
+| **4** | **Phase E — `ask_user` and sessions on the single path** | **NEXT.** Not started |
+| 5 | Phase F — **structured-query aggregate shapes first**, then QuickBooks connector, real financial series, freshness/authority inside the retrieval tools | Not started. **This fixes more of the wrong-answer problem than any reasoning change**, and Step 3 produced live evidence for the reordering (defect 11) |
+| 6 | Phase G — reflect-and-steer, **authority enforced at terminal validation on the published answer**, varied-question rubric, then cutover | Not started. Scope tightened by Step 3 — see defect 10 |
 
 ---
 
@@ -84,14 +90,24 @@ hide worker tools from the lead. A hook does that job, and the hook is proven.
   context rather than the numbers retrieved, got one wrong, and published an incorrect figure alongside
   stale wiki retainers.
 
-**Two rubric lines were downgraded, not upgraded, in the Step 2 close-out:** *composes founder-grade cited
-judgment* and *honest about gaps* both moved from proven to failing. That is the correct and honest state
-to enter Phases F and G with.
+- Run 3 (Step 3 smoke, `5f03966b-25ee-4ad5-9804-da7604b849c0`) fetched correctly, was **blocked from the
+  sandbox three times by the new compute gate — correctly** — and then computed nine percentages in prose
+  and published them to the founder with no compute result and no citation.
 
-**Also unproven:** whether the nested plan panel and SOURCES rail render correctly *on the granular
-surface*. The founder confirms both panels do render and populate in general, but no run-specific
-observation was captured, and **both panels still need UI and organisation work regardless.** Schedule the
-observation into Step 3's smoke; treat the UI work as its own item, not as part of this proof.
+**Two rubric lines were downgraded, not upgraded, in the Step 2 close-out:** *composes founder-grade cited
+judgment* and *honest about gaps* both moved from proven to failing.
+
+**Step 3 re-graded a third line down.** *Cited provenance* was previously assumed to be holding because
+every retrieval carried its source. Run 3 shows it does not hold for **derived** figures: the model can
+assert computed values in prose without any compute result. Partial credit on *honest about gaps* — the
+answer did disclose the refusal at the top before proceeding to publish uncited derivations anyway.
+
+**Still unproven:** whether the nested plan panel and SOURCES rail render correctly *on the granular
+surface*. The founder confirms both panels render and populate in general, but **no run-specific
+observation has been captured, including on the Step 3 smoke** — the operator harness produced the run,
+not a human watching the UI. **Carry the observation to the first armed run of Step 4.** Do not spend a
+paid run on it alone. Both panels also still need UI and organisation work, which is its own item and not
+part of any proof.
 
 ---
 
@@ -99,8 +115,8 @@ observation into Step 3's smoke; treat the UI work as its own item, not as part 
 
 | # | Defect | Scheduled |
 |---|---|---|
-| 1 | **Compute gate is hollow** — `execute_code` requires a prior retrieval but is not bound to *use* it, so the sandbox can compute on model-typed numbers | **Step 3** |
-| 2 | **`decision="LEAKED"` recorded for the owned positive control** — false-positive language in the permanent evidence for a binding lock | **Step 3** |
+| 1 | ~~**Compute gate is hollow**~~ — `execute_code` was not bound to *use* the retrieval | **FIXED Step 3** (`f2ac3502`). Verified firing live, 3 denials, run `5f03966b`. **But see defect 10 — the fix is bypassable** |
+| 2 | ~~**`decision="LEAKED"` for the owned positive control**~~ | **FIXED Step 3** (`0beaf48d`). Now `owned_positive_control_returned_rows`; genuine leak paths still record `LEAKED`. Historical row `8a51ce24` left unmodified by decision |
 | 3 | **Authority rule not enforced at composition** — it is prose in tool descriptions only; the model invented a carve-out to justify using stale wiki figures | Phase G |
 | 4 | **Record-vs-wiki discrepancies never surfaced** despite the model holding both figures | Phase G |
 | 5 | **Composer-integrity gate never arms** — it classifies the *question*, and the anchor is phrased as advice. It has never fired on any run | Phase G |
@@ -108,6 +124,8 @@ observation into Step 3's smoke; treat the UI work as its own item, not as part 
 | 7 | **Dataset-grain provenance invisible to the model** — neither structured tool selects it, so a dataset citation cannot carry it | Phase F |
 | 8 | **Narration bleeds into the persisted answer** (missing separator, narration text at the top of the message) | C2 surface work |
 | 9 | **`execute_code` step's `input_summary`/`output_summary` are empty** — the code and stdout are auditable, but in `source_refs[].verbatim`, not where a reader looks | Low priority; record only |
+| **10** | **The compute gate is bypassable — gating the tool does not gate the computation.** Refused at `execute_code`, the model performed the arithmetic in prose and published nine uncited computed percentages to the founder (run `5f03966b`, message `60c3ba85`). The figures were arithmetically correct; nothing in the system established that. **Enforcement must move to terminal validation on the published answer, not only the tool boundary** | **Phase G — scope-defining.** Supersedes the tool-only reading of defect 3 | 
+| **11** | **`run_structured_query` rejects aggregate query shapes** — `"Query shape is not approved for structured dataset reads."` (run `b5cf1351`, steps 4 and 5). Because totals cannot be *retrieved*, the model must derive them by hand, which is what forces the pattern defect 10 describes. **This is the root cause; defect 10 is the symptom** | **Phase F — first unit, ahead of the connector** |
 
 ---
 
@@ -123,6 +141,9 @@ Recorded so that changed goalposts stay visible instead of dissolving into the r
 | 2026-07-30 | **Anchor dataset seeded** | The test account held one row; the test question needed a 90-day trend. The bar was unreachable for reasons unrelated to the system |
 | 2026-07-30 | **N=5 retired as constructed. Step 2 closed on mechanism evidence instead** | Its pass criteria bundled the mechanism question with composition quality, which Phase G is scheduled to build. As written it could not pass until G shipped, inverting the roadmap. **This changed a founder-set gate (D13) and is the most likely thing to look like drift later** |
 | 2026-07-30 | **Isolation tests moved BEFORE the deletion** | Step 3 deletes the token machinery, which is the mechanism currently carrying the isolation evidence. Deleting it first would destroy the old proof and the ability to rebuild it in one move |
+| 2026-08-09 | **Step 3 closed on its own scope despite discovering a composition defect mid-close** | The discovery (defect 10) is a composition failure. Step 3 was scoped as a deletion, and it delivered one. **Expanding it would repeat the N=5 mistake** — bundling mechanism scope with composition quality, which made the Step 2 gate unpassable until Phase G shipped. Recorded, scheduled, moved on. Risk accepted knowingly: Step 4 begins with a founder-visible path that can publish uncited computed figures, mitigated by every flag being dark |
+| 2026-08-09 | **Phase F resequenced — structured-query aggregate shapes become its first unit**, ahead of the QuickBooks connector | Previously F was ordered connector-first. Run `5f03966b` produced live evidence that the aggregate-shape rejection is what forces in-head derivation, so the cheapest fix to the wrong-answer problem sits at the front of F, not behind a connector build |
+| 2026-08-09 | **Phase G's authority enforcement moved from the tool boundary to terminal validation on the published answer** | G was written to enforce the authority rule at composition, understood as tool descriptions plus a composition check. Run `5f03966b` proved a tool-level gate is insufficient — the model simply did not use the tool. The requirement is now about the *output*, not the call |
 
 ---
 
@@ -145,19 +166,42 @@ New findings go here, dated, one line each. **Do not open new amendment sections
   `owned_positive_control_returned_rows`; historical run `8a51ce24-f417-4709-b060-2803a743422d` remains
   unmodified pending London's decision on whether to annotate persisted evidence or leave the correction
   in this findings log only.
+- 2026-08-09 — **The numbers the compute gate refused in run `5f03966b` were correct.** Orchestrator
+  verification summed `founder_dataset_rows` directly: April revenue = 41,000 (7400+9000+8400+8200+8000),
+  May = 44,000, April delivery cost = 10,660, May = 12,100. All four refused constants are exact
+  aggregates of retrieved rows. **The gate cannot distinguish a correct derived subtotal from a fabricated
+  one, and that is defensible** — a model summing five numbers in its head is the failure mode that
+  produced the wrong figure in run 2. The problem is not the refusal; it is what the model did next.
+- 2026-08-09 — **A report can be accurate in every particular and still carry the wrong conclusion.** The
+  Unit 5 report asserted no fact that was false. It reported the denials as a clean pass without checking
+  whether the refused numbers were correct, and without reading the published answer against the authority
+  rule. Both checks were cheap. **Verify the interpretation, not only the facts.**
+- 2026-08-09 — Fifth near-false-green, and a new species: not a broken code path, but a **gate that fires
+  correctly and is then routed around.** A green lifecycle entry proved the gate worked; the founder-visible
+  answer proved it did not hold. Lifecycle evidence alone is not sufficient to grade composition.
 
 ---
 
 ## 9. Open items needing founder input
 
-1. **Deletion scope — one item to confirm.** Deletion of Path A, the external worker transport,
-   `TURN_REGISTRY` and the token machinery, the `MCP_TOOL_TIMEOUT` dependency, the single-process
-   constraint, the out-of-band completion bridge, `vcso_planner`, and the old token-based cross-worker
-   probe is **approved**. The founder noted one item should stay that a pivot changed. **Reading it as:
-   Phase E's landed session store, thread→session pointer and `ask_user` code stay in place and dormant
-   per D10a — present and unreachable, not deleted.** Confirm before Step 3 executes.
+1. ~~**Deletion scope.**~~ **RESOLVED 2026-08-03.** Phase E's session store, thread→session pointer and
+   `ask_user` code stay dormant per D10a; everything else on the list was deleted in `b216a0c4` and
+   verified. `ask_user` remains at 42 references across 4 files, unchanged by the deletion.
 2. **UI/organisation work on the plan panel and SOURCES rail** is a real, separate workstream, not part of
-   any proof. Needs scoping and its own slot.
+   any proof. Needs scoping and its own slot. **Still open.**
+3. ~~**Persisted-evidence correction on run `8a51ce24`.**~~ **DECIDED 2026-08-09 — leave the row
+   unmodified.** The correction lives in §8 and `04B-STEP-3-COMPLETION.md`, both in git. **We annotate the
+   record; we never rewrite persisted evidence**, least of all for a binding lock. Standing precedent,
+   inherited by Domain Agents. **Closed.**
+4. ~~**Railway single-process constraint.**~~ **DECIDED 2026-08-09 — stays at replicas = 1.** Now safe to
+   change; deliberately unchanged. Extra replicas add nondeterminism to single-run canary proofs for zero
+   benefit while everything is dark and founder-only. Revisit at beta launch, not during the migration.
+5. ~~**`MCP_TOOL_TIMEOUT` in the Railway environment.**~~ **DECIDED 2026-08-09 — remove it, early in
+   Step 4** (§5.1 of the Step 4 handoff), so any effect surfaces inside that step rather than being
+   conflated with a later change. Zero code references remain. Founder-console action.
+6. **Versioning — DECIDED 2026-08-09 (London).** The project stays on `v0.6.x` for the **remainder of the
+   SDK migration**. Next tag `v0.6.167`. **Do not propose `v0.7.0`**; the MINOR bump is reserved for
+   completion of the whole migration and is the founder's call alone.
 
 ---
 
@@ -176,11 +220,17 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - **Locks, binding:** founder isolation; one writer (feed the OS Engine, never write the wiki); cited
   provenance; cost-tier routing at the capability grain with no founder-facing model selector; the
   context-selection IP; curated transparency; bounded, non-recursive, depth-capped workers.
-- **Landmines:** keep `MCP_TOOL_TIMEOUT=240000` until Step 3 removes its cause; single process only while
-  `TURN_REGISTRY` exists (Railway replicas = 1, held by configuration not code); never re-add the
-  per-agent `timeout` config key; `max_rounds` and SDK `maxTurns` are different concepts and must never be
-  re-collapsed.
+- **Landmines, updated after Step 3:** `TURN_REGISTRY` is **gone**, so the single-process constraint no
+  longer has a code cause — Railway replicas = 1 is now a configuration choice, safe to change, and
+  deliberately unchanged. `MCP_TOOL_TIMEOUT`'s cause is likewise **gone**; remove it from the Railway
+  environment when convenient. **Still binding:** never re-add the per-agent `timeout` config key (the
+  deployed CLI rejects it and it broke delegation outright); `max_rounds` and SDK `maxTurns` are different
+  concepts and must never be re-collapsed; the bundled Claude Code CLI is pinned to `2.1.209 (Claude Code)`
+  and native activation **fails closed** on mismatch, including when the version reads `unavailable`.
 - **Do not edit the harness-root `ROADMAP.md`** — that is the separately founder-gated Phase G cutover.
+- **Grade composition on the published answer, not on lifecycle events.** A gate can fire correctly and
+  still be routed around. This cost a wrong close-out call in Step 3 and was caught only by reading the
+  founder-visible message.
 
 - 2026-08-03 - Step 3 Unit 3 removed the retired external worker MCP transport, vcso_planner, token/worker-hop probes, handler-backed compile surface, and out-of-band completion bridge from the backend code/tests. The native granular path remains via Task + in-process architectos registry tools; no production flags were armed during this deletion unit.
 - 2026-08-03 - Step 3 Unit 4 pins native activation to bundled Claude Code CLI `2.1.209 (Claude Code)`. The guard is checked by the compile preflight and fails closed only when native model-driven activation is attempted; dark/standard SDK traffic is unaffected.

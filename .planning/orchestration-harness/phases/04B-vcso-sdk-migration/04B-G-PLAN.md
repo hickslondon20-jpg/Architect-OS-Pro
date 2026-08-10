@@ -18,6 +18,44 @@
 until Phase F** supplies the financial series its sandbox tests need. The back half is terminal — it
 assumes the G-gate has cleared and Phases E + F are done, and it does not start until then.
 
+## REQUIREMENT ADDED 2026-08-09 — authority enforcement moves to the published answer
+
+**Source: live evidence, Step 3 smoke, run `5f03966b-25ee-4ad5-9804-da7604b849c0`. Written down while
+fresh because it changes what G builds, not merely how well.**
+
+Phase G was written to enforce the knowledge-authority rule "at composition," understood as tool
+descriptions plus a composition-time check. **Step 3 proved that is insufficient.**
+
+What happened: the new compute gate refused `execute_code` three times, correctly, because the model was
+passing its own hand-computed subtotals as constants. The model then **performed the arithmetic in prose
+and published nine uncited computed percentages to the founder** — client concentration, top-2 share, and
+gross margin across three months. The figures were arithmetically correct; nothing in the system
+established that. See `04B-STEP-3-COMPLETION.md` §4 and defect 10.
+
+**The lesson: gating the tool does not gate the computation.** A model that cannot compute in the sandbox
+will compute in its head, and every tool-boundary control is blind to that.
+
+**Therefore G must build:**
+
+1. **Terminal validation on the published answer.** Detect factual figures asserted without a traceable
+   compute result or citation, and refuse or downgrade the turn before it reaches the founder. This is an
+   *output* check, not a *call* check. It is the only control point the prose bypass cannot route around.
+2. **STEER as the destination for what that validation catches.** Today a turn can only answer or fail, so
+   a model blocked from computing answers anyway. Terminal validation without STEER converts the bypass
+   into a hard failure, which is worse UX and will pressure someone to loosen it. **Build them together**
+   — and per D9, design STEER jointly with Phase E's `ask_user`.
+3. **Record-vs-wiki discrepancy surfacing** (defect 4) belongs on this same output-validation path rather
+   than as a separate mechanism.
+
+**This supersedes the tool-only reading of defect 3.** Tool-description authority prose stays — it is
+useful — but it is no longer the enforcement point and must not be graded as if it were.
+
+**Grading note for the G-gate:** rubric line *composes founder-grade cited judgment* must be graded on the
+**founder-visible message**, not on lifecycle events. In the Step 3 smoke the lifecycle trail was clean and
+the published answer was not. Lifecycle evidence alone will produce a false green here.
+
+---
+
 ## Current state (verified 2026-07-23)
 - **D2 done** (`v0.6.114`); `vcso_sdk_loop` + `vcso_planner` **dark**; Path A retained dark as the
   flag-off fallback — **keep it until parity is signed off.** `/api/health ok=true`, SHA `feb3fe04`.
