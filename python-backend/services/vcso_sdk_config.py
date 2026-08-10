@@ -20,6 +20,7 @@ MODE_B_LEAD_TOOL_NAMES = (
     "wiki_get_page",
     "get_dataset_periods",
     "execute_code",
+    "ask_user",
 )
 NATIVE_GRANULAR_AGENT_TOOL_GRANTS: dict[str, tuple[str, ...]] = {
     "structured_data_agent": (

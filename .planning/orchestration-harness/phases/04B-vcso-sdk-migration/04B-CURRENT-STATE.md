@@ -237,6 +237,7 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - 2026-08-09 - Deploy of `421560d1` was reported as a head mismatch during Unit 4 and was propagation timing, not a fault. Railway shows the deploy succeeded; health now returns `421560d1`. Third occurrence. A head mismatch immediately after a push is not evidence of a broken deploy; read the Railway deploy list before concluding anything.
 - 2026-08-09 - Compute-gate binding inspects material numeric constants >= 1000 only (`_material_numeric_tokens`, `vcso_sdk_loop.py:803`). Typed figures below that threshold are unchecked. Deliberate - small integers are usually legitimate literals - but it is a real coverage limit.
 - 2026-08-09 - The CLI pin treats `unavailable` as a mismatch and fails closed. If the container's subprocess call to the bundled CLI fails for an environmental reason, native activation blocks. Check `sdk_runtime_pin_status()` before diagnosing any confusing native failure.
+- 2026-08-09 - Step 4 Guardrail 1 spike was local, not a deployed-backend run: direct SDK `0.2.118` plus bundled Claude Code CLI `2.1.209`, ephemeral config dir, and an in-memory session store. It proves the pinned CLI accepts `resume=` and `fork_session=true`; it does **not** prove `SupabaseVcsoSessionStore` through the real RPC path or behavior inside the Railway container. That composition remains open for the Step 4 pause/reload/resume gate.
 
 ---
 

@@ -1775,7 +1775,6 @@ def test_give_up_budget_resets_when_a_worker_actually_completes(monkeypatch):
     assert not [event for event in lifecycle_events if event["event"] == "delegation_give_up"]
 
 
-@pytest.mark.skip(reason="External worker-hop diagnostics are retained but unwired in Step 1.")
 def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(monkeypatch):
     captured: dict[str, object] = {}
     session_store = object()
@@ -1786,7 +1785,10 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
         decision = await pause_hook(
             {
                 "tool_name": "mcp__architectos__ask_user",
-                "tool_input": {"question": "Which market should I prioritize?"},
+                "tool_input": {
+                    "question": "Which market should I prioritize?",
+                    "reason_code": "founder_priority",
+                },
             },
             "tool-question-1",
             None,
@@ -1839,6 +1841,16 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
     assert result.answer_text == ""
     assert result.deferred_tool_use_id == "tool-question-1"
     assert result.deferred_question == "Which market should I prioritize?"
+    assert result.deferred_classification == {
+        "classification": "pause",
+        "reason_code": "founder_priority",
+        "retrieval_attempted": False,
+        "single_question": True,
+        "question_count": 1,
+        "missing_reason_code": False,
+        "retrieved_context_summary_present": False,
+        "observation": "retrieval_not_attempted_before_pause",
+    }
 
 
 def test_deep_resume_allows_only_persisted_question_replay_and_emits_final_answer(monkeypatch):

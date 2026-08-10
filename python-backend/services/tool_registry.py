@@ -1173,10 +1173,38 @@ def _native_tool_definitions() -> list[ToolDefinition]:
         ),
         ToolDefinition(
             name="ask_user",
-            description="Pause Deep Mode and ask the founder one concise clarifying question.",
+            description=(
+                "Pause the native SDK session path and ask the founder one concise clarifying question. "
+                "Use only for founder-held judgment or preference after available founder records have "
+                "been checked; do not use for platform-obtainable data gaps."
+            ),
             json_schema={
                 "type": "object",
-                "properties": {"question": {"type": "string", "description": "Question for the founder."}},
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "One clear question for the founder.",
+                    },
+                    "reason_code": {
+                        "type": "string",
+                        "description": "Why this is a PAUSE rather than ANSWER or STEER.",
+                        "enum": [
+                            "founder_preference",
+                            "founder_priority",
+                            "founder_definition",
+                            "founder_constraint",
+                            "other_founder_judgment",
+                        ],
+                    },
+                    "retrieval_attempted": {
+                        "type": "boolean",
+                        "description": "Whether available founder records were checked for this preference first.",
+                    },
+                    "retrieved_context_summary": {
+                        "type": "string",
+                        "description": "Brief summary of records checked, if any.",
+                    },
+                },
                 "required": ["question"],
             },
             source="native",

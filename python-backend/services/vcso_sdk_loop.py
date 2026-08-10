@@ -250,6 +250,7 @@ class VcsoSdkTurnResult:
     usage_recorded: bool = False
     deferred_tool_use_id: str | None = None
     deferred_question: str | None = None
+    deferred_classification: dict[str, Any] = field(default_factory=dict)
 
     @property
     def tool_step_count(self) -> int:
@@ -1616,7 +1617,7 @@ async def _run_sdk_turn(
     stop_block_completed_watermark = 0
     task_denial_count = 0
     gave_up_early = False
-    deferred_ask_user: dict[str, str] | None = None
+    deferred_ask_user: dict[str, Any] | None = None
     resumed_ask_user_consumed = False
     stream_diagnostic_started_at = time.monotonic()
     stream_diagnostic_sequence = 0
@@ -2691,7 +2692,38 @@ async def _run_sdk_turn(
                     }
                 }
             question = str(input_data.get("tool_input", {}).get("question") or "").strip()
-            deferred_ask_user = {"id": current_id, "question": question}
+            tool_input = dict(input_data.get("tool_input") or {})
+            supplied_reason = _ask_user_reason_code(tool_input.get("reason_code"))
+            retrieval_attempted = bool(successful_retrievals) or bool(tool_input.get("retrieval_attempted"))
+            question_count = _ask_user_question_count(question)
+            classification = {
+                "classification": "pause",
+                "reason_code": supplied_reason,
+                "retrieval_attempted": retrieval_attempted,
+                "single_question": question_count <= 1,
+                "question_count": question_count,
+                "missing_reason_code": supplied_reason == "unspecified",
+                "retrieved_context_summary_present": bool(
+                    str(tool_input.get("retrieved_context_summary") or "").strip()
+                ),
+            }
+            if not retrieval_attempted:
+                classification["observation"] = "retrieval_not_attempted_before_pause"
+            elif question_count > 1:
+                classification["observation"] = "multiple_questions_in_pause"
+            record_lifecycle(
+                "ask_user_classification",
+                decision="pause",
+                reason_code=supplied_reason,
+                retrieval_attempted=retrieval_attempted,
+                single_question=question_count <= 1,
+                question_count=question_count,
+            )
+            deferred_ask_user = {
+                "id": current_id,
+                "question": question,
+                "classification": classification,
+            }
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
@@ -3177,6 +3209,9 @@ async def _run_sdk_turn(
         if deferred_ask_user:
             deferred_id = deferred_id or deferred_ask_user["id"]
             deferred_question = deferred_question or deferred_ask_user["question"]
+            deferred_classification = dict(deferred_ask_user.get("classification") or {})
+        else:
+            deferred_classification = {}
         if not session_id or not deferred_id or not deferred_question:
             raise RuntimeError("SDK ask_user pause ended without a durable session, tool id, or question.")
         return VcsoSdkTurnResult(
@@ -3198,6 +3233,7 @@ async def _run_sdk_turn(
             usage_recorded=usage_recorded,
             deferred_tool_use_id=deferred_id,
             deferred_question=deferred_question,
+            deferred_classification=deferred_classification,
         )
     answer_text = "".join(answer_parts).strip()
     if not answer_text and final_result_text:
@@ -3383,6 +3419,29 @@ def _marker_prefix_suffix_length(value: str, marker: str) -> int:
         if value.endswith(marker[:length]):
             return length
     return 0
+
+
+def _ask_user_reason_code(value: Any) -> str:
+    allowed = {
+        "founder_preference",
+        "founder_priority",
+        "founder_definition",
+        "founder_constraint",
+        "other_founder_judgment",
+    }
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in allowed else "unspecified"
+
+
+def _ask_user_question_count(question: str) -> int:
+    text = str(question or "").strip()
+    if not text:
+        return 0
+    question_marks = text.count("?")
+    if question_marks:
+        return question_marks
+    lines = [line for line in text.splitlines() if line.strip()]
+    return max(1, len(lines))
 
 
 def _selected_definitions(registry: ToolRegistry, tool_names: list[str]) -> list[ToolDefinition]:

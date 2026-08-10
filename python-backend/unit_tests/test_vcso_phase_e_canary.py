@@ -19,7 +19,8 @@ def _paused_run(**overrides):
         "parent_thread_id": THREAD_ID,
         "status": "running",
         "metadata": {
-            "deep_mode": True,
+            "deep_mode": False,
+            "sdk_session_mode": True,
             "sdk_phase": "04B-E",
             "sdk_session_id": SESSION_ID,
         },
@@ -58,6 +59,7 @@ def test_phase_c_run_is_void_even_if_ui_was_expected_to_be_deep():
     run = _paused_run(
         metadata={
             "deep_mode": False,
+            "sdk_session_mode": False,
             "sdk_phase": "04B-C",
         }
     )
@@ -70,7 +72,7 @@ def test_phase_c_run_is_void_even_if_ui_was_expected_to_be_deep():
     )
 
     assert verdict["countable"] is False
-    assert "run_deep_mode" in verdict["failures"]
+    assert "run_sdk_session_mode" in verdict["failures"]
     assert "phase_e_marker" in verdict["failures"]
     assert "run_session_pointer" in verdict["failures"]
 
@@ -90,7 +92,7 @@ def test_mismatched_thread_pointer_cannot_count():
 def test_completed_resume_requires_pending_state_to_be_cleared():
     run = _paused_run(
         status="completed",
-        metadata={"deep_mode": True, "sdk_phase": "04B-E"},
+        metadata={"deep_mode": False, "sdk_session_mode": True, "sdk_phase": "04B-E"},
         structured_result={
             "sdk_phase": "04B-E",
             "sdk_session_id": SESSION_ID,

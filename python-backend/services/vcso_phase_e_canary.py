@@ -47,7 +47,7 @@ def evaluate_phase_e_countability(
     session_id = sdk_session_pointer(run)
     thread_session_id = str(thread.get("active_sdk_session_id") or "").strip()
     checks = {
-        "run_deep_mode": metadata.get("deep_mode") is True,
+        "run_sdk_session_mode": metadata.get("sdk_session_mode") is True,
         "phase_e_marker": observed_phases == {PHASE_E_MARKER},
         "run_session_pointer": bool(session_id),
         "thread_session_pointer_matches": bool(session_id)
