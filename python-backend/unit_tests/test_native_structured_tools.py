@@ -9,7 +9,9 @@ import pytest
 from services.structured_query import (
     APPROVED_SURFACES,
     StructuredQueryError,
+    StructuredQueryRequest,
     StructuredQueryResult,
+    StructuredQueryService,
     validate_structured_sql,
 )
 from services.tool_registry import ToolExecutionContext, ToolRegistry
@@ -50,8 +52,22 @@ class _Query:
         self.operations.append(("limit", value))
         return self
 
+    def insert(self, value: Any) -> "_Query":
+        self.operations.append(("insert", value))
+        return self
+
+    def update(self, value: Any) -> "_Query":
+        self.operations.append(("update", value))
+        return self
+
     def execute(self) -> _Response:
         self.client.calls.append((self.table_name, list(self.operations)))
+        if any(operation == "insert" for operation, _value in self.operations):
+            configured = self.client.responses.get(self.table_name, [{"id": "query-1"}])
+            return _Response(configured)
+        if any(operation == "update" for operation, _value in self.operations):
+            configured = self.client.responses.get(self.table_name, [])
+            return _Response(configured)
         configured = self.client.responses[self.table_name]
         if isinstance(configured, BaseException):
             raise configured
@@ -87,6 +103,7 @@ def _dataset() -> dict[str, Any]:
         "status": "ready",
         "summary": "Monthly financial series.",
         "confidence": 0.98,
+        "provenance": {"source_file_name": "northlight-pnl.csv", "ingested_by": "seed"},
         "metadata": {"currency": "USD"},
     }
 
@@ -98,8 +115,10 @@ def _row(index: int, *, normalized: bool = True) -> dict[str, Any]:
         "row_label": "Revenue",
         "period_start": f"2026-0{index}-01",
         "period_end": f"2026-0{index}-28",
+        "period_grain": "month",
+        "entity_name": "Client A" if index < 3 else "Client B",
         "values": {"revenue": index * 100},
-        "normalized_values": {"revenue": index * 1000} if normalized else {},
+        "normalized_values": {"revenue_usd": index * 1000, "delivery_cost_usd": index * 100} if normalized else {},
         "provenance": {"sheet": "P&L", "row": index},
     }
 
@@ -132,7 +151,12 @@ def test_list_founder_datasets_preserves_summary_findings_and_reports_truncation
     assert structured["truncated"] is True
     assert structured["returned_count"] == 1
     assert structured["findings"][0]["type"] == "dataset_summary"
+    assert structured["findings"][0]["provenance"] == {"source_file_name": "northlight-pnl.csv", "ingested_by": "seed"}
     assert result.sources[0].source_kind == "founder_dataset"
+    assert result.sources[0].metadata["dataset_provenance"] == {
+        "source_file_name": "northlight-pnl.csv",
+        "ingested_by": "seed",
+    }
     assert ("eq", ("user_id", "founder-1")) in client.calls[0][1]
 
 
@@ -158,7 +182,7 @@ def test_get_dataset_periods_double_scopes_prefers_normalized_and_exposes_trunca
     row_findings = [item for item in structured["findings"] if item["type"] == "dataset_row"]
     assert structured["truncated"] is True
     assert structured["requested_limit"] == 2
-    assert row_findings[0]["values"] == {"revenue": 1000}
+    assert row_findings[0]["values"] == {"revenue_usd": 1000, "delivery_cost_usd": 100}
     assert row_findings[1]["values"] == {"revenue": 200}
     assert row_findings[0]["provenance"] == {"sheet": "P&L", "row": 1}
     row_call = next(operations for table, operations in client.calls if table == "founder_dataset_rows")
@@ -236,6 +260,81 @@ def test_run_structured_query_validates_before_service_and_returns_agent_result(
     assert structured["truncated"] is False
     assert captured["payload"].user_id == "founder-1"
     assert result.sources[0].source_id == _dataset()["id"]
+
+
+def test_aggregate_query_shape_validates_with_whitelisted_group_and_function() -> None:
+    validated = validate_structured_sql(
+        (
+            "select period_start, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue, "
+            "count(*) as row_count from founder_dataset_rows "
+            f"where dataset_id = '{_dataset()['id']}' group by period_start order by period_start limit 10"
+        )
+    )
+
+    assert validated["query_kind"] == "aggregate"
+    assert validated["group_by"] == ["period_start"]
+    assert validated["aggregates"] == [
+        {"function": "sum", "value_key": "revenue_usd", "alias": "total_revenue"},
+        {"function": "count", "value_key": None, "alias": "row_count"},
+    ]
+    assert validated["filters"] == {"dataset_id": _dataset()["id"]}
+
+
+@pytest.mark.parametrize(
+    "sql, message",
+    [
+        (
+            "select period_start, ratio(normalized_values->>'revenue_usd') as share "
+            "from founder_dataset_rows group by period_start",
+            "Query shape is not approved",
+        ),
+        (
+            "select created_at, sum(normalized_values->>'revenue_usd') as total_revenue "
+            "from founder_dataset_rows group by created_at",
+            "GROUP BY column is not approved",
+        ),
+        (
+            "select period_start, sum(values->>'revenue_usd') as total_revenue "
+            "from founder_dataset_rows group by period_start",
+            "Only approved aggregate expressions",
+        ),
+    ],
+)
+def test_aggregate_query_shape_rejects_non_whitelisted_shapes(sql: str, message: str) -> None:
+    with pytest.raises(StructuredQueryError, match=message):
+        validate_structured_sql(sql)
+
+
+def test_structured_query_service_executes_aggregate_with_input_provenance() -> None:
+    client = _Client(
+        {
+            "founder_dataset_queries": [{"id": "query-1"}],
+            "founder_dataset_query_results": [],
+            "founder_dataset_rows": [_row(1), _row(2), _row(3)],
+        }
+    )
+    service = StructuredQueryService(SimpleNamespace(client=client))
+
+    result = service.execute(
+        StructuredQueryRequest(
+            user_id="founder-1",
+            question="Revenue by month",
+            generated_sql=(
+                "select period_start, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
+                f"from founder_dataset_rows where dataset_id = '{_dataset()['id']}' "
+                "group by period_start order by period_start limit 5"
+            ),
+        )
+    )
+
+    assert result.accepted is True
+    assert [row["total_revenue"] for row in result.rows] == [1000, 2000, 3000]
+    assert result.rows[0]["provenance"]["provenance_kind"] == "aggregate_inputs"
+    assert result.rows[0]["provenance"]["dataset_ids"] == [_dataset()["id"]]
+    assert result.rows[0]["provenance"]["source_row_count"] == 1
+    row_call = next(operations for table, operations in client.calls if table == "founder_dataset_rows")
+    assert ("eq", ("user_id", "founder-1")) in row_call
+    assert ("eq", ("dataset_id", _dataset()["id"])) in row_call
 
 
 def test_run_structured_query_does_not_invoke_service_for_invalid_sql(

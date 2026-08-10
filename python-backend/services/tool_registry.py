@@ -760,8 +760,11 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             name="run_structured_query",
             description=(
                 "Run a validated, read-only, row-capped SQL query against approved founder dataset surfaces. "
-                "Use it for aggregation across many rows, or when rows returned by a bounded dataset read do "
-                "not already answer the question; do not repeat a complete, untruncated bounded read. "
+                "Use it for aggregation across many rows: whitelisted totals, counts, averages, min/max values, and group-by components "
+                "across many rows, or when rows returned by a bounded dataset read do not already answer the "
+                "question; do not repeat a complete, untruncated bounded read. Do not retrieve percentages, "
+                "shares, ratios, margins, or concentration calculations; retrieve cited inputs and use "
+                "execute_code for those derivations. "
                 "Authoritative for the returned structured figures and current state. Not authoritative for "
                 "interpretation, and never permits model-supplied founder identity or write operations."
             ),
@@ -1276,7 +1279,8 @@ def _dataset_source(
     row: dict[str, Any] | None = None,
 ) -> ToolSourceRef:
     row = row or {}
-    provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
+    row_provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
+    dataset_provenance = dataset.get("provenance") if isinstance(dataset.get("provenance"), dict) else {}
     return ToolSourceRef(
         source_kind="founder_dataset",
         source_id=str(dataset.get("id")) if dataset.get("id") else None,
@@ -1284,11 +1288,12 @@ def _dataset_source(
         metadata={
             "dataset_type": dataset.get("dataset_type"),
             "status": dataset.get("status"),
+            "dataset_provenance": dataset_provenance,
             "row_id": row.get("id"),
             "row_label": row.get("row_label"),
             "period_start": row.get("period_start"),
             "period_end": row.get("period_end"),
-            "provenance": provenance,
+            "provenance": row_provenance or dataset_provenance,
         },
     )
 
@@ -1300,7 +1305,7 @@ def _execute_list_founder_datasets(
     limit = _bounded_int(tool_input.get("limit"), default=50, minimum=1, maximum=100)
     response = (
         context.client.table("founder_datasets")
-        .select("id,user_id,source_document_id,dataset_name,dataset_type,status,summary,confidence,metadata")
+        .select("id,user_id,source_document_id,dataset_name,dataset_type,status,summary,confidence,provenance,metadata")
         .eq("user_id", context.user_id)
         .order("updated_at", desc=True)
         .limit(limit + 1)
@@ -1318,6 +1323,7 @@ def _execute_list_founder_datasets(
             "dataset_type": dataset.get("dataset_type"),
             "status": dataset.get("status"),
             "confidence": dataset.get("confidence"),
+            "provenance": dataset.get("provenance") or {},
             "metadata": dataset.get("metadata") or {},
         }
         for dataset in datasets
@@ -1354,7 +1360,7 @@ def _execute_get_dataset_periods(
     limit = _bounded_int(tool_input.get("limit"), default=20, minimum=1, maximum=100)
     dataset_response = (
         context.client.table("founder_datasets")
-        .select("id,user_id,source_document_id,dataset_name,dataset_type,status,summary,confidence,metadata")
+        .select("id,user_id,source_document_id,dataset_name,dataset_type,status,summary,confidence,provenance,metadata")
         .eq("user_id", context.user_id)
         .eq("id", dataset_id)
         .limit(1)
@@ -1483,6 +1489,7 @@ def _execute_run_structured_query(
         if not dataset_id or dataset_id in seen_dataset_ids:
             continue
         seen_dataset_ids.add(dataset_id)
+        aggregate_provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
         sources.append(
             ToolSourceRef(
                 source_kind="founder_dataset",
@@ -1492,7 +1499,8 @@ def _execute_run_structured_query(
                     "query_id": result.query_id,
                     "period_start": row.get("period_start"),
                     "period_end": row.get("period_end"),
-                    "provenance": row.get("provenance") or {},
+                    "aggregate": row.get("aggregate") or {},
+                    "provenance": aggregate_provenance,
                 },
             )
         )
