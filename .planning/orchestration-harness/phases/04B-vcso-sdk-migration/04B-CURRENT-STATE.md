@@ -179,6 +179,16 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - 2026-08-09 — Fifth near-false-green, and a new species: not a broken code path, but a **gate that fires
   correctly and is then routed around.** A green lifecycle entry proved the gate worked; the founder-visible
   answer proved it did not hold. Lifecycle evidence alone is not sufficient to grade composition.
+- 2026-08-09 — **An instrument that is always green measures nothing.** Step 4's first `ask_user`
+  classification derived `retrieval_attempted` from turn-level `successful_retrievals`, which is true on
+  essentially every native turn because the lead retrieves before it reasons. The
+  `retrieval_not_attempted_before_pause` observation could therefore almost never fire. Tightened in
+  `v0.6.169` to a preference-specific signal. **When adding an observation, ask what its false value looks
+  like** — if you cannot describe a realistic run that trips it, it is decoration.
+- 2026-08-09 — **A model's self-assertion about its own behaviour is not evidence.** The same
+  classification accepted `tool_input["retrieval_attempted"]` from the model as an alternative to observed
+  retrieval. Same trust pattern as defect 10. Model-supplied fields may be *recorded* for comparison
+  against observed facts; they may never *satisfy* a check.
 
 ---
 

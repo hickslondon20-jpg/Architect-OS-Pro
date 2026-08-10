@@ -40,6 +40,8 @@ from services.vcso_sdk_loop import (
     _native_granular_worker_outcome,
     _native_partial_failure_context,
     _RetrievalBinding,
+    _ask_user_observed_retrievals,
+    _ask_user_preference_retrievals,
     _sanitized_sdk_error,
     _native_tool_output_summary,
     _successful_cited_compute_result,
@@ -1788,6 +1790,7 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
                 "tool_input": {
                     "question": "Which market should I prioritize?",
                     "reason_code": "founder_priority",
+                    "retrieval_attempted": True,
                 },
             },
             "tool-question-1",
@@ -1845,12 +1848,41 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
         "classification": "pause",
         "reason_code": "founder_priority",
         "retrieval_attempted": False,
+        "preference_retrieval_attempted": False,
+        "model_claimed_retrieval_attempted": True,
+        "observed_retrievals": [],
+        "preference_retrievals": [],
         "single_question": True,
         "question_count": 1,
         "missing_reason_code": False,
         "retrieved_context_summary_present": False,
         "observation": "retrieval_not_attempted_before_pause",
     }
+
+
+def test_ask_user_preference_retrieval_signal_ignores_structured_data_reads():
+    retrievals = {
+        "structured-read": _RetrievalBinding(
+            tool_use_id="structured-read",
+            tool_name="get_dataset_periods",
+            source_tokens=set(),
+            numeric_tokens=set(),
+        ),
+        "wiki-read": _RetrievalBinding(
+            tool_use_id="wiki-read",
+            tool_name="wiki_get_page",
+            source_tokens=set(),
+            numeric_tokens=set(),
+        ),
+    }
+
+    assert _ask_user_observed_retrievals(retrievals) == [
+        {"tool_use_id": "structured-read", "tool_name": "get_dataset_periods"},
+        {"tool_use_id": "wiki-read", "tool_name": "wiki_get_page"},
+    ]
+    assert _ask_user_preference_retrievals(retrievals) == [
+        {"tool_use_id": "wiki-read", "tool_name": "wiki_get_page"},
+    ]
 
 
 def test_deep_resume_allows_only_persisted_question_replay_and_emits_final_answer(monkeypatch):

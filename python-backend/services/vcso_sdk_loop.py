@@ -2694,12 +2694,18 @@ async def _run_sdk_turn(
             question = str(input_data.get("tool_input", {}).get("question") or "").strip()
             tool_input = dict(input_data.get("tool_input") or {})
             supplied_reason = _ask_user_reason_code(tool_input.get("reason_code"))
-            retrieval_attempted = bool(successful_retrievals) or bool(tool_input.get("retrieval_attempted"))
+            observed_retrievals = _ask_user_observed_retrievals(successful_retrievals)
+            preference_retrievals = _ask_user_preference_retrievals(successful_retrievals)
+            retrieval_attempted = bool(preference_retrievals)
             question_count = _ask_user_question_count(question)
             classification = {
                 "classification": "pause",
                 "reason_code": supplied_reason,
                 "retrieval_attempted": retrieval_attempted,
+                "preference_retrieval_attempted": retrieval_attempted,
+                "model_claimed_retrieval_attempted": bool(tool_input.get("retrieval_attempted")),
+                "observed_retrievals": observed_retrievals,
+                "preference_retrievals": preference_retrievals,
                 "single_question": question_count <= 1,
                 "question_count": question_count,
                 "missing_reason_code": supplied_reason == "unspecified",
@@ -2716,6 +2722,9 @@ async def _run_sdk_turn(
                 decision="pause",
                 reason_code=supplied_reason,
                 retrieval_attempted=retrieval_attempted,
+                preference_retrieval_count=len(preference_retrievals),
+                observed_retrieval_count=len(observed_retrievals),
+                model_claimed_retrieval_attempted=bool(tool_input.get("retrieval_attempted")),
                 single_question=question_count <= 1,
                 question_count=question_count,
             )
@@ -3442,6 +3451,35 @@ def _ask_user_question_count(question: str) -> int:
         return question_marks
     lines = [line for line in text.splitlines() if line.strip()]
     return max(1, len(lines))
+
+
+def _ask_user_observed_retrievals(
+    retrievals: dict[str, _RetrievalBinding],
+) -> list[dict[str, str]]:
+    return [
+        {"tool_use_id": binding.tool_use_id, "tool_name": binding.tool_name}
+        for binding in retrievals.values()
+    ]
+
+
+def _ask_user_preference_retrievals(
+    retrievals: dict[str, _RetrievalBinding],
+) -> list[dict[str, str]]:
+    preference_tools = {
+        "wiki_search",
+        "wiki_get_page",
+        "wiki_list",
+        "kb_grep",
+        "kb_read",
+        "kb_tree",
+        "kb_ls",
+        "read_file",
+    }
+    return [
+        {"tool_use_id": binding.tool_use_id, "tool_name": binding.tool_name}
+        for binding in retrievals.values()
+        if binding.tool_name in preference_tools
+    ]
 
 
 def _selected_definitions(registry: ToolRegistry, tool_names: list[str]) -> list[ToolDefinition]:
