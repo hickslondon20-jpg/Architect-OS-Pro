@@ -23,6 +23,13 @@ from services.vcso_phase_e_canary import evaluate_phase_e_countability
 from services.vcso_session_store import SupabaseVcsoSessionStore
 
 
+SDK_PROJECT_KEY_CANDIDATES = (
+    "architectos-vcso-deep",
+    "-app",
+    "C--Users-Hicks-ArchitectOS-Pro-beta",
+)
+
+
 def _single(response: Any, label: str) -> dict[str, Any]:
     data = getattr(response, "data", None)
     if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
@@ -77,13 +84,35 @@ async def verify(*, user_id: str, run_id: str, stage: str) -> dict[str, Any]:
             thread_id=thread_id,
             turn_message_id=str(run.get("parent_message_id") or ""),
         )
-        transcript = await store.load(
-            {
-                "project_key": "architectos-vcso-deep",
-                "session_id": str(pointer),
-                "subpath": "",
-            }
+        metadata = run.get("metadata") if isinstance(run.get("metadata"), dict) else {}
+        structured_result = (
+            run.get("structured_result")
+            if isinstance(run.get("structured_result"), dict)
+            else {}
         )
+        candidates = [
+            str(value).strip()
+            for value in (
+                metadata.get("sdk_project_key"),
+                structured_result.get("sdk_project_key"),
+                *SDK_PROJECT_KEY_CANDIDATES,
+            )
+            if str(value or "").strip()
+        ]
+        seen: set[str] = set()
+        for project_key in candidates:
+            if project_key in seen:
+                continue
+            seen.add(project_key)
+            transcript = await store.load(
+                {
+                    "project_key": project_key,
+                    "session_id": str(pointer),
+                    "subpath": "",
+                }
+            )
+            if transcript:
+                break
     verdict = evaluate_phase_e_countability(
         run=run,
         thread=thread,
