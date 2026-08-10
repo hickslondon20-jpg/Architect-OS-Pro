@@ -200,6 +200,17 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - 2026-08-09 — The rich `sdk_ask_user_classification` payload is written **only on the successful pause
   path** (`vcso_chat_service.py:781`). A run that reaches PAUSE and then fails persists nothing, so the
   most diagnostically valuable runs are the least observable. Write it on the failure path too.
+- 2026-08-09 — **The Step 1.5 countability guard voids Step 4's own gate runs on a literal reading.** That
+  guard declares a run void unless it carries `sdk_phase=04B-D`. Session-mode turns correctly record
+  `sdk_phase=04B-E` (confirmed on run `e97e9339`), while still carrying `native_subagent_mode=true` and a
+  non-empty `available_subagents` — which is the substance the guard actually protects. **Restate the Step 4
+  gate criteria to accept `04B-E` before the gate runs, not after.** Settling pass criteria after the
+  evidence exists is what made the N=5 gate unpassable.
+- 2026-08-10 — **Step 4 countability restatement:** a Step 4 Phase E pause/resume gate is countable only
+  when the persisted parent run carries `sdk_phase=04B-E`, `sdk_session_mode=true`,
+  `native_subagent_mode=true`, non-empty `available_subagents`, a reloadable SDK session transcript, and
+  the expected thread session/pending-question state for the stage under test. `sdk_phase=04B-D` is the
+  native-surface Step 3 marker and is not required for Step 4 session-mode gate runs.
 - 2026-08-09 — **The Guardrail 1 spike could not have caught the durable-flush refusal**, because it used
   an in-memory store where "durably flushed" has no meaning. This is precisely the gap that was recorded as
   still-open when the spike was accepted as local-only. The open item was real and it cost `$0.14` to
@@ -265,6 +276,8 @@ New findings go here, dated, one line each. **Do not open new amendment sections
 - 2026-08-09 - Step 4 Guardrail 1 spike was local, not a deployed-backend run: direct SDK `0.2.118` plus bundled Claude Code CLI `2.1.209`, ephemeral config dir, and an in-memory session store. It proves the pinned CLI accepts `resume=` and `fork_session=true`; it does **not** prove `SupabaseVcsoSessionStore` through the real RPC path or behavior inside the Railway container. That composition remains open for the Step 4 pause/reload/resume gate.
 - 2026-08-09 - Step 4 `v0.6.170` Unit 1 fixes the pause observability fault found by the first armed run. Lifecycle persistence now carries the bounded ask_user classification fields (`retrieval_attempted`, preference-specific counts, model-claim comparison, single-question check, and sanitized retrieval tool names/tool-use ids), and failed pause attempts preserve `sdk_ask_user_classification` on the final run metadata.
 - 2026-08-09 - Step 4 `v0.6.170` Unit 2 applies the durable-flush fix using the narrowest public SDK primitive available. The pinned SDK exposes `session_store_flush` (`batched`/`eager`) but no public force-flush method at the defer boundary, so only `enable_ask_user_pause` turns compile with `session_store_flush="eager"`; non-pause native turns remain `batched`.
+- 2026-08-10 - Step 4 real-store spike proved the durable-flush failure is not a flush-mode race. Local SDK runs against `SupabaseVcsoSessionStore` and the real Supabase RPCs attempted appends for production-shaped `deep_mode=false` pause turns, but the live `vcso_sdk_session_append` RPC rejected them with `SDK session turn ownership or Deep Mode check failed`, so fresh load returned zero rows. The same spike with legacy `deep_mode=true` fixtures persisted deferred turns under both `eager` and `batched`, and a completed -> resume -> fork run loaded the sentinel successfully. The remaining fix is the RPC predicate, not another arm.
+- 2026-08-10 - Step 4 `v0.6.171` prepares the RPC fix as a migration artifact: `docs/migrations/20260810_phase_e_sdk_session_append_native_turns.sql` keeps the service-role RPC and founder/thread/message ownership checks, but removes the deleted Deep Mode predicate from append authorization. This migration has not been applied live in this unit; the Supabase apply was stopped pending explicit approval because it mutates the live authorization RPC.
 
 ---
 
