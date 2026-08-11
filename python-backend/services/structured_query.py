@@ -47,6 +47,7 @@ AGGREGATE_GROUP_COLUMNS = {
     "period_end",
     "period_grain",
     "entity_name",
+    "client_name",
     "row_label",
 }
 AGGREGATE_SOURCE_COLUMNS = (
@@ -211,7 +212,7 @@ class StructuredQueryService:
         group_columns = list(validated["group_by"])
         grouped: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
         for row in source_rows:
-            key = tuple(row.get(column) for column in group_columns) if group_columns else ("__all__",)
+            key = tuple(_group_value(row, column) for column in group_columns) if group_columns else ("__all__",)
             grouped.setdefault(key, []).append(row)
 
         result_rows: list[dict[str, Any]] = []
@@ -563,6 +564,21 @@ def _numeric_value(row: dict[str, Any], key: str) -> Decimal | None:
         return Decimal(str(raw))
     except (InvalidOperation, ValueError):
         return None
+
+
+def _group_value(row: dict[str, Any], column: str) -> Any:
+    if column != "client_name":
+        return row.get(column)
+    provenance = row.get("provenance")
+    if isinstance(provenance, dict) and provenance.get("client_name"):
+        return provenance.get("client_name")
+    normalized_values = row.get("normalized_values")
+    if isinstance(normalized_values, dict) and normalized_values.get("client_name"):
+        return normalized_values.get("client_name")
+    values = row.get("values")
+    if isinstance(values, dict):
+        return values.get("client_name")
+    return None
 
 
 def _json_number(value: Decimal) -> int | float:

@@ -761,10 +761,12 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             description=(
                 "Run a validated, read-only, row-capped SQL query against approved founder dataset surfaces. "
                 "Use it for aggregation across many rows: whitelisted totals, counts, averages, min/max values, and group-by components "
-                "across many rows, or when rows returned by a bounded dataset read do not already answer the "
+                "by period or client_name across many rows, or when rows returned by a bounded dataset read do not already answer the "
                 "question; do not repeat a complete, untruncated bounded read. Do not retrieve percentages, "
                 "shares, ratios, margins, or concentration calculations; retrieve cited inputs and use "
                 "execute_code for those derivations. "
+                "Example: select period_start, client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
+                "from founder_dataset_rows group by period_start, client_name order by period_start limit 25. "
                 "Authoritative for the returned structured figures and current state. Not authoritative for "
                 "interpretation, and never permits model-supplied founder identity or write operations."
             ),

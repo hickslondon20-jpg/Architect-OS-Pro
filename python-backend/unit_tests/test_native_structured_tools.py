@@ -280,6 +280,21 @@ def test_aggregate_query_shape_validates_with_whitelisted_group_and_function() -
     assert validated["filters"] == {"dataset_id": _dataset()["id"]}
 
 
+def test_aggregate_query_shape_allows_client_dimension_without_retrieving_percentages() -> None:
+    validated = validate_structured_sql(
+        (
+            "select period_start, client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
+            "from founder_dataset_rows group by period_start, client_name order by period_start limit 25"
+        )
+    )
+
+    assert validated["query_kind"] == "aggregate"
+    assert validated["group_by"] == ["period_start", "client_name"]
+    assert validated["aggregates"] == [
+        {"function": "sum", "value_key": "revenue_usd", "alias": "total_revenue"}
+    ]
+
+
 @pytest.mark.parametrize(
     "sql, message",
     [
@@ -347,6 +362,48 @@ def test_structured_query_service_executes_aggregate_with_input_provenance() -> 
     row_call = next(operations for table, operations in client.calls if table == "founder_dataset_rows")
     assert ("eq", ("user_id", "founder-1")) in row_call
     assert ("eq", ("dataset_id", _dataset()["id"])) in row_call
+
+
+def test_structured_query_service_groups_aggregate_by_client_provenance_dimension() -> None:
+    client_a_1 = {
+        **_row(1),
+        "provenance": {"sheet": "P&L", "row": 1, "client_name": "Client A"},
+    }
+    client_a_2 = {
+        **_row(2),
+        "provenance": {"sheet": "P&L", "row": 2, "client_name": "Client A"},
+    }
+    client_b = {
+        **_row(4),
+        "provenance": {"sheet": "P&L", "row": 4, "client_name": "Client B"},
+    }
+    client = _Client(
+        {
+            "founder_dataset_queries": [{"id": "query-1"}],
+            "founder_dataset_query_results": [],
+            "founder_dataset_rows": [client_a_1, client_a_2, client_b],
+        }
+    )
+    service = StructuredQueryService(SimpleNamespace(client=client))
+
+    result = service.execute(
+        StructuredQueryRequest(
+            user_id="founder-1",
+            question="Revenue by client",
+            generated_sql=(
+                "select client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
+                "from founder_dataset_rows group by client_name order by total_revenue desc limit 5"
+            ),
+        )
+    )
+
+    assert result.accepted is True
+    assert [(row["client_name"], row["total_revenue"]) for row in result.rows] == [
+        ("Client B", 4000),
+        ("Client A", 3000),
+    ]
+    assert result.rows[0]["aggregate"]["group_by"] == ["client_name"]
+    assert result.rows[0]["provenance"]["group_by"] == ["client_name"]
 
 
 def test_run_structured_query_does_not_invoke_service_for_invalid_sql(
