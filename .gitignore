@@ -13,11 +13,18 @@ dist-ssr
 *.local
 .claude/settings.local.json
 
+# Scratch / local snapshots. Never commit a working copy of the repo — git already
+# holds every snapshot you need. A full copy under .tmp/ carried a nested virtualenv
+# that the anchored venv rule below did not match, staging ~34,600 files.
+.tmp/
+
 # Python
 __pycache__/
 *.py[cod]
 *.pyo
-python-backend/venv/
+# Unanchored so nested copies are covered the way `node_modules` already is.
+# `python-backend/venv/` only matched at the repo root and missed copies one level down.
+venv/
 .pytest_cache/
 .mypy_cache/
 *.egg-info/
@@ -27,6 +34,10 @@ python-backend/venv/
 .env.*
 !.env.example
 !**/.env.example
+
+# Windows / OneDrive artifacts
+desktop.ini
+Thumbs.db
 
 # Editor directories and files
 .vscode/*
