@@ -6,7 +6,10 @@ from typing import Any
 
 import pytest
 
-from services.vcso_session_store import SupabaseVcsoSessionStore
+from services.vcso_session_store import (
+    SupabaseVcsoSessionStore,
+    VCSO_SDK_SESSION_PROJECT_KEY,
+)
 
 
 USER_ID = str(uuid.uuid4())
@@ -56,7 +59,7 @@ def test_append_binds_founder_thread_message_and_confirms_durability() -> None:
 
     asyncio.run(
         store.append(
-            {"project_key": "architectos", "session_id": SESSION_ID},
+            {"project_key": "C--Users-Hicks-ArchitectOS-Pro-beta", "session_id": SESSION_ID},
             entries,
         )
     )
@@ -68,7 +71,7 @@ def test_append_binds_founder_thread_message_and_confirms_durability() -> None:
                 "p_user_id": USER_ID,
                 "p_thread_id": THREAD_ID,
                 "p_turn_message_id": MESSAGE_ID,
-                "p_project_key": "architectos",
+                "p_project_key": VCSO_SDK_SESSION_PROJECT_KEY,
                 "p_session_id": SESSION_ID,
                 "p_subpath": "",
                 "p_entries": entries,
@@ -89,7 +92,7 @@ def test_load_is_founder_scoped_and_returns_opaque_entries() -> None:
     loaded = asyncio.run(
         store.load(
             {
-                "project_key": "architectos",
+                "project_key": "-app",
                 "session_id": SESSION_ID,
                 "subpath": "subagents/agent-1",
             }
@@ -101,7 +104,7 @@ def test_load_is_founder_scoped_and_returns_opaque_entries() -> None:
         "vcso_sdk_session_load",
         {
             "p_user_id": USER_ID,
-            "p_project_key": "architectos",
+            "p_project_key": VCSO_SDK_SESSION_PROJECT_KEY,
             "p_session_id": SESSION_ID,
             "p_subpath": "subagents/agent-1",
         },
@@ -119,14 +122,23 @@ def test_empty_load_returns_none_and_subkeys_are_filtered() -> None:
     store = _store(client)
 
     loaded = asyncio.run(
-        store.load({"project_key": "architectos", "session_id": SESSION_ID})
+        store.load({"project_key": "-app", "session_id": SESSION_ID})
     )
     subkeys = asyncio.run(
-        store.list_subkeys({"project_key": "architectos", "session_id": SESSION_ID})
+        store.list_subkeys(
+            {
+                "project_key": "C--Users-Hicks-ArchitectOS-Pro-beta",
+                "session_id": SESSION_ID,
+            }
+        )
     )
 
     assert loaded is None
     assert subkeys == ["subagents/agent-1", "subagents/agent-2"]
+    assert [call[1]["p_project_key"] for call in client.calls] == [
+        VCSO_SDK_SESSION_PROJECT_KEY,
+        VCSO_SDK_SESSION_PROJECT_KEY,
+    ]
 
 
 def test_invalid_identifiers_fail_before_rpc() -> None:

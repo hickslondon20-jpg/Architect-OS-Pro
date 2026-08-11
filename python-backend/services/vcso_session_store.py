@@ -13,6 +13,8 @@ from claude_agent_sdk.types import (
     SessionStoreEntry,
 )
 
+VCSO_SDK_SESSION_PROJECT_KEY = "architectos-vcso-deep"
+
 
 def _uuid(value: str, label: str) -> str:
     try:
@@ -49,6 +51,11 @@ class SupabaseVcsoSessionStore:
         self._confirmed_sessions: set[str] = set()
         self._confirmation_lock = threading.Lock()
 
+    def _project_key(self) -> str:
+        """Pin SDK session persistence to one deploy-stable namespace."""
+
+        return VCSO_SDK_SESSION_PROJECT_KEY
+
     async def append(self, key: SessionKey, entries: list[SessionStoreEntry]) -> None:
         session_id = _uuid(key["session_id"], "session_id")
         if not entries:
@@ -57,7 +64,7 @@ class SupabaseVcsoSessionStore:
             "p_user_id": self.user_id,
             "p_thread_id": self.thread_id,
             "p_turn_message_id": self.turn_message_id,
-            "p_project_key": str(key["project_key"]),
+            "p_project_key": self._project_key(),
             "p_session_id": session_id,
             "p_subpath": str(key.get("subpath") or ""),
             "p_entries": entries,
@@ -74,7 +81,7 @@ class SupabaseVcsoSessionStore:
         session_id = _uuid(key["session_id"], "session_id")
         payload = {
             "p_user_id": self.user_id,
-            "p_project_key": str(key["project_key"]),
+            "p_project_key": self._project_key(),
             "p_session_id": session_id,
             "p_subpath": str(key.get("subpath") or ""),
         }
@@ -91,7 +98,7 @@ class SupabaseVcsoSessionStore:
         session_id = _uuid(key["session_id"], "session_id")
         payload = {
             "p_user_id": self.user_id,
-            "p_project_key": str(key["project_key"]),
+            "p_project_key": self._project_key(),
             "p_session_id": session_id,
         }
 
@@ -111,4 +118,3 @@ class SupabaseVcsoSessionStore:
         normalized = _uuid(session_id, "session_id")
         with self._confirmation_lock:
             return normalized in self._confirmed_sessions
-
