@@ -757,16 +757,106 @@ def _native_tool_definitions() -> list[ToolDefinition]:
             keywords=["dataset", "period", "revenue", "margin", "figures"],
         ),
         ToolDefinition(
+            name="aggregate_founder_dataset",
+            description=(
+                "Retrieve bounded aggregate inputs from a founder-owned structured dataset using typed parameters, "
+                "not SQL. Use this when you need totals, counts, averages, min/max values, or grouped components "
+                "before computing percentages, shares, ratios, margins, or concentration in execute_code. "
+                "For client-level datasets, use group_by value 'client': the underlying dataset row column is "
+                "entity_name, and entity_name carries the client name such as Vantage Cloud or Harborline Legal. "
+                "For June client revenue components, pass group_by ['client'] and metrics "
+                "[{'function':'sum','value_key':'revenue_usd'}]. "
+                "This tool returns cited aggregate input rows with aggregate_inputs provenance; it does not calculate "
+                "percentages or business-defined ratios. Authoritative for the returned structured figures and current "
+                "state. Not authoritative for interpretation, and never permits model-supplied founder identity or "
+                "write operations."
+            ),
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "dataset_id": {
+                        "type": "string",
+                        "description": "Founder-owned dataset UUID returned by list_founder_datasets.",
+                    },
+                    "group_by": {
+                        "type": "array",
+                        "description": "Dimensions to group by. Use 'client' for client-level revenue or margin components; it maps to entity_name.",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "client",
+                                "period_start",
+                                "period_end",
+                                "period_grain",
+                                "dataset_id",
+                                "table_id",
+                                "row_label",
+                            ],
+                        },
+                        "default": ["period_start"],
+                    },
+                    "metrics": {
+                        "type": "array",
+                        "description": "Aggregate metrics to retrieve as cited inputs. Do not request percentages, ratios, shares, margins, or concentration.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "function": {
+                                    "type": "string",
+                                    "enum": ["sum", "count", "avg", "min", "max"],
+                                },
+                                "value_key": {
+                                    "type": ["string", "null"],
+                                    "enum": [
+                                        "revenue_usd",
+                                        "delivery_cost_usd",
+                                        "net_revenue",
+                                        "net_income",
+                                        None,
+                                    ],
+                                    "description": "Approved numeric field. Use null only for count(*) row counts.",
+                                },
+                            },
+                            "required": ["function"],
+                        },
+                    },
+                    "period_start": {
+                        "type": ["string", "null"],
+                        "description": "Optional inclusive lower period bound in YYYY-MM-DD form.",
+                    },
+                    "period_end": {
+                        "type": ["string", "null"],
+                        "description": "Optional inclusive upper period bound in YYYY-MM-DD form.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum aggregate rows to return (1-100). Default: 25.",
+                        "default": 25,
+                    },
+                    "question": {
+                        "type": "string",
+                        "description": "The business question these aggregate inputs answer.",
+                    },
+                },
+                "required": ["dataset_id", "metrics"],
+            },
+            source="native",
+            executor_kind="native",
+            persistence_semantics="read_only",
+            executor=_execute_aggregate_founder_dataset,
+            citation={"source_kind": "founder_dataset", "mode": "verbatim"},
+            capability_hints=["structured_data_agent"],
+            surface_tags=["virtual_cso", "domain_agent"],
+            keywords=["aggregate", "dataset", "client", "revenue", "total", "margin"],
+        ),
+        ToolDefinition(
             name="run_structured_query",
             description=(
                 "Run a validated, read-only, row-capped SQL query against approved founder dataset surfaces. "
-                "Use it for aggregation across many rows: whitelisted totals, counts, averages, min/max values, and group-by components "
-                "by period or client_name across many rows, or when rows returned by a bounded dataset read do not already answer the "
-                "question; do not repeat a complete, untruncated bounded read. Do not retrieve percentages, "
-                "shares, ratios, margins, or concentration calculations; retrieve cited inputs and use "
-                "execute_code for those derivations. "
-                "Example: select period_start, client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
-                "from founder_dataset_rows group by period_start, client_name order by period_start limit 25. "
+                "Use only for bounded row reads. Do not use this tool for aggregates; use aggregate_founder_dataset "
+                "for totals, counts, averages, min/max values, and grouped components. Do not retrieve percentages, "
+                "shares, ratios, margins, or concentration calculations; retrieve cited inputs and use execute_code "
+                "for those derivations. "
                 "Authoritative for the returned structured figures and current state. Not authoritative for "
                 "interpretation, and never permits model-supplied founder identity or write operations."
             ),
@@ -1517,6 +1607,101 @@ def _execute_run_structured_query(
             "row_count": len(result.rows),
             "row_limit": validated["limit"],
             "truncated": len(result.rows) >= validated["limit"],
+            "execution_ms": result.execution_ms,
+        },
+    )
+
+
+def _execute_aggregate_founder_dataset(
+    context: ToolExecutionContext,
+    tool_input: dict[str, Any],
+) -> ToolResultEnvelope:
+    from services.structured_query import (
+        AggregateMetricRequest,
+        StructuredQueryService,
+        TypedAggregateRequest,
+    )
+
+    dataset_id = str(tool_input.get("dataset_id") or "").strip()
+    if not dataset_id:
+        raise ToolRegistryError("dataset_id is required.")
+    raw_metrics = tool_input.get("metrics") or []
+    if not isinstance(raw_metrics, list) or not raw_metrics:
+        raise ToolRegistryError("metrics must be a non-empty list.")
+    metrics = [
+        AggregateMetricRequest(
+            function=str(metric.get("function") or ""),
+            value_key=metric.get("value_key"),
+        )
+        for metric in raw_metrics
+        if isinstance(metric, dict)
+    ]
+    if len(metrics) != len(raw_metrics):
+        raise ToolRegistryError("Each metric must be an object with typed fields.")
+
+    raw_group_by = tool_input.get("group_by") or ["period_start"]
+    if not isinstance(raw_group_by, list):
+        raise ToolRegistryError("group_by must be a list of approved enum values.")
+    group_by = [str(value or "").strip() for value in raw_group_by]
+    limit = _bounded_int(tool_input.get("limit"), default=25, minimum=1, maximum=100)
+    question = str(tool_input.get("question") or "Typed aggregate founder dataset retrieval.").strip()
+    result = StructuredQueryService(context.store).execute_typed_aggregate(
+        TypedAggregateRequest(
+            user_id=context.user_id,
+            question=question,
+            dataset_id=dataset_id,
+            group_by=group_by,
+            metrics=metrics,
+            period_start=str(tool_input.get("period_start") or "").strip() or None,
+            period_end=str(tool_input.get("period_end") or "").strip() or None,
+            thread_id=context.thread_id,
+            tool_call_id=str(context.metadata.get("tool_call_id") or "") or None,
+            max_rows=limit,
+        )
+    )
+    if not result.accepted:
+        raise ToolRegistryError(result.rejection_reason or "Typed aggregate query was rejected.")
+    findings = [
+        {
+            "type": "typed_aggregate_result",
+            "summary": f"Typed aggregate retrieval returned {len(result.rows)} row(s).",
+            "query_id": result.query_id,
+            "row_count": len(result.rows),
+            "rows": result.rows,
+        }
+    ]
+    sources: list[ToolSourceRef] = []
+    seen_dataset_ids: set[str] = set()
+    for row in result.rows:
+        dataset_id_value = str(row.get("dataset_id") or "")
+        if not dataset_id_value or dataset_id_value in seen_dataset_ids:
+            continue
+        seen_dataset_ids.add(dataset_id_value)
+        aggregate_provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
+        sources.append(
+            ToolSourceRef(
+                source_kind="founder_dataset",
+                source_id=dataset_id_value,
+                label="Typed aggregate dataset",
+                metadata={
+                    "query_id": result.query_id,
+                    "period_start": row.get("period_start"),
+                    "period_end": row.get("period_end"),
+                    "aggregate": row.get("aggregate") or {},
+                    "provenance": aggregate_provenance,
+                },
+            )
+        )
+    return _agent_result_envelope(
+        summary=f"Typed aggregate retrieval returned {len(result.rows)} row(s).",
+        findings=findings,
+        sources=sources,
+        extra={
+            "query_id": result.query_id,
+            "query_surface": "founder_dataset_rows",
+            "row_count": len(result.rows),
+            "row_limit": limit,
+            "truncated": len(result.rows) >= limit,
             "execution_ms": result.execution_ms,
         },
     )

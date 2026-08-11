@@ -252,6 +252,7 @@ def test_native_granular_surface_compiles_mode_b_and_worker_grants_on_one_server
     assert compiled.options.agents["structured_data_agent"].tools == [
         "mcp__architectos__list_founder_datasets",
         "mcp__architectos__get_dataset_periods",
+        "mcp__architectos__aggregate_founder_dataset",
         "mcp__architectos__run_structured_query",
     ]
     assert compiled.options.agents["per_user_wiki"].tools == [

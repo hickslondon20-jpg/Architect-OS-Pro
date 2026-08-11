@@ -26,6 +26,7 @@ NATIVE_GRANULAR_AGENT_TOOL_GRANTS: dict[str, tuple[str, ...]] = {
     "structured_data_agent": (
         "list_founder_datasets",
         "get_dataset_periods",
+        "aggregate_founder_dataset",
         "run_structured_query",
     ),
     "per_user_wiki": (

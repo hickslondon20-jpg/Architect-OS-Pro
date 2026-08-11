@@ -7,12 +7,15 @@ from typing import Any
 import pytest
 
 from services.structured_query import (
+    AggregateMetricRequest,
     APPROVED_SURFACES,
     StructuredQueryError,
     StructuredQueryRequest,
     StructuredQueryResult,
     StructuredQueryService,
+    TypedAggregateRequest,
     validate_structured_sql,
+    validate_typed_aggregate,
 )
 from services.tool_registry import ToolExecutionContext, ToolRegistry
 
@@ -125,7 +128,7 @@ def _row(index: int, *, normalized: bool = True) -> dict[str, Any]:
 
 def test_structured_tool_contracts_and_authority_descriptions() -> None:
     registry = ToolRegistry()
-    for name in ("list_founder_datasets", "get_dataset_periods", "run_structured_query"):
+    for name in ("list_founder_datasets", "get_dataset_periods", "aggregate_founder_dataset", "run_structured_query"):
         definition = registry.get(name)
         assert definition.persistence_semantics == "read_only"
         assert definition.citation["source_kind"] == "founder_dataset"
@@ -262,66 +265,146 @@ def test_run_structured_query_validates_before_service_and_returns_agent_result(
     assert result.sources[0].source_id == _dataset()["id"]
 
 
-def test_aggregate_query_shape_validates_with_whitelisted_group_and_function() -> None:
-    validated = validate_structured_sql(
-        (
-            "select period_start, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue, "
-            "count(*) as row_count from founder_dataset_rows "
-            f"where dataset_id = '{_dataset()['id']}' group by period_start order by period_start limit 10"
+def test_aggregate_founder_dataset_uses_typed_service_and_returns_agent_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class _Service:
+        def __init__(self, store: Any) -> None:
+            captured["store"] = store
+
+        def execute_typed_aggregate(self, payload: Any) -> StructuredQueryResult:
+            captured["payload"] = payload
+            return StructuredQueryResult(
+                accepted=True,
+                status="executed",
+                query_id="query-1",
+                rows=[
+                    {
+                        "dataset_id": _dataset()["id"],
+                        "entity_name": "Client A",
+                        "sum_revenue_usd": 1000,
+                        "period_start": "2026-01-01",
+                        "period_end": "2026-01-31",
+                        "aggregate": {
+                            "group_by": ["entity_name"],
+                            "functions": [
+                                {
+                                    "function": "sum",
+                                    "value_key": "revenue_usd",
+                                    "alias": "sum_revenue_usd",
+                                    "contributing_row_count": 1,
+                                }
+                            ],
+                        },
+                        "provenance": {"provenance_kind": "aggregate_inputs"},
+                    }
+                ],
+                execution_ms=12,
+            )
+
+    monkeypatch.setattr("services.structured_query.StructuredQueryService", _Service)
+    client = _Client({})
+    result = ToolRegistry(supabase_client=client).execute(
+        "aggregate_founder_dataset",
+        _context(client),
+        {
+            "dataset_id": _dataset()["id"],
+            "group_by": ["client"],
+            "metrics": [{"function": "sum", "value_key": "revenue_usd"}],
+            "period_start": "2026-01-01",
+            "period_end": "2026-01-31",
+            "limit": 5,
+        },
+    )
+
+    structured = result.content["structured_result"]
+    assert structured["schema_version"] == "agent_result_v1"
+    assert structured["query_id"] == "query-1"
+    assert structured["row_count"] == 1
+    assert captured["payload"].user_id == "founder-1"
+    assert captured["payload"].group_by == ["client"]
+    assert captured["payload"].metrics[0] == AggregateMetricRequest(function="sum", value_key="revenue_usd")
+    assert result.sources[0].source_id == _dataset()["id"]
+
+
+def test_aggregate_sql_front_door_is_retired() -> None:
+    with pytest.raises(StructuredQueryError, match="Query shape is not approved"):
+        validate_structured_sql(
+            (
+                "select period_start, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
+                "from founder_dataset_rows group by period_start limit 10"
+            )
+        )
+
+
+def test_typed_aggregate_validates_client_dimension_and_metrics() -> None:
+    validated = validate_typed_aggregate(
+        TypedAggregateRequest(
+            user_id="founder-1",
+            question="Revenue by client",
+            dataset_id=_dataset()["id"],
+            group_by=["client"],
+            metrics=[
+                AggregateMetricRequest(function="sum", value_key="revenue_usd"),
+                AggregateMetricRequest(function="count", value_key=None),
+            ],
+            period_start="2026-06-01",
+            period_end="2026-06-30",
+            max_rows=10,
         )
     )
 
     assert validated["query_kind"] == "aggregate"
-    assert validated["group_by"] == ["period_start"]
+    assert validated["requested_group_by"] == ["client"]
+    assert validated["group_by"] == ["entity_name"]
+    assert validated["filters"] == {"dataset_id": _dataset()["id"]}
+    assert validated["range_filters"] == {"period_start": "2026-06-01", "period_end": "2026-06-30"}
     assert validated["aggregates"] == [
-        {"function": "sum", "value_key": "revenue_usd", "alias": "total_revenue"},
+        {"function": "sum", "value_key": "revenue_usd", "alias": "sum_revenue_usd"},
         {"function": "count", "value_key": None, "alias": "row_count"},
     ]
-    assert validated["filters"] == {"dataset_id": _dataset()["id"]}
 
 
-def test_aggregate_query_shape_allows_client_dimension_without_retrieving_percentages() -> None:
-    validated = validate_structured_sql(
+@pytest.mark.parametrize(
+    "payload, message",
+    [
         (
-            "select period_start, client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
-            "from founder_dataset_rows group by period_start, client_name order by period_start limit 25"
-        )
-    )
-
-    assert validated["query_kind"] == "aggregate"
-    assert validated["group_by"] == ["period_start", "client_name"]
-    assert validated["aggregates"] == [
-        {"function": "sum", "value_key": "revenue_usd", "alias": "total_revenue"}
-    ]
-
-
-def test_aggregate_query_shape_accepts_multiline_order_after_client_group() -> None:
-    validated = validate_structured_sql(
+            TypedAggregateRequest(
+                user_id="founder-1",
+                question="Bad group",
+                dataset_id=_dataset()["id"],
+                group_by=["client_name_typo"],
+                metrics=[AggregateMetricRequest(function="sum", value_key="revenue_usd")],
+            ),
+            "group_by value is not approved",
+        ),
         (
-            "select client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
-            "from founder_dataset_rows where period_start = '2026-06-01' group by client_name\n"
-            "order by total_revenue desc limit 10"
-        )
-    )
-
-    assert validated["filters"]["period_start"] == "2026-06-01"
-    assert validated["group_by"] == ["client_name"]
-    assert validated["order_column"] == "total_revenue"
-    assert validated["order_desc"] is True
-
-
-def test_aggregate_query_shape_accepts_cast_syntax_for_same_whitelisted_value_key() -> None:
-    validated = validate_structured_sql(
+            TypedAggregateRequest(
+                user_id="founder-1",
+                question="Bad value",
+                dataset_id=_dataset()["id"],
+                group_by=["client"],
+                metrics=[AggregateMetricRequest(function="sum", value_key="margin_pct")],
+            ),
+            "value_key is not approved",
+        ),
         (
-            "select client_name, sum(cast(normalized_values->>'revenue_usd' as numeric)) as total_revenue "
-            "from founder_dataset_rows group by client_name order by total_revenue desc limit 10"
-        )
-    )
-
-    assert validated["group_by"] == ["client_name"]
-    assert validated["aggregates"] == [
-        {"function": "sum", "value_key": "revenue_usd", "alias": "total_revenue"}
-    ]
+            TypedAggregateRequest(
+                user_id="founder-1",
+                question="Bad function",
+                dataset_id=_dataset()["id"],
+                group_by=["client"],
+                metrics=[AggregateMetricRequest(function="ratio", value_key="revenue_usd")],
+            ),
+            "function is not approved",
+        ),
+    ],
+)
+def test_typed_aggregate_rejects_invalid_enum_values(payload: TypedAggregateRequest, message: str) -> None:
+    with pytest.raises(StructuredQueryError, match=message):
+        validate_typed_aggregate(payload)
 
 
 @pytest.mark.parametrize(
@@ -335,12 +418,12 @@ def test_aggregate_query_shape_accepts_cast_syntax_for_same_whitelisted_value_ke
         (
             "select created_at, sum(normalized_values->>'revenue_usd') as total_revenue "
             "from founder_dataset_rows group by created_at",
-            "GROUP BY column is not approved",
+            "Query shape is not approved",
         ),
         (
             "select period_start, sum(values->>'revenue_usd') as total_revenue "
             "from founder_dataset_rows group by period_start",
-            "Only approved aggregate expressions",
+            "Query shape is not approved",
         ),
     ],
 )
@@ -365,21 +448,22 @@ def test_structured_query_service_executes_aggregate_with_input_provenance() -> 
     )
     service = StructuredQueryService(SimpleNamespace(client=client))
 
-    result = service.execute(
-        StructuredQueryRequest(
+    result = service.execute_typed_aggregate(
+        TypedAggregateRequest(
             user_id="founder-1",
             question="Revenue by month",
-            generated_sql=(
-                "select period_start, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue, "
-                "count(*) as row_count "
-                f"from founder_dataset_rows where dataset_id = '{_dataset()['id']}' "
-                "group by period_start order by period_start limit 5"
-            ),
+            dataset_id=_dataset()["id"],
+            group_by=["period_start"],
+            metrics=[
+                AggregateMetricRequest(function="sum", value_key="revenue_usd"),
+                AggregateMetricRequest(function="count", value_key=None),
+            ],
+            max_rows=5,
         )
     )
 
     assert result.accepted is True
-    assert [row["total_revenue"] for row in result.rows] == [1000, 2000, 3000]
+    assert [row["sum_revenue_usd"] for row in result.rows] == [1000, 2000, 3000]
     assert [row["row_count"] for row in result.rows] == [2, 1, 1]
     assert result.rows[0]["provenance"]["provenance_kind"] == "aggregate_inputs"
     assert result.rows[0]["provenance"]["dataset_ids"] == [_dataset()["id"]]
@@ -415,24 +499,24 @@ def test_structured_query_service_groups_aggregate_by_client_provenance_dimensio
     )
     service = StructuredQueryService(SimpleNamespace(client=client))
 
-    result = service.execute(
-        StructuredQueryRequest(
+    result = service.execute_typed_aggregate(
+        TypedAggregateRequest(
             user_id="founder-1",
             question="Revenue by client",
-            generated_sql=(
-                "select client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
-                "from founder_dataset_rows group by client_name order by total_revenue desc limit 5"
-            ),
+            dataset_id=_dataset()["id"],
+            group_by=["client"],
+            metrics=[AggregateMetricRequest(function="sum", value_key="revenue_usd")],
+            max_rows=5,
         )
     )
 
     assert result.accepted is True
-    assert [(row["client_name"], row["total_revenue"]) for row in result.rows] == [
-        ("Client B", 4000),
+    assert sorted((row["entity_name"], row["sum_revenue_usd"]) for row in result.rows) == [
         ("Client A", 3000),
+        ("Client B", 4000),
     ]
-    assert result.rows[0]["aggregate"]["group_by"] == ["client_name"]
-    assert result.rows[0]["provenance"]["group_by"] == ["client_name"]
+    assert result.rows[0]["aggregate"]["group_by"] == ["entity_name"]
+    assert result.rows[0]["provenance"]["group_by"] == ["entity_name"]
 
 
 def test_run_structured_query_does_not_invoke_service_for_invalid_sql(
@@ -463,6 +547,9 @@ def test_structured_query_surface_refusal_names_the_approved_surfaces() -> None:
 
 def test_run_structured_query_description_limits_when_it_is_appropriate() -> None:
     definition = ToolRegistry().get("run_structured_query")
+    aggregate_definition = ToolRegistry().get("aggregate_founder_dataset")
 
-    assert "aggregation across many rows" in definition.description
-    assert "complete, untruncated bounded read" in definition.description
+    assert "Use only for bounded row reads" in definition.description
+    assert "use aggregate_founder_dataset" in definition.description
+    assert "use group_by value 'client'" in aggregate_definition.description
+    assert "entity_name carries the client name" in aggregate_definition.description

@@ -40,15 +40,22 @@ BASE_ROW_COLUMNS = {
 VIEW_ONLY_COLUMNS = {"dataset_name", "dataset_type", "table_key", "table_label"}
 APPROVED_COLUMNS = BASE_ROW_COLUMNS | VIEW_ONLY_COLUMNS
 AGGREGATE_FUNCTIONS = {"sum", "count", "avg", "min", "max"}
-AGGREGATE_GROUP_COLUMNS = {
-    "dataset_id",
-    "table_id",
-    "period_start",
-    "period_end",
-    "period_grain",
-    "entity_name",
-    "client_name",
-    "row_label",
+AGGREGATE_VALUE_KEYS = {
+    "revenue_usd",
+    "delivery_cost_usd",
+    "net_revenue",
+    "net_income",
+}
+AGGREGATE_GROUP_ENUM = {
+    "dataset_id": "dataset_id",
+    "table_id": "table_id",
+    "period_start": "period_start",
+    "period_end": "period_end",
+    "period_grain": "period_grain",
+    "client": "entity_name",
+    "client_name": "entity_name",
+    "entity_name": "entity_name",
+    "row_label": "row_label",
 }
 AGGREGATE_SOURCE_COLUMNS = (
     "id,dataset_id,table_id,row_label,period_start,period_end,period_grain,"
@@ -77,25 +84,6 @@ SQL_RE = re.compile(
     r"(?:\s+limit\s+(?P<limit>\d+))?\s*$",
     re.IGNORECASE | re.DOTALL,
 )
-AGGREGATE_SQL_RE = re.compile(
-    r"^\s*select\s+(?P<select>.+?)\s+from\s+(?:(?:public)\.)?(?P<surface>[a-z_][a-z0-9_]*)"
-    r"(?:\s+where\s+(?P<where>.*?))?(?:\s+group\s+by\s+(?P<group>.*?))?"
-    r"(?:\s+order\s+by\s+(?P<order>[a-z_][a-z0-9_]*(?:\s+(?:asc|desc))?))?"
-    r"(?:\s+limit\s+(?P<limit>\d+))?\s*$",
-    re.IGNORECASE | re.DOTALL,
-)
-AGGREGATE_EXPR_RE = re.compile(
-    r"^(?P<function>sum|count|avg|min|max)\s*\(\s*(?P<arg>\*|"
-    r"\(?\s*normalized_values\s*->>\s*'(?P<key>[a-z_][a-z0-9_]*)'\s*\)?"
-    r"(?:\s*::\s*(?:numeric|decimal|double\s+precision|real|integer|bigint))?)\s*\)"
-    r"(?:\s+as\s+(?P<alias>[a-z_][a-z0-9_]*))?$",
-    re.IGNORECASE,
-)
-CAST_AGGREGATE_ARG_RE = re.compile(
-    r"cast\s*\(\s*\(?\s*normalized_values\s*->>\s*'(?P<key>[a-z_][a-z0-9_]*)'\s*\)?"
-    r"\s+as\s+(?:numeric|decimal|double\s+precision|real|integer|bigint)\s*\)",
-    re.IGNORECASE,
-)
 EQUALITY_RE = re.compile(
     r"\b(?P<column>dataset_id|table_id|period_start|period_end|period_grain|entity_name|row_label)\s*=\s*'(?P<value>[^']*)'",
     re.IGNORECASE,
@@ -107,6 +95,26 @@ class StructuredQueryRequest:
     user_id: str
     question: str
     generated_sql: str
+    thread_id: str | None = None
+    tool_call_id: str | None = None
+    max_rows: int = 25
+
+
+@dataclass(frozen=True)
+class AggregateMetricRequest:
+    function: str
+    value_key: str | None = None
+
+
+@dataclass(frozen=True)
+class TypedAggregateRequest:
+    user_id: str
+    question: str
+    dataset_id: str
+    group_by: list[str]
+    metrics: list[AggregateMetricRequest]
+    period_start: str | None = None
+    period_end: str | None = None
     thread_id: str | None = None
     tool_call_id: str | None = None
     max_rows: int = 25
@@ -183,6 +191,55 @@ class StructuredQueryService:
             execution_ms=execution_ms,
         )
 
+    def execute_typed_aggregate(self, payload: TypedAggregateRequest) -> StructuredQueryResult:
+        validated = validate_typed_aggregate(payload)
+        query_id = self._create_audit(
+            StructuredQueryRequest(
+                user_id=payload.user_id,
+                question=payload.question,
+                generated_sql="typed:aggregate_founder_dataset",
+                thread_id=payload.thread_id,
+                tool_call_id=payload.tool_call_id,
+                max_rows=payload.max_rows,
+            )
+        )
+        started = time.perf_counter()
+        try:
+            rows = self._execute_aggregate(payload.user_id, validated)
+        except Exception as exc:
+            message = str(exc)
+            self._update_audit(query_id, payload.user_id, status="failed", rejection_reason=message[:1000])
+            raise StructuredQueryError(f"Typed aggregate execution failed: {message}") from exc
+
+        execution_ms = int((time.perf_counter() - started) * 1000)
+        self._update_audit(
+            query_id,
+            payload.user_id,
+            status="executed",
+            approved_query_surface=validated["surface"],
+            execution_ms=execution_ms,
+            row_count=len(rows),
+            metadata={
+                "limit": validated["limit"],
+                "filters": validated["filters"],
+                "range_filters": validated.get("range_filters", {}),
+                "query_kind": "typed_aggregate",
+                "aggregate": {
+                    "requested_group_by": validated.get("requested_group_by", []),
+                    "group_by": validated.get("group_by", []),
+                    "aggregates": validated.get("aggregates", []),
+                },
+            },
+        )
+        self._store_result(query_id, payload.user_id, rows)
+        return StructuredQueryResult(
+            accepted=True,
+            status="executed",
+            query_id=query_id,
+            rows=rows,
+            execution_ms=execution_ms,
+        )
+
     def _execute_validated(self, user_id: str, validated: dict[str, Any]) -> list[dict[str, Any]]:
         if validated.get("query_kind") == "aggregate":
             return self._execute_aggregate(user_id, validated)
@@ -210,6 +267,11 @@ class StructuredQueryService:
         )
         for column, value in validated["filters"].items():
             query = query.eq(column, value)
+        range_filters = validated.get("range_filters") or {}
+        if range_filters.get("period_start"):
+            query = query.gte("period_end", range_filters["period_start"])
+        if range_filters.get("period_end"):
+            query = query.lte("period_start", range_filters["period_end"])
         response = query.execute()
         source_rows = list(response.data or [])
         if len(source_rows) > AGGREGATE_SOURCE_ROW_CAP:
@@ -314,9 +376,6 @@ def validate_structured_sql(sql: str, *, max_rows: int = 25) -> dict[str, Any]:
 
     match = SQL_RE.match(cleaned)
     if not match:
-        aggregate = _parse_aggregate_query(cleaned, max_rows=max_rows)
-        if aggregate:
-            return aggregate
         raise StructuredQueryError("Query shape is not approved for structured dataset reads.")
 
     surface = match.group("surface").lower()
@@ -341,59 +400,67 @@ def validate_structured_sql(sql: str, *, max_rows: int = 25) -> dict[str, Any]:
     }
 
 
-def _parse_aggregate_query(sql: str, *, max_rows: int) -> dict[str, Any] | None:
-    if not re.search(r"\b(sum|count|avg|min|max)\s*\(", sql, flags=re.IGNORECASE):
-        return None
-    match = AGGREGATE_SQL_RE.match(sql)
-    if not match:
-        return None
+def validate_typed_aggregate(payload: TypedAggregateRequest) -> dict[str, Any]:
+    dataset_id = payload.dataset_id.strip()
+    if not dataset_id:
+        raise StructuredQueryError("dataset_id is required.")
+    limit = min(payload.max_rows, 100)
+    if limit < 1:
+        raise StructuredQueryError("limit must be at least 1.")
 
-    surface = match.group("surface").lower()
-    if surface not in APPROVED_SURFACES:
-        approved = ", ".join(sorted(APPROVED_SURFACES))
-        raise StructuredQueryError(
-            f"Query references an unapproved dataset surface. Approved surfaces: {approved}."
-        )
+    group_by: list[str] = []
+    requested_group_by: list[str] = []
+    for raw_group in payload.group_by:
+        requested = str(raw_group or "").strip()
+        mapped = AGGREGATE_GROUP_ENUM.get(requested)
+        if not mapped:
+            raise StructuredQueryError(f"Aggregate group_by value is not approved: {requested}")
+        requested_group_by.append(requested)
+        group_by.append(mapped)
+    if len(set(group_by)) != len(group_by):
+        raise StructuredQueryError("Aggregate group_by values must be unique after mapping.")
 
-    select_items = _split_sql_list(match.group("select"))
-    raw_group_by, leaked_order = _split_leaked_order(match.group("group") or "")
-    raw_order = match.group("order") or leaked_order
-    group_by = _parse_group_by(raw_group_by)
-    group_selects: list[str] = []
+    if not payload.metrics:
+        raise StructuredQueryError("At least one aggregate metric is required.")
+    if len(payload.metrics) > 5:
+        raise StructuredQueryError("Typed aggregate queries may request at most five metrics.")
+
     aggregates: list[dict[str, Any]] = []
-    for item in select_items:
-        column = item.strip().split(".")[-1].lower()
-        if column in AGGREGATE_GROUP_COLUMNS:
-            group_selects.append(column)
-            continue
-        aggregate = _parse_aggregate_expr(item)
-        if aggregate:
-            aggregates.append(aggregate)
-            continue
-        raise StructuredQueryError("Only approved aggregate expressions and group columns may be selected.")
+    seen_aliases: set[str] = set()
+    for metric in payload.metrics:
+        function = str(metric.function or "").strip().lower()
+        value_key = str(metric.value_key).strip() if metric.value_key is not None else None
+        if function not in AGGREGATE_FUNCTIONS:
+            raise StructuredQueryError(f"Aggregate function is not approved: {function}")
+        if function == "count" and value_key in {"", "*"}:
+            value_key = None
+        if function != "count" and not value_key:
+            raise StructuredQueryError(f"{function} requires an approved value_key.")
+        if value_key is not None and value_key not in AGGREGATE_VALUE_KEYS:
+            raise StructuredQueryError(f"Aggregate value_key is not approved: {value_key}")
+        alias = _aggregate_alias(function, value_key)
+        if alias in seen_aliases:
+            raise StructuredQueryError(f"Duplicate aggregate metric requested: {alias}")
+        seen_aliases.add(alias)
+        aggregates.append({"function": function, "value_key": value_key, "alias": alias})
 
-    if not aggregates:
-        raise StructuredQueryError("Aggregate query must select at least one approved aggregate.")
-    if group_selects != group_by:
-        raise StructuredQueryError("Selected group columns must exactly match GROUP BY columns in order.")
-    if len(aggregates) > 5:
-        raise StructuredQueryError("Aggregate queries may select at most five aggregate expressions.")
-
-    limit = min(int(match.group("limit") or max_rows), max(1, max_rows))
-    filters = _parse_filters(match.group("where") or "")
-    order_column, order_desc = _parse_aggregate_order(
-        raw_order,
-        group_by=group_by,
-        aggregate_aliases={aggregate["alias"] for aggregate in aggregates},
-    )
     return {
-        "surface": surface,
+        "surface": "founder_dataset_rows",
         "query_kind": "aggregate",
         "columns": [],
         "limit": limit,
-        "filters": filters,
-        "order_column": order_column,
-        "order_desc": order_desc,
+        "filters": {"dataset_id": dataset_id},
+        "range_filters": {
+            key: value
+            for key, value in {
+                "period_start": payload.period_start,
+                "period_end": payload.period_end,
+            }.items()
+            if value
+        },
+        "order_column": None,
+        "order_desc": False,
+        "requested_group_by": requested_group_by,
         "group_by": group_by,
         "aggregates": aggregates,
     }
@@ -443,99 +510,8 @@ def _parse_order(order_clause: str | None) -> tuple[str | None, bool]:
     return column, len(parts) > 1 and parts[1] == "desc"
 
 
-def _split_sql_list(raw: str) -> list[str]:
-    items: list[str] = []
-    current: list[str] = []
-    depth = 0
-    quote: str | None = None
-    for char in raw:
-        if quote:
-            current.append(char)
-            if char == quote:
-                quote = None
-            continue
-        if char in {"'", '"'}:
-            quote = char
-            current.append(char)
-            continue
-        if char == "(":
-            depth += 1
-        elif char == ")" and depth:
-            depth -= 1
-        if char == "," and depth == 0:
-            item = "".join(current).strip()
-            if item:
-                items.append(item)
-            current = []
-            continue
-        current.append(char)
-    item = "".join(current).strip()
-    if item:
-        items.append(item)
-    return items
-
-
-def _split_leaked_order(raw_group_by: str) -> tuple[str, str | None]:
-    match = re.search(r"\border\s+by\b", raw_group_by, flags=re.IGNORECASE)
-    if not match:
-        return raw_group_by, None
-    return raw_group_by[: match.start()].strip(), raw_group_by[match.end() :].strip()
-
-
-def _parse_group_by(raw_group_by: str) -> list[str]:
-    if not raw_group_by.strip():
-        return []
-    columns = [item.strip().split(".")[-1].lower() for item in _split_sql_list(raw_group_by)]
-    rejected = [column for column in columns if column not in AGGREGATE_GROUP_COLUMNS]
-    if rejected:
-        raise StructuredQueryError(f"GROUP BY column is not approved: {rejected[0]}")
-    if len(set(columns)) != len(columns):
-        raise StructuredQueryError("GROUP BY columns must be unique.")
-    return columns
-
-
-def _parse_aggregate_expr(raw_expr: str) -> dict[str, Any] | None:
-    normalized_expr = CAST_AGGREGATE_ARG_RE.sub(
-        lambda match: f"normalized_values->>'{match.group('key')}'", raw_expr.strip()
-    )
-    match = AGGREGATE_EXPR_RE.match(normalized_expr)
-    if not match:
-        return None
-    function = match.group("function").lower()
-    value_key = match.group("key")
-    if function not in AGGREGATE_FUNCTIONS:
-        raise StructuredQueryError(f"Aggregate function is not approved: {function}")
-    if function != "count" and not value_key:
-        raise StructuredQueryError(f"{function} requires a normalized_values field.")
-    if function == "count" and match.group("arg") != "*" and not value_key:
-        raise StructuredQueryError("count may target '*' or a normalized_values field.")
-    alias = (match.group("alias") or _aggregate_alias(function, value_key)).lower()
-    if alias in APPROVED_COLUMNS or alias in {"user_id", "provenance", "aggregate"}:
-        raise StructuredQueryError("Aggregate alias conflicts with a reserved output field.")
-    return {
-        "function": function,
-        "value_key": value_key,
-        "alias": alias,
-    }
-
-
 def _aggregate_alias(function: str, value_key: str | None) -> str:
     return "row_count" if function == "count" and not value_key else f"{function}_{value_key}"
-
-
-def _parse_aggregate_order(
-    order_clause: str | None,
-    *,
-    group_by: list[str],
-    aggregate_aliases: set[str],
-) -> tuple[str | None, bool]:
-    if not order_clause:
-        return None, False
-    parts = order_clause.lower().split()
-    column = parts[0]
-    if column not in set(group_by) | aggregate_aliases:
-        raise StructuredQueryError("ORDER BY column is not approved for aggregate queries.")
-    return column, len(parts) > 1 and parts[1] == "desc"
 
 
 def _compute_aggregate(rows: list[dict[str, Any]], aggregate: dict[str, Any]) -> int | float | None:

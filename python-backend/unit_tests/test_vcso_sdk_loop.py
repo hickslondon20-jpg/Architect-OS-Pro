@@ -564,6 +564,7 @@ class _Registry:
                 "ask_user",
                 "execute_code",
                 "get_dataset_periods",
+                "aggregate_founder_dataset",
                 "list_founder_datasets",
                 "run_structured_query",
                 "wiki_get_page",
@@ -1208,6 +1209,7 @@ def test_native_model_driven_worker_uses_in_process_grants_and_lifecycle_hooks(m
         assert agent.tools == [
             "mcp__architectos__list_founder_datasets",
             "mcp__architectos__get_dataset_periods",
+            "mcp__architectos__aggregate_founder_dataset",
             "mcp__architectos__run_structured_query",
         ]
         assert agent.mcpServers == ["architectos"]
@@ -1905,6 +1907,7 @@ def test_deep_ask_user_defers_after_buffering_answer_and_wires_session_store(mon
             allowed_tools=[
                 "list_founder_datasets",
                 "get_dataset_periods",
+                "aggregate_founder_dataset",
                 "run_structured_query",
             ],
             default_config={"max_rounds": 2},
