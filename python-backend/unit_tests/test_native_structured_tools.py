@@ -306,11 +306,17 @@ def test_aggregate_query_shape_rejects_non_whitelisted_shapes(sql: str, message:
 
 
 def test_structured_query_service_executes_aggregate_with_input_provenance() -> None:
+    non_contributing_row = {
+        **_row(1),
+        "id": "00000000-0000-0000-0000-000000000901",
+        "normalized_values": {"net_revenue": 45000},
+        "provenance": {"sheet": "P&L", "row": "seed-marker"},
+    }
     client = _Client(
         {
             "founder_dataset_queries": [{"id": "query-1"}],
             "founder_dataset_query_results": [],
-            "founder_dataset_rows": [_row(1), _row(2), _row(3)],
+            "founder_dataset_rows": [_row(1), non_contributing_row, _row(2), _row(3)],
         }
     )
     service = StructuredQueryService(SimpleNamespace(client=client))
@@ -320,7 +326,8 @@ def test_structured_query_service_executes_aggregate_with_input_provenance() -> 
             user_id="founder-1",
             question="Revenue by month",
             generated_sql=(
-                "select period_start, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
+                "select period_start, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue, "
+                "count(*) as row_count "
                 f"from founder_dataset_rows where dataset_id = '{_dataset()['id']}' "
                 "group by period_start order by period_start limit 5"
             ),
@@ -329,9 +336,14 @@ def test_structured_query_service_executes_aggregate_with_input_provenance() -> 
 
     assert result.accepted is True
     assert [row["total_revenue"] for row in result.rows] == [1000, 2000, 3000]
+    assert [row["row_count"] for row in result.rows] == [2, 1, 1]
     assert result.rows[0]["provenance"]["provenance_kind"] == "aggregate_inputs"
     assert result.rows[0]["provenance"]["dataset_ids"] == [_dataset()["id"]]
-    assert result.rows[0]["provenance"]["source_row_count"] == 1
+    assert result.rows[0]["provenance"]["rows_in_scope_count"] == 2
+    assert result.rows[0]["provenance"]["source_row_count"] == 2
+    assert result.rows[0]["aggregate"]["functions"][0]["contributing_row_count"] == 1
+    assert result.rows[0]["provenance"]["aggregates"][0]["contributing_row_count"] == 1
+    assert result.rows[0]["provenance"]["aggregates"][1]["contributing_row_count"] == 2
     row_call = next(operations for table, operations in client.calls if table == "founder_dataset_rows")
     assert ("eq", ("user_id", "founder-1")) in row_call
     assert ("eq", ("dataset_id", _dataset()["id"])) in row_call

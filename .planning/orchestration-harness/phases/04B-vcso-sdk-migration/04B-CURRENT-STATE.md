@@ -222,6 +222,14 @@ New findings go here, dated, one line each. **Do not open new amendment sections
   dataset-grain surface was `list_founder_datasets`, while aggregate reads need input provenance
   (`dataset_ids`, period range, source row count, group columns, aggregate functions) because grouping
   destroys row-level provenance.
+- 2026-08-10 - **Step 5 aggregate provenance has a count-semantics footnote.** June has six period rows
+  across the founder's structured datasets, but only five client-level rows carry `revenue_usd` /
+  `delivery_cost_usd`; founder-facing citations should distinguish rows in scope from rows contributing so
+  "5 source rows" does not imply "all rows."
+- 2026-08-10 - **Step 5 exposed a free Step 7 validator input.** Northlight aggregate row provenance
+  carries `seeded=true`, `source=probe_seed_data`, and `real_founder_supplied=false`; semantic validation
+  should flag founder-facing answers that cite non-founder-supplied/probe data without saying so before
+  beta exposure.
 
 ---
 

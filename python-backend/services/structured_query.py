@@ -229,6 +229,7 @@ class StructuredQueryService:
                         "function": aggregate["function"],
                         "value_key": aggregate.get("value_key"),
                         "alias": aggregate["alias"],
+                        "contributing_row_count": _aggregate_contribution_count(rows, aggregate),
                     }
                     for aggregate in validated["aggregates"]
                 ],
@@ -543,6 +544,14 @@ def _compute_aggregate(rows: list[dict[str, Any]], aggregate: dict[str, Any]) ->
     raise StructuredQueryError(f"Aggregate function is not approved: {function}")
 
 
+def _aggregate_contribution_count(rows: list[dict[str, Any]], aggregate: dict[str, Any]) -> int:
+    if aggregate["function"] == "count" and not aggregate.get("value_key"):
+        return len(rows)
+    return sum(
+        1 for row in rows if _numeric_value(row, str(aggregate.get("value_key"))) is not None
+    )
+
+
 def _numeric_value(row: dict[str, Any], key: str) -> Decimal | None:
     values = row.get("normalized_values")
     if not isinstance(values, dict) or key not in values or values.get(key) in (None, ""):
@@ -584,6 +593,7 @@ def _aggregate_provenance(
         "period_start": min(period_starts) if period_starts else None,
         "period_end": max(period_ends) if period_ends else None,
         "period_grains": period_grains,
+        "rows_in_scope_count": len(rows),
         "source_row_count": len(rows),
         "source_row_ids": [row.get("id") for row in rows[:100] if row.get("id")],
         "source_row_ids_truncated": len(rows) > 100,
@@ -593,6 +603,7 @@ def _aggregate_provenance(
                 "function": aggregate["function"],
                 "value_key": aggregate.get("value_key"),
                 "alias": aggregate["alias"],
+                "contributing_row_count": _aggregate_contribution_count(rows, aggregate),
             }
             for aggregate in aggregates
         ],
