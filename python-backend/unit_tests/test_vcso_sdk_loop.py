@@ -634,6 +634,60 @@ def _consume(generator):
             return events, stop.value
 
 
+def _model_driven_turn(
+    monkeypatch,
+    *,
+    fake_query,
+    required=("structured_data_agent",),
+    store=None,
+    stream_diagnostic_events=None,
+):
+    _capture_sdk_tools(monkeypatch)
+    monkeypatch.setattr(
+        "services.vcso_sdk_config.AgentCapabilityRegistry.list_active",
+        lambda _self: [_native_capability(key) for key in required],
+    )
+    monkeypatch.setattr("services.vcso_sdk_loop._record_post_tool_trace", lambda **_kwargs: None)
+    monkeypatch.setattr("services.vcso_sdk_loop._record_turn_trace", lambda **_kwargs: None)
+    lifecycle_events = []
+    generator = stream_vcso_sdk_turn(
+        prompt="P4 thin-slice prompt",
+        system_prompt="System\n\nRules remain bounded.",
+        model="claude-sonnet-test",
+        api_key="test-key",
+        registry=ToolRegistry(),
+        tool_names=[],
+        tool_context=ToolExecutionContext(
+            user_id="founder-1",
+            store=store or _NoChildrenStore(),
+            thread_id="thread-1",
+            metadata={"surface": "virtual_cso", "parent_run_id": "lead-run"},
+        ),
+        trace_metadata={"run_id": "lead-run"},
+        native_subagent_required_agents=required,
+        native_subagent_scopes={"structured_data_agent": {"founder_dataset_ids": ["dataset-1"]}},
+        native_lifecycle_sink=lifecycle_events.append,
+        native_stream_diagnostic_sink=(
+            stream_diagnostic_events.append if stream_diagnostic_events is not None else None
+        ),
+        native_model_driven=True,
+        query_impl=fake_query,
+    )
+    return generator, lifecycle_events
+
+
+def _delegation_contract(objective):
+    return json.dumps(
+        {
+            "objective": objective,
+            "output_format": "compact_json",
+            "tools_sources": ["founder_dataset"],
+            "boundaries": ["founder isolation", "cite every claim"],
+            "context_scope": {},
+        }
+    )
+
+
 def test_sdk_flag_is_fail_closed_and_founder_scoped():
     client = _FlagClient(error=RuntimeError("unavailable"))
     assert read_sdk_loop_settings(client, "founder-1") == {"enabled": False, "settings": {}}
@@ -1590,8 +1644,7 @@ def test_sdk_stream_capture_drops_token_deltas_but_keeps_agent_tool_start(monkey
         fake_query=fake_query,
         stream_diagnostic_events=diagnostics,
     )
-    with pytest.raises(RuntimeError, match="before required workers completed"):
-        _consume(generator)
+    _consume(generator)
 
     stream_events = [
         event
@@ -1678,7 +1731,7 @@ def test_sdk_stream_capture_records_agent_post_tool_use_failure(monkeypatch):
         fake_query=fake_query,
         stream_diagnostic_events=diagnostics,
     )
-    with pytest.raises(RuntimeError, match="before required workers completed"):
+    with pytest.raises(RuntimeError, match="returned no assistant text"):
         _consume(generator)
 
     failure = next(
@@ -1717,7 +1770,7 @@ def test_cheap_give_up_stops_blocking_a_lead_that_will_not_delegate(monkeypatch)
         )
 
     generator, lifecycle_events = _model_driven_turn(monkeypatch, fake_query=fake_query)
-    with pytest.raises(RuntimeError, match="before required workers completed"):
+    with pytest.raises(RuntimeError, match="returned no assistant text"):
         _consume(generator)
 
     assert [result.get("decision") for result in stop_results] == ["block", "block", None, None]
