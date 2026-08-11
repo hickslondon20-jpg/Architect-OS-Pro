@@ -295,6 +295,35 @@ def test_aggregate_query_shape_allows_client_dimension_without_retrieving_percen
     ]
 
 
+def test_aggregate_query_shape_accepts_multiline_order_after_client_group() -> None:
+    validated = validate_structured_sql(
+        (
+            "select client_name, sum((normalized_values->>'revenue_usd')::numeric) as total_revenue "
+            "from founder_dataset_rows where period_start = '2026-06-01' group by client_name\n"
+            "order by total_revenue desc limit 10"
+        )
+    )
+
+    assert validated["filters"]["period_start"] == "2026-06-01"
+    assert validated["group_by"] == ["client_name"]
+    assert validated["order_column"] == "total_revenue"
+    assert validated["order_desc"] is True
+
+
+def test_aggregate_query_shape_accepts_cast_syntax_for_same_whitelisted_value_key() -> None:
+    validated = validate_structured_sql(
+        (
+            "select client_name, sum(cast(normalized_values->>'revenue_usd' as numeric)) as total_revenue "
+            "from founder_dataset_rows group by client_name order by total_revenue desc limit 10"
+        )
+    )
+
+    assert validated["group_by"] == ["client_name"]
+    assert validated["aggregates"] == [
+        {"function": "sum", "value_key": "revenue_usd", "alias": "total_revenue"}
+    ]
+
+
 @pytest.mark.parametrize(
     "sql, message",
     [

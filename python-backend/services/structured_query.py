@@ -91,7 +91,15 @@ AGGREGATE_EXPR_RE = re.compile(
     r"(?:\s+as\s+(?P<alias>[a-z_][a-z0-9_]*))?$",
     re.IGNORECASE,
 )
-EQUALITY_RE = re.compile(r"\b(?P<column>dataset_id|table_id|period_grain|entity_name|row_label)\s*=\s*'(?P<value>[^']*)'", re.IGNORECASE)
+CAST_AGGREGATE_ARG_RE = re.compile(
+    r"cast\s*\(\s*\(?\s*normalized_values\s*->>\s*'(?P<key>[a-z_][a-z0-9_]*)'\s*\)?"
+    r"\s+as\s+(?:numeric|decimal|double\s+precision|real|integer|bigint)\s*\)",
+    re.IGNORECASE,
+)
+EQUALITY_RE = re.compile(
+    r"\b(?P<column>dataset_id|table_id|period_start|period_end|period_grain|entity_name|row_label)\s*=\s*'(?P<value>[^']*)'",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -348,7 +356,9 @@ def _parse_aggregate_query(sql: str, *, max_rows: int) -> dict[str, Any] | None:
         )
 
     select_items = _split_sql_list(match.group("select"))
-    group_by = _parse_group_by(match.group("group") or "")
+    raw_group_by, leaked_order = _split_leaked_order(match.group("group") or "")
+    raw_order = match.group("order") or leaked_order
+    group_by = _parse_group_by(raw_group_by)
     group_selects: list[str] = []
     aggregates: list[dict[str, Any]] = []
     for item in select_items:
@@ -372,7 +382,7 @@ def _parse_aggregate_query(sql: str, *, max_rows: int) -> dict[str, Any] | None:
     limit = min(int(match.group("limit") or max_rows), max(1, max_rows))
     filters = _parse_filters(match.group("where") or "")
     order_column, order_desc = _parse_aggregate_order(
-        match.group("order"),
+        raw_order,
         group_by=group_by,
         aggregate_aliases={aggregate["alias"] for aggregate in aggregates},
     )
@@ -465,6 +475,13 @@ def _split_sql_list(raw: str) -> list[str]:
     return items
 
 
+def _split_leaked_order(raw_group_by: str) -> tuple[str, str | None]:
+    match = re.search(r"\border\s+by\b", raw_group_by, flags=re.IGNORECASE)
+    if not match:
+        return raw_group_by, None
+    return raw_group_by[: match.start()].strip(), raw_group_by[match.end() :].strip()
+
+
 def _parse_group_by(raw_group_by: str) -> list[str]:
     if not raw_group_by.strip():
         return []
@@ -478,7 +495,10 @@ def _parse_group_by(raw_group_by: str) -> list[str]:
 
 
 def _parse_aggregate_expr(raw_expr: str) -> dict[str, Any] | None:
-    match = AGGREGATE_EXPR_RE.match(raw_expr.strip())
+    normalized_expr = CAST_AGGREGATE_ARG_RE.sub(
+        lambda match: f"normalized_values->>'{match.group('key')}'", raw_expr.strip()
+    )
+    match = AGGREGATE_EXPR_RE.match(normalized_expr)
     if not match:
         return None
     function = match.group("function").lower()
