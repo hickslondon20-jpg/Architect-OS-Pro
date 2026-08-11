@@ -873,7 +873,7 @@ def _sanitized_sdk_error(error: Any) -> dict[str, str]:
 
 
 @lru_cache(maxsize=1)
-def sdk_runtime_versions() -> dict[str, str]:
+def sdk_runtime_versions() -> dict[str, Any]:
     """Read the SDK package and the exact bundled CLI that the SDK will launch."""
 
     try:
@@ -884,6 +884,8 @@ def sdk_runtime_versions() -> dict[str, str]:
     bundled_cli = Path(claude_agent_sdk.__file__).resolve().parent / "_bundled" / cli_name
     cli_version = "unavailable"
     cli_source = "bundled" if bundled_cli.is_file() else "system"
+    cli_error_type = ""
+    cli_error_message = ""
     executable = str(bundled_cli) if bundled_cli.is_file() else "claude"
     try:
         completed = subprocess.run(
@@ -895,12 +897,16 @@ def sdk_runtime_versions() -> dict[str, str]:
         )
         raw_version = (completed.stdout or completed.stderr or "").strip()
         cli_version = raw_version[:120] or "unavailable"
-    except (OSError, subprocess.SubprocessError):
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        details = _sanitized_sdk_error(exc)
+        cli_error_type = details["error_type"]
+        cli_error_message = details["error_message"]
     return {
         "claude_agent_sdk_version": sdk_version[:80],
         "claude_code_cli_version": cli_version,
         "claude_code_cli_source": cli_source,
+        "claude_code_cli_error_type": cli_error_type,
+        "claude_code_cli_error_message": cli_error_message,
     }
 
 

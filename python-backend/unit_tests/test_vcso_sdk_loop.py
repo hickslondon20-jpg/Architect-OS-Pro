@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict, deque
 import json
 import queue
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -144,6 +145,29 @@ def test_sdk_runtime_pin_matches_the_bundled_cli():
     assert status["claude_code_cli_source"] == "bundled"
     assert status["claude_code_cli_version"] == EXPECTED_CLAUDE_CODE_CLI_VERSION
     assert status["ok"] is True
+
+
+def test_sdk_runtime_versions_report_cli_version_failures(monkeypatch):
+    import services.vcso_sdk_loop as sdk_loop
+
+    sdk_loop.sdk_runtime_versions.cache_clear()
+
+    def fail_version(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired("claude", timeout=8)
+
+    monkeypatch.setattr(sdk_loop.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(sdk_loop.subprocess, "run", fail_version)
+
+    versions = sdk_loop.sdk_runtime_versions()
+    status = sdk_loop.sdk_runtime_pin_status()
+
+    assert versions["claude_code_cli_version"] == "unavailable"
+    assert versions["claude_code_cli_error_type"] == "TimeoutExpired"
+    assert "claude" in versions["claude_code_cli_error_message"]
+    assert status["ok"] is False
+    assert status["reason"] == "claude_code_cli_pin_mismatch"
+
+    sdk_loop.sdk_runtime_versions.cache_clear()
 
 
 def test_sdk_tool_executor_returns_bounded_real_exception_identity():
